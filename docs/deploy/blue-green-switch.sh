@@ -86,7 +86,8 @@ is_running() { # container name -> 0/1
 # ==================== 状态探测 ====================
 find_nginx_file() {
   local files f n
-  files="$(grep -rlE "proxy_pass[[:space:]]+http://127\.0\.0\.1:(${PORT_A}|${PORT_B})" $NGINX_SEARCH_PATHS 2>/dev/null \
+  # --exclude 排除本脚本生成的 .bak-* 备份，避免备份文件被计入探测结果
+  files="$(grep -rlE "proxy_pass[[:space:]]+http://127\.0\.0\.1:(${PORT_A}|${PORT_B})" --exclude='*.bak-*' $NGINX_SEARCH_PATHS 2>/dev/null \
     | xargs -r -n1 readlink -f | sort -u)"
   if [ -z "$files" ]; then
     die "N2: 在 $NGINX_SEARCH_PATHS 中未找到含 proxy_pass(3000/3001) 的 Nginx 配置文件。请确认 Nginx 已配置反向代理，或修改 NGINX_SEARCH_PATHS。"
@@ -103,9 +104,12 @@ find_nginx_file() {
   echo "$f"
 }
 
-active_port() { # 当前 Nginx 指向的端口
+active_port() { # 当前 Nginx 指向的端口；探测失败时返回非 0（不输出）
   local f
-  f="$(find_nginx_file)"
+  # 注意：本函数经命令替换调用，子 shell 中 set -e 失效，必须显式传播失败，
+  # 否则 find_nginx_file 的 die 只终止子 shell，父脚本会拿着空值继续执行
+  f="$(find_nginx_file)" || return 1
+  [ -n "$f" ] || return 1
   if grep -qE "proxy_pass[[:space:]]+http://127\.0\.0\.1:${PORT_A}([;[:space:]]|$)" "$f"; then
     echo "$PORT_A"
   else
