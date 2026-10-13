@@ -351,7 +351,7 @@ docker compose build --pull --progress=plain new-api
 
 这个步骤会使用 `/opt/new-api-src` 中的 Dockerfile 和源码构建镜像。官方 Dockerfile 采用多阶段构建，包含前端构建和 Go 后端编译。
 
-首次构建可能需要下载前端、Go 依赖及基础镜像。构建期间如果失败，先保留终端完整报错，不要急着切换回官方镜像，否则就无法验证自己的分支。
+首次构建会依次执行前端依赖安装、前端打包和 Go 编译，对磁盘和内存要求较高（建议磁盘剩余 10GB 以上、内存 2GB 以上；小内存 VPS 上构建可能较慢，必要时可临时增加 swap）。构建期间如果失败，先保留终端完整报错，不要急着切换回官方镜像，否则就无法验证自己的分支。
 
 构建成功后检查镜像：
 
@@ -440,7 +440,7 @@ http://127.0.0.1:13000
 
 ## 第十步：后续更新 zyy 分支
 
-以后在 GitHub 的 zyy 分支提交新代码后，按照这个流程更新部署。
+以后在 GitHub 的 zyy 分支提交新代码后（包括按 [sync-upstream.md](sync-upstream.md) 同步 upstream 产生的 merge commit），按照这个流程更新部署。
 
 先备份数据库，并备份当前镜像：
 
@@ -502,5 +502,17 @@ docker compose up -d --force-recreate new-api
 1. **MySQL 的公网访问权限。** 如果 3306 端口已对外开放，且存在高权限账户，建议将 UFW 的 3306 规则收紧为只允许本机公网 IP 访问，或改用 SSH 隧道管理 MySQL。
 2. **Nginx 和 HTTPS。** 上述步骤完成后，New API 已在宿主机的 3000 端口运行，但尚未完成域名反向代理和 HTTPS 配置。不要把管理员登录、API 密钥等敏感信息长期通过公网明文 HTTP 传输。
 3. **反向代理后的客户端 IP。** Nginx 反向代理后，应用看到的来源 IP 都是 `127.0.0.1`。应用默认信任回环地址并解析 `X-Forwarded-For`（会打印告警日志），如需消除告警并显式声明，可在 `.env` 中设置 `TRUSTED_PROXIES=127.0.0.1`；同时注意基于 IP 的限流与审计日志记录的是代理地址而非真实客户端 IP。
+4. **日志与镜像清理。** 应用每次启动都会新建一个 `oneapi-<时间戳>.log`（无内置轮转），每次更新容器都会新增日志文件；第十步的备份标签也会随更新不断累积镜像。建议定期清理：
+
+```bash
+# 清理 30 天前的日志（可加入 cron）
+find /opt/new-api-logs -name 'oneapi-*.log' -mtime +30 -delete
+
+# 清理悬空镜像
+docker image prune -f
+
+# 备份标签只保留最近 3 个，其余删除
+docker images new-api-zyy:backup-* --format '{{.Tag}}' | sort -r | tail -n +4 | xargs -r -I{} docker rmi "new-api-zyy:{}"
+```
 
 下一步应当根据准备绑定到该服务器的域名，配置 Nginx 反向代理和免费 HTTPS 证书。

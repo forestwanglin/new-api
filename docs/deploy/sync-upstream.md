@@ -45,13 +45,17 @@ git merge main          # 产生一个 "sync upstream xxx" merge commit
 # 解决冲突（应该只出现在定制清单里的文件）
 
 # ④ 回归验证：前端 build + 单测 + 定制清单逐项检查
-cd web && bun install && bun run build && bun test && cd ..
+cd web && bun install && bun run build && bun run test && cd ..
 go build .
 
 # ⑤ 打 tag 并推送
 git tag v1.x.x-fork.1
 git push origin zyy --tags
 ```
+
+注意：`bun run test` 执行的是 `web/package.json` 里的 `test` 脚本（即 `vitest run`）；`bun test` 是 bun 自带测试运行器，不会跑项目的 vitest 用例。
+
+推送后，如果服务器已在运行旧版本，按 [deploy-zyy-branch.md](deploy-zyy-branch.md) 第十步更新部署（备份 → 拉取 → 重建 → 重建容器）。
 
 **merge 还是 rebase？** 推荐 merge（main 合入 zyy）：
 
@@ -69,7 +73,7 @@ rebase 只在"zyy 分支只有你一人用、且强烈要求线性历史"时才�
 
 ## 5. CI 配合
 
-- 现有 `ci.yml` 保留，在 `zyy` 分支上也触发（build + test）。
+- 现有 `ci.yml` 由 `pull_request` 触发，天然覆盖指向 `zyy` 的 PR；直接 push 到 `zyy` 不会跑 CI，建议一律走 PR 合入（同时启用下面的改动面检查）。
 - 加一个轻量检查：`zyy` 分支的 PR 合并前，CI 跑 `git diff main...zyy --name-only`，把改动文件列表贴到 PR 评论里——强制"改动面可视化"，防止定制悄悄扩散。
 - 升级 merge 的 PR 描述里贴定制清单核对结果。
 
