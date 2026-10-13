@@ -442,6 +442,8 @@ http://127.0.0.1:13000
 
 以后在 GitHub 的 zyy 分支提交新代码后（包括按 [sync-upstream.md](sync-upstream.md) 同步 upstream 产生的 merge commit），按照这个流程更新部署。
 
+> 如果线上已有较多用户在使用转发服务、不能接受中断，请改用 [zero-downtime-update.md](zero-downtime-update.md) 的蓝绿切换流程（本流程作为其简化版，适用于无用户或可接受短暂中断的场景）。
+
 先备份数据库，并备份当前镜像：
 
 ```bash

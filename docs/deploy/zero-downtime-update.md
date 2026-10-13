@@ -1,0 +1,248 @@
+# 零停机更新（蓝绿切换）
+
+线上已有用户在使用大模型转发服务（尤其是 SSE 流式请求可能持续数分钟）时，[deploy-zyy-branch.md](deploy-zyy-branch.md) 第十步"停旧容器 → 起新容器"的方式会产生中断。本文描述基于蓝绿切换的零停机更新流程。
+
+## 原理
+
+以下事实已对照源码核实，使零停机更新可行：
+
+| 事实 | 依据 |
+| --- | --- |
+| 应用支持 `--port` 参数，两个实例可同时监听不同端口 | `common/init.go`（`flag.Int("port", 3000, ...)`） |
+| 收到 SIGTERM 后应用会优雅等待在途请求（含 SSE 流）完成再退出，默认 120 秒，可用 `SHUTDOWN_TIMEOUT_SECONDS` 调整 | `main.go` |
+| Nginx `reload` 是平滑切换：存量连接继续由旧上游处理，只有新请求走新上游 | Nginx 行为 |
+| 应用支持多实例部署（共享 MySQL/Redis，`NODE_NAME` 区分实例）；同一 `SESSION_SECRET` 下切换后用户会话保持 | 官方 Compose 的 `NODE_NAME` 说明 |
+
+流程概览：
+
+```
+Nginx ──► 3000（旧实例，旧镜像）
+   │
+   │ ① 构建新镜像
+   │ ② 在 3001 启动新实例（新镜像），等待健康检查通过
+   │ ③ Nginx 上游改为 3001 并 reload（新请求走新实例，存量请求不受影响）
+   │ ④ 等待旧实例在途请求排空
+   │ ⑤ 停止旧实例
+   ▼
+Nginx ──► 3001（新实例，新镜像）
+```
+
+下一次更新反向进行（新实例起在 3000，切回 3000，停 3001），两个实例交替承担"活跃/备用"角色。
+
+## 前提
+
+- Nginx 反向代理已配置（域名 → `127.0.0.1:3000`），见 deploy-zyy-branch.md 的注意事项。
+- 3001 端口与 3000 一样只在宿主机监听，不要对公网开放（UFW 默认拒绝入站即可满足）。
+
+## 第一步：改造 Compose 配置
+
+用下面的双实例配置替换 `/opt/new-api-deploy/compose.yaml`。两个实例共用同一镜像、同一份 `.env`、同一组数据卷，仅端口、容器名和 `NODE_NAME` 不同：
+
+```yaml
+services:
+  new-api-a:
+    build:
+      context: /opt/new-api-src
+      dockerfile: Dockerfile
+
+    image: new-api-zyy:latest
+    container_name: new-api-zyy-a
+    restart: unless-stopped
+
+    # 直接使用宿主机网络，访问宿主机上的 MySQL 和 Redis
+    network_mode: host
+
+    command: ["--port", "3000", "--log-dir", "/app/logs"]
+
+    env_file:
+      - /opt/new-api-deploy/.env
+
+    environment:
+      # 覆盖 .env 中的 NODE_NAME，便于审计日志区分实例
+      - NODE_NAME=new-api-zyy-a
+
+    volumes:
+      - /opt/new-api-data:/data
+      - /opt/new-api-logs:/app/logs
+
+    # 必须大于 SHUTDOWN_TIMEOUT_SECONDS（默认 120s），
+    # 否则 Docker 会在应用排空在途请求前 SIGKILL
+    stop_grace_period: 130s
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:3000/api/status | grep -o '\"success\":\\s*true' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  new-api-b:
+    build:
+      context: /opt/new-api-src
+      dockerfile: Dockerfile
+
+    image: new-api-zyy:latest
+    container_name: new-api-zyy-b
+    restart: unless-stopped
+
+    network_mode: host
+
+    command: ["--port", "3001", "--log-dir", "/app/logs"]
+
+    env_file:
+      - /opt/new-api-deploy/.env
+
+    environment:
+      - NODE_NAME=new-api-zyy-b
+
+    volumes:
+      - /opt/new-api-data:/data
+      - /opt/new-api-logs:/app/logs
+
+    stop_grace_period: 130s
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:3001/api/status | grep -o '\"success\":\\s*true' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+```
+
+关键点：
+
+| 配置 | 作用 |
+| --- | --- |
+| `--port 3000` / `--port 3001` | 两个实例监听不同端口，Nginx 决定流量走向 |
+| `stop_grace_period: 130s` | Docker 默认只给 10 秒就 SIGKILL，会切断正在进行的 SSE 流；必须放宽到大于应用的排空超时 |
+| `NODE_NAME` 按实例覆盖 | 审计日志能区分请求来自哪个实例 |
+| 各自独立的 `healthcheck` | 分别检查 3000 / 3001 |
+
+验证配置：
+
+```bash
+cd /opt/new-api-deploy
+docker compose config --quiet
+```
+
+## 第二步：一次性迁移（从单容器切换到双实例）
+
+如果当前运行的是 deploy-zyy-branch.md 里的单容器 `new-api-zyy`，需要一次性迁移（仅此一次有短暂中断）：
+
+```bash
+cd /opt/new-api-deploy
+
+# 停掉并删除旧单容器
+docker stop new-api-zyy
+docker rm new-api-zyy
+
+# 用当前镜像启动 A 实例（3000），B 保持停止
+docker compose up -d new-api-a
+
+# 确认 3000 恢复服务
+curl -i http://127.0.0.1:3000/api/status
+```
+
+迁移完成后，日常状态是"只有一个实例在运行"，备用实例不占内存。
+
+## 第三步：零停机更新流程
+
+以下以"A（3000）活跃、B（3001）备用"为例，下一次更新角色对调。
+
+### ① 备份（与 deploy-zyy-branch.md 第十步相同）
+
+```bash
+mysqldump --single-transaction --routines --triggers new_api \
+  | gzip > "/opt/new-api-backups/new_api_$(date +%F_%H%M%S).sql.gz"
+
+BACKUP_TAG="new-api-zyy:backup-$(date +%Y%m%d-%H%M%S)"
+docker image tag new-api-zyy:latest "$BACKUP_TAG"
+echo "当前镜像备份标签：$BACKUP_TAG"
+```
+
+### ② 拉取代码并构建新镜像
+
+```bash
+cd /opt/new-api-src
+git fetch origin zyy
+git pull --ff-only origin zyy
+git log -1 --oneline
+
+cd /opt/new-api-deploy
+docker compose build --pull --progress=plain
+```
+
+构建完成后 `new-api-zyy:latest` 指向新镜像；正在运行的 A 实例仍使用旧镜像（容器在创建时固定镜像），不受影响。
+
+### ③ 在备用端口启动新实例
+
+```bash
+docker compose up -d new-api-b
+```
+
+等待 B 健康（首次启动包含数据库迁移，可能需要 1–2 分钟）：
+
+```bash
+timeout 300 bash -c \
+  'until [ "$(docker inspect --format {{.State.Health.Status}} new-api-zyy-b)" = "healthy" ]; do sleep 5; done' \
+  && echo "B is healthy"
+
+curl -i http://127.0.0.1:3001/api/status
+```
+
+> 如果 B 启动失败或一直不健康：不要动 Nginx，直接 `docker compose stop new-api-b`，线上服务完全不受影响。这是蓝绿方案最大的安全垫。
+
+### ④ 切换 Nginx 上游
+
+修改 Nginx 站点配置（Ubuntu 默认在 `/etc/nginx/sites-available/`，按实际布局调整），把 `proxy_pass` 从 3000 改为 3001：
+
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:3001;
+    # 其余 proxy_header / SSE 相关配置保持不变
+}
+```
+
+校验并平滑 reload：
+
+```bash
+nginx -t && nginx -s reload
+```
+
+reload 后：新请求走 B（新版本）；已经建立的 SSE 流继续由 A 处理，不会被切断。
+
+### ⑤ 等待旧实例排空，然后停止
+
+应用没有公开的"在途请求数"接口，用固定等待 + 应用自身排空兜底：
+
+```bash
+# 等待在途流式请求结束（按业务调整；普通对话 5 分钟通常足够）
+sleep 300
+
+# 停止旧实例：Docker 发 SIGTERM，应用最多再排空 SHUTDOWN_TIMEOUT_SECONDS（默认 120s）
+docker compose stop new-api-a
+```
+
+两层保护叠加：切换后 5 分钟的自然排空 + 停止时最多 120 秒的优雅排空。如果业务存在更长的流式任务（如长视频生成转发），相应调大等待时间，并在 `.env` 中调大 `SHUTDOWN_TIMEOUT_SECONDS`（同时保持 `stop_grace_period` 大于它）。
+
+### ⑥ 验证
+
+```bash
+docker compose ps
+curl -i http://127.0.0.1:3001/api/status
+docker compose logs --tail=100 new-api-b
+```
+
+确认无误后，本次更新完成。B（3001）成为新的活跃实例，下次更新在 A（3000）上启动新版本并切回。
+
+## 回滚
+
+- **切换后、停止旧实例前**（约 5–7 分钟窗口内）：把 Nginx 上游改回旧端口并 `nginx -s reload` 即可，旧实例还在运行，秒级回滚。
+- **停止旧实例后**：按 deploy-zyy-branch.md 第十步的镜像回滚流程，用备份标签在备用端口启动旧版本，再切 Nginx。
+- **数据库**：更新前已做 mysqldump 备份。注意新版本启动时（切流量之前）已执行过迁移，若回滚后旧版本与新表结构不兼容，需要恢复数据库备份——这正是每次更新前必须备份的原因。
+
+## 风险与注意事项
+
+1. **数据库迁移的向后兼容性。** 新实例在切换流量之前就会执行数据库迁移，此时旧实例仍在服务。要求旧版本能容忍新表结构。GORM 自动迁移大多是增量式（加列/加表），通常兼容；但上游大版本更新前，应检查 release notes 和迁移相关改动，确认没有破坏性变更（删列/改类型）。
+2. **双实例短暂并存是应用支持的模式。** 应用支持多实例部署（`NODE_NAME`、会话限制等机制），后台任务有分布式协调；但更新窗口外不要长期双跑，备用实例用完即停，节省内存。
+3. **3001 不要暴露公网。** host 网络模式下 3001 同样监听在宿主机，保持 UFW 默认拒绝入站。
+4. **更新前仍须备份。** 蓝绿只解决"服务不中断"，不解决"新版本有 bug"或"迁移不兼容"，备份与回滚流程不变。
+5. **`stop_grace_period` 与 `SHUTDOWN_TIMEOUT_SECONDS` 的约束关系**：前者必须大于后者，否则优雅排空会被 SIGKILL 打断。

@@ -55,7 +55,7 @@ git push origin zyy --tags
 
 注意：`bun run test` 执行的是 `web/package.json` 里的 `test` 脚本（即 `vitest run`）；`bun test` 是 bun 自带测试运行器，不会跑项目的 vitest 用例。
 
-推送后，如果服务器已在运行旧版本，按 [deploy-zyy-branch.md](deploy-zyy-branch.md) 第十步更新部署（备份 → 拉取 → 重建 → 重建容器）。
+推送后，如果服务器已在运行旧版本，按 [deploy-zyy-branch.md](deploy-zyy-branch.md) 第十步更新部署（备份 → 拉取 → 重建 → 重建容器）；线上用户较多、不能接受中断时，按 [zero-downtime-update.md](zero-downtime-update.md) 的蓝绿切换流程更新。
 
 **merge 还是 rebase？** 推荐 merge（main 合入 zyy）：
 
