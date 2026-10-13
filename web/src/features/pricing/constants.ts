@@ -118,8 +118,7 @@ export const MAX_FILTER_ITEMS = 5
 export const SIDEBAR_WIDTH = 'w-64'
 
 /** Excluded groups */
-// 'default' 是用户分组（计费身份），不是渠道分组，不展示在模型广场筛选中
-export const EXCLUDED_GROUPS = ['', 'auto', 'default']
+export const EXCLUDED_GROUPS = ['', 'auto']
 
 /** Quota type values */
 export const QUOTA_TYPE_VALUES = {
