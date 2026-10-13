@@ -34,6 +34,37 @@ Nginx ──► 3001（新实例，新镜像）
 - Nginx 反向代理已配置（域名 → `127.0.0.1:3000`），见 deploy-zyy-branch.md 的注意事项。
 - 3001 端口与 3000 一样只在宿主机监听，不要对公网开放（UFW 默认拒绝入站即可满足）。
 
+## 脚本化执行（推荐）
+
+"备份 → 构建 → 起备用 → 切流 → 排空 → 停旧"的完整流程已脚本化为 [blue-green-switch.sh](blue-green-switch.sh)（放到服务器的 `/opt/new-api-deploy/` 下）：
+
+```bash
+sudo /opt/new-api-deploy/blue-green-switch.sh update     # 零停机更新
+sudo /opt/new-api-deploy/blue-green-switch.sh rollback    # 快速回滚（旧实例未被删除前有效）
+```
+
+脚本会自动探测当前活跃实例（解析 Nginx `proxy_pass` 指向的端口）、做状态一致性检查，并在以下情况安全中止（线上零影响）：新实例启动失败、Nginx 配置探测到 0 处或多处、运行实例与 Nginx 指向不匹配、rollback 方向错误。
+
+**等待点**（脚本会暂停等待，属正常现象，请勿中断）：
+
+| 编号 | 等待内容 | 默认时长 |
+| --- | --- | --- |
+| W1 | 新实例健康检查通过（含数据库迁移） | 最长 300s（`HEALTH_TIMEOUT`） |
+| W2 | 旧实例在途请求排空（SSE 流式请求） | 300s（`DRAIN_WAIT`，长任务调大） |
+| W3 | 停止旧实例时应用优雅排空 | 最长约 120s（`SHUTDOWN_TIMEOUT_SECONDS`） |
+
+**注意点**：
+
+| 编号 | 内容 |
+| --- | --- |
+| N1 | 运行前确认本次更新的数据库迁移向后兼容（旧实例在切流前仍在服务） |
+| N2 | Nginx 配置自动探测失败（0 处/多处 proxy_pass）时脚本中止，需人工处理 |
+| N3 | 切流后、停旧实例前是快速回滚窗口，发现异常立即执行 `rollback` |
+| N4 | 停旧实例后快速回滚失效，需按备份标签流程回滚 |
+| N5 | 新实例启动失败时脚本不会切流，线上零影响 |
+
+下面的手动流程用于理解原理，以及脚本中止时的人工处理参考。
+
 ## 第一步：改造 Compose 配置
 
 用下面的双实例配置替换 `/opt/new-api-deploy/compose.yaml`。两个实例共用同一镜像、同一份 `.env`、同一组数据卷，仅端口、容器名和 `NODE_NAME` 不同：
@@ -235,6 +266,7 @@ docker compose logs --tail=100 new-api-b
 
 ## 回滚
 
+- **快速回滚（推荐）**：在旧实例停止前执行 `sudo /opt/new-api-deploy/blue-green-switch.sh rollback`，脚本会把 Nginx 切回旧端口并在必要时重启旧实例（仍为旧镜像）。
 - **切换后、停止旧实例前**（约 5–7 分钟窗口内）：把 Nginx 上游改回旧端口并 `nginx -s reload` 即可，旧实例还在运行，秒级回滚。
 - **停止旧实例后**：按 deploy-zyy-branch.md 第十步的镜像回滚流程，用备份标签在备用端口启动旧版本，再切 Nginx。
 - **数据库**：更新前已做 mysqldump 备份。注意新版本启动时（切流量之前）已执行过迁移，若回滚后旧版本与新表结构不兼容，需要恢复数据库备份——这正是每次更新前必须备份的原因。
