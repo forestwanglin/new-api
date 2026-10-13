@@ -194,7 +194,8 @@ step_switch_nginx() {
 
   bak="${nginx_file}.bak-$(date +%Y%m%d-%H%M%S)"
   cp "$nginx_file" "$bak"
-  sed -i -E "s|(proxy_pass[[:space:]]+http://127\.0\.0\.1:)(${PORT_A}|${PORT_B})|\1${target_port}|" "$nginx_file"
+  # 注意：sed 分隔符必须用 #，不能用 |（pattern 中的 | 是正则 alternation，会提前截断表达式）
+  sed -i -E "s#(proxy_pass[[:space:]]+http://127\.0\.0\.1:)(${PORT_A}|${PORT_B})#\1${target_port}#" "$nginx_file"
 
   if ! nginx -t >/dev/null 2>&1; then
     cp "$bak" "$nginx_file"
