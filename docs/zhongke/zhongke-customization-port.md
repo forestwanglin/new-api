@@ -242,7 +242,7 @@ if a.plugin.Meta.Key == "sora" {
 修改：
 
 - `relay/channel/openai/adaptor.go`（+23 行）：thinking 参数剥离
-- `service/error.go`（+6 −5）：上游错误透传
+- `service/error.go`（+8 −7）：上游错误透传
 - `relay/channel/task/jsplugin/adaptor.go`（+10 行）：Sora JSON body 视频 URL 内联钩子
 
 新增：
