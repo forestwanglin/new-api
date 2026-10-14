@@ -21,6 +21,11 @@ import { formatBillingCurrencyFromUSD } from '@/lib/currency'
 import { QUOTA_TYPE_VALUES, TOKEN_UNIT_DIVISORS } from '../constants'
 import type { PricingModel, TokenUnit, PriceType } from '../types'
 import { getConfiguredGroupRatio, getDisplayGroupRatio } from './model-helpers'
+import {
+  formatVideoCNY,
+  getSeedanceVideoPrice,
+  getSeedanceVideoSpec,
+} from './video-price'
 
 // ----------------------------------------------------------------------------
 // Price Calculation Utilities
@@ -225,6 +230,10 @@ export function formatFixedPrice(
   }
 
   const ratio = getConfiguredGroupRatio(groupRatio, group)
+  // Legacy MAI Seedance video models are priced per second, not per request.
+  if (getSeedanceVideoSpec(model)) {
+    return formatVideoCNY((model.model_price || 0) * ratio)
+  }
   let priceInUSD = (model.model_price || 0) * ratio
 
   priceInUSD = applyRechargeRate(
@@ -256,6 +265,8 @@ export function formatRequestPrice(
     return '-'
   }
 
+  const videoPrice = getSeedanceVideoPrice(model, selectedGroup)
+  if (videoPrice) return formatVideoCNY(videoPrice.sale)
   const displayGroupRatio = getDisplayGroupRatio(model, selectedGroup)
 
   let priceInUSD = (model.model_price || 0) * displayGroupRatio

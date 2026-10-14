@@ -40,6 +40,8 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useStatus } from '@/hooks/use-status'
 
+import { buildArkVideoSample } from '../lib/ark-video-examples'
+import { getArkVideoSpec } from '../lib/ark-video-price'
 import {
   buildRateLimits,
   buildSupportedParameters,
@@ -433,6 +435,12 @@ function buildSample(
   if (endpointType === 'embeddings' || endpointType === 'jina-rerank')
     return buildEmbeddingSample(lang, ctx)
   if (endpointType === 'image-generation') return buildImageSample(lang, ctx)
+  if (
+    endpointType === 'openai-video' &&
+    /^doubao-seedance-2-0-(fast-260128|mini-260615)$/.test(ctx.modelName)
+  ) {
+    return buildArkVideoSample(lang, ctx)
+  }
   return buildChatSample(lang, ctx)
 }
 
@@ -464,7 +472,11 @@ function CodeSamplesSection(props: {
     const types = props.model.supported_endpoint_types || []
     return types
       .map((type) => {
-        const info = props.endpointMap[type] || {}
+        const info =
+          props.endpointMap[type] ||
+          (type === 'openai-video' && getArkVideoSpec(props.model)
+            ? { path: '/v1/videos', method: 'POST' }
+            : {})
         let path = info.path || ''
         if (path && path.includes('{model}')) {
           path = replaceModelInPath(path, props.model.model_name || '')
@@ -766,8 +778,12 @@ export function ModelDetailsApi(props: {
     <div className='space-y-6'>
       <CodeSamplesSection model={props.model} endpointMap={props.endpointMap} />
       <AuthSection />
-      <SupportedParametersSection model={props.model} />
-      <RateLimitsSection model={props.model} />
+      {!getArkVideoSpec(props.model) && (
+        <>
+          <SupportedParametersSection model={props.model} />
+          <RateLimitsSection model={props.model} />
+        </>
+      )}
     </div>
   )
 }

@@ -6865,6 +6865,14 @@
     "Zhipu": "Zhipu",
     "Zhipu GLM": "Zhipu GLM",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Video specification pricing": "Video specification pricing",
+    "CNY per second · No reference video": "CNY per second · No reference video",
+    "Group rate {{rate}}%": "Group rate {{rate}}%",
+    "Resolution": "Resolution",
+    "Official example rate": "Official example rate",
+    "Site selling rate": "Site selling rate",
+    "5-second video": "5-second video",
+    "Official 16:9 example converted to seconds. Reference video input is unavailable.": "Official 16:9 example converted to seconds. Reference video input is unavailable."
   }
 }

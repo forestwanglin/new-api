@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils'
 
 import { getBillingModeLabelKey } from '../lib/billing-mode'
 import { isDynamicPricingModel } from '../lib/dynamic-price'
+import { getSeedanceVideoSpec } from '../lib/video-price'
 import type { PricingModel } from '../types'
 
 interface ModelBillingModeBadgeProps {
@@ -34,11 +35,12 @@ interface ModelBillingModeBadgeProps {
 export function ModelBillingModeBadge(props: ModelBillingModeBadgeProps) {
   const { t } = useTranslation()
   const labelKey = getBillingModeLabelKey(props.model)
-  const label = t(labelKey)
+  const seedanceSpec = getSeedanceVideoSpec(props.model)
+  const label = seedanceSpec ? t('Per Second') : t(labelKey)
   const isCaption = props.appearance === 'caption'
   let variant: StatusVariant = 'purple'
 
-  if (isDynamicPricingModel(props.model)) {
+  if (seedanceSpec || isDynamicPricingModel(props.model)) {
     variant = 'warning'
   } else if (labelKey === 'Token-based') {
     variant = 'info'
