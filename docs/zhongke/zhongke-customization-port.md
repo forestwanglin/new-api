@@ -5,9 +5,9 @@
 移植到本仓库当前分支 `merge_zhongke` 的结果。
 
 - 目标分支基线：`f409dd330`（fork 自 upstream/main `7aa3531ef`，比 rc.23 更新约 40 个上游版本）
-- 移植范围：后端 Go 逻辑；排除构建方式（Dockerfile）、价格页/详情页前端、打包相关逻辑
+- 移植范围：后端 Go 逻辑 + 前端定价（方案 A，见 §3）；排除构建方式（Dockerfile）、打包相关逻辑，以及会与现有通用 task 定价重复的火山 CNY 卡片
 - 约束：不修改现有代码结构，只把缺失的逻辑追加进当前代码
-- 本次未提交任何 Git commit
+- 相关提交：`2673ab2b7`（后端 Go + 本文档初版）、`a7b0b0c49`（前端定价，方案 A）
 
 由于目标代码已经明显领先于 rc.23，部分定制在上游演进中已经存在（或已有更完整的实现），
 下文逐项标注“已存在 / 已移植 / 不适用”。
@@ -25,9 +25,11 @@
 | 5 | 上游错误信息透传（不再包装） | 缺失 | 已移植 |
 | 6 | 前端渠道/令牌分组界面调整 | 目标已为相同或更优状态 | 不改动 |
 | 7 | 前端 i18n footer key | 仅转义写法差异，无功能变化 | 不改动 |
-| 8 | Dockerfile 基础镜像改 alpine、COPY tokenizers | 构建方式 | 排除 |
-| 9 | 前端价格页/详情页视频定价 | — | 按需求排除 |
-| 10 | 打包（compose/Caddy/init_env/adapters/runtime/frontend 等） | — | 按需求排除 |
+| 8 | 前端 MAI Seedance 按秒计费显示 + “Per Second” 徽章 | 缺失 | 已移植（方案 A，§3.2） |
+| 9 | 前端火山 Ark 视频请求示例 + endpoint 归一化 | 缺失 | 已移植（方案 A，§3.3） |
+| 10 | 前端火山 Fast/Mini 的 `¥/百万 token` 卡片 | 通用 task 定价已覆盖 | 不移植（会重复，§3.4） |
+| 11 | Dockerfile 基础镜像改 alpine、COPY tokenizers | 构建方式 | 排除 |
+| 12 | 打包（compose/Caddy/init_env/adapters/runtime/frontend 等） | — | 按需求排除 |
 
 ---
 
@@ -167,24 +169,75 @@ if a.plugin.Meta.Key == "sora" {
 
 ## 3. 前端变更说明
 
-发行包相对 rc.23 的前端改动分两类，均无需移植：
+### 3.1 已存在，无需移植
 
-1. **渠道/令牌分组界面调整**（`channel-mutate-drawer.tsx`、`channel-form.ts`、
-   `api-key-group-cell.tsx`）：本质是格式化换行，以及隐藏 `AutoGroupBadge`。
-   当前分支已处于相同或更新状态：
-   - `channel-form.ts` 的 `http2_connection_shards: protocol === HTTP_PROTOCOL_HTTP1 ? 1 : shards`
-     已是单行写法；
-   - `channel-mutate-drawer.tsx` 的 `<SelectContent alignItemWithTrigger={false}>` 已是单行写法；
-   - `api-key-group-cell.tsx` 已不再渲染 `AutoGroupBadge`（仅保留 `auto-group-visuals.tsx` 中的定义）。
-2. **i18n footer key**：发行包把 `footer.new\u0061pi.projectAttributionSuffix` 写成
-   `footer.newapi.projectAttributionSuffix`。`\u0061` 就是字符 `a`，两者是同一个 JSON key，
-   无任何功能差异，故不改动。
-3. **价格页/详情页视频定价**（`web/src/features/pricing/*` 与相关 i18n 文案）：按需求排除，
-   未移植。
+- **渠道/令牌分组界面调整**（`channel-mutate-drawer.tsx`、`channel-form.ts`、
+  `api-key-group-cell.tsx`）：发行包相对 rc.23 只是格式化换行，以及隐藏 `AutoGroupBadge`。
+  当前分支已处于相同或更新状态：
+  - `channel-form.ts` 的 `http2_connection_shards: protocol === HTTP_PROTOCOL_HTTP1 ? 1 : shards` 已是单行；
+  - `channel-mutate-drawer.tsx` 的 `<SelectContent alignItemWithTrigger={false}>` 已是单行；
+  - `api-key-group-cell.tsx` 已不再渲染 `AutoGroupBadge`。
+- **i18n footer key**：`footer.new\u0061pi.projectAttributionSuffix` 与
+  `footer.newapi.projectAttributionSuffix` 是同一个 JSON key（`\u0061` = `a`），无功能差异。
+
+### 3.2 已移植：MAI Seedance 按秒计费显示（方案 A）
+
+发行包把旧的 MAI Seedance 模型（`sd2.0-480P` / `sd2.0-720P` / `sd2.0-1080P` /
+`seedance-2.5`，`quota_type === REQUEST`）从“按次”改造为“¥/秒”展示，并新增规格价格卡片。
+当前分支没有任何插件声明这些模型，通用 task 定价矩阵不会覆盖，因此这块确实缺失。
+
+新增：
+
+- `web/src/features/pricing/lib/video-price.ts`：`getSeedanceVideoSpec`（模型规格）、
+  `getSeedanceVideoPrice`（基准价 / 分组倍率 / 售价）、`formatVideoCNY`；
+- `web/src/features/pricing/components/seedance-video-price.tsx`：规格价格卡片（分辨率、官方示例秒价、
+  本站售价、分组倍率、5 秒合计）。
+
+修改：
+
+- `lib/price.ts`：`formatFixedPrice` / `formatRequestPrice` 对规格模型返回 `formatVideoCNY(...)`；
+- `components/model-billing-mode-badge.tsx`：规格模型的徽章从默认 “Per Request” 改为 “Per Second”（warning 配色）；
+- `components/model-card.tsx`：单位 `/ request` → `/ second`，并在描述下方渲染规格卡片；
+- `components/model-price-cell.tsx`（表格价格列）：标签与单位改为按秒；
+- `components/model-details.tsx`：详情页价格区返回规格卡片；
+- `i18n/locales/*.json`（en/zh/zh-TW/fr/ja/ru/vi）：新增 8 个规格价格文案，zh/zh-TW 用中文，其余用英文兜底。
+
+与发行包的差异（有意保留）：
+
+- 发行包的测试用 `bun:test` + `.jsx`；当前分支的 vitest 只收集 `.ts`/`.tsx`，故改为 `vitest` + `.test.ts(x)`；
+- 新文件按仓库规范补了 AGPL 版权头；
+- zh-TW 使用繁体文案（发行包原样为简体）。
+
+### 3.3 已移植：火山 Ark 视频请求示例 + endpoint 归一化（方案 A）
+
+发行包为 `doubao-seedance-2-0-fast-260128` / `doubao-seedance-2-0-mini-260615` 提供
+`/v1/videos` 请求示例，并把“旧后端误报为 Chat”的 endpoint 归一为 `openai-video`。
+
+新增：
+
+- `lib/ark-video-examples.ts`：`buildArkVideoSample`（curl/python/ts/js，`seconds`、`metadata.resolution`、
+  `generate_audio`）；
+- `lib/ark-video-price.ts`：仅保留 `getArkVideoSpec`（不含价格卡片）。
+
+修改：
+
+- `components/model-details-api.tsx`：`openai-video` 且模型名匹配 fast/mini 时使用 Ark 视频示例；
+  endpoint map 兜底 `/v1/videos`；火山视频模型不渲染参数 / 限流区块；
+- `hooks/use-pricing-data.ts`：`getArkVideoSpec` 命中的模型 `supported_endpoint_types` 归一为
+  `['openai-video']`。
+
+### 3.4 未移植：火山 Fast/Mini 的 `¥/百万 token` 卡片
+
+发行包的 `ArkVideoPrice` 卡片（无 / 有视频输入的 `¥/百万 token`）**未移植**。原因：当前分支的
+`plugins/tasks/doubao/plugin.js` 已为这两个模型声明 `usageSchema`/`usageProfiles`，价格页会通过
+通用 task 定价矩阵渲染，再叠加卡片会重复显示。`getArkVideoSpec` 仅保留用于 §3.3 的 endpoint
+归一化与示例选择。
 
 ---
 
 ## 4. 变更文件清单
+
+### 4.1 后端 Go（commit `2673ab2b7`）
 
 修改：
 
@@ -199,6 +252,29 @@ if a.plugin.Meta.Key == "sora" {
 
 未改动（已存在）：`relaykit/dto/openai_request.go`、`plugins/tasks/doubao/plugin.js`。
 
+### 4.2 前端（commit `a7b0b0c49`，方案 A）
+
+新增：
+
+- `web/src/features/pricing/lib/video-price.ts`
+- `web/src/features/pricing/lib/ark-video-price.ts`
+- `web/src/features/pricing/lib/ark-video-examples.ts`
+- `web/src/features/pricing/components/seedance-video-price.tsx`
+- `web/src/features/pricing/components/__tests__/seedance-video-price.test.tsx`
+- `web/src/features/pricing/lib/__tests__/ark-video-examples.test.ts`
+- `web/src/features/pricing/hooks/__tests__/ark-video-endpoints.test.tsx`
+
+修改：
+
+- `web/src/features/pricing/lib/price.ts`
+- `web/src/features/pricing/components/model-billing-mode-badge.tsx`
+- `web/src/features/pricing/components/model-card.tsx`
+- `web/src/features/pricing/components/model-price-cell.tsx`
+- `web/src/features/pricing/components/model-details.tsx`
+- `web/src/features/pricing/components/model-details-api.tsx`
+- `web/src/features/pricing/hooks/use-pricing-data.ts`
+- `web/src/i18n/locales/{en,zh,zh-TW,fr,ja,ru,vi}.json`
+
 ---
 
 ## 5. 验证情况
@@ -211,6 +287,16 @@ go build ./relay/channel/openai/... ./service/... ./relay/channel/task/jsplugin/
 go vet   ./relay/channel/openai/... ./service/... ./relay/channel/task/jsplugin/...   # 无告警
 go test  ./relay/channel/task/jsplugin/ -run 'TestConvertVideoURLs' -count=1          # ok
 go test  -run 'TestNoSuchTestXYZ' -count=1 ./relay/channel/openai/... ./service/...   # 编译通过
+```
+
+前端（本机无 `bun`，直接使用 `web/node_modules/.bin` 下的工具）：
+
+```bash
+cd web
+node_modules/.bin/tsgo -b                                  # 类型检查通过
+node_modules/.bin/vitest run src/features/pricing          # 13 文件 / 263 测试通过
+node_modules/.bin/rsbuild build                            # 生产构建成功（exit 0）
+node_modules/.bin/oxfmt -c .oxfmtrc.json --check <改动文件> # 格式通过
 ```
 
 说明：
@@ -231,7 +317,14 @@ go test  -run 'TestNoSuchTestXYZ' -count=1 ./relay/channel/openai/... ./service/
 3. **`reasoning_effort:"none"` 的条件化**：仅在 `!renderReasoning` 时剥离。若希望与发行包
    完全一致（无条件剥离），需要评估当前分支 reasoning 转换框架的回归风险。
 4. **未做端到端验证**：未在真实 Sora/火山渠道上验证视频内联与错误透传的实际效果，
-   也未运行完整 `go test ./...`（仓库级测试面较大）。
+   也未运行完整 `go test ./...`（仓库级测试面较大）。前端只跑了 pricing 用例，未跑完整
+   `vitest run`。
+5. **前端 `¥` 硬编码**：`formatVideoCNY` 固定输出 `¥`，未走 `@/lib/currency`，与仓库前端规范不一致；
+   这是为忠实还原中科生产显示。若站点货币不是 CNY，需要改用站点货币格式化。
+6. **火山 endpoint 收敛**：`use-pricing-data.ts` 把 fast/mini 的 `supported_endpoint_types` 收敛为
+   仅 `openai-video`；若后端已正确上报且存在其它合法 endpoint，需要确认是否要收窄。
+7. **前端 `oxlint` 既有告警**：`model-details-api.tsx` 报的 6 条
+   （`prefer-string-replace-all` / `curly`）经与 HEAD 版本比对为既有问题，不是本次引入，未一并修。
 
 ---
 
@@ -246,7 +339,8 @@ go test  -run 'TestNoSuchTestXYZ' -count=1 ./relay/channel/openai/... ./service/
 | `relay/channel/task/sora/video_url.go` + `adaptor.go` | `relay/channel/task/jsplugin/video_url.go` + `adaptor.go` | 已移植（限定 sora 插件） |
 | `service/error.go` | 同路径 | 已移植 |
 | `Dockerfile` | — | 排除（构建方式） |
-| `web/src/features/pricing/*` | — | 排除（价格页/详情页） |
+| `web/src/features/pricing/*`（`lib/price.ts`、`model-card.tsx`、`model-details*.tsx`、`pricing-columns.tsx`、`use-pricing-data.ts` 等） | 同路径（多数已重构） | 已移植（方案 A，§3.2/§3.3） |
+| `web/src/features/pricing/lib/{video-price,ark-video-price,ark-video-examples}.ts`、`components/{seedance-video-price,ark-video-price}.tsx` | 新增对应文件 | 部分移植（Ark 价格卡片不移植，§3.4） |
 | `web/src/features/channels/*`、`web/src/features/keys/*` | 同路径 | 已为相同/更优状态 |
-| `web/src/i18n/locales/*` | 同路径 | footer key 转义等价，不改 |
+| `web/src/i18n/locales/*` | 同路径 | 已移植视频规格文案（§3.2） |
 | `compose.yml`/`Caddyfile`/`init_env.py`/`adapters/` 等 | — | 排除（打包） |
