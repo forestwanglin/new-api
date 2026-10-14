@@ -65,6 +65,49 @@ git push origin zyy --tags
 
 rebase 只在"zyy 分支只有你一人用、且强烈要求线性历史"时才考虑，且升级前先打备份 tag。
 
+### 同步到固定的 branch / tag
+
+默认 `git fetch upstream` 会按 `remote.upstream.fetch` 拉取上游**所有分支**（本仓库示例：`+refs/heads/*:refs/remotes/upstream/*`），并自动跟随这些对象可达的 tag。只想固定到某个分支或 tag 时：
+
+```bash
+# 只拉某个分支，更新 upstream/<branch>
+git fetch upstream main
+git fetch upstream release/1.0
+
+# 只拉某个 tag（同名 branch/tag 同时存在时必须写 tag 关键字）
+git fetch upstream tag v0.13.2
+git fetch upstream refs/tags/v0.13.2:refs/tags/v0.13.2
+
+# 拉分支但不要任何 tag
+git fetch upstream --no-tags
+```
+
+把升级流程的 ① 换成固定版本：
+
+```bash
+git checkout main
+git fetch upstream tag v0.13.2
+git merge --ff-only v0.13.2      # tag 是 main 后代时才能快进
+git push origin main
+```
+
+`main` 是纯上游镜像，如果要回到某个历史版本而不是前进，用 `git reset --hard v0.13.2`。只想临时构建、不挪 `main` 时可以 detached：
+
+```bash
+git fetch upstream --tags
+git checkout --detach v0.13.2
+```
+
+想长期只跟踪少数分支，收窄 remote 的 refspec：
+
+```bash
+git remote set-branches upstream main
+git remote set-branches --add upstream release/1.0
+git config remote.upstream.tagOpt --no-tags
+```
+
+注意 `set-branches` 会重写 `remote.upstream.fetch`，之后 `git fetch upstream` 只拉这些引用。网络受限时可以用 `git fetch --depth=1 upstream <branch|tag>` 做浅拉取，但浅拉取后 `--ff-only` 可能因缺少共同历史而失败。
+
 ## 4. Tag / 版本策略
 
 - upstream 的 tag（如 `v0.13.2`）不要复用，避免混淆。
