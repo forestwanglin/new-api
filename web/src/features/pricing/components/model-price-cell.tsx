@@ -33,6 +33,7 @@ import {
 import { isTokenBasedModel } from '../lib/model-helpers'
 import { formatPrice, formatRequestPrice } from '../lib/price'
 import { taskUsageUnitLabel } from '../lib/task-price-display'
+import { getSeedanceVideoSpec } from '../lib/video-price'
 import type { PricingModel, TokenUnit } from '../types'
 
 export type ModelPriceCellOptions = {
@@ -55,6 +56,7 @@ export function ModelPriceCell(props: {
   const options = props.options ?? {}
   const tokenUnit = options.tokenUnit ?? DEFAULT_TOKEN_UNIT
   const tokenUnitLabel = tokenUnit === 'K' ? '1K' : '1M'
+  const seedanceSpec = getSeedanceVideoSpec(props.model)
   const billingTime = useBillingTime(props.model.billing_expr)
   const dynamic = useMemo(
     () =>
@@ -219,7 +221,7 @@ export function ModelPriceCell(props: {
     } else {
       metrics = [
         {
-          label: t('Per-request'),
+          label: seedanceSpec ? t('Per Second') : t('Per-request'),
           value: formatRequestPrice(
             props.model,
             options.showRechargePrice,
@@ -230,7 +232,7 @@ export function ModelPriceCell(props: {
           ),
         },
       ]
-      caption = `${currencyLabel} / ${t('request')}`
+      caption = `${currencyLabel} / ${seedanceSpec ? t('second') : t('request')}`
     }
   }
   return (

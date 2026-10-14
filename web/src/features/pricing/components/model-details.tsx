@@ -94,6 +94,7 @@ import {
   taskTierConditions,
   pricingDisplayFallbackKey,
 } from '../lib/task-price-display'
+import { getSeedanceVideoSpec } from '../lib/video-price'
 import type {
   ModelCapability,
   PriceType,
@@ -104,6 +105,7 @@ import { DynamicPricingBreakdown } from './dynamic-pricing-breakdown'
 import { ModelBillingModeBadge } from './model-billing-mode-badge'
 import { ModelDetailsApi } from './model-details-api'
 import { ModelDetailsPerformance } from './model-details-performance'
+import { SeedanceVideoPrice } from './seedance-video-price'
 
 // ----------------------------------------------------------------------------
 // Local UI helpers
@@ -837,6 +839,10 @@ function PriceSection(props: {
         <UnconfiguredTaskPricingNotice model={props.model} />
       </section>
     )
+  }
+
+  if (getSeedanceVideoSpec(props.model)) {
+    return <SeedanceVideoPrice model={props.model} />
   }
 
   if (!isTokenBased) {

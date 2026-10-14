@@ -23,6 +23,7 @@ import { useStatus } from '@/hooks/use-status'
 import { requireServerSuccess } from '@/lib/server-error-message'
 
 import { getPricing } from '../api'
+import { getArkVideoSpec } from '../lib/ark-video-price'
 
 export function usePricingData(enabled = true) {
   const { status } = useStatus()
@@ -60,6 +61,10 @@ export function usePricingData(enabled = true) {
         vendor_icon: vendor?.icon,
         vendor_description: vendor?.description,
         group_ratio: data.group_ratio,
+        // Older DoubaoVideo backends advertise Chat despite using the video routes.
+        supported_endpoint_types: getArkVideoSpec(model)
+          ? ['openai-video']
+          : model.supported_endpoint_types,
       }
     })
   }, [data])
