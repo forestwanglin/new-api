@@ -419,6 +419,29 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 		}
 	}
 
+	// Strip thinking parameters that only mean "do not think". Upstreams that
+	// reject unknown fields error out on thinking:{type:"disabled"}, and some
+	// clients disable thinking with enable_thinking:false; both are dropped so
+	// the upstream keeps its default. reasoning_effort:"none" is dropped only on
+	// the plain passthrough path: upstreams like kimi-k3 do not really stop
+	// reasoning for it (they reason internally and answer slower), so falling
+	// back to the default is better. Converted requests keep their intent.
+	if request.THINKING != nil {
+		var thinkingParam dto.Thinking
+		if jsonErr := json.Unmarshal(request.THINKING, &thinkingParam); jsonErr == nil && thinkingParam.Type != "enabled" {
+			request.THINKING = nil
+		}
+	}
+	if !renderReasoning && request.ReasoningEffort == "none" {
+		request.ReasoningEffort = ""
+	}
+	if request.EnableThinking != nil {
+		var enableValue bool
+		if jsonErr := json.Unmarshal(request.EnableThinking, &enableValue); jsonErr == nil && !enableValue {
+			request.EnableThinking = nil
+		}
+	}
+
 	capabilities := dto.GetOpenAIChatCapabilities(info.UpstreamModelName, info.ReasoningEffort)
 	if capabilities.UseMaxCompletionTokens {
 		if lo.FromPtrOr(request.MaxCompletionTokens, uint(0)) == 0 && lo.FromPtrOr(request.MaxTokens, uint(0)) != 0 {

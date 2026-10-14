@@ -364,6 +364,16 @@ func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayIn
 	if err != nil {
 		return nil, err
 	}
+	// Some Sora-compatible upstreams reject remote reference videos and only
+	// accept inline content, so video URLs in a JSON submit body are downloaded
+	// and rewritten as base64 data URIs. Only the Sora channel is rewritten:
+	// other task upstreams (for example Doubao/Ark) accept URLs as they are.
+	if a.plugin.Meta.Key == "sora" {
+		inlined, err = inlineVideoURLs(c, inlined)
+		if err != nil {
+			return nil, err
+		}
+	}
 	body, err := common.Marshal(inlined)
 	if err != nil {
 		return nil, err
