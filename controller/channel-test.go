@@ -870,6 +870,14 @@ func TestChannel(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	if endpointType == "seedance-quick" {
+		testSeedanceQuick(c, channel, testModel)
+		return
+	}
+	if endpointType == "seedance-video" {
+		testSeedanceChannel(c, channel, testUserID, testModel)
+		return
+	}
 	tik := time.Now()
 	requestCtx := context.Background()
 	if c.Request != nil {

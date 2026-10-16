@@ -442,6 +442,13 @@ func RelayTask(c *gin.Context) {
 		relayInfo.Action = action
 	}
 
+	if selected, ok := c.Get("seedance_test_channel"); ok {
+		if ch, valid := selected.(*model.Channel); valid {
+			relayInfo.LockedChannel = ch
+			relayInfo.IsPlayground = true
+		}
+	}
+
 	if taskErr := relay.ResolveOriginTask(c, relayInfo); taskErr != nil {
 		respondTaskSubmissionError(c, taskErr)
 		return
