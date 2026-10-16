@@ -81,12 +81,17 @@ import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { handleServerError } from '@/lib/handle-server-error'
 
-import { updateChannel } from '../../api'
+import { updateChannel, testChannel } from '../../api'
 import {
   channelsQueryKeys,
   formatResponseTime,
   handleTestChannel,
 } from '../../lib'
+import {
+  runSeedanceChannelTest,
+  runSeedanceQuickTest,
+  type SeedanceStage,
+} from '../../lib/seedance-channel-test'
 import type {
   Channel,
   GetChannelsResponse,
@@ -107,10 +112,13 @@ type ModelRow = {
   model: string
 }
 
-type TestStatus = 'idle' | 'testing' | 'success' | 'error'
+type TestStatus = 'idle' | 'testing' | 'success' | 'error' | 'pending'
 
 type TestResult = {
   status: TestStatus
+  stage?: SeedanceStage
+  quickCheck?: boolean
+  taskId?: string
   responseTime?: number
   completedAt?: number
   error?: string
@@ -172,8 +180,18 @@ function getLatestChannelTestCachePatch(
   return latest?.patch
 }
 
+const seedanceStageLabels: Record<SeedanceStage, string> = {
+  queued: 'Video submitted',
+  in_progress: 'Video generating',
+  completed: 'Video generation completed',
+  failed: 'Video generation failed',
+  pending: 'Video task retained; check task history',
+}
+
 const endpointTypeOptions: Array<{ value: string; label: string }> = [
   { value: 'auto', label: 'Auto detect (default)' },
+  { value: 'seedance-quick', label: 'Seedance Quick (no video generation)' },
+  { value: 'seedance-video', label: 'Seedance Video (paid generation test)' },
   { value: 'openai', label: 'OpenAI (/v1/chat/completions)' },
   { value: 'openai-response', label: 'OpenAI Responses (/v1/responses)' },
   {
@@ -194,6 +212,8 @@ const endpointTypeOptions: Array<{ value: string; label: string }> = [
 ]
 
 const STREAM_INCOMPATIBLE_ENDPOINTS = new Set([
+  'seedance-quick',
+  'seedance-video',
   'embeddings',
   'image-generation',
   'jina-rerank',
@@ -540,11 +560,35 @@ function ChannelTestDialogContent({
     ): Promise<TestResult | undefined> => {
       if (!currentRow) return
 
+      const retainedTaskId =
+        testResults[model]?.status === 'pending'
+          ? testResults[model]?.taskId
+          : undefined
       markModelTesting(model, true)
       updateTestResult(model, { status: 'testing' })
       let finalResult: TestResult | undefined
 
       try {
+        if (endpointType === 'seedance-quick') {
+          const result = await runSeedanceQuickTest(model, (params) =>
+            testChannel(currentRow.id, params)
+          )
+          finalResult = { ...result, completedAt: Date.now() }
+          updateTestResult(model, finalResult)
+          return finalResult
+        }
+        if (endpointType === 'seedance-video') {
+          const result = await runSeedanceChannelTest(
+            model,
+            (params) => testChannel(currentRow.id, params),
+            (update) => updateTestResult(model, update),
+            undefined,
+            retainedTaskId
+          )
+          finalResult = { ...result, completedAt: Date.now() }
+          updateTestResult(model, finalResult)
+          return finalResult
+        }
         await handleTestChannel(
           currentRow.id,
           {
@@ -589,6 +633,7 @@ function ChannelTestDialogContent({
     [
       currentRow,
       endpointType,
+      testResults,
       effectiveStreamTest,
       markModelTesting,
       refreshChannelLists,
@@ -640,7 +685,7 @@ function ChannelTestDialogContent({
           if (result.status === 'success') {
             successCount += 1
           }
-          failedCount = completedCount - successCount
+          failedCount = results.filter((item) => item.status === 'error').length
 
           setBatchProgress({
             total: uniqueModels.length,
@@ -995,6 +1040,20 @@ function ChannelTestDialogContent({
                   'Override the endpoint used for testing. Leave empty to auto detect.'
                 )}
               </p>
+              {endpointType === 'seedance-quick' && (
+                <p className='text-muted-foreground text-xs' role='note'>
+                  {t(
+                    'Read-only interface and authentication check. Creates no video task. Passing does not confirm video generation or upstream model capacity.'
+                  )}
+                </p>
+              )}
+              {endpointType === 'seedance-video' && (
+                <p className='text-xs text-amber-700' role='note'>
+                  {t(
+                    'Creates one paid 4-second video per selected model. Submission is not generation success. Closing this dialog does not cancel a submitted task; use task history to continue checking.'
+                  )}
+                </p>
+              )}
             </div>
             <div className='grid gap-2'>
               <Label htmlFor='stream-toggle'>{t('Stream Mode')}</Label>
@@ -1159,12 +1218,22 @@ function TestStatusCell({ result }: { result?: TestResult }) {
     )
   }
 
+  if (result.status === 'pending') {
+    return (
+      <StatusBadge
+        label={t('Pending verification')}
+        variant='neutral'
+        copyable={false}
+      />
+    )
+  }
+
   if (result.status === 'testing') {
     return (
       <StatusBadge variant='info' copyable={false}>
         <Loader2 className='size-3.5 shrink-0 animate-spin' />
         <span className='min-w-0 truncate leading-normal'>
-          {t('Testing...')}
+          {t(result.stage ? seedanceStageLabels[result.stage] : 'Testing...')}
         </span>
       </StatusBadge>
     )
@@ -1172,7 +1241,11 @@ function TestStatusCell({ result }: { result?: TestResult }) {
 
   if (result.status === 'success') {
     return (
-      <StatusBadge label={t('Success')} variant='success' copyable={false} />
+      <StatusBadge
+        label={t(result.quickCheck ? 'Interface check passed' : 'Success')}
+        variant='success'
+        copyable={false}
+      />
     )
   }
 
@@ -1194,12 +1267,37 @@ function TestResultCell({
     return <span className='text-muted-foreground text-sm'>-</span>
   }
 
+  if (result.taskId) {
+    return (
+      <div className='grid gap-1 text-xs'>
+        <span>
+          {t(
+            result.stage
+              ? seedanceStageLabels[result.stage]
+              : 'Video task retained; check task history'
+          )}
+        </span>
+        <code className='break-all'>{result.taskId}</code>
+      </div>
+    )
+  }
+
   if (result.status === 'testing') {
     return (
       <div className='text-muted-foreground flex min-w-0 items-center gap-2 text-sm'>
         <Loader2 className='size-4 shrink-0 animate-spin' />
         <span className='truncate'>{t('Testing...')}</span>
       </div>
+    )
+  }
+
+  if (result.status === 'success' && result.quickCheck) {
+    return (
+      <span className='text-muted-foreground text-xs'>
+        {t('Interface check passed; video generation was not tested')}
+        {typeof result.responseTime === 'number' &&
+          ` · ${formatResponseTime(result.responseTime, t)}`}
+      </span>
     )
   }
 

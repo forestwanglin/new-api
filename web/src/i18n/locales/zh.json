@@ -7277,6 +7277,18 @@
     "Official example rate": "官方示例秒价",
     "Site selling rate": "本站售价",
     "5-second video": "生成 5 秒视频",
-    "Official 16:9 example converted to seconds. Reference video input is unavailable.": "以官方 16:9 示例换算秒价；当前不支持参考视频输入。"
+    "Official 16:9 example converted to seconds. Reference video input is unavailable.": "以官方 16:9 示例换算秒价；当前不支持参考视频输入。",
+    "Seedance Quick (no video generation)": "Seedance 快速测活（不生成视频）",
+    "Read-only interface and authentication check. Creates no video task. Passing does not confirm video generation or upstream model capacity.": "仅检查接口、鉴权与模型配置，不创建视频任务；通过不代表视频生成或上游模型产能正常。",
+    "Interface check passed": "接口检查通过",
+    "Interface check passed; video generation was not tested": "接口检查通过；未验证视频生成",
+    "Seedance Video (paid generation test)": "Seedance 视频测活（真实生成，可能计费）",
+    "Creates one paid 4-second video per selected model. Submission is not generation success. Closing this dialog does not cancel a submitted task; use task history to continue checking.": "每个所选模型创建一个4秒付费视频。提交成功不代表生成成功；关闭窗口不会取消任务，可到任务记录继续查询。",
+    "Pending verification": "待确认",
+    "Video submitted": "视频已提交",
+    "Video generating": "视频生成中",
+    "Video generation completed": "视频生成成功",
+    "Video generation failed": "视频生成失败",
+    "Video task retained; check task history": "任务已保留，可在任务记录中继续查询"
   }
 }
