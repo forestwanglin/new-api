@@ -64,7 +64,7 @@ sudo /opt/new-api-deploy/blue-green-switch.sh check       # 只做预检（含�
 | N4 | 停旧实例后快速回滚失效，需按备份标签流程回滚 |
 | N5 | 新实例启动失败时脚本不会切流，线上零影响 |
 | N6 | 版本盖章：构建前把 `VERSION` 写成 `<branch>-<commit 前 8 位>`（界面版本号来源），构建后还原；手工 `compose build` 不会盖章 |
-| N7 | 构建必须有 CPU/内存配额：需先跑 `setup-build-builder.sh`；缺配额时 `update` 直接中止，不会退回无限制构建 |
+| N7 | 构建必须有 CPU/内存配额：配额由 `setup-build-builder.sh` 写入 `build-limits.env`；`update` 只校验不修改，配额缺失或超过总资源时直接中止 |
 
 ### 构建资源限制（N7，必须）
 
@@ -92,13 +92,12 @@ sudo /opt/new-api-deploy/blue-green-switch.sh check
 
 代价与注意：
 
-- **构建时间约翻倍**：2 核配额下原先约 2.5 分钟的构建约变 5 分钟。想更快可以调大配额：
+- **构建时间约翻倍**：2 核配额下原先约 2.5 分钟的构建约变 5 分钟。想调大配额（会先打印服务器总核数/总内存再校验）：
   ```bash
-  sudo /opt/new-api-deploy/setup-build-builder.sh --cpus 3 --mem 3g   # 会先打印服务器总核数/总内存再校验
-  # blue-green-switch.sh 默认会用 2 核/2g 校正配额，两者需保持一致：
-  BUILD_CPUS=3 BUILD_MEM=3g sudo /opt/new-api-deploy/blue-green-switch.sh update
+  sudo /opt/new-api-deploy/setup-build-builder.sh --cpus 3 --mem 3g
   ```
-  `--cpus` 不得超过服务器总核数（超过等于不限制构建），`--mem` 不得达到总内存（会被拒绝）。
+  `--cpus` 不得超过服务器总核数（大于等于总核数等于不限制构建），`--mem` 不得达到总内存，两者都会被拒绝。
+- **配额来源（单一事实来源）**：`setup-build-builder.sh` 是唯一写入配额的地方，并把选择记录到 `/opt/new-api-deploy/build-limits.env`；`blue-green-switch.sh` 启动时 source 它，**只校验不修改**（builder 必须存在、必须已有配额且不超过总核数/总内存，否则直接中止）。优先级为 **显式环境变量 > `build-limits.env` > 脚本内置默认**，因此临时覆盖一次部署只需 `BUILD_CPUS=2 sudo .../blue-green-switch.sh check`，不会写回文件。副作用：builder 容器被重建导致配额丢失时，部署会中止并提示重跑 `setup-build-builder.sh`（不再自动写回默认值）。
 - **首次构建是冷缓存**：docker-container driver 与默认 builder 的层缓存不共享，第一次会全量构建（明显更慢），之后缓存在 builder 容器里。
 - 构建内存同样受限（默认 2g），避免构建期内存冲高（实测曾从 33% 冲到 60%）把机器压进 swap。
 - 配额存放在 builder 容器的 HostConfig 中，容器重启、宿主机重启后依然有效；只有 `docker buildx rm` 重建 builder 才会丢失，此时重跑 `setup-build-builder.sh` 即可。

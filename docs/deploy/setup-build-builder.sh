@@ -12,9 +12,9 @@
 #   sudo ./setup-build-builder.sh --cpus 3 --mem 3g    # 修改配额
 #   sudo ./setup-build-builder.sh --help
 #
-# 注意: blue-green-switch.sh update 会用 BUILD_CPUS/BUILD_MEM 校正配额。
-#       要让新配额在部署时长期生效，两者必须一致：
-#         BUILD_CPUS=3 BUILD_MEM=3g sudo /opt/new-api-deploy/blue-green-switch.sh update
+# 注意: 本脚本会把选择写入 ${DEPLOY_DIR}/build-limits.env（配额的单一事实来源）；
+#       blue-green-switch.sh 启动时读取该文件做校验（显式环境变量优先），
+#       它不再自行修改配额，因此这里的调整不会被部署覆盖。
 #
 # 幂等：builder 已存在时只做校验与配额校正。
 # 需要重新执行的场景：docker buildx rm <builder>、迁移到新机器、Docker 重装。
@@ -24,6 +24,8 @@ set -euo pipefail
 BUILDER="${BUILDX_BUILDER_NAME:-build-limited}"
 BUILD_CPUS="${BUILD_CPUS:-2}"
 BUILD_MEM="${BUILD_MEM:-2g}"
+DEPLOY_DIR="${DEPLOY_DIR:-/opt/new-api-deploy}"
+LIMITS_FILE="${BUILD_LIMITS_FILE:-${DEPLOY_DIR}/build-limits.env}"
 # 与默认 docker driver 的 worker（network=host）保持一致，避免构建期 DNS/NAT 差异
 DRIVER_OPT_NETWORK="${DRIVER_OPT_NETWORK:-host}"
 
@@ -46,8 +48,9 @@ usage() {
 同名环境变量 BUILD_CPUS / BUILD_MEM / BUILDX_BUILDER_NAME 仍然可用，
 命令行参数优先于环境变量。
 
-注意: blue-green-switch.sh update 会用 BUILD_CPUS/BUILD_MEM 校正配额，
-      要让新配额在部署时长期生效，两者必须一致，例如：
+注意: 本脚本会把选择写入 build-limits.env（配额的单一事实来源）。
+      blue-green-switch.sh 启动时读取它做校验（显式环境变量优先），
+      且不会再修改配额；如需临时覆盖一次部署，可用：
         BUILD_CPUS=3 BUILD_MEM=3g sudo /opt/new-api-deploy/blue-green-switch.sh update
 EOF
 }
@@ -180,9 +183,20 @@ if [ -r "${cg_root}/cpu.max" ]; then
   log "内核强制: cpu.max=$(cat "${cg_root}/cpu.max") memory.max=$(cat "${cg_root}/memory.max" 2>/dev/null || echo n/a)"
 fi
 
-log "验证: sudo /opt/new-api-deploy/blue-green-switch.sh check"
-if [ "$BUILD_CPUS" != "2" ] || [ "$mem_bytes" != $((2 * 1024 * 1024 * 1024)) ]; then
-  warn "提醒: 非默认配额只在本次生效。blue-green-switch.sh 默认会用 2 核 / 2g 校正配额，"
-  warn "      部署时请保持一致，否则配额会被改回："
-  warn "        BUILD_CPUS=${BUILD_CPUS} BUILD_MEM=${BUILD_MEM} sudo /opt/new-api-deploy/blue-green-switch.sh update"
-fi
+log "验证: sudo ${DEPLOY_DIR}/blue-green-switch.sh check"
+
+# 记录到 build-limits.env：配额的单一事实来源，blue-green-switch.sh 启动时读取。
+# 原子写入（临时文件 + mv），避免其他进程读到半截内容。
+mkdir -p "$(dirname "$LIMITS_FILE")"
+limits_tmp="${LIMITS_FILE}.tmp.$$"
+cat > "$limits_tmp" <<EOF
+# 由 setup-build-builder.sh 生成（$(date -u +%Y-%m-%dT%H:%M:%SZ)）：构建资源配额的单一事实来源。
+# blue-green-switch.sh 启动时 source 本文件做校验；显式环境变量优先于本文件。
+# 格式保持 \${VAR:-value}，所以 source 不会覆盖调用方已设置的环境变量。
+BUILDX_BUILDER_NAME="\${BUILDX_BUILDER_NAME:-${BUILDER}}"
+BUILD_CPUS="\${BUILD_CPUS:-${BUILD_CPUS}}"
+BUILD_MEM="\${BUILD_MEM:-${BUILD_MEM}}"
+EOF
+chmod 0644 "$limits_tmp"
+mv -f "$limits_tmp" "$LIMITS_FILE"
+log "已记录配额到 ${LIMITS_FILE}（blue-green-switch.sh 会读取；显式环境变量可覆盖）"

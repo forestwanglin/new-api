@@ -31,8 +31,10 @@
 #      这样界面左上角版本号才随部署变化（受保护行为，修改构建流程时必须保留）。
 #      注意：手工在 $SRC_DIR 直接 compose build 不会盖章，只有本脚本会。
 #   N7 构建 CPU 配额：构建必须走受限 builder（BUILDX_BUILDER_NAME），
-#      由 ensure_build_limits 校验/校正配额；配额缺失时 update 直接中止，
-#      不会退回无限制构建。原因见下方 ensure_build_limits 注释。
+#      由 ensure_build_limits 校验“配额存在且不超过总核数/总内存”；
+#      配额不可用时 update 直接中止，不会退回无限制构建。
+#      配额本身由 setup-build-builder.sh 写入并记录到 build-limits.env，
+#      本脚本只读不写（不会把运维调整过的值改回去）。
 #      rollback 不构建，因此不受该检查影响。
 #
 set -euo pipefail
@@ -58,11 +60,17 @@ BACKUP_KEEP=3                    # 数据库备份与镜像备份标签各保留
 HEALTH_TIMEOUT=300               # W1: 等待新实例 healthy 的最长秒数
 DRAIN_WAIT=300                   # W2: 切流后等待在途请求排空的秒数
 
-# N7: 构建资源限制。构建跑在独立 builder 容器里，配额由内核（cgroup）强制，
-# 构建过程无法绕过。4 vCPU 机器默认留 2 核给线上（new-api/MySQL/Redis/Nginx）。
+# N7: 构建资源限制。配额的唯一写入方是 setup-build-builder.sh（它会把选择记到
+# build-limits.env）；本脚本只读取与校验，不会覆盖实际配额。
+# 优先级: 显式环境变量 > build-limits.env > 内置默认。
+BUILD_LIMITS_FILE="${DEPLOY_DIR}/build-limits.env"
+if [ -r "$BUILD_LIMITS_FILE" ]; then
+  # 文件内为 "${VAR:-value}" 形式，不会覆盖调用方显式传入的环境变量
+  . "$BUILD_LIMITS_FILE"
+fi
 BUILDX_BUILDER_NAME="${BUILDX_BUILDER_NAME:-build-limited}"
-BUILD_CPUS="${BUILD_CPUS:-2}"    # 构建可用 CPU 上限（核）
-BUILD_MEM="${BUILD_MEM:-2g}"     # 构建可用内存上限
+BUILD_CPUS="${BUILD_CPUS:-2}"    # 仅用于与实际配额比对提示，不写回
+BUILD_MEM="${BUILD_MEM:-2g}"     # 同上
 
 NGINX_SEARCH_PATHS="/etc/nginx/sites-enabled /etc/nginx/sites-available /etc/nginx/conf.d"
 
@@ -112,13 +120,15 @@ is_running() { # container name -> 0/1
 # docker-container driver 的 builder 则整体受容器配额约束（实测 --cpus=1 时
 # 4 个满载进程合计恰好 1 核）。
 #
-# 配额会随 builder 容器重建而丢失，所以这里每次 update 前都做一次幂等校正。
+# 配额会随 builder 容器重建而丢失，所以这里每次 update 前都做校验；
+# 但本脚本**不写入**配额（不调 docker update）：配额由 setup-build-builder.sh
+# 决定并记录到 build-limits.env，避免两处配置互相覆盖。
 ensure_build_limits() {
-  local ct="buildx_buildkit_${BUILDX_BUILDER_NAME}0" want_nano
+  local ct="buildx_buildkit_${BUILDX_BUILDER_NAME}0"
+  local nano mem cpu_total mem_total_kb mem_total_bytes cpu_desc mem_desc
 
   [ -n "$BUILDX_BUILDER_NAME" ] \
     || die "N7: BUILDX_BUILDER_NAME 为空，拒绝执行无配额构建"
-  want_nano=$((BUILD_CPUS * 1000000000))
 
   if ! docker inspect "$ct" >/dev/null 2>&1; then
     warn "N7: 未找到受限 builder '${BUILDX_BUILDER_NAME}'（容器 ${ct} 不存在）。"
@@ -126,11 +136,42 @@ ensure_build_limits() {
     die "    请先执行: sudo ${DEPLOY_DIR}/setup-build-builder.sh"
   fi
 
-  docker update --cpus="$BUILD_CPUS" --memory="$BUILD_MEM" --memory-swap="$BUILD_MEM" "$ct" >/dev/null
-  [ "$(docker inspect -f '{{.HostConfig.NanoCpus}}' "$ct")" = "$want_nano" ] \
-    || die "N7: builder '${BUILDX_BUILDER_NAME}' 的 CPU 配额未生效（期望 ${BUILD_CPUS} 核），拒绝构建"
+  nano="$(docker inspect -f '{{.HostConfig.NanoCpus}}' "$ct")"
+  mem="$(docker inspect -f '{{.HostConfig.Memory}}' "$ct")"
 
-  log "N7 构建资源限制: builder=${BUILDX_BUILDER_NAME} cpu=${BUILD_CPUS}核 mem=${BUILD_MEM}"
+  # 断言①：配额存在
+  [ "${nano:-0}" -gt 0 ] 2>/dev/null \
+    || die "N7: builder '${BUILDX_BUILDER_NAME}' 没有 CPU 配额（NanoCpus=${nano:-空}），拒绝构建；请执行 sudo ${DEPLOY_DIR}/setup-build-builder.sh"
+  [ "${mem:-0}" -gt 0 ] 2>/dev/null \
+    || die "N7: builder '${BUILDX_BUILDER_NAME}' 没有内存配额（Memory=${mem:-空}），拒绝构建；请执行 sudo ${DEPLOY_DIR}/setup-build-builder.sh"
+
+  # 断言②：配额不超过服务器总资源（大于等于总资源等于不限制，防线失效）
+  cpu_total="$(nproc --all 2>/dev/null || nproc)"
+  case "$cpu_total" in
+    ''|*[!0-9]*) die "N7: 无法识别服务器 CPU 核数（nproc 输出: '${cpu_total}'）" ;;
+  esac
+  [ "$nano" -le "$((cpu_total * 1000000000))" ] \
+    || die "N7: builder 的 CPU 配额 $(awk -v n="$nano" 'BEGIN{printf "%.2f", n/1e9}') 核 超过服务器总核数 ${cpu_total}，等于不限制构建，拒绝"
+
+  mem_total_bytes=""
+  mem_total_kb="$(awk '/^MemTotal:/{print $2}' /proc/meminfo)"
+  case "$mem_total_kb" in
+    ''|*[!0-9]*) warn "N7: 读不到 /proc/meminfo 的总内存，跳过内存配额上限校验" ;;
+    *) mem_total_bytes=$((mem_total_kb * 1024))
+       [ "$mem" -lt "$mem_total_bytes" ] \
+         || die "N7: builder 的内存配额 $((mem / 1024 / 1024))MiB 不小于服务器总内存 $((mem_total_bytes / 1024 / 1024))MiB，拒绝构建" ;;
+  esac
+
+  cpu_desc="$(awk -v n="$nano" 'BEGIN{printf "%.2f", n/1e9}')/${cpu_total}核"
+  mem_desc="$((mem / 1024 / 1024))MiB"
+  [ -n "$mem_total_bytes" ] && mem_desc="${mem_desc}/$((mem_total_bytes / 1024 / 1024))MiB"
+  log "N7 构建资源限制: builder=${BUILDX_BUILDER_NAME} cpu=${cpu_desc} mem=${mem_desc}"
+
+  # 期望值（环境变量或 build-limits.env）与实际不一致时只提示，不覆盖
+  if [ "$BUILD_CPUS" -gt 0 ] 2>/dev/null && [ "$nano" != "$((BUILD_CPUS * 1000000000))" ]; then
+    warn "N7: 实际 CPU 配额 $(awk -v n="$nano" 'BEGIN{printf "%.2f", n/1e9}') 核 与期望 ${BUILD_CPUS} 核（环境变量或 ${BUILD_LIMITS_FILE}）不一致；"
+    warn "    本脚本不覆盖配额，如需统一请重跑 sudo ${DEPLOY_DIR}/setup-build-builder.sh"
+  fi
 }
 
 # ==================== 状态探测 ====================
