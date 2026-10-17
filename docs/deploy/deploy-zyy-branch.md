@@ -351,7 +351,7 @@ docker compose config --quiet
 # 不写它，部署多少次版本号都不会变；构建后必须还原，否则下次
 # git pull --ff-only 会因本地改动失败。
 cd /opt/new-api-src
-VERSION_TAG="$(git describe --tags --match 'v[0-9]*' --always 2>/dev/null || git rev-parse --short HEAD)"
+VERSION_TAG="zyy-$(git rev-parse HEAD | cut -c1-8)"
 printf '%s' "$VERSION_TAG" > VERSION
 
 cd /opt/new-api-deploy
