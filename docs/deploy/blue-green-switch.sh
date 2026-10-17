@@ -23,6 +23,11 @@
 #   N3 切流后、停旧实例前是快速回滚窗口，发现异常立即执行: ./blue-green-switch.sh rollback
 #   N4 停旧实例后快速回滚失效，需按 zero-downtime-update.md 的备份标签流程回滚
 #   N5 新实例启动失败时脚本不会切流，线上零影响
+#   N6 版本盖章：step_pull_and_build 会在构建前把本次部署的 commit 写入
+#      $SRC_DIR/VERSION（前端 VITE_REACT_APP_VERSION + 后端 common.Version），
+#      构建后还原空文件。这样界面左上角版本号才随部署变化（受保护行为，
+#      修改构建流程时必须保留）。注意：手工在 $SRC_DIR 直接 compose build
+#      不会盖章，只有本脚本会。
 #
 set -euo pipefail
 
@@ -165,8 +170,21 @@ step_pull_and_build() {
   git -C "$SRC_DIR" pull --ff-only origin "$BRANCH"
   git -C "$SRC_DIR" log -1 --oneline
 
+  # 版本盖章：仓库里的 VERSION 是空文件，Dockerfile 用它注入前端
+  # VITE_REACT_APP_VERSION 和二进制 common.Version（即 /api/status 里显示在
+  # 界面左上角的版本号）。不在构建前写入本次部署的 commit，版本号就会一直是
+  # 旧的/空值。构建后立即还原空文件，并挂 EXIT trap 覆盖构建失败与 Ctrl-C，
+  # 否则残留的本地改动会让下一次 git pull --ff-only 失败。
+  local build_version
+  build_version="$(git -C "$SRC_DIR" describe --tags --match 'v[0-9]*' --always 2>/dev/null \
+    || git -C "$SRC_DIR" rev-parse --short HEAD)"
+  printf '%s' "$build_version" > "$SRC_DIR/VERSION"
+  trap 'git -C "$SRC_DIR" checkout -- VERSION >/dev/null 2>&1 || true' EXIT
+
   compose build --pull --progress=plain
-  log "镜像构建完成"
+  git -C "$SRC_DIR" checkout -- VERSION
+  trap - EXIT
+  log "镜像构建完成 (version=${build_version})"
 }
 
 step_start_standby() {

@@ -346,8 +346,22 @@ docker compose config --quiet
 没有错误输出时，开始构建：
 
 ```bash
+# 版本盖章：仓库里的 VERSION 是空文件，Dockerfile 用它注入前端
+# VITE_REACT_APP_VERSION 和二进制 common.Version（即界面左上角的版本号）。
+# 不写它，部署多少次版本号都不会变；构建后必须还原，否则下次
+# git pull --ff-only 会因本地改动失败。
+cd /opt/new-api-src
+VERSION_TAG="$(git describe --tags --match 'v[0-9]*' --always 2>/dev/null || git rev-parse --short HEAD)"
+printf '%s' "$VERSION_TAG" > VERSION
+
+cd /opt/new-api-deploy
 docker compose build --pull --progress=plain new-api
+
+cd /opt/new-api-src
+git checkout -- VERSION   # 还原空文件
 ```
+
+> `blue-green-switch.sh update` 已内置同样的盖章与还原逻辑，走脚本更新时无需手工执行。构建后可用 `curl -s http://127.0.0.1:3000/api/status | grep -o '"version":"[^"]*"'` 确认版本号已随本次 commit 变化。
 
 这个步骤会使用 `/opt/new-api-src` 中的 Dockerfile 和源码构建镜像。官方 Dockerfile 采用多阶段构建，包含前端构建和 Go 后端编译。
 

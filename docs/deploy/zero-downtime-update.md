@@ -197,11 +197,23 @@ git fetch origin zyy
 git pull --ff-only origin zyy
 git log -1 --oneline
 
+# 版本盖章：仓库里的 VERSION 是空文件，Dockerfile 用它注入前端
+# VITE_REACT_APP_VERSION 和二进制 common.Version（即界面左上角版本号）。
+# 不写它，部署多少次版本号都不会变。构建后必须还原，否则下次
+# git pull --ff-only 会因本地改动失败。
+VERSION_TAG="$(git describe --tags --match 'v[0-9]*' --always 2>/dev/null || git rev-parse --short HEAD)"
+printf '%s' "$VERSION_TAG" > VERSION
+
 cd /opt/new-api-deploy
 docker compose build --pull --progress=plain
+
+cd /opt/new-api-src
+git checkout -- VERSION   # 还原空文件
 ```
 
-构建完成后 `new-api-zyy:latest` 指向新镜像；正在运行的 A 实例仍使用旧镜像（容器在创建时固定镜像），不受影响。
+构建完成后 `new-api-zyy:latest` 指向新镜像；正在运行的 A 实例仍使用旧镜像（容器在创建时固定镜像），不受影响。可用 `curl -s http://127.0.0.1:3001/api/status | grep -o '"version":"[^"]*"'` 确认版本号已随本次 commit 变化。
+
+> `blue-green-switch.sh update` 已内置同样的盖章与还原逻辑，走脚本更新时无需手工执行。
 
 ### ③ 在备用端口启动新实例
 
