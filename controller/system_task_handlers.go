@@ -11,16 +11,21 @@ import (
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 )
 
+// taskBillingReconcileDefaultIntervalMinutes is how often the Ark Seedance
+// billing reconciliation pass runs when the environment does not override it.
+const taskBillingReconcileDefaultIntervalMinutes = 5
+
 // RegisterScheduledSystemTasks wires the periodic channel test, upstream model
-// update, and async task polling (Midjourney / Suno / video) jobs into the
-// system task framework so a DB lease dedups execution across multiple master
-// instances and each run is recorded as one task row. Call this before
-// service.StartSystemTaskRunner.
+// update, async task polling (Midjourney / Suno / video), and task billing
+// reconciliation jobs into the system task framework so a DB lease dedups
+// execution across multiple master instances and each run is recorded as one
+// task row. Call this before service.StartSystemTaskRunner.
 func RegisterScheduledSystemTasks() {
 	service.RegisterSystemTaskHandler(channelTestHandler{})
 	service.RegisterSystemTaskHandler(modelUpdateHandler{})
 	service.RegisterSystemTaskHandler(midjourneyPollHandler{})
 	service.RegisterSystemTaskHandler(asyncTaskPollHandler{})
+	service.RegisterSystemTaskHandler(arkSeedanceSettleHandler{})
 }
 
 // channelTestHandler runs the scheduled "test all channels" job. Enablement and
@@ -148,6 +153,42 @@ func (asyncTaskPollHandler) NewPayload() any { return nil }
 
 func (asyncTaskPollHandler) Run(ctx context.Context, task *model.SystemTask, runnerID string) {
 	summary := service.RunTaskPollingOnce(ctx, service.NewSystemTaskProgressReporter(task, runnerID))
+	finishSystemTaskHandler(task, runnerID, model.SystemTaskStatusSucceeded, summary, nil)
+}
+
+// arkSeedanceSettleHandler re-settles finished Ark Seedance video tasks from the
+// upstream usage the poll stored on them. It covers the case where the terminal
+// transition was finalized without a token-based settlement (for example by an
+// instance still running the previous plugin during a rolling deploy), so the
+// caller is refunded the difference instead of keeping the reservation. The pass
+// is idempotent: tasks already holding the settled quota are skipped.
+type arkSeedanceSettleHandler struct{}
+
+func (arkSeedanceSettleHandler) Type() string { return model.SystemTaskTypeTaskBillingReconcile }
+
+func (arkSeedanceSettleHandler) Enabled() bool {
+	return common.GetEnvOrDefaultBool("TASK_BILLING_RECONCILE_ENABLED", true)
+}
+
+func (arkSeedanceSettleHandler) Interval() time.Duration {
+	minutes := common.GetEnvOrDefault(
+		"TASK_BILLING_RECONCILE_INTERVAL_MINUTES",
+		taskBillingReconcileDefaultIntervalMinutes,
+	)
+	if minutes < 1 {
+		minutes = taskBillingReconcileDefaultIntervalMinutes
+	}
+	return time.Duration(minutes) * time.Minute
+}
+
+func (arkSeedanceSettleHandler) NewPayload() any { return nil }
+
+func (arkSeedanceSettleHandler) Run(ctx context.Context, task *model.SystemTask, runnerID string) {
+	summary, err := service.ReconcileArkSeedanceTaskBillingOnce(ctx)
+	if err != nil {
+		finishSystemTaskHandler(task, runnerID, model.SystemTaskStatusFailed, summary, err)
+		return
+	}
 	finishSystemTaskHandler(task, runnerID, model.SystemTaskStatusSucceeded, summary, nil)
 }
 

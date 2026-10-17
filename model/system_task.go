@@ -21,6 +21,9 @@ const (
 	SystemTaskTypeModelUpdate    = "model_update"
 	SystemTaskTypeMidjourneyPoll = "midjourney_poll"
 	SystemTaskTypeAsyncTaskPoll  = "async_task_poll"
+	// SystemTaskTypeTaskBillingReconcile re-settles finished async tasks whose
+	// terminal poll could not price them (see service/task_billing_reconcile.go).
+	SystemTaskTypeTaskBillingReconcile = "task_billing_reconcile"
 )
 
 var ErrSystemTaskLockLost = errors.New("system task lock lost")

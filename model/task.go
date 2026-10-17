@@ -388,6 +388,25 @@ func GetAllUnFinishSyncTasks(limit int) []*Task {
 	return tasks
 }
 
+// GetSettledTasksForBillingReconcile returns successfully finished tasks whose
+// billing may still need a difference settlement, newest first. The model name
+// and the upstream usage block live in JSON columns whose serialization differs
+// per database driver, so callers filter those in Go instead of in SQL.
+func GetSettledTasksForBillingReconcile(submittedAfter int64, limit int) ([]*Task, error) {
+	if limit <= 0 {
+		limit = 200
+	}
+	var tasks []*Task
+	err := DB.Model(&Task{}).
+		Where("status = ?", TaskStatusSuccess).
+		Where("quota > ?", 0).
+		Where("submit_time >= ?", submittedAfter).
+		Order("id DESC").
+		Limit(limit).
+		Find(&tasks).Error
+	return tasks, err
+}
+
 // HasUnfinishedSyncTasks reports whether at least one async (Suno/video) task is
 // still in progress. It is a cheap existence check (LIMIT 1) used to decide
 // whether the async_task_poll system task needs to run; when no task is pending
