@@ -40,6 +40,26 @@ function trimmed(value) {
   return String(value || "").trim();
 }
 
+// Ark Seedance models (doubao-seedance-*) are driven through this plugin's
+// OpenAI-video channels. Their configured price already covers one generated
+// video, so the sora duration ratio must not scale the reservation, and the
+// upstream task body carries the real billing tokens the host settles against.
+const ARK_SEEDANCE_MODEL_PREFIX = "doubao-seedance-";
+
+function arkSeedanceModel(source) {
+  if (!source || typeof source !== "object") return "";
+  const direct = trimmed(source.upstreamModel) || trimmed(source.model);
+  if (direct) return direct;
+  // AdjustBillingOnComplete passes the stored task row instead of the query
+  // context, so the model can also arrive through the task properties.
+  const properties = source.properties || {};
+  return trimmed(properties.origin_model_name) || trimmed(properties.upstream_model_name);
+}
+
+function isArkSeedanceModel(source) {
+  return arkSeedanceModel(source).toLowerCase().startsWith(ARK_SEEDANCE_MODEL_PREFIX);
+}
+
 function responsesInput(req) {
   const texts = [],
     images = [];
@@ -126,6 +146,9 @@ export function parseSubmitResponse(ctx, resp) {
 
 export function extractUsage(ctx) {
   if (ctx.action === "remix") return {};
+  // No duration ratio for Ark Seedance: the reservation stays at the model's
+  // price for one video instead of being multiplied by the requested length.
+  if (isArkSeedanceModel(ctx)) return {};
   const req = ctx.requestBody || {};
   let seconds = Number(req.seconds || req.duration || 4);
   if (!Number.isFinite(seconds) || seconds <= 0) seconds = 4;
@@ -133,6 +156,15 @@ export function extractUsage(ctx) {
 }
 
 export function extractUsageOnComplete(task, taskResult, body) {
+  // Ark Seedance bills by upstream tokens. totalTokens is a host-owned fact
+  // that drives the token-based settlement, and the poll body is the only
+  // place the upstream reports it; a missing body keeps the reservation.
+  if (isArkSeedanceModel(task)) {
+    const usage = (body && body.usage) || {};
+    let tokens = Number(usage.completion_tokens);
+    if (!Number.isFinite(tokens) || tokens <= 0) tokens = Number(usage.total_tokens);
+    return Number.isFinite(tokens) && tokens > 0 ? { totalTokens: tokens } : {};
+  }
   const facts = {};
   const seconds = Number((body || {}).seconds || (body || {}).duration || 0);
   if (Number.isFinite(seconds) && seconds > 0) facts.seconds = Math.min(seconds, 3600);
