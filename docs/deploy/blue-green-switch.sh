@@ -5,12 +5,14 @@
 # 用法:
 #   sudo ./blue-green-switch.sh update      # 完整零停机更新（默认）
 #   sudo ./blue-green-switch.sh rollback    # 快速回滚：Nginx 切回旧实例（旧实例未被删除时有效）
+#   sudo ./blue-green-switch.sh check       # 只做预检（含构建资源限制校验），不改动线上任何东西
 #
 # 前置条件:
 #   1. /opt/new-api-deploy/compose.yaml 为双实例配置（new-api-a:3000 / new-api-b:3001）
 #   2. Nginx 配置中有且仅有一处 proxy_pass 指向 127.0.0.1:3000 或 127.0.0.1:3001
 #   3. compose 中 stop_grace_period(130s) > 应用 SHUTDOWN_TIMEOUT_SECONDS(默认120s)
 #   4. 3000/3001 均未对公网开放
+#   5. 受限构建 builder 已初始化（setup-build-builder.sh，见 N7）
 #
 # 等待点（脚本会暂停等待，属正常现象，请勿中断）:
 #   W1 等待新实例健康检查通过   最长 HEALTH_TIMEOUT（默认 300s，含数据库迁移）
@@ -28,6 +30,10 @@
 #      VITE_REACT_APP_VERSION + 后端 common.Version），构建后还原空文件。
 #      这样界面左上角版本号才随部署变化（受保护行为，修改构建流程时必须保留）。
 #      注意：手工在 $SRC_DIR 直接 compose build 不会盖章，只有本脚本会。
+#   N7 构建 CPU 配额：构建必须走受限 builder（BUILDX_BUILDER_NAME），
+#      由 ensure_build_limits 校验/校正配额；配额缺失时 update 直接中止，
+#      不会退回无限制构建。原因见下方 ensure_build_limits 注释。
+#      rollback 不构建，因此不受该检查影响。
 #
 set -euo pipefail
 
@@ -51,6 +57,12 @@ BACKUP_KEEP=3                    # 数据库备份与镜像备份标签各保留
 
 HEALTH_TIMEOUT=300               # W1: 等待新实例 healthy 的最长秒数
 DRAIN_WAIT=300                   # W2: 切流后等待在途请求排空的秒数
+
+# N7: 构建资源限制。构建跑在独立 builder 容器里，配额由内核（cgroup）强制，
+# 构建过程无法绕过。4 vCPU 机器默认留 2 核给线上（new-api/MySQL/Redis/Nginx）。
+BUILDX_BUILDER_NAME="${BUILDX_BUILDER_NAME:-build-limited}"
+BUILD_CPUS="${BUILD_CPUS:-2}"    # 构建可用 CPU 上限（核）
+BUILD_MEM="${BUILD_MEM:-2g}"     # 构建可用内存上限
 
 NGINX_SEARCH_PATHS="/etc/nginx/sites-enabled /etc/nginx/sites-available /etc/nginx/conf.d"
 
@@ -86,6 +98,39 @@ svc_of_port() {
 is_running() { # container name -> 0/1
   docker inspect "$1" >/dev/null 2>&1 \
     && [ "$(docker inspect --format '{{.State.Running}}' "$1")" = "true" ]
+}
+
+# ==================== 构建资源限制（N7） ====================
+# 背景：本机只有 4 vCPU，而 new-api 自带 CPU 保护（middleware/performance.go，
+# 默认阈值 90%）。宿主机 CPU 超阈值时，relay 请求会被直接拒绝并返回
+# 503 system_cpu_overloaded —— 2026-10-17 的线上 503 就是部署时 `compose build`
+# 把宿主机 CPU 打到 99% 触发的（旧实例仍在服务，用户拿到 503）。
+#
+# 因此构建必须跑在带 cgroup CPU 配额的独立 builder 容器里。注意：默认 builder
+# 是 docker driver，其构建步由 containerd 创建，不落在 `--cgroup-parent` 指定的
+# 父 cgroup 下 —— 在本机实测 `--cgroup-parent` 对构建 CPU 完全无效（仍占满 4 核）。
+# docker-container driver 的 builder 则整体受容器配额约束（实测 --cpus=1 时
+# 4 个满载进程合计恰好 1 核）。
+#
+# 配额会随 builder 容器重建而丢失，所以这里每次 update 前都做一次幂等校正。
+ensure_build_limits() {
+  local ct="buildx_buildkit_${BUILDX_BUILDER_NAME}0" want_nano
+
+  [ -n "$BUILDX_BUILDER_NAME" ] \
+    || die "N7: BUILDX_BUILDER_NAME 为空，拒绝执行无配额构建"
+  want_nano=$((BUILD_CPUS * 1000000000))
+
+  if ! docker inspect "$ct" >/dev/null 2>&1; then
+    warn "N7: 未找到受限 builder '${BUILDX_BUILDER_NAME}'（容器 ${ct} 不存在）。"
+    warn "    无配额的构建会打满宿主机 CPU，触发 new-api 的 CPU 保护并让用户拿到 503。"
+    die "    请先执行: sudo ${DEPLOY_DIR}/setup-build-builder.sh"
+  fi
+
+  docker update --cpus="$BUILD_CPUS" --memory="$BUILD_MEM" --memory-swap="$BUILD_MEM" "$ct" >/dev/null
+  [ "$(docker inspect -f '{{.HostConfig.NanoCpus}}' "$ct")" = "$want_nano" ] \
+    || die "N7: builder '${BUILDX_BUILDER_NAME}' 的 CPU 配额未生效（期望 ${BUILD_CPUS} 核），拒绝构建"
+
+  log "N7 构建资源限制: builder=${BUILDX_BUILDER_NAME} cpu=${BUILD_CPUS}核 mem=${BUILD_MEM}"
 }
 
 # ==================== 状态探测 ====================
@@ -181,7 +226,8 @@ step_pull_and_build() {
   printf '%s' "$build_version" > "$SRC_DIR/VERSION"
   trap 'git -C "$SRC_DIR" checkout -- VERSION >/dev/null 2>&1 || true' EXIT
 
-  compose build --pull --progress=plain
+  # N7: 必须显式指定受限 builder，否则会回到会打满宿主机 CPU 的默认 builder
+  compose build --builder "$BUILDX_BUILDER_NAME" --pull --progress=plain
   git -C "$SRC_DIR" checkout -- VERSION
   trap - EXIT
   log "镜像构建完成 (version=${build_version})"
@@ -264,6 +310,8 @@ step_verify() {
 # ==================== 命令入口 ====================
 cmd_update() {
   check_preconditions
+  # N7: 在任何副作用（数据库备份、git pull、构建）之前先确认构建资源限制可用
+  ensure_build_limits
 
   local active_port active_svc running old standby standby_port
   active_port="$(active_port)"
@@ -335,8 +383,18 @@ cmd_rollback() {
   warn "新版本实例仍在 ${cur_port} 运行，确认稳定后可手动停止: docker compose -f $COMPOSE_FILE stop $(svc_of_port "$cur_port")"
 }
 
+cmd_check() { # 预检：只读校验，不改动线上任何东西
+  check_preconditions
+  ensure_build_limits
+
+  local port
+  port="$(active_port)"
+  log "预检通过: 活跃端口 ${port}，运行实例 $(running_instance)，构建 builder ${BUILDX_BUILDER_NAME}"
+}
+
 case "${1:-update}" in
   update)   cmd_update ;;
   rollback) cmd_rollback ;;
-  *)        die "未知命令: $1（可用: update | rollback）" ;;
+  check)    cmd_check ;;
+  *)        die "未知命令: $1（可用: update | rollback | check）" ;;
 esac

@@ -343,7 +343,7 @@ cd /opt/new-api-deploy
 docker compose config --quiet
 ```
 
-没有错误输出时，开始构建：
+没有错误输出时，开始构建（**N7：必须指定受限 builder**，否则会把宿主机 CPU 打满并触发 new-api 的 CPU 保护，用户会拿到 503；见 [zero-downtime-update.md](zero-downtime-update.md) 的“构建资源限制”）：
 
 ```bash
 # 版本盖章：仓库里的 VERSION 是空文件，Dockerfile 用它注入前端
@@ -355,7 +355,7 @@ VERSION_TAG="zyy-$(git rev-parse HEAD | cut -c1-8)"
 printf '%s' "$VERSION_TAG" > VERSION
 
 cd /opt/new-api-deploy
-docker compose build --pull --progress=plain new-api
+docker compose build --builder build-limited --pull --progress=plain new-api
 
 cd /opt/new-api-src
 git checkout -- VERSION   # 还原空文件

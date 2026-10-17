@@ -41,6 +41,7 @@ Nginx ──► 3001（新实例，新镜像）
 ```bash
 sudo /opt/new-api-deploy/blue-green-switch.sh update     # 零停机更新
 sudo /opt/new-api-deploy/blue-green-switch.sh rollback    # 快速回滚（旧实例未被删除前有效）
+sudo /opt/new-api-deploy/blue-green-switch.sh check       # 只做预检（含构建配额校验），不改动线上
 ```
 
 脚本会自动探测当前活跃实例（解析 Nginx `proxy_pass` 指向的端口）、做状态一致性检查，并在以下情况安全中止（线上零影响）：新实例启动失败、Nginx 配置探测到 0 处或多处、运行实例与 Nginx 指向不匹配、rollback 方向错误。
@@ -62,6 +63,39 @@ sudo /opt/new-api-deploy/blue-green-switch.sh rollback    # 快速回滚（旧�
 | N3 | 切流后、停旧实例前是快速回滚窗口，发现异常立即执行 `rollback` |
 | N4 | 停旧实例后快速回滚失效，需按备份标签流程回滚 |
 | N5 | 新实例启动失败时脚本不会切流，线上零影响 |
+| N6 | 版本盖章：构建前把 `VERSION` 写成 `<branch>-<commit 前 8 位>`（界面版本号来源），构建后还原；手工 `compose build` 不会盖章 |
+| N7 | 构建必须有 CPU/内存配额：需先跑 `setup-build-builder.sh`；缺配额时 `update` 直接中止，不会退回无限制构建 |
+
+### 构建资源限制（N7，必须）
+
+生产机只有 4 vCPU，而 new-api 自带 CPU 保护（`middleware/performance.go`，默认阈值 90%）：宿主机 CPU 超过阈值时，relay 请求会被直接拒绝并返回 `503 system_cpu_overloaded`。2026-10-17 的线上 503 就是部署时 `compose build`（bun/vite 前端构建 + Go 编译）把宿主机 CPU 打到 99%，而当时旧实例仍在服务、用户请求正好打在旧实例上造成的。
+
+因此构建必须跑在带 cgroup CPU 配额的独立 builder 里 —— 配额由内核强制，构建过程无法绕过：
+
+```bash
+# 一次性初始化（约 1 分钟，含拉取 moby/buildkit 镜像）
+sudo /opt/new-api-deploy/setup-build-builder.sh
+# 预检：确认活跃实例、Nginx 探测与构建配额都正常
+sudo /opt/new-api-deploy/blue-green-switch.sh check
+```
+
+`blue-green-switch.sh update` 每次会校验并校正配额；builder 不存在时**直接中止**，不会退回无限制构建。`rollback` 不构建，不受该检查影响。
+
+实测数据（同一满载构建任务，观察构建期宿主机 CPU 占用）：
+
+| 构建方式 | 构建期宿主机 CPU |
+| --- | --- |
+| 默认 builder（docker driver） | 3.9 核 / 4（约 98%） |
+| 默认 builder + `--cgroup-parent=<slice>` | 3.9 核 / 4（无效：构建步由 containerd 创建，不继承该父 cgroup） |
+| 受限 builder + `--cpus=1` | 1.0 核 / 4（26%） |
+| 受限 builder + `--cpus=2`（默认） | 2.0 核 / 4（50%） |
+
+代价与注意：
+
+- **构建时间约翻倍**：2 核配额下原先约 2.5 分钟的构建约变 5 分钟。想更快可把 `BUILD_CPUS` 调到 3（占用 75%，仍低于 90% 阈值但没有余量）。
+- **首次构建是冷缓存**：docker-container driver 与默认 builder 的层缓存不共享，第一次会全量构建（明显更慢），之后缓存在 builder 容器里。
+- 构建内存同样受限（默认 2g），避免构建期内存冲高（实测曾从 33% 冲到 60%）把机器压进 swap。
+- 配额存放在 builder 容器的 HostConfig 中，容器重启、宿主机重启后依然有效；只有 `docker buildx rm` 重建 builder 才会丢失，此时重跑 `setup-build-builder.sh` 即可。
 
 下面的手动流程用于理解原理，以及脚本中止时的人工处理参考。
 
