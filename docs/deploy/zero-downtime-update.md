@@ -64,7 +64,7 @@ sudo /opt/new-api-deploy/blue-green-switch.sh check       # 只做预检（含�
 | N4 | 停旧实例后快速回滚失效，需按备份标签流程回滚 |
 | N5 | 新实例启动失败时脚本不会切流，线上零影响 |
 | N6 | 版本盖章：构建前把 `VERSION` 写成 `<branch>-<commit 前 8 位>`（界面版本号来源），构建后还原；手工 `compose build` 不会盖章 |
-| N7 | 构建必须有 CPU/内存配额：配额由 `setup-build-builder.sh` 写入 `build-limits.env`；`update` 只校验不修改，配额缺失或超过总资源时直接中止 |
+| N7 | 构建必须有 CPU 配额（内存配额可选，默认不限制）：配额由 `setup-build-builder.sh` 写入 `build-limits.env`；`update` 只校验不修改，配额缺失或超过总资源时直接中止 |
 
 ### 构建资源限制（N7，必须）
 
@@ -79,7 +79,16 @@ sudo /opt/new-api-deploy/setup-build-builder.sh
 sudo /opt/new-api-deploy/blue-green-switch.sh check
 ```
 
-`blue-green-switch.sh update` 每次会校验并校正配额；builder 不存在时**直接中止**，不会退回无限制构建。`rollback` 不构建，不受该检查影响。
+`blue-green-switch.sh update` 每次会**校验**配额（不修改）：CPU 配额必须存在且不超过总核数；若设了内存上限则必须小于总内存；builder 不存在时**直接中止**，不会退回无限制构建。`rollback` 不构建，不受该检查影响。
+
+配额默认只限 CPU（2 核）、**内存不限制**。原因是 2026-10-17 16:49 的一次部署失败：给构建加 2g 内存上限（且 `memory-swap == memory`，即 cgroup 内零 swap）会让构建全程卡在内存回收（`memory.peak` 顶满 2GiB、`memory.events.max` 累计 117 万次），反而把主机内存推到 3.17G/3.9G、swap 打满，最终 BuildKit 会话心跳（15s）连续超时被判死，导出镜像时报 `no active session ... context deadline exceeded`。同一命令在 16:09（无任何配额、默认 driver）是成功的。
+
+**这类失败的识别方法**：`--progress=plain` 会显示构建步骤正常推进，失败只在最后导出阶段暴露（往往白跑几分钟）。真正的原因要看 builder 自己的日志：
+
+```bash
+docker logs --tail 50 buildx_buildkit_build-limited0 | grep -i session
+# session healthcheck failed fatally: context deadline exceeded
+```
 
 实测数据（同一满载构建任务，观察构建期宿主机 CPU 占用）：
 
@@ -92,14 +101,19 @@ sudo /opt/new-api-deploy/blue-green-switch.sh check
 
 代价与注意：
 
-- **构建时间约翻倍**：2 核配额下原先约 2.5 分钟的构建约变 5 分钟。想调大配额（会先打印服务器总核数/总内存再校验）：
+- **构建时间约翻倍**：2 核配额下原先约 2.5 分钟的构建约变 5 分钟。想调大 CPU 配额（会先打印服务器总核数/总内存再校验）：
   ```bash
-  sudo /opt/new-api-deploy/setup-build-builder.sh --cpus 3 --mem 3g
+  sudo /opt/new-api-deploy/setup-build-builder.sh --cpus 3
   ```
-  `--cpus` 不得超过服务器总核数（大于等于总核数等于不限制构建），`--mem` 不得达到总内存，两者都会被拒绝。
-- **配额来源（单一事实来源）**：`setup-build-builder.sh` 是唯一写入配额的地方，并把选择记录到 `/opt/new-api-deploy/build-limits.env`；`blue-green-switch.sh` 启动时 source 它，**只校验不修改**（builder 必须存在、必须已有配额且不超过总核数/总内存，否则直接中止）。优先级为 **显式环境变量 > `build-limits.env` > 脚本内置默认**，因此临时覆盖一次部署只需 `BUILD_CPUS=2 sudo .../blue-green-switch.sh check`，不会写回文件。副作用：builder 容器被重建导致配额丢失时，部署会中止并提示重跑 `setup-build-builder.sh`（不再自动写回默认值）。
+  `--cpus` 不得超过服务器总核数（大于等于总核数等于不限制构建，会被拒绝）。
+- **只构建一个 service**：两个 service 共用 `image: new-api-zyy:latest`，`blue-green-switch.sh` 只构建本次要启动的那个（`compose build ... $standby`）。全部构建会让 bake 各导出一份镜像，而导出是最吃内存的阶段。手工构建时同样如此：
+  ```bash
+  docker compose -f /opt/new-api-deploy/compose.yaml build --builder build-limited --pull --progress=plain new-api-a
+  ```
+- **内存配额默认关闭**：除非确有必要，不要用 `--mem` 限制。若确实要限，注意：① 切回不限制必须用 `--recreate`（`docker update --memory=0` 无法清除已有上限）；② 上限值需高于构建本身的需求，否则会重现上面的会话心跳超时。
+- **配额来源（单一事实来源）**：`setup-build-builder.sh` 是唯一写入配额的地方，并把选择记录到 `/opt/new-api-deploy/build-limits.env`；`blue-green-switch.sh` 启动时 source 它，**只校验不修改**。优先级为 **显式环境变量 > `build-limits.env` > 脚本内置默认**，因此临时覆盖一次部署只需 `BUILD_CPUS=2 sudo .../blue-green-switch.sh check`，不会写回文件。副作用：builder 容器被重建导致配额丢失时，部署会中止并提示重跑 `setup-build-builder.sh`。
 - **首次构建是冷缓存**：docker-container driver 与默认 builder 的层缓存不共享，第一次会全量构建（明显更慢），之后缓存在 builder 容器里。
-- 构建内存同样受限（默认 2g），避免构建期内存冲高（实测曾从 33% 冲到 60%）把机器压进 swap。
+- **建议给主机加 swap**：本机空闲时 swap 就已 0.93–0.99G/1.0G 占满（构建无关的长期状态），任何内存尖峰都会直接进 thrash。加一个 2G swapfile 能显著降低“构建期整机抖动”的风险。
 - 配额存放在 builder 容器的 HostConfig 中，容器重启、宿主机重启后依然有效；只有 `docker buildx rm` 重建 builder 才会丢失，此时重跑 `setup-build-builder.sh` 即可。
 
 下面的手动流程用于理解原理，以及脚本中止时的人工处理参考。

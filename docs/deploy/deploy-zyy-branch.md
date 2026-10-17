@@ -355,7 +355,7 @@ VERSION_TAG="zyy-$(git rev-parse HEAD | cut -c1-8)"
 printf '%s' "$VERSION_TAG" > VERSION
 
 cd /opt/new-api-deploy
-docker compose build --builder build-limited --pull --progress=plain new-api
+docker compose build --builder build-limited --pull --progress=plain new-api-a
 
 cd /opt/new-api-src
 git checkout -- VERSION   # 还原空文件

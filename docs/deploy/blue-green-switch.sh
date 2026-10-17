@@ -31,10 +31,14 @@
 #      这样界面左上角版本号才随部署变化（受保护行为，修改构建流程时必须保留）。
 #      注意：手工在 $SRC_DIR 直接 compose build 不会盖章，只有本脚本会。
 #   N7 构建 CPU 配额：构建必须走受限 builder（BUILDX_BUILDER_NAME），
-#      由 ensure_build_limits 校验“配额存在且不超过总核数/总内存”；
-#      配额不可用时 update 直接中止，不会退回无限制构建。
+#      由 ensure_build_limits 校验“CPU 配额存在且不超过总核数；
+#      若设了内存上限则必须小于总内存”；不满足时 update 直接中止，
+#      不会退回无限制构建。
 #      配额本身由 setup-build-builder.sh 写入并记录到 build-limits.env，
 #      本脚本只读不写（不会把运维调整过的值改回去）。
+#      内存配额默认不限制：本机实测 2g 上限 + cgroup 零 swap 会让构建卡在
+#      内存回收上，BuildKit 会话心跳超时，导出时报 no active session。
+#      另：只构建本次要启动的备用 target，避免两个 service 各导出一份镜像。
 #      rollback 不构建，因此不受该检查影响。
 #
 set -euo pipefail
@@ -70,7 +74,7 @@ if [ -r "$BUILD_LIMITS_FILE" ]; then
 fi
 BUILDX_BUILDER_NAME="${BUILDX_BUILDER_NAME:-build-limited}"
 BUILD_CPUS="${BUILD_CPUS:-2}"    # 仅用于与实际配额比对提示，不写回
-BUILD_MEM="${BUILD_MEM:-2g}"     # 同上
+BUILD_MEM="${BUILD_MEM:-off}"    # off = 不限制；同上，不写回
 
 NGINX_SEARCH_PATHS="/etc/nginx/sites-enabled /etc/nginx/sites-available /etc/nginx/conf.d"
 
@@ -139,11 +143,9 @@ ensure_build_limits() {
   nano="$(docker inspect -f '{{.HostConfig.NanoCpus}}' "$ct")"
   mem="$(docker inspect -f '{{.HostConfig.Memory}}' "$ct")"
 
-  # 断言①：配额存在
+  # 断言①：CPU 配额必须存在（内存配额可选，见下）
   [ "${nano:-0}" -gt 0 ] 2>/dev/null \
     || die "N7: builder '${BUILDX_BUILDER_NAME}' 没有 CPU 配额（NanoCpus=${nano:-空}），拒绝构建；请执行 sudo ${DEPLOY_DIR}/setup-build-builder.sh"
-  [ "${mem:-0}" -gt 0 ] 2>/dev/null \
-    || die "N7: builder '${BUILDX_BUILDER_NAME}' 没有内存配额（Memory=${mem:-空}），拒绝构建；请执行 sudo ${DEPLOY_DIR}/setup-build-builder.sh"
 
   # 断言②：配额不超过服务器总资源（大于等于总资源等于不限制，防线失效）
   cpu_total="$(nproc --all 2>/dev/null || nproc)"
@@ -158,13 +160,19 @@ ensure_build_limits() {
   case "$mem_total_kb" in
     ''|*[!0-9]*) warn "N7: 读不到 /proc/meminfo 的总内存，跳过内存配额上限校验" ;;
     *) mem_total_bytes=$((mem_total_kb * 1024))
-       [ "$mem" -lt "$mem_total_bytes" ] \
-         || die "N7: builder 的内存配额 $((mem / 1024 / 1024))MiB 不小于服务器总内存 $((mem_total_bytes / 1024 / 1024))MiB，拒绝构建" ;;
+       # 内存配额是可选的（0 = 不限制）；设了就必须小于总内存
+       if [ "${mem:-0}" -gt 0 ] 2>/dev/null; then
+         [ "$mem" -lt "$mem_total_bytes" ] \
+           || die "N7: builder 的内存配额 $((mem / 1024 / 1024))MiB 不小于服务器总内存 $((mem_total_bytes / 1024 / 1024))MiB，拒绝构建"
+       fi ;;
   esac
 
   cpu_desc="$(awk -v n="$nano" 'BEGIN{printf "%.2f", n/1e9}')/${cpu_total}核"
-  mem_desc="$((mem / 1024 / 1024))MiB"
-  [ -n "$mem_total_bytes" ] && mem_desc="${mem_desc}/$((mem_total_bytes / 1024 / 1024))MiB"
+  mem_desc="不限制"
+  if [ "${mem:-0}" -gt 0 ] 2>/dev/null; then
+    mem_desc="$((mem / 1024 / 1024))MiB"
+    [ -n "$mem_total_bytes" ] && mem_desc="${mem_desc}/$((mem_total_bytes / 1024 / 1024))MiB"
+  fi
   log "N7 构建资源限制: builder=${BUILDX_BUILDER_NAME} cpu=${cpu_desc} mem=${mem_desc}"
 
   # 期望值（环境变量或 build-limits.env）与实际不一致时只提示，不覆盖
@@ -249,8 +257,9 @@ step_backup() {
     | while read -r t; do docker rmi "new-api-zyy:$t" >/dev/null 2>&1 || true; done
 }
 
-step_pull_and_build() {
-  log "② 拉取 ${BRANCH} 分支并构建镜像"
+step_pull_and_build() { # $1 = 本次要启动的备用服务名（只构建它，见下方注释）
+  local target="$1"
+  log "② 拉取 ${BRANCH} 分支并构建镜像（target=${target}）"
   warn "N1: 请确认本次更新的数据库迁移向后兼容（旧实例在切流前仍在服务）"
   git -C "$SRC_DIR" fetch origin "$BRANCH"
   git -C "$SRC_DIR" pull --ff-only origin "$BRANCH"
@@ -267,8 +276,12 @@ step_pull_and_build() {
   printf '%s' "$build_version" > "$SRC_DIR/VERSION"
   trap 'git -C "$SRC_DIR" checkout -- VERSION >/dev/null 2>&1 || true' EXIT
 
-  # N7: 必须显式指定受限 builder，否则会回到会打满宿主机 CPU 的默认 builder
-  compose build --builder "$BUILDX_BUILDER_NAME" --pull --progress=plain
+  # N7: 必须显式指定受限 builder，否则会回到会打满宿主机 CPU 的默认 builder。
+  # 只构建本次要启动的那个 service：两个 service 共用同一个 image
+  # (new-api-zyy:latest)，全都构建会让 compose bake 各导出一份镜像；导出是最
+  # 吃内存的阶段，2026-10-17 就是两轮导出 + 内存上限把 BuildKit 会话挤死导致
+  # 部署失败（no active session）。
+  compose build --builder "$BUILDX_BUILDER_NAME" --pull --progress=plain "$target"
   git -C "$SRC_DIR" checkout -- VERSION
   trap - EXIT
   log "镜像构建完成 (version=${build_version})"
@@ -376,7 +389,7 @@ cmd_update() {
   log "更新计划: 活跃 ${active_port}(${old}) → 备用 ${standby_port}(${standby})"
 
   step_backup
-  step_pull_and_build
+  step_pull_and_build "$standby"
   step_start_standby "$standby"
   step_switch_nginx "$standby_port" update
   step_drain_and_stop_old "$old"
