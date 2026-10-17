@@ -92,7 +92,13 @@ sudo /opt/new-api-deploy/blue-green-switch.sh check
 
 代价与注意：
 
-- **构建时间约翻倍**：2 核配额下原先约 2.5 分钟的构建约变 5 分钟。想更快可把 `BUILD_CPUS` 调到 3（占用 75%，仍低于 90% 阈值但没有余量）。
+- **构建时间约翻倍**：2 核配额下原先约 2.5 分钟的构建约变 5 分钟。想更快可以调大配额：
+  ```bash
+  sudo /opt/new-api-deploy/setup-build-builder.sh --cpus 3 --mem 3g   # 会先打印服务器总核数/总内存再校验
+  # blue-green-switch.sh 默认会用 2 核/2g 校正配额，两者需保持一致：
+  BUILD_CPUS=3 BUILD_MEM=3g sudo /opt/new-api-deploy/blue-green-switch.sh update
+  ```
+  `--cpus` 不得超过服务器总核数（超过等于不限制构建），`--mem` 不得达到总内存（会被拒绝）。
 - **首次构建是冷缓存**：docker-container driver 与默认 builder 的层缓存不共享，第一次会全量构建（明显更慢），之后缓存在 builder 容器里。
 - 构建内存同样受限（默认 2g），避免构建期内存冲高（实测曾从 33% 冲到 60%）把机器压进 swap。
 - 配额存放在 builder 容器的 HostConfig 中，容器重启、宿主机重启后依然有效；只有 `docker buildx rm` 重建 builder 才会丢失，此时重跑 `setup-build-builder.sh` 即可。
