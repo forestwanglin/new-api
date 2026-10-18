@@ -25,6 +25,12 @@ import { useSystemConfigStore } from '@/stores/system-config-store'
 import { DEFAULT_TOKEN_UNIT } from '../constants'
 import { useBillingTime } from '../hooks/use-billing-time'
 import {
+  BASE_GROUP_KEY,
+  getBasePriceOptions,
+  getVisibleDiscount,
+  withBaseGroupRatio,
+} from '../lib/display-discount'
+import {
   getDynamicDisplayGroupRatio,
   getDynamicPriceUnitLabelKey,
   getDynamicPricingSummary,
@@ -34,7 +40,8 @@ import { isTokenBasedModel } from '../lib/model-helpers'
 import { formatPrice, formatRequestPrice } from '../lib/price'
 import { taskUsageUnitLabel } from '../lib/task-price-display'
 import { getSeedanceVideoSpec } from '../lib/video-price'
-import type { PricingModel, TokenUnit } from '../types'
+import type { PricingModel, PriceType, TokenUnit } from '../types'
+import { OriginalPrice } from './original-price'
 
 export type ModelPriceCellOptions = {
   tokenUnit?: TokenUnit
@@ -58,20 +65,19 @@ export function ModelPriceCell(props: {
   const tokenUnitLabel = tokenUnit === 'K' ? '1K' : '1M'
   const seedanceSpec = getSeedanceVideoSpec(props.model)
   const billingTime = useBillingTime(props.model.billing_expr)
-  const dynamic = useMemo(
-    () =>
-      getDynamicPricingSummary(props.model, {
-        priceRate: options.priceRate,
-        usdExchangeRate: options.usdExchangeRate,
-        showRechargePrice: options.showRechargePrice,
-        now: billingTime === undefined ? undefined : new Date(billingTime),
-        tokenUnit,
-        showCurrencySymbol: false,
-        groupRatioMultiplier: getDynamicDisplayGroupRatio(
-          props.model,
-          options.selectedGroup
-        ),
-      }),
+  const dynamicOptions = useMemo(
+    () => ({
+      priceRate: options.priceRate,
+      usdExchangeRate: options.usdExchangeRate,
+      showRechargePrice: options.showRechargePrice,
+      now: billingTime === undefined ? undefined : new Date(billingTime),
+      tokenUnit,
+      showCurrencySymbol: false,
+      groupRatioMultiplier: getDynamicDisplayGroupRatio(
+        props.model,
+        options.selectedGroup
+      ),
+    }),
     // Currency is read indirectly by the price formatter.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
@@ -85,7 +91,44 @@ export function ModelPriceCell(props: {
       currency,
     ]
   )
-  let metrics: Array<{ label: string; value: string }>
+  const dynamic = useMemo(
+    () => getDynamicPricingSummary(props.model, dynamicOptions),
+    // Currency is read indirectly by the price formatter.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [props.model, dynamicOptions, currency]
+  )
+  const discount = getVisibleDiscount(props.model, options.selectedGroup)
+  const showOriginalPrice = discount.kind === 'discount'
+  const baseModel = useMemo(
+    () => withBaseGroupRatio(props.model),
+    [props.model]
+  )
+  const baseEntryByKey = useMemo(() => {
+    const map = new Map<
+      string,
+      { formatted: string; formattedRange?: string }
+    >()
+    if (!showOriginalPrice) {
+      return map
+    }
+    const summary = getDynamicPricingSummary(
+      props.model,
+      getBasePriceOptions(dynamicOptions)
+    )
+    for (const entry of [
+      ...(summary?.primaryEntries ?? []),
+      ...(summary?.secondaryEntries ?? []),
+    ]) {
+      map.set(entry.key, {
+        formatted: entry.formatted,
+        formattedRange: entry.formattedRange,
+      })
+    }
+    return map
+    // Currency is read indirectly by the price formatter.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.model, dynamicOptions, showOriginalPrice, currency])
+  let metrics: Array<{ label: string; value: string; original?: string }>
   const providerCaption = dynamic?.providerCount
     ? t('{{count}} providers', { count: dynamic.providerCount })
     : ''
@@ -135,12 +178,16 @@ export function ModelPriceCell(props: {
         if (hasRequestPrice && entry.unit === 'token') {
           suffix = `/${t('{{unit}} tokens', { unit: tokenUnitLabel })}`
         }
+        const baseEntry = baseEntryByKey.get(entry.key)
         return {
           label:
             entry.labelKind === 'schema'
               ? entry.shortLabel
               : t(entry.shortLabel),
           value: `${entry.formattedRange ?? entry.formatted}${suffix}`,
+          original: baseEntry
+            ? `${baseEntry.formattedRange ?? baseEntry.formatted}${suffix}`
+            : undefined,
         }
       })
     if (metrics.length === 0) {
@@ -189,6 +236,19 @@ export function ModelPriceCell(props: {
         </span>
       )
     }
+    const originalTokenPrice = (type: PriceType) =>
+      showOriginalPrice
+        ? formatPrice(
+            baseModel,
+            type,
+            tokenUnit,
+            options.showRechargePrice,
+            options.priceRate,
+            options.usdExchangeRate,
+            BASE_GROUP_KEY,
+            false
+          )
+        : undefined
     if (tokenBased) {
       metrics = [
         {
@@ -203,6 +263,7 @@ export function ModelPriceCell(props: {
             options.selectedGroup,
             false
           ),
+          original: originalTokenPrice('input'),
         },
         {
           label: t('Output'),
@@ -216,6 +277,7 @@ export function ModelPriceCell(props: {
             options.selectedGroup,
             false
           ),
+          original: originalTokenPrice('output'),
         },
       ]
     } else {
@@ -230,6 +292,16 @@ export function ModelPriceCell(props: {
             options.selectedGroup,
             false
           ),
+          original: showOriginalPrice
+            ? formatRequestPrice(
+                baseModel,
+                options.showRechargePrice,
+                options.priceRate,
+                options.usdExchangeRate,
+                BASE_GROUP_KEY,
+                false
+              )
+            : undefined,
         },
       ]
       caption = `${currencyLabel} / ${seedanceSpec ? t('second') : t('request')}`
@@ -251,11 +323,14 @@ export function ModelPriceCell(props: {
             >
               {metric.label}
             </span>
-            <span
-              className='min-w-0 font-mono text-sm break-words whitespace-normal tabular-nums'
-              title={metric.value}
-            >
-              {metric.value}
+            <span className='flex min-w-0 flex-col items-start gap-y-0.5'>
+              <span
+                className='min-w-0 font-mono text-sm break-words whitespace-normal tabular-nums'
+                title={metric.value}
+              >
+                {metric.value}
+              </span>
+              {metric.original && <OriginalPrice value={metric.original} />}
             </span>
           </span>
         ))}

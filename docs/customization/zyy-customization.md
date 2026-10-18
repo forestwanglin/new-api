@@ -7,7 +7,8 @@
 因此 **`git diff main zyy` 的每一处差异都是一条定制**，都必须登记在本文。
 
 - 盘点基线：`main` = `7de10f2c6`，`zyy` = `273abb320`，盘点日期 2026-10-18
-- 差异规模：58 个文件（28 新增 / 30 修改 / 0 删除）（截至 Z012）；行数与提交数会随后续提交变化，
+- 差异规模：58 个文件（28 新增 / 30 修改 / 0 删除）（截至 Z012）；含 Z013 后为 78 个文件
+  （42 新增 / 35 修改 / 1 删除）。行数与提交数会随后续提交变化，
   以 `git diff main zyy --shortstat` 与 `git log --oneline main..zyy` 的输出为准
 - 差异来源：`git diff main zyy --name-status`、`git log main..zyy`（当前含 4 个合并提交）
 
@@ -343,13 +344,59 @@
   （钱包页未改动以降低回归风险），后续如需收敛可抽公共面板 + 共享 query。合规被撤销但
   `aff_quota` 仍大于 0 的历史场景下，概览页与钱包页都会依据同一标记禁用划转，行为一致。
 
+### Z013 模型广场按分组倍率展示折扣与原价
+
+- 需求与原因：模型广场的价格按分组倍率折算（例如 DeepSeek 分组 ×0.6），但卡片与表格只显示折算后的
+  单一价格，用户看不到「标准价 vs 当前分组价」，也无法判断自己选的计价分组打了多少折。交付方要求
+  按**分组倍率**展示折扣徽标，并在卡片与表格补删除线原价；详情抽屉只补徽标（抽屉主价格区本身就是
+  ratio=1 的基准价口径，挂折扣会自相矛盾）。
+- 变更内容（前端）：
+  - 新增 `web/src/features/pricing/lib/display-discount.ts`：`getDisplayDiscount` 复刻
+    `getDisplayGroupRatio`（`lib/model-helpers.ts`）的选取顺序——有显式选中分组用该分组，否则取
+    `enable_groups` 中最小倍率的分组，同倍率按 `enable_groups` 顺序取第一个——返回
+    `{ group, ratio, percent, kind, isBest }`；`percent = round((ratio - 1) × 100)`，
+    `|ratio - 1| < 0.005` 视为无折扣；`getVisibleDiscount` 统一过滤已自带价格卡的 Seedance 视频模型
+    与无法解析的计费表达式；`withBaseGroupRatio` / `getBasePriceOptions` 提供「同 options、倍率置 1」
+    的原价口径——**不做除法反推**，因此货币符号、recharge 口径与小数位与现价完全一致。
+  - 新增 `components/price-discount-badge.tsx`：复用 `@/components/group-badge` 的
+    `GroupMultiplierBadge` 取色（倍率 <1 为 info、>1 为 warning），未选分组时文案为「最优分组 -40%」，
+    `title`/`aria-label` 带实际分组名；倍率 >1 显示 `+50%` 且不画删除线。
+  - 新增 `components/original-price.tsx`：`<del>` + `aria-label="Original price …"`。
+  - `components/model-card.tsx`：价格区块 caption 行右端放折扣徽标；token / request / dynamic 三条价格
+    分支各追加一行删除线原价（dynamic 分支用同一 evaluator 以 `groupRatioMultiplier: 1` 重算，
+    按 `entry.key` 对齐基准价条目）。
+  - `components/model-price-cell.tsx`：把动态定价 options 抽成 `dynamicOptions` 以便复算基准价；
+    metric 增加 `original` 字段，原价渲染在现价正下方，沿用 `showCurrencySymbol: false`。
+  - `components/cached-price-cell.tsx`：Cached 列同步原价，沿用 `stripTrailingZeros` 与默认符号。
+  - `components/pricing-columns.tsx`：Type 列在计费模式徽标后放折扣徽标，列宽 `110 → 130`。
+  - `components/model-details.tsx`：`ModelHeader` 第二行放折扣徽标；`ModelDetailsContentProps` 新增
+    `selectedGroup`，独立详情页取 `search.group`。
+  - `features/pricing/index.tsx`：`<ModelDetailsDrawer>` 透传 `selectedGroup={groupFilter}`，使抽屉
+    徽标与用户点开的那一行一致。
+  - `components/pricing-table.tsx`：`skeletonRowHeight='h-[68px]'`，让骨架行高匹配新增原价行后的真实行高。
+  - i18n：7 个 locale 新增 `Best group`、`Original price`。
+- 影响面：新增 `web/src/features/pricing/lib/display-discount.ts`、
+  `web/src/features/pricing/components/{price-discount-badge,original-price}.tsx`、
+  `web/src/features/pricing/__tests__/group-discount-display.test.tsx`、
+  `web/src/features/pricing/lib/__tests__/display-discount.test.ts`；
+  **上游自有文件**：`web/src/features/pricing/components/{model-card,model-price-cell,cached-price-cell,pricing-columns,pricing-table,model-details}.tsx`、
+  `web/src/features/pricing/index.tsx`、7 个 `web/src/i18n/locales/*.json`。
+- 与上游差异：上游只显示折算后的单一价格，没有原价与折扣；上游 Type 列只有计费模式徽标；
+  上游卡片价格区块没有 caption 行容器；上游抽屉不接收模型广场的分组筛选。
+- 开关与默认值：无开关，按分组倍率自动显示。倍率等于 1、Seedance 视频模型、无法解析的计费表达式、
+  未配置价格都不显示；倍率 >1（溢价分组）只显示 `+xx%`，不画删除线。
+- 验证：见 §6 的 Z013 小节。
+- 风险与未覆盖：卡片示例价行（`≈ 示例价`）不加原价；溢价分组沿用 `GroupMultiplierBadge` 的 warning 配色，
+  与「动态计费」徽标同为橙色，表格里两者同格时视觉略挤（未改共享组件以控制影响面）；
+  侧边栏筛选项的 `x0.6` 后缀与徽标百分比来自同一倍率数据，两处表述不同但不会互相矛盾。
+
 ---
 
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
 确认定制没有被上游实现静默覆盖。清单按 `git diff main zyy --name-status` 的 `M` 记录整理
-（基线 `95287ef7d`，当时 28 个文件；含 Z012 后 30 个文件）：
+（基线 `95287ef7d`，当时 28 个文件；含 Z012 后 30 个文件；含 Z013 后 35 个文件）：
 
 | 区域 | 文件 | 关联条目 |
 |---|---|---|
@@ -360,12 +407,13 @@
 | 前端渠道 | `web/src/features/channels/api.ts`、`web/src/features/channels/components/dialogs/channel-test-dialog.tsx` | Z004 |
 | 前端概览 | `web/src/features/dashboard/components/overview/overview-dashboard.tsx`、`web/src/features/dashboard/components/overview/__tests__/setup-guide.test.tsx` | Z012 |
 | 前端定价 | `web/src/features/pricing/components/model-billing-mode-badge.tsx`、`model-card.tsx`、`model-details.tsx`、`model-details-api.tsx`、`model-price-cell.tsx`、`web/src/features/pricing/hooks/use-pricing-data.ts`、`web/src/features/pricing/lib/price.ts` | Z002 |
+| 前端定价（折扣/原价） | `web/src/features/pricing/components/model-card.tsx`、`model-price-cell.tsx`、`cached-price-cell.tsx`、`pricing-columns.tsx`、`pricing-table.tsx`、`model-details.tsx`、`web/src/features/pricing/index.tsx` | Z013 |
 | 前端系统信息 | `web/src/features/system-info/constants.ts` | Z007 |
-| i18n | `web/src/i18n/locales/{en,zh,zh-TW,fr,ru,ja,vi}.json` | Z002 / Z004 / Z007 / Z012 |
+| i18n | `web/src/i18n/locales/{en,zh,zh-TW,fr,ru,ja,vi}.json` | Z002 / Z004 / Z007 / Z012 / Z013 |
 
 ## 6. 验证快照
 
-本节记录实测结果：Z004 修复前、后两次，以及 Z012（同日，随改动一并更新）。
+本节记录实测结果：Z004 修复前、后两次，以及 Z012、Z013（同日，随改动一并更新）。
 
 **前端全量测试**：`cd web && ./node_modules/.bin/vitest run`
 
@@ -410,6 +458,35 @@
 
 **前端构建**：本机**未安装 `bun`**（`which bun` 失败），因此按包管理器约定改用
 `./node_modules/.bin/rsbuild build` → 构建成功（产物 66592.3 kB / gzip 20454.2 kB，退出码 0）。
+`web/dist` 已被 `.gitignore` 忽略，未进入工作区改动。
+
+### Z013 验证快照
+
+**定向测试**：`./node_modules/.bin/vitest run src/features/pricing`
+→ `Test Files 15 passed (15)`、`Tests 292 passed (292)`（3.86s）。其中本次新增的两个文件单独运行：
+`display-discount.test.ts` + `group-discount-display.test.tsx` → `Test Files 2 passed (2)`、
+`Tests 22 passed (22)`。覆盖：折扣倍率与 `getDisplayGroupRatio` 在全输入矩阵上的一致性、
+同倍率按 `enable_groups` 顺序 tie-break、epsilon 边界（0.999/1.004 视为无折扣）、
+倍率 <1 渲染 `-40%` 与删除线原价（原价 = 现价 ÷ 倍率）、倍率 =1 两者都不渲染、
+倍率 >1 渲染 `+50%` 且**无** `line-through`、未选分组渲染「最优分组」并在 tooltip 带分组名、
+Seedance 视频模型与无法解析表达式不渲染折扣、表格 Type 列渲染徽标且列宽 130、
+Cached 列同步原价、`PriceDiscountBadge` 在无折扣时渲染空。
+
+**前端全量测试**：`cd web && ./node_modules/.bin/vitest run` → 197 文件：1 失败 / 196 通过；
+2319 用例：1 失败 / 2318 通过（38.67s），唯一失败仍为既有的 `markdown.test.tsx`
+（该文件本次未改动，单独运行同样失败，归属见本节上文说明）。
+
+**类型检查与 lint**：`./node_modules/.bin/tsgo -b` 退出码 0；
+`./node_modules/.bin/oxlint -c .oxlintrc.json` 针对本次新增与修改的 12 个文件无输出（无 error/warning）。
+注意 `src/features/pricing` 目录内的 `constants.ts`、`components/model-details-apps.tsx`、
+`lib/mock-stats.ts`、`lib/filters.ts` 仍存在与本次无关的既有 error（未改动这些文件）。
+
+**格式化与版权头**：`node scripts/format-with-protected-headers.mjs --check` 无输出；
+`node scripts/add-copyright.mjs --check` 退出码 1，列出 16 个**既有**文件需要更新头，
+本次新增的 5 个文件均不在其中。
+
+**前端构建**：本机**未安装 `bun`**（`which bun` 失败），按仓库约定改用
+`./node_modules/.bin/rsbuild build` → 构建成功（`Total: 66893.8 kB / gzip 20532.2 kB`，退出码 0）。
 `web/dist` 已被 `.gitignore` 忽略，未进入工作区改动。
 
 ## 7. 与升级流程的关系

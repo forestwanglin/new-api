@@ -28,11 +28,13 @@ import { GroupBadge } from '@/components/group-badge'
 import { StatusBadge } from '@/components/status-badge'
 import { getLobeIcon } from '@/lib/lobe-icon'
 
+import { getVisibleDiscount } from '../lib/display-discount'
 import { parseTags } from '../lib/filters'
 import type { PricingModel } from '../types'
 import { CachedPriceCell } from './cached-price-cell'
 import { ModelBillingModeBadge } from './model-billing-mode-badge'
 import { ModelPriceCell, type ModelPriceCellOptions } from './model-price-cell'
+import { PriceDiscountBadge } from './price-discount-badge'
 
 // ----------------------------------------------------------------------------
 // Pricing Table Columns
@@ -74,10 +76,21 @@ export function usePricingColumns(
     {
       accessorKey: 'quota_type',
       header: t('Type'),
-      cell: ({ row }) => (
-        <ModelBillingModeBadge model={row.original} className='-ml-1.5' />
-      ),
-      size: 110,
+      cell: ({ row }) => {
+        const discount = getVisibleDiscount(
+          row.original,
+          options.selectedGroup
+        )
+        return (
+          <div className='flex min-w-0 flex-wrap items-center gap-1.5'>
+            <ModelBillingModeBadge model={row.original} className='-ml-1.5' />
+            {discount.kind !== 'none' && (
+              <PriceDiscountBadge discount={discount} />
+            )}
+          </div>
+        )
+      },
+      size: 130,
       enableSorting: false,
     },
 

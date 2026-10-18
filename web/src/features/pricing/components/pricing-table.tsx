@@ -95,6 +95,7 @@ export function PricingTable(props: PricingTableProps) {
         emptyTitle={t('No Models Found')}
         emptyDescription={t('No models match your current filters.')}
         skeletonKeyPrefix='pricing-skeleton'
+        skeletonRowHeight='h-[68px]'
         applyHeaderSize
         getColumnClassName={(_columnId, kind) =>
           kind === 'header' ? 'text-muted-foreground font-medium' : undefined

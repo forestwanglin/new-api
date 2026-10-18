@@ -30,6 +30,12 @@ import { useSystemConfigStore } from '@/stores/system-config-store'
 import { DEFAULT_TOKEN_UNIT } from '../constants'
 import { useBillingTime } from '../hooks/use-billing-time'
 import {
+  BASE_GROUP_KEY,
+  getBasePriceOptions,
+  getVisibleDiscount,
+  withBaseGroupRatio,
+} from '../lib/display-discount'
+import {
   getCardExamplePrice,
   getDynamicDisplayGroupRatio,
   getDynamicPriceUnitLabelKey,
@@ -44,6 +50,8 @@ import { getSeedanceVideoSpec } from '../lib/video-price'
 import type { PricingModel, PriceType, TokenUnit } from '../types'
 import { ModelBillingModeBadge } from './model-billing-mode-badge'
 import { ModelPerfBadge, type ModelPerfBadgeData } from './model-perf-badge'
+import { OriginalPrice } from './original-price'
+import { PriceDiscountBadge } from './price-discount-badge'
 import { SeedanceVideoPrice } from './seedance-video-price'
 
 export interface ModelCardProps {
@@ -109,6 +117,38 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [props.model, dynamicPriceOptions, currency]
   )
+  const discount = getVisibleDiscount(props.model, props.selectedGroup)
+  const showDiscount = discount.kind !== 'none'
+  const showOriginalPrice = discount.kind === 'discount'
+  const baseModel = useMemo(
+    () => withBaseGroupRatio(props.model),
+    [props.model]
+  )
+  const baseEntryByKey = useMemo(() => {
+    const map = new Map<
+      string,
+      { formatted: string; formattedRange?: string }
+    >()
+    if (!showOriginalPrice) {
+      return map
+    }
+    const summary = getDynamicPricingSummary(
+      props.model,
+      getBasePriceOptions(dynamicPriceOptions)
+    )
+    for (const entry of [
+      ...(summary?.primaryEntries ?? []),
+      ...(summary?.secondaryEntries ?? []),
+    ]) {
+      map.set(entry.key, {
+        formatted: entry.formatted,
+        formattedRange: entry.formattedRange,
+      })
+    }
+    return map
+    // Currency is read indirectly by the price formatter.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.model, dynamicPriceOptions, showOriginalPrice, currency])
   let priceSummary: ReactNode
   if (dynamicSummary) {
     const cacheReadEntries = dynamicSummary.secondaryEntries.filter(
@@ -156,6 +196,7 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
                   i18n.language
                 )
               }
+              const baseEntry = baseEntryByKey.get(entry.key)
               return (
                 <div
                   key={entry.key}
@@ -176,6 +217,11 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
                       / {unitLabel}
                     </span>
                   </span>
+                  {showOriginalPrice && baseEntry && (
+                    <OriginalPrice
+                      value={baseEntry.formattedRange ?? baseEntry.formatted}
+                    />
+                  )}
                 </div>
               )
             })}
@@ -246,6 +292,19 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
             / {tokenUnitLabel}
           </span>
         </span>
+        {showOriginalPrice && (
+          <OriginalPrice
+            value={formatPrice(
+              baseModel,
+              price.type,
+              tokenUnit,
+              showRechargePrice,
+              priceRate,
+              usdExchangeRate,
+              BASE_GROUP_KEY
+            )}
+          />
+        )}
       </div>
     ))
   } else {
@@ -264,6 +323,17 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
             / {seedanceSpec ? t('second') : t('request')}
           </span>
         </span>
+        {showOriginalPrice && (
+          <OriginalPrice
+            value={formatRequestPrice(
+              baseModel,
+              showRechargePrice,
+              priceRate,
+              usdExchangeRate,
+              BASE_GROUP_KEY
+            )}
+          />
+        )}
       </div>
     )
   }
@@ -336,7 +406,10 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
           aria-label={t('Pricing')}
           className='mt-auto flex min-w-0 flex-col gap-1.5'
         >
-          <ModelBillingModeBadge model={props.model} appearance='caption' />
+          <div className='flex min-w-0 items-center justify-between gap-2'>
+            <ModelBillingModeBadge model={props.model} appearance='caption' />
+            {showDiscount && <PriceDiscountBadge discount={discount} />}
+          </div>
           {dynamicSummary?.providerCount && (
             <span className='text-muted-foreground text-xs break-words'>
               {t('{{count}} providers', {
