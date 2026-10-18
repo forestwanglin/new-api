@@ -77,6 +77,28 @@ beforeEach(() => {
         }
       case '/api/user/models':
         return { data: { success: true, data: ['gpt-4o-mini'] } }
+      case '/api/user/self':
+        return {
+          data: {
+            success: true,
+            data: {
+              id: 1,
+              username: 'dashboard-user',
+              quota: 1000000,
+              used_quota: 1000,
+              request_count: 1,
+              aff_count: 0,
+              aff_quota: 0,
+              aff_history_quota: 0,
+            },
+          },
+        }
+      case '/api/user/aff':
+        return { data: { success: true, data: 'zyycode' } }
+      case '/api/user/topup/info':
+        return {
+          data: { success: true, data: { payment_compliance_confirmed: true } },
+        }
       case '/api/data/self':
         return { data: { success: true, data: [] } }
       default:
@@ -111,10 +133,11 @@ describe('overview setup guide', () => {
     await renderOverview()
 
     const toggle = await screen.findByRole('button', { name: 'Setup guide' })
+    await screen.findByRole('heading', { name: 'Referral Program' })
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
     expect(
       screen.getAllByRole('heading').map((heading) => heading.textContent)
-    ).toEqual(['Overview', 'Usage at a glance'])
+    ).toEqual(['Overview', 'Referral Program', 'Usage at a glance'])
     expect(screen.queryByText('Setup guide complete')).not.toBeInTheDocument()
     expect(screen.queryByText('Setup progress: 3/3')).not.toBeInTheDocument()
     for (const name of ['API Keys', 'Channels', 'Usage Logs', 'Pricing']) {
@@ -125,6 +148,32 @@ describe('overview setup guide', () => {
     )
     expect(panel).toBeInTheDocument()
     expect(panel).not.toBeVisible()
+  })
+
+  it('renders the referral panel above the rest of the overview content', async () => {
+    useAuthStore
+      .getState()
+      .auth.setUser({ id: 1, username: 'new-user', role: 1 })
+    await renderOverview()
+
+    const referral = await screen.findByRole('heading', {
+      name: 'Referral Program',
+    })
+    const guide = await screen.findByRole('heading', {
+      name: 'Build on your API gateway in minutes',
+    })
+    const summary = await screen.findByRole('heading', {
+      name: 'Usage at a glance',
+    })
+
+    expect(
+      referral.compareDocumentPosition(guide) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+    expect(
+      referral.compareDocumentPosition(summary) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
   })
 
   it('toggles the completed guide with the keyboard and restores focus after hiding it', async () => {

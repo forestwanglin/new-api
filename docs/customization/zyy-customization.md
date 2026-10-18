@@ -7,7 +7,7 @@
 因此 **`git diff main zyy` 的每一处差异都是一条定制**，都必须登记在本文。
 
 - 盘点基线：`main` = `7de10f2c6`，`zyy` = `273abb320`，盘点日期 2026-10-18
-- 差异规模：54 个文件（26 新增 / 28 修改 / 0 删除）；行数与提交数会随后续提交变化，
+- 差异规模：58 个文件（28 新增 / 30 修改 / 0 删除）（截至 Z012）；行数与提交数会随后续提交变化，
   以 `git diff main zyy --shortstat` 与 `git log --oneline main..zyy` 的输出为准
 - 差异来源：`git diff main zyy --name-status`、`git log main..zyy`（当前含 4 个合并提交）
 
@@ -309,13 +309,47 @@
 - 风险与未覆盖：`AGENTS.md` 属上游文件，本次改动会在下次 `git merge upstream/main` 时冲突；
   未来的登记条目要持续维护，且模型/价格白名单类定制（Z002）需要随业务变更同步。
 
+### Z012 概览页顶部展示「邀请好友注册」卡片
+
+- 需求与原因：交付方要求注册/邀请入口出现在用户进入系统后的第一屏（概览页 `/dashboard/overview`），
+  而不是只在钱包页底部；同时把简体中文标题从「推荐计划」改为「邀请好友注册」，贴合业务口径。
+  钱包页保持原样（卡片位置不动）。
+- 变更内容（前端）：
+  - 新增 `web/src/features/dashboard/components/overview/referral-panel.tsx`：复用钱包的
+    `AffiliateRewardsCard` 与 `TransferDialog`；邀请链接与划转来自 `useAffiliate()`；邀请计数
+    （`aff_count` / `aff_quota` / `aff_history_quota`）来自独立的 `/api/user/self` react-query
+    （`staleTime` 60s），因为 auth-store 快照只在登录/引导时刷新，会话中别人用你的邀请码注册后
+    计数会过期；「转移到余额」的可用性来自 `/api/user/topup/info` 的
+    `payment_compliance_confirmed`（只取该布尔值，不引入 `useTopupInfo` 的整套充值解析）。
+    划转成功后重新拉取 self，并把 `quota` / `used_quota` / `request_count` / `aff_*` 写回
+    auth-store，避免旁边的概览指标仍显示划转前的余额。
+  - `web/src/features/dashboard/components/overview/overview-dashboard.tsx`：在概览内容
+    栈最前面插入 `<ReferralPanel />`，位于引导区与 `SummaryCards` 之前。
+  - `web/src/i18n/locales/zh.json`：键 `"Referral Program"` 的简体中文值 `推荐计划` →
+    `邀请好友注册`。其余 6 种语言未改（英文仍为 `Referral Program`）。
+- 影响面：新增 `referral-panel.tsx` 与 `__tests__/referral-panel.test.tsx`；
+  **上游自有文件**：`web/src/features/dashboard/components/overview/overview-dashboard.tsx`、
+  `web/src/features/dashboard/components/overview/__tests__/setup-guide.test.tsx`、
+  `web/src/i18n/locales/zh.json`。`affiliate-rewards-card.tsx` 未改动（仍接收 `UserWalletData`）。
+- 与上游差异：上游概览页没有邀请入口，该卡片只出现在钱包页；上游中文标题为「推荐计划」。
+- 开关与默认值：无独立开关，登录用户在概览页常显（邀请 0 人、奖励 0 时也显示，与钱包页一致）；
+  合规未确认时卡片提示划转不可用并禁用按钮，后端接口本身也会拒绝划转。
+- 验证：见 §6 的 Z012 小节（定向测试 2 文件 10 用例通过；全量 193 文件 1 失败 / 192 通过，
+  唯一失败仍是既有的 `markdown.test.tsx`；`tsgo -b` 退出码 0；oxlint 改动文件无 error；
+  `rsbuild build` 成功）。
+- 风险与未覆盖：概览页因此新增 `/api/user/self` 与 `/api/user/topup/info` 两个请求
+  （`useAffiliate` 的 `/api/user/aff` 沿用钱包实现，不带缓存）。概览页的 `SummaryCards` 仍读
+  auth-store，仅在本卡片划转成功后同步一次。钱包页与概览页的卡片装配目前是两份实现
+  （钱包页未改动以降低回归风险），后续如需收敛可抽公共面板 + 共享 query。合规被撤销但
+  `aff_quota` 仍大于 0 的历史场景下，概览页与钱包页都会依据同一标记禁用划转，行为一致。
+
 ---
 
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
 确认定制没有被上游实现静默覆盖。清单按 `git diff main zyy --name-status` 的 `M` 记录整理
-（基线 `95287ef7d`，共 28 个文件）：
+（基线 `95287ef7d`，当时 28 个文件；含 Z012 后 30 个文件）：
 
 | 区域 | 文件 | 关联条目 |
 |---|---|---|
@@ -324,13 +358,14 @@
 | 服务层 | `service/error.go` | Z001 |
 | Relay / 插件 | `relay/channel/openai/adaptor.go`、`relay/channel/task/jsplugin/adaptor.go`、`plugins/tasks/sora/plugin.js` | Z001、Z005 |
 | 前端渠道 | `web/src/features/channels/api.ts`、`web/src/features/channels/components/dialogs/channel-test-dialog.tsx` | Z004 |
+| 前端概览 | `web/src/features/dashboard/components/overview/overview-dashboard.tsx`、`web/src/features/dashboard/components/overview/__tests__/setup-guide.test.tsx` | Z012 |
 | 前端定价 | `web/src/features/pricing/components/model-billing-mode-badge.tsx`、`model-card.tsx`、`model-details.tsx`、`model-details-api.tsx`、`model-price-cell.tsx`、`web/src/features/pricing/hooks/use-pricing-data.ts`、`web/src/features/pricing/lib/price.ts` | Z002 |
 | 前端系统信息 | `web/src/features/system-info/constants.ts` | Z007 |
-| i18n | `web/src/i18n/locales/{en,zh,zh-TW,fr,ru,ja,vi}.json` | Z002 / Z004 / Z007 |
+| i18n | `web/src/i18n/locales/{en,zh,zh-TW,fr,ru,ja,vi}.json` | Z002 / Z004 / Z007 / Z012 |
 
 ## 6. 验证快照
 
-本节记录本轮（2026-10-18）实测，包含 Z004 修复前、后两次结果。
+本节记录实测结果：Z004 修复前、后两次，以及 Z012（同日，随改动一并更新）。
 
 **前端全量测试**：`cd web && ./node_modules/.bin/vitest run`
 
@@ -351,8 +386,31 @@
 （`go env` 报 `No version is set for shim: go`），未擅自安装或切换工具链。因此 Z001/Z003/Z005/Z006
 的 Go 测试结论仍以提交历史中的既有产物为准：待运行的用例为
 `go test ./relay/channel/task/jsplugin/... ./service/... -run 'VideoURL|Reconcile'`、
-`go test ./controller/... -run 'Seedance'`、`go test ./plugins/... -run 'SoraPluginArkSeedanceUsage'`、
-`go build ./...`。升级前应在具备 Go 1.26/1.25.1 的环境补跑并把结果写回本节。
+`go test ./controller/... -run 'Seedance'`、
+`go test ./plugins/... -run 'SoraPluginArkSeedanceUsage'`、`go build ./...`。
+升级前应在具备 Go 1.26/1.25.1 的环境补跑并把结果写回本节。
+
+### Z012 验证快照
+
+**定向测试**：
+`./node_modules/.bin/vitest run src/features/dashboard/components/overview/__tests__/referral-panel.test.tsx src/features/dashboard/components/overview/__tests__/setup-guide.test.tsx`
+→ `Test Files 2 passed (2)`、`Tests 10 passed (10)`（3.42s）。覆盖：中文标题「邀请好友注册」与邀请链接、
+邀请计数来自 self、仅有待划转奖励时才出现「转移到余额」、划转调用 `/api/user/aff_transfer` 后
+弹窗关闭且 auth-store 余额同步为刷新后的值、邀请面板在概览内容栈中位于引导区与 `SummaryCards` 之前。
+
+**前端全量测试**（`cd web && ./node_modules/.bin/vitest run`）：193 文件：1 失败 / 192 通过；
+2273 用例：1 失败 / 2272 通过（37.7s），失败文件仍仅为 `markdown.test.tsx`
+（上表 Z004 修复后的基线为 192 文件 / 2269 用例，失败文件相同）。
+
+**类型检查与 lint**：`./node_modules/.bin/tsgo -b` 退出码 0；
+`./node_modules/.bin/oxlint -c .oxlintrc.json` 针对 `referral-panel.tsx`、
+`overview-dashboard.tsx`、`referral-panel.test.tsx` 无输出（无 error/warning）；
+`setup-guide.test.tsx` 仅剩该文件既有的 `unicorn(prefer-query-selector)` warning
+（`document.getElementById` 用法，非本次引入）。
+
+**前端构建**：本机**未安装 `bun`**（`which bun` 失败），因此按包管理器约定改用
+`./node_modules/.bin/rsbuild build` → 构建成功（产物 66592.3 kB / gzip 20454.2 kB，退出码 0）。
+`web/dist` 已被 `.gitignore` 忽略，未进入工作区改动。
 
 ## 7. 与升级流程的关系
 
