@@ -38,6 +38,10 @@
 #      本脚本只读不写（不会把运维调整过的值改回去）。
 #      内存配额默认不限制：本机实测 2g 上限 + cgroup 零 swap 会让构建卡在
 #      内存回收上，BuildKit 会话心跳超时，导出时报 no active session。
+#      另 ensure_build_headroom 会在构建前校验“内存余量”（MemAvailable +
+#      SwapFree >= MIN_BUILD_HEADROOM_MB，默认 2048MiB）：2026-10-18 的部署
+#      失败就是宿主机空闲 swap 只剩 ~23MiB，前端 node 峰值 1.75GiB 触发内核
+#      全局 OOM 被 SIGKILL（buildkitd 报 cannot allocate memory）。
 #      另：只构建本次要启动的备用 target，避免两个 service 各导出一份镜像。
 #      rollback 不构建，因此不受该检查影响。
 #
@@ -75,6 +79,12 @@ fi
 BUILDX_BUILDER_NAME="${BUILDX_BUILDER_NAME:-build-limited}"
 BUILD_CPUS="${BUILD_CPUS:-2}"    # 仅用于与实际配额比对提示，不写回
 BUILD_MEM="${BUILD_MEM:-off}"    # off = 不限制；同上，不写回
+
+# N7: 构建前内存余量下限（MiB），口径 = MemAvailable + SwapFree。前端 rspack/node
+# 峰值实测约 1.8GiB 且与 Go 编译并行；2026-10-18 的部署失败正是宿主机 4G 内存 +
+# 1G swap 已被占满（空闲 swap 仅 ~23MiB），node 被内核全局 OOM SIGKILL。
+# 置 0 可跳过该检查（风险自担）。
+MIN_BUILD_HEADROOM_MB="${MIN_BUILD_HEADROOM_MB:-2048}"
 
 NGINX_SEARCH_PATHS="/etc/nginx/sites-enabled /etc/nginx/sites-available /etc/nginx/conf.d"
 
@@ -180,6 +190,42 @@ ensure_build_limits() {
     warn "N7: 实际 CPU 配额 $(awk -v n="$nano" 'BEGIN{printf "%.2f", n/1e9}') 核 与期望 ${BUILD_CPUS} 核（环境变量或 ${BUILD_LIMITS_FILE}）不一致；"
     warn "    本脚本不覆盖配额，如需统一请重跑 sudo ${DEPLOY_DIR}/setup-build-builder.sh"
   fi
+}
+
+# N7: 构建前内存余量预检。CPU 配额解决的是 503（CPU 超阈值），管不住内存：
+# 构建期前端 rsbuild(node) 峰值实测约 1.8GiB，且与 Go 编译并行推进。
+# 2026-10-18 的失败证据：
+#   dmesg: Out of memory: Killed process (node) ... anon-rss:1757864kB, global_oom
+#   buildkitd: ... bun run build ... cannot allocate memory
+# 当时宿主机 MemAvailable ≈ 1.9GiB、空闲 swap 仅 ~23MiB，尖峰无处可去。
+# 这里在构建前把余量摆出来并直接中止，避免白跑几分钟才被 OOM 杀掉。
+ensure_build_headroom() {
+  local avail_kb swap_free_kb avail_mb swap_mb headroom_mb
+  case "$MIN_BUILD_HEADROOM_MB" in
+    ''|*[!0-9]*) die "N7: MIN_BUILD_HEADROOM_MB 必须是整数（MiB），当前为 '${MIN_BUILD_HEADROOM_MB}'" ;;
+  esac
+  if [ "$MIN_BUILD_HEADROOM_MB" -eq 0 ]; then
+    warn "N7: MIN_BUILD_HEADROOM_MB=0，跳过构建内存余量预检（风险自担）"
+    return 0
+  fi
+
+  avail_kb="$(awk '/^MemAvailable:/{print $2}' /proc/meminfo)"
+  swap_free_kb="$(awk '/^SwapFree:/{print $2}' /proc/meminfo)"
+  case "$avail_kb" in
+    ''|*[!0-9]*) warn "N7: 读不到 /proc/meminfo 的 MemAvailable，跳过构建内存余量预检"; return 0 ;;
+  esac
+  case "$swap_free_kb" in ''|*[!0-9]*) swap_free_kb=0 ;; esac
+  avail_mb=$((avail_kb / 1024))
+  swap_mb=$((swap_free_kb / 1024))
+  headroom_mb=$((avail_mb + swap_mb))
+
+  log "N7 构建内存余量: 可用内存 ${avail_mb}MiB + 空闲 swap ${swap_mb}MiB = ${headroom_mb}MiB（下限 ${MIN_BUILD_HEADROOM_MB}MiB）"
+  [ "$headroom_mb" -ge "$MIN_BUILD_HEADROOM_MB" ] || die "N7: 构建内存余量不足（${headroom_mb}MiB < ${MIN_BUILD_HEADROOM_MB}MiB）。\
+前端 rsbuild 峰值约 1.8GiB 且与 Go 编译并行，继续构建大概率被内核 OOM 杀掉（见 2026-10-18 事件）。\
+请先扩容/释放内存再重试，例如：\
+  1) 加 swapfile: fallocate -l 4G /swap2 && chmod 600 /swap2 && mkswap /swap2 && swapon /swap2（并把 /swap2 写入 /etc/fstab 持久化）\
+  2) 释放构建缓存常驻内存: docker restart buildx_buildkit_${BUILDX_BUILDER_NAME}0（保留缓存）或 docker builder prune -f（会冷构建）\
+  3) 确认风险可接受时覆盖阈值: MIN_BUILD_HEADROOM_MB=0 sudo $0 update"
 }
 
 # ==================== 状态探测 ====================
@@ -366,6 +412,7 @@ cmd_update() {
   check_preconditions
   # N7: 在任何副作用（数据库备份、git pull、构建）之前先确认构建资源限制可用
   ensure_build_limits
+  ensure_build_headroom
 
   local active_port active_svc running old standby standby_port
   active_port="$(active_port)"
@@ -440,6 +487,7 @@ cmd_rollback() {
 cmd_check() { # 预检：只读校验，不改动线上任何东西
   check_preconditions
   ensure_build_limits
+  ensure_build_headroom
 
   local port
   port="$(active_port)"

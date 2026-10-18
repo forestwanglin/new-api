@@ -64,7 +64,7 @@ sudo /opt/new-api-deploy/blue-green-switch.sh check       # 只做预检（含�
 | N4 | 停旧实例后快速回滚失效，需按备份标签流程回滚 |
 | N5 | 新实例启动失败时脚本不会切流，线上零影响 |
 | N6 | 版本盖章：构建前把 `VERSION` 写成 `<branch>-<commit 前 8 位>`（界面版本号来源），构建后还原；手工 `compose build` 不会盖章 |
-| N7 | 构建必须有 CPU 配额（内存配额可选，默认不限制）：配额由 `setup-build-builder.sh` 写入 `build-limits.env`；`update` 只校验不修改，配额缺失或超过总资源时直接中止 |
+| N7 | 构建必须有 CPU 配额（内存配额可选，默认不限制），且构建前内存余量须 ≥ `MIN_BUILD_HEADROOM_MB`（默认 2048MiB）：配额由 `setup-build-builder.sh` 写入 `build-limits.env`；`update` 只校验不修改，配额缺失/超过总资源、内存余量不足时直接中止 |
 
 ### 构建资源限制（N7，必须）
 
@@ -82,6 +82,23 @@ sudo /opt/new-api-deploy/blue-green-switch.sh check
 `blue-green-switch.sh update` 每次会**校验**配额（不修改）：CPU 配额必须存在且不超过总核数；若设了内存上限则必须小于总内存；builder 不存在时**直接中止**，不会退回无限制构建。`rollback` 不构建，不受该检查影响。
 
 配额默认只限 CPU（2 核）、**内存不限制**。原因是 2026-10-17 16:49 的一次部署失败：给构建加 2g 内存上限（且 `memory-swap == memory`，即 cgroup 内零 swap）会让构建全程卡在内存回收（`memory.peak` 顶满 2GiB、`memory.events.max` 累计 117 万次），反而把主机内存推到 3.17G/3.9G、swap 打满，最终 BuildKit 会话心跳（15s）连续超时被判死，导出镜像时报 `no active session ... context deadline exceeded`。同一命令在 16:09（无任何配额、默认 driver）是成功的。
+
+**内存余量预检（2026-10-18 事件）**：CPU 配额管得住 503，但管不住内存。2026-10-18 07:06 的一次 `update` 失败：
+
+- 症状：`--progress=plain` 中前端 `rsbuild` 已打出 `ready built in 32.4s`，随后 `bun` 报 `script "build" was terminated by signal SIGKILL`，buildkitd 报 `cannot allocate memory`（前端的 `ready` 只代表产物写完，不代表进程能正常退出）。
+- 真因（`dmesg -T`）：宿主机 **4G 内存 + 1G swap**，失败前 `free -m` 显示空闲 swap 仅 **~23MiB**；前端 `node` 进程 anon-rss 峰值 **1.75GiB**，触发**内核全局 OOM**（`global_oom`）被 SIGKILL。**不是** cgroup 内存上限（builder `Memory=0`），也**不是** 2026-10-17 的会话心跳问题。
+- 处置：宿主机新增 4G swapfile；`docker restart buildx_buildkit_build-limited0` 释放 buildkitd 常驻内存（缓存卷与 CPU 配额都不受影响）。详见下方命令。
+- 防线：`blue-green-switch.sh` 的 `ensure_build_headroom` 在构建前校验 `MemAvailable + SwapFree ≥ MIN_BUILD_HEADROOM_MB`（默认 2048MiB），不足直接中止并给出处置命令；`check` 也会跑这条检查。确认风险可接受时可覆盖：`MIN_BUILD_HEADROOM_MB=0 sudo …/blue-green-switch.sh update`。
+
+```bash
+# 加一个 4G swapfile（磁盘需有余量；以下已在生产机执行过）
+fallocate -l 4G /swap2 && chmod 600 /swap2
+mkswap /swap2 && swapon /swap2
+echo '/swap2  none  swap  sw  0  0' >> /etc/fstab   # 持久化
+free -m && swapon --show
+```
+
+> 不要用 `--mem` 去“修”内存不足：它会重现 2026-10-17 的会话心跳超时（见下方内存配额说明）。也不要用 `docker builder prune -f` 省内存：冷构建要重跑 `bun install` / `go mod download`，峰值反而更高；要释放常驻内存用 `docker restart` 保留缓存即可。
 
 **这类失败的识别方法**：`--progress=plain` 会显示构建步骤正常推进，失败只在最后导出阶段暴露（往往白跑几分钟）。真正的原因要看 builder 自己的日志：
 
@@ -113,7 +130,7 @@ docker logs --tail 50 buildx_buildkit_build-limited0 | grep -i session
 - **内存配额默认关闭**：除非确有必要，不要用 `--mem` 限制。若确实要限，注意：① 切回不限制必须用 `--recreate`（`docker update --memory=0` 无法清除已有上限）；② 上限值需高于构建本身的需求，否则会重现上面的会话心跳超时。
 - **配额来源（单一事实来源）**：`setup-build-builder.sh` 是唯一写入配额的地方，并把选择记录到 `/opt/new-api-deploy/build-limits.env`；`blue-green-switch.sh` 启动时 source 它，**只校验不修改**。优先级为 **显式环境变量 > `build-limits.env` > 脚本内置默认**，因此临时覆盖一次部署只需 `BUILD_CPUS=2 sudo .../blue-green-switch.sh check`，不会写回文件。副作用：builder 容器被重建导致配额丢失时，部署会中止并提示重跑 `setup-build-builder.sh`。
 - **首次构建是冷缓存**：docker-container driver 与默认 builder 的层缓存不共享，第一次会全量构建（明显更慢），之后缓存在 builder 容器里。
-- **建议给主机加 swap**：本机空闲时 swap 就已 0.93–0.99G/1.0G 占满（构建无关的长期状态），任何内存尖峰都会直接进 thrash。加一个 2G swapfile 能显著降低“构建期整机抖动”的风险。
+- **主机 swap（已扩容，不要再降回去）**：本机空闲时原 1G `/swap` 就长期 0.93–0.99G 占满（构建无关的长期状态），2026-10-18 因此发生构建期全局 OOM（见上）。现已新增 4G `/swap2`（合计 5G，写入 `/etc/fstab`）。这台 4G 内存的机器上 swap 是构建内存的硬约束，缩回会让 `ensure_build_headroom` 直接中止部署。
 - 配额存放在 builder 容器的 HostConfig 中，容器重启、宿主机重启后依然有效；只有 `docker buildx rm` 重建 builder 才会丢失，此时重跑 `setup-build-builder.sh` 即可。
 
 下面的手动流程用于理解原理，以及脚本中止时的人工处理参考。
