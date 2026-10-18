@@ -33,7 +33,9 @@ export function OriginalPrice(props: { value: string; className?: string }) {
   return (
     <del
       className={cn(
-        'text-muted-foreground text-xs font-normal tabular-nums line-through',
+        // Match the displayed price size in cards and table cells while
+        // keeping the struck-through original visually distinct in red.
+        'text-destructive text-sm font-normal tabular-nums line-through',
         props.className
       )}
       aria-label={description}

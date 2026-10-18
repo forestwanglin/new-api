@@ -390,6 +390,29 @@
   与「动态计费」徽标同为橙色，表格里两者同格时视觉略挤（未改共享组件以控制影响面）；
   侧边栏筛选项的 `x0.6` 后缀与徽标百分比来自同一倍率数据，两处表述不同但不会互相矛盾。
 
+### Z014 模型广场折扣与原价统一红色、划线原价对齐现价字号
+
+- 需求与原因：Z013 上线的折扣展示里，删除线原价用 `text-muted-foreground text-xs`、折扣徽标用
+  `GroupMultiplierBadge` 的 info 蓝，交付方要求：卡片模式下删除线原价与现价**同字号**，删除线与
+  折扣信息用**红色**；表格模式下折扣信息与删除线沿用卡片模式**同一个红色**。
+- 变更内容（前端）：
+  - `components/original-price.tsx`：删除线原价 `text-muted-foreground text-xs` →
+    `text-destructive text-sm`，字号对齐卡片/表格现价（两者均为 `text-sm`），并在所有调用点统一为红色。
+  - `components/price-discount-badge.tsx`：`discount.kind === 'discount'`（倍率 <1）时在共享
+    `GroupMultiplierBadge` 上覆写 `border-destructive/30 bg-destructive/10 text-destructive`；
+    溢价分组（`+xx%`）保持 warning 橙。卡片、表格 Type 列、详情抽屉共用该组件，三处同步变红。
+  - `__tests__/group-discount-display.test.tsx`：新增「卡片折扣与原价红色 + 原价与现价同字号」用例，
+    并在表格价格单元与 Type 列断言上补 `text-destructive` / `text-sm`。
+- 影响面：无新增文件；**上游自有文件**：
+  `web/src/features/pricing/components/{original-price,price-discount-badge}.tsx`、
+  `web/src/features/pricing/__tests__/group-discount-display.test.tsx`。
+- 与上游差异：上游没有折扣/原价展示（Z013 引入）；本次只在 Z013 的基础上调整配色与字号，未改共享
+  `@/components/group-badge.tsx`，因此密钥页等其它 `GroupMultiplierBadge` 用法不受影响。
+- 开关与默认值：无开关；无折扣与溢价分组维持原配色，删除线原价仍只在 Z013 的显示条件下出现。
+- 验证：见 §6 的 Z014 小节。
+- 风险与未覆盖：红色取自主题 `destructive` 变量，深浅色与主题预设下会随之变化；未在真实浏览器截图
+  核对红色与卡片背景的对比度。
+
 ---
 
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
@@ -413,7 +436,7 @@
 
 ## 6. 验证快照
 
-本节记录实测结果：Z004 修复前、后两次，以及 Z012、Z013（同日，随改动一并更新）。
+本节记录实测结果：Z004 修复前、后两次，以及 Z012、Z013、Z014（同日，随改动一并更新）。
 
 **前端全量测试**：`cd web && ./node_modules/.bin/vitest run`
 
@@ -488,6 +511,23 @@ Cached 列同步原价、`PriceDiscountBadge` 在无折扣时渲染空。
 **前端构建**：本机**未安装 `bun`**（`which bun` 失败），按仓库约定改用
 `./node_modules/.bin/rsbuild build` → 构建成功（`Total: 66893.8 kB / gzip 20532.2 kB`，退出码 0）。
 `web/dist` 已被 `.gitignore` 忽略，未进入工作区改动。
+
+### Z014 验证快照
+
+**定向测试**：`./node_modules/.bin/vitest run src/features/pricing`
+→ `Test Files 15 passed (15)`、`Tests 293 passed (293)`（3.78s）。新增/加强的断言：卡片折扣徽标
+文案元素带 `text-destructive`、两条删除线原价同为 `text-sm` + `text-destructive`；表格价格单元的
+原价、Type 列折扣徽标同为 `text-destructive`。
+
+**前端全量测试**：`cd web && ./node_modules/.bin/vitest run` → 197 文件：1 失败 / 196 通过；
+2320 用例：1 失败 / 2319 通过（37.64s），唯一失败仍为既有的 `markdown.test.tsx`
+（与本次改动无关，归属见本节上文）。
+
+**类型检查与 lint**：`./node_modules/.bin/tsgo -b` 退出码 0；
+`./node_modules/.bin/oxlint -c .oxlintrc.json` 针对本次修改的 2 个组件与 1 个测试文件无输出（无 error/warning）。
+
+**前端构建**：本机**未安装 `bun`**，按仓库约定改用 `./node_modules/.bin/rsbuild build`
+→ 构建成功（`Total: 66893.9 kB / gzip 20532.2 kB`，退出码 0）。
 
 ## 7. 与升级流程的关系
 

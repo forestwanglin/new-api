@@ -50,6 +50,12 @@ export function PriceDiscountBadge(props: {
     ? `${t('Best group')} ${percentText}`
     : percentText
   const hint = discount.group ? `${discount.group} ${percentText}` : percentText
+  // Cheaper groups are the only true discount; override the shared badge's
+  // info colour with the destructive red used for the struck-through price.
+  const discountColorClassName =
+    discount.kind === 'discount'
+      ? 'border-destructive/30 bg-destructive/10 text-destructive'
+      : undefined
 
   return (
     <span
@@ -60,7 +66,7 @@ export function PriceDiscountBadge(props: {
       <GroupMultiplierBadge
         ratio={discount.ratio}
         label={label}
-        className='tabular-nums'
+        className={cn('tabular-nums', discountColorClassName)}
       />
     </span>
   )

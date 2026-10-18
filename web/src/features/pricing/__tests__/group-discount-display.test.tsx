@@ -111,6 +111,20 @@ describe('model card group discount', () => {
     expect(document.querySelectorAll('del')).toHaveLength(2)
   })
 
+  it('sizes the struck-through price like the current price and paints it red', () => {
+    renderCard({}, 'DeepSeek')
+
+    const badgeLabel = screen.getByText('-40%')
+    expect(badgeLabel.parentElement?.className).toContain('text-destructive')
+
+    const originalPrices = document.querySelectorAll('del')
+    expect(originalPrices).toHaveLength(2)
+    for (const price of originalPrices) {
+      expect(price.className).toContain('text-sm')
+      expect(price.className).toContain('text-destructive')
+    }
+  })
+
   it('hides the badge and the original price when the multiplier is 1', () => {
     renderCard(
       {
@@ -179,7 +193,9 @@ describe('table price cells', () => {
     )
 
     expect(screen.getByText('1.2')).toBeVisible()
-    expect(screen.getByLabelText('Original price 2')).toBeVisible()
+    const original = screen.getByLabelText('Original price 2')
+    expect(original.className).toContain('text-destructive')
+    expect(original.className).toContain('text-sm')
     expect(screen.getByLabelText('Original price 6')).toBeVisible()
   })
 
@@ -210,6 +226,9 @@ describe('table price cells', () => {
     render(<>{renderCell({ row: { original: pricingModel() } })}</>)
 
     expect(screen.getByText('-40%')).toBeVisible()
+    expect(screen.getByText('-40%').parentElement?.className).toContain(
+      'text-destructive'
+    )
   })
 })
 
