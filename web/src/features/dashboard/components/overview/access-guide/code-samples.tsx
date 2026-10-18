@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { Copy, Loader2 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { CodeBlock } from '@/components/ai-elements/code-block'
@@ -39,6 +39,33 @@ type AccessCodeSamplesProps = {
   onCopyCommand: (tab: Exclude<AccessCodeSampleTab, 'client'>) => void
 }
 
+/**
+ * Fixed copy shown in place of the generated samples while the user owns no
+ * API key. It points at the empty-key card above instead of rendering a
+ * command that could never run (`sk-...` + a model they have not unlocked).
+ */
+function EmptyCodeSamples() {
+  const { t } = useTranslation()
+  const steps = [
+    t('1. Click the “Create now” button above.'),
+    t('2. Pick a group (for example the DeepSeek or GPT series).'),
+    t('3. Copy base_url / api_key / model here into your client.'),
+  ]
+
+  return (
+    <div className='bg-muted/20 rounded-lg border p-4 font-mono text-[13px] leading-6'>
+      <p className='text-muted-foreground'>{`# ${t(
+        'Create and select an API key to generate runnable code samples here.'
+      )}`}</p>
+      <div className='mt-3 flex flex-col gap-1'>
+        {steps.map((step) => (
+          <span key={step}>{step}</span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function AccessCodeSamples(props: AccessCodeSamplesProps) {
   const { t } = useTranslation()
   const [tab, setTab] = useState<AccessCodeSampleTab>('curl')
@@ -56,6 +83,60 @@ export function AccessCodeSamples(props: AccessCodeSamplesProps) {
     { key: 'API Key' as const, value: props.args.apiKey },
     { key: 'Model' as const, value: props.args.model },
   ]
+
+  let sampleContent: ReactNode
+  if (!props.hasKey) {
+    sampleContent = <EmptyCodeSamples />
+  } else if (tab === 'client') {
+    sampleContent = (
+      <div className='bg-muted/20 flex flex-col gap-2 rounded-lg border p-3'>
+        {clientRows.map((row) => (
+          <div key={row.key} className='flex items-center justify-between gap-3'>
+            <span className='text-muted-foreground shrink-0 text-xs'>
+              {t(row.key)}
+            </span>
+            <span className='flex min-w-0 items-center gap-1'>
+              <code className='truncate font-mono text-xs'>{row.value}</code>
+              <CopyButton
+                value={row.value}
+                aria-label={t('Copy to clipboard')}
+                iconClassName='size-3.5'
+                className='size-7'
+              />
+            </span>
+          </div>
+        ))}
+        <p className='text-muted-foreground text-xs'>
+          {t('Select OpenAI Compatible as the protocol.')}
+        </p>
+      </div>
+    )
+  } else {
+    sampleContent = (
+      <CodeBlock
+        code={code}
+        language={tab === 'python' ? 'python' : 'bash'}
+        showToolbar
+        title={tab === 'python' ? 'Python (OpenAI SDK)' : 'curl'}
+      >
+        <Button
+          type='button'
+          variant='outline'
+          size='sm'
+          className='h-7 gap-1.5 px-2 text-xs'
+          disabled={props.copying}
+          onClick={() => props.onCopyCommand(tab)}
+        >
+          {props.copying ? (
+            <Loader2 className='size-3.5 animate-spin' />
+          ) : (
+            <Copy className='size-3.5' />
+          )}
+          {t('Copy')}
+        </Button>
+      </CodeBlock>
+    )
+  }
 
   return (
     <div className='flex flex-col gap-2'>
@@ -76,55 +157,7 @@ export function AccessCodeSamples(props: AccessCodeSamplesProps) {
         </TabsList>
       </Tabs>
 
-      {tab === 'client' ? (
-        <div className='bg-muted/20 flex flex-col gap-2 rounded-lg border p-3'>
-          {clientRows.map((row) => (
-            <div
-              key={row.key}
-              className='flex items-center justify-between gap-3'
-            >
-              <span className='text-muted-foreground shrink-0 text-xs'>
-                {t(row.key)}
-              </span>
-              <span className='flex min-w-0 items-center gap-1'>
-                <code className='truncate font-mono text-xs'>{row.value}</code>
-                <CopyButton
-                  value={row.value}
-                  aria-label={t('Copy to clipboard')}
-                  iconClassName='size-3.5'
-                  className='size-7'
-                />
-              </span>
-            </div>
-          ))}
-          <p className='text-muted-foreground text-xs'>
-            {t('Select OpenAI Compatible as the protocol.')}
-          </p>
-        </div>
-      ) : (
-        <CodeBlock
-          code={code}
-          language={tab === 'python' ? 'python' : 'bash'}
-          showToolbar
-          title={tab === 'python' ? 'Python (OpenAI SDK)' : 'curl'}
-        >
-          <Button
-            type='button'
-            variant='outline'
-            size='sm'
-            className='h-7 gap-1.5 px-2 text-xs'
-            disabled={!props.hasKey || props.copying}
-            onClick={() => props.onCopyCommand(tab)}
-          >
-            {props.copying ? (
-              <Loader2 className='size-3.5 animate-spin' />
-            ) : (
-              <Copy className='size-3.5' />
-            )}
-            {t('Copy')}
-          </Button>
-        </CodeBlock>
-      )}
+      {sampleContent}
     </div>
   )
 }

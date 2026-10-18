@@ -176,6 +176,48 @@ describe('AccessGuideCard', () => {
     expect(screen.getByRole('button', { name: 'Create now' })).toBeVisible()
   })
 
+  test('replaces the code samples with fixed guidance before a key exists', async () => {
+    const user = userEvent.setup()
+    await renderCard()
+
+    // Wait for the key query to settle so the empty state (and its button) is up.
+    await screen.findByText('No API key yet')
+    expect(
+      screen.getByText(
+        '# Create and select an API key to generate runnable code samples here.'
+      )
+    ).toBeVisible()
+    expect(
+      screen.getByText('1. Click the “Create now” button above.')
+    ).toBeVisible()
+    expect(
+      screen.getByText(
+        '2. Pick a group (for example the DeepSeek or GPT series).'
+      )
+    ).toBeVisible()
+    expect(
+      screen.getByText(
+        '3. Copy base_url / api_key / model here into your client.'
+      )
+    ).toBeVisible()
+    expect(document.querySelector('.shiki')).toBeNull()
+
+    // Once a key exists the real, runnable sample takes over.
+    await user.click(screen.getByRole('button', { name: 'Create now' }))
+    await user.click(screen.getByRole('combobox'))
+    await user.click(getCommandItem('default'))
+    await user.click(screen.getByRole('button', { name: 'Create key' }))
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText(
+          '# Create and select an API key to generate runnable code samples here.'
+        )
+      ).not.toBeInTheDocument()
+      expect(document.querySelector('.shiki')).not.toBeNull()
+    })
+  })
+
   test('blocks creation until a group is selected', async () => {
     const user = userEvent.setup()
     await renderCard()
