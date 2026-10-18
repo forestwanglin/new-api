@@ -19,12 +19,14 @@ For commercial licensing, please contact support@quantumnous.com
 import { Link } from '@tanstack/react-router'
 import {
   BookOpen,
+  ChevronDown,
+  ChevronUp,
   FileText,
   KeyRound,
   RadioTower,
   type LucideIcon,
 } from 'lucide-react'
-import { useMemo } from 'react'
+import { useId, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { SectionPageLayout } from '@/components/layout'
@@ -63,6 +65,25 @@ interface QuickAction {
   adminOnly?: boolean
 }
 
+const SETUP_GUIDE_EXPANDED_STORAGE_KEY =
+  'dashboard_overview_setup_guide_expanded'
+
+function getSavedSetupGuideExpanded(): boolean | null {
+  if (typeof window === 'undefined') return null
+  const saved = window.localStorage.getItem(SETUP_GUIDE_EXPANDED_STORAGE_KEY)
+  if (saved === 'expanded') return true
+  if (saved === 'collapsed') return false
+  return null
+}
+
+function saveSetupGuideExpanded(expanded: boolean): void {
+  if (typeof window === 'undefined') return
+  window.localStorage.setItem(
+    SETUP_GUIDE_EXPANDED_STORAGE_KEY,
+    expanded ? 'expanded' : 'collapsed'
+  )
+}
+
 function QuickActionItem(props: { action: QuickAction }) {
   const Icon = props.action.icon
 
@@ -97,6 +118,17 @@ export function OverviewDashboard() {
     uptimeKuma: showUptimePanel,
   } = useDashboardContentVisibility()
   const isAdmin = Boolean(user?.role && user.role >= ROLE.ADMIN)
+  const setupGuideId = useId()
+  const [manualSetupGuideExpanded, setManualSetupGuideExpanded] = useState<
+    boolean | null
+  >(() => getSavedSetupGuideExpanded())
+  const setupGuideExpanded = manualSetupGuideExpanded ?? true
+
+  const handleSetupGuideToggle = () => {
+    const nextExpanded = !setupGuideExpanded
+    setManualSetupGuideExpanded(nextExpanded)
+    saveSetupGuideExpanded(nextExpanded)
+  }
 
   const quickActions = useMemo<QuickAction[]>(
     () => [
@@ -141,29 +173,50 @@ export function OverviewDashboard() {
   return (
     <SectionPageLayout>
       <SectionPageLayout.Title>{t('Overview')}</SectionPageLayout.Title>
+      <SectionPageLayout.Actions>
+        <Button
+          variant='ghost'
+          size='sm'
+          className='text-muted-foreground hover:text-foreground h-auto min-h-7'
+          aria-expanded={setupGuideExpanded}
+          aria-controls={setupGuideId}
+          onClick={handleSetupGuideToggle}
+        >
+          {setupGuideExpanded ? (
+            <ChevronUp data-icon='inline-start' />
+          ) : (
+            <ChevronDown data-icon='inline-start' />
+          )}
+          {t('Setup guide')}
+        </Button>
+      </SectionPageLayout.Actions>
       <SectionPageLayout.Content>
         <div className='flex flex-col gap-4'>
           <ReferralPanel />
-          <CardStaggerContainer className='grid items-stretch gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]'>
-            <AccessGuideCard />
-            <CardStaggerItem className='bg-card h-full rounded-2xl border p-4 shadow-xs sm:p-5'>
-              <div className='flex h-full flex-col gap-4'>
-                <div className='flex flex-col gap-1'>
-                  <div className='text-muted-foreground text-xs font-medium tracking-wider uppercase'>
-                    {t('Recommended actions')}
+          <div id={setupGuideId} hidden={!setupGuideExpanded}>
+            {setupGuideExpanded && (
+              <CardStaggerContainer className='grid items-stretch gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]'>
+                <AccessGuideCard onHide={handleSetupGuideToggle} />
+                <CardStaggerItem className='bg-card h-full rounded-2xl border p-4 shadow-xs sm:p-5'>
+                  <div className='flex h-full flex-col gap-4'>
+                    <div className='flex flex-col gap-1'>
+                      <div className='text-muted-foreground text-xs font-medium tracking-wider uppercase'>
+                        {t('Recommended actions')}
+                      </div>
+                      <h3 className='text-lg font-semibold tracking-tight'>
+                        {t('Keep the platform ready')}
+                      </h3>
+                    </div>
+                    <div className='grid gap-2'>
+                      {visibleQuickActions.map((action) => (
+                        <QuickActionItem key={action.title} action={action} />
+                      ))}
+                    </div>
                   </div>
-                  <h3 className='text-lg font-semibold tracking-tight'>
-                    {t('Keep the platform ready')}
-                  </h3>
-                </div>
-                <div className='grid gap-2'>
-                  {visibleQuickActions.map((action) => (
-                    <QuickActionItem key={action.title} action={action} />
-                  ))}
-                </div>
-              </div>
-            </CardStaggerItem>
-          </CardStaggerContainer>
+                </CardStaggerItem>
+              </CardStaggerContainer>
+            )}
+          </div>
 
           <SummaryCards />
 

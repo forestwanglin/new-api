@@ -23,7 +23,7 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Toaster } from 'sonner'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -139,9 +139,11 @@ afterEach(() => {
   client.clear()
 })
 
-async function renderCard() {
+async function renderCard(onHide: () => void = () => undefined) {
   const router = createRouter({
-    routeTree: createRootRoute({ component: () => <AccessGuideCard /> }),
+    routeTree: createRootRoute({
+      component: () => <AccessGuideCard onHide={onHide} />,
+    }),
     history: createMemoryHistory({ initialEntries: ['/'] }),
   })
   await router.load()
@@ -208,42 +210,84 @@ describe('AccessGuideCard', () => {
         })
       )
     )
-    expect(await screen.findByText('my-key-1')).toBeVisible()
+    expect(
+      await screen.findByRole('combobox', { name: 'API Key' })
+    ).toHaveValue('99')
+    expect(screen.getByRole('option', { name: /my-key-1/ })).toBeInTheDocument()
   })
 
-  test('always follows the first key and its group models', async () => {
+  test('shows the first key by default and only its group models', async () => {
     tokenList = [
       makeKey(5, { name: 'Newest key', group: 'vip' }),
       makeKey(4, { name: 'Older key', group: 'default' }),
     ]
     await renderCard()
 
-    expect(await screen.findByText('Newest key')).toBeVisible()
-    expect(screen.queryByText('Older key')).not.toBeInTheDocument()
+    // Both owned keys are offered through the switcher; the newest is selected.
+    const selector = await screen.findByRole('combobox', { name: 'API Key' })
+    expect(selector).toHaveValue('5')
+    expect(
+      within(selector).getByRole('option', { name: /Older key/ })
+    ).toBeInTheDocument()
     expect(await screen.findByText('gpt-4o-mini')).toBeVisible()
     expect(screen.queryByText('deepseek-chat')).not.toBeInTheDocument()
-    // No key switcher: the newest key is always the one shown.
-    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
   })
 
-  test('switches the code sample between curl and python', async () => {
+  test('switches models and code samples when another key is selected', async () => {
+    const user = userEvent.setup()
+    tokenList = [
+      makeKey(5, { name: 'Newest key', group: 'vip' }),
+      makeKey(4, { name: 'Older key', group: 'default' }),
+    ]
+    await renderCard()
+
+    const selector = await screen.findByRole('combobox', { name: 'API Key' })
+    expect(screen.queryByText('deepseek-chat')).not.toBeInTheDocument()
+
+    await user.selectOptions(selector, '4')
+
+    expect(await screen.findByText('deepseek-chat')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: /deepseek-chat/ }))
+    await waitFor(() =>
+      expect(
+        document.querySelector('.cm-content, .shiki')?.textContent
+      ).toContain('deepseek-chat')
+    )
+  })
+
+  test('highlights curl and python samples instead of rendering plain text', async () => {
     const user = userEvent.setup()
     tokenList = [makeKey(5, { name: 'Newest key', group: 'vip' })]
     await renderCard()
 
-    await screen.findByText('Newest key')
-    await waitFor(() =>
-      expect(document.querySelector('.cm-content')?.textContent).toContain(
-        'curl'
-      )
-    )
+    await screen.findByRole('combobox', { name: 'API Key' })
+    await waitFor(() => {
+      const block = document.querySelector('.shiki')
+      expect(block?.textContent).toContain('curl')
+      // Token-level highlighting, not a single monochrome text node.
+      expect(
+        block?.querySelector('span[style*="--shiki-light"]')
+      ).not.toBeNull()
+    })
 
     await user.click(screen.getByRole('tab', { name: 'Python (OpenAI SDK)' }))
     await waitFor(() =>
-      expect(document.querySelector('.cm-content')?.textContent).toContain(
+      expect(document.querySelector('.shiki')?.textContent).toContain(
         'from openai import OpenAI'
       )
     )
+  })
+
+  test('invokes the hide callback from the card header', async () => {
+    const user = userEvent.setup()
+    const onHide = vi.fn()
+    tokenList = [makeKey(5, { name: 'Newest key', group: 'vip' })]
+    await renderCard(onHide)
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Hide setup guide' })
+    )
+    expect(onHide).toHaveBeenCalledTimes(1)
   })
 
   test('copies the full key through the token key endpoint', async () => {

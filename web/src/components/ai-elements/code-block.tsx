@@ -49,7 +49,7 @@ import {
   useState,
 } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { BundledLanguage } from 'shiki'
+import type { BundledLanguage, HighlighterCore } from 'shiki'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -241,6 +241,77 @@ function getCodeMirrorLanguageExtension(language: BundledLanguage | string) {
   }
 
   return []
+}
+
+// CodeMirror only ships markdown/javascript parsers here, so shell and python
+// samples would render without syntax highlighting. Shiki is already a project
+// dependency, so unsupported languages fall back to a lazily loaded shiki
+// highlighter instead of shipping more CodeMirror grammars.
+const SHIKI_SUPPORTED_LANGUAGES = new Set(['bash', 'python'])
+const SHIKI_THEMES = { light: 'github-light', dark: 'github-dark' } as const
+
+let shikiHighlighterPromise: Promise<HighlighterCore> | null = null
+
+function loadShikiHighlighter(): Promise<HighlighterCore> {
+  if (!shikiHighlighterPromise) {
+    shikiHighlighterPromise = Promise.all([
+      import('shiki/core'),
+      import('@shikijs/engine-javascript'),
+      import('@shikijs/langs/bash'),
+      import('@shikijs/langs/python'),
+      import('@shikijs/themes/github-light'),
+      import('@shikijs/themes/github-dark'),
+    ]).then(([core, engine, bash, python, light, dark]) =>
+      core.createHighlighterCore({
+        themes: [light.default, dark.default],
+        langs: [bash.default, python.default],
+        engine: engine.createJavaScriptRegexEngine(),
+      })
+    )
+  }
+
+  return shikiHighlighterPromise
+}
+
+/**
+ * Highlight `code` with shiki when the language is not covered by CodeMirror.
+ * The returned HTML is keyed by language+code so a stale result is never shown
+ * while the next highlight is being computed.
+ */
+function useShikiHighlight(code: string, language: string): string | null {
+  const supported = SHIKI_SUPPORTED_LANGUAGES.has(language)
+  const cacheKey = `${language}:${code}`
+  const [highlighted, setHighlighted] = useState<{
+    key: string
+    html: string
+  } | null>(null)
+
+  useEffect(() => {
+    if (!supported) return
+
+    let cancelled = false
+    loadShikiHighlighter()
+      .then((highlighter) => {
+        if (cancelled) return
+        setHighlighted({
+          key: cacheKey,
+          html: highlighter.codeToHtml(code, {
+            lang: language,
+            themes: SHIKI_THEMES,
+            defaultColor: false,
+          }),
+        })
+      })
+      .catch(() => {
+        // Keep the CodeMirror view when shiki cannot be loaded.
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [cacheKey, code, language, supported])
+
+  return highlighted?.key === cacheKey ? highlighted.html : null
 }
 
 function getCodeLineCount(code: string) {
@@ -510,6 +581,8 @@ export const CodeBlock = ({
     URL.revokeObjectURL(url)
   }
 
+  const shikiHtml = useShikiHighlight(code, displayLanguage)
+
   return (
     <CodeBlockContext.Provider value={{ code, language: displayLanguage }}>
       <CodeBlockFrame
@@ -581,16 +654,29 @@ export const CodeBlock = ({
         title={displayTitle}
         {...props}
       >
-        <CodeMirrorCodeView
-          ariaLabel={
-            typeof displayTitle === 'string' ? displayTitle : displayLanguage
-          }
-          language={language}
-          readOnly
-          rows={Math.min(Math.max(lineCount, 4), maxExpandedLines ?? lineCount)}
-          showLineNumbers={showLineNumbers}
-          value={code}
-        />
+        {shikiHtml === null ? (
+          <CodeMirrorCodeView
+            ariaLabel={
+              typeof displayTitle === 'string' ? displayTitle : displayLanguage
+            }
+            language={language}
+            readOnly
+            rows={Math.min(
+              Math.max(lineCount, 4),
+              maxExpandedLines ?? lineCount
+            )}
+            showLineNumbers={showLineNumbers}
+            value={code}
+          />
+        ) : (
+          <div
+            className='text-[13px] leading-6 [&>pre]:m-0 [&>pre]:overflow-x-auto [&>pre]:bg-transparent [&>pre]:p-4 [&>pre]:font-mono'
+            // Shiki escapes the source it highlights and the HTML is generated
+            // locally from the same `code` string CodeMirror renders.
+            // oxlint-disable-next-line react/no-danger
+            dangerouslySetInnerHTML={{ __html: shikiHtml }}
+          />
+        )}
       </CodeBlockFrame>
     </CodeBlockContext.Provider>
   )

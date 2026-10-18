@@ -24,6 +24,7 @@ import {
   RouterProvider,
 } from '@tanstack/react-router'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 import { api } from '@/lib/api'
@@ -152,16 +153,35 @@ async function renderOverview() {
 }
 
 describe('overview dashboard layout', () => {
-  test('replaces the setup guide with the access guide card and keeps recommended actions', async () => {
+  test('shows the access guide card and recommended actions behind a setup guide toggle', async () => {
     await renderOverview()
 
     await screen.findByText('Build your first app')
     expect(screen.getByText('Recommended actions')).toBeVisible()
     expect(screen.getByText('Keep the platform ready')).toBeVisible()
-    expect(
-      screen.queryByRole('button', { name: 'Setup guide' })
-    ).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Setup guide' })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    )
     expect(screen.queryByText(/Setup progress:/)).not.toBeInTheDocument()
+  })
+
+  test('hides the guide and recommended actions when collapsed and restores them', async () => {
+    const user = userEvent.setup()
+    await renderOverview()
+    await screen.findByText('Build your first app')
+
+    await user.click(screen.getByRole('button', { name: 'Setup guide' }))
+
+    expect(screen.queryByText('Build your first app')).not.toBeInTheDocument()
+    expect(screen.queryByText('Recommended actions')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Setup guide' })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Setup guide' }))
+    expect(await screen.findByText('Build your first app')).toBeVisible()
   })
 
   test('orders the referral panel, access guide card and usage summary', async () => {

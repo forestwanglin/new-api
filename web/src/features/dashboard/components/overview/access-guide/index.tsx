@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Rocket } from 'lucide-react'
+import { ChevronUp, Rocket } from 'lucide-react'
 import { useMemo, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -25,6 +25,7 @@ import { toast } from 'sonner'
 import { CopyButton } from '@/components/copy-button'
 import { CardStaggerItem } from '@/components/page-transition'
 import { Button } from '@/components/ui/button'
+import { IconBadge } from '@/components/ui/icon-badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { createApiKey, fetchTokenKey, getApiKeys } from '@/features/keys/api'
 import type { ApiKeyGroupOption } from '@/features/keys/components/api-key-group-combobox'
@@ -51,7 +52,7 @@ import {
 } from '../../../lib/access-guide'
 import { AccessCodeSamples, type AccessCodeSampleTab } from './code-samples'
 import { CreateKeyForm, type CreateKeyInput } from './create-key-form'
-import { KeySummary } from './key-summary'
+import { KeySelector } from './key-selector'
 import { ModelChips } from './model-chips'
 
 const API_KEYS_QUERY_KEY = ['dashboard', 'overview', 'api-keys'] as const
@@ -80,13 +81,14 @@ function EmptyKeyState(props: { onCreate: () => void }) {
  * Overview onboarding card: endpoint, API key, group models and copyable code
  * samples in one place. Replaces the previous setup guide.
  */
-export function AccessGuideCard() {
+export function AccessGuideCard(props: { onHide: () => void }) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const { items: apiInfoItems } = useApiInfo()
   const pricing = usePricingData()
   const { copyToClipboard } = useCopyToClipboard({ notify: false })
   const [creating, setCreating] = useState(false)
+  const [selectedKeyId, setSelectedKeyId] = useState<number | null>(null)
   const [selectedModel, setSelectedModel] = useState('')
   const [copying, setCopying] = useState(false)
 
@@ -118,8 +120,12 @@ export function AccessGuideCard() {
   })
 
   const keys = useMemo(() => apiKeysQuery.data ?? [], [apiKeysQuery.data])
-  // The card always follows the newest key (backend orders tokens by `id desc`).
-  const currentKey = useMemo(() => pickFirstKey(keys), [keys])
+  // Default to the newest key (backend orders tokens by `id desc`), but let the
+  // user switch to any other key they already own.
+  const currentKey = useMemo(
+    () => keys.find((key) => key.id === selectedKeyId) ?? pickFirstKey(keys),
+    [keys, selectedKeyId]
+  )
   const group = currentKey?.group?.trim() ?? ''
 
   const models = useMemo(
@@ -172,6 +178,7 @@ export function AccessGuideCard() {
     },
     onSuccess: async () => {
       setCreating(false)
+      setSelectedKeyId(null)
       setSelectedModel('')
       await queryClient.invalidateQueries({ queryKey: API_KEYS_QUERY_KEY })
       toast.success(t('API Key created successfully'))
@@ -190,6 +197,11 @@ export function AccessGuideCard() {
       name: input.name || t('Create API Key'),
       group: input.group,
     })
+  }
+
+  const handleSelectKey = (id: number) => {
+    setSelectedKeyId(id)
+    setSelectedModel('')
   }
 
   const resolveFullKey = async (): Promise<string | null> => {
@@ -238,11 +250,13 @@ export function AccessGuideCard() {
     apiKeyContent = <Skeleton className='h-14 w-full rounded-lg' />
   } else if (currentKey) {
     apiKeyContent = (
-      <KeySummary
-        apiKey={currentKey}
+      <KeySelector
+        keys={keys}
+        value={currentKey.id}
         maskedKey={displayKey}
-        groupRatio={group ? pricing.groupRatio[group] : undefined}
+        ratioByGroup={pricing.groupRatio}
         copying={copying}
+        onValueChange={handleSelectKey}
         onCopyFullKey={handleCopyFullKey}
       />
     )
@@ -264,11 +278,27 @@ export function AccessGuideCard() {
     <CardStaggerItem className='bg-card h-full overflow-hidden rounded-2xl border shadow-xs'>
       <div className='flex h-full flex-col gap-5 p-4 sm:p-5'>
         <div className='flex flex-col gap-1'>
-          <div className='text-muted-foreground flex items-center gap-2 text-xs font-medium tracking-wider uppercase'>
-            <Rocket className='size-3.5' aria-hidden='true' />
-            {t('Build your first app')}
+          <div className='flex flex-wrap items-center justify-between gap-2'>
+            <div className='flex min-w-0 items-center gap-2'>
+              <IconBadge tone='primary' size='sm'>
+                <Rocket />
+              </IconBadge>
+              <h3 className='truncate text-sm font-semibold'>
+                {t('Build your first app')}
+              </h3>
+            </div>
+            <Button
+              type='button'
+              variant='ghost'
+              size='sm'
+              className='h-7 shrink-0 gap-1.5 px-2 text-xs'
+              onClick={props.onHide}
+            >
+              <ChevronUp className='size-3.5' aria-hidden='true' />
+              {t('Hide setup guide')}
+            </Button>
           </div>
-          <p className='text-muted-foreground text-sm leading-relaxed'>
+          <p className='text-muted-foreground text-xs leading-relaxed'>
             {t(
               'Fill these values into any client that supports the OpenAI protocol.'
             )}
