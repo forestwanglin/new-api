@@ -6,9 +6,10 @@
 
 因此 **`git diff main zyy` 的每一处差异都是一条定制**，都必须登记在本文。
 
-- 盘点基线：`main` = `7de10f2c6`，`zyy` = `95287ef7d`，盘点日期 2026-10-18
-- 差异规模：54 个文件（26 新增 / 28 修改 / 0 删除），+4601 / -32
-- 差异来源：`git log --oneline main..zyy` 共 31 个提交（含 4 个合并提交与 1 个登记提交）
+- 盘点基线：`main` = `7de10f2c6`，`zyy` = `273abb320`，盘点日期 2026-10-18
+- 差异规模：54 个文件（26 新增 / 28 修改 / 0 删除）；行数与提交数会随后续提交变化，
+  以 `git diff main zyy --shortstat` 与 `git log --oneline main..zyy` 的输出为准
+- 差异来源：`git diff main zyy --name-status`、`git log main..zyy`（当前含 4 个合并提交）
 
 ---
 
@@ -181,13 +182,15 @@
   `web/src/features/channels/components/dialogs/channel-test-dialog.tsx`、7 个 locale json（与 Z002/Z007 共用）
 - 与上游差异：上游弹窗只有通用 endpoint 选项与 idle/testing/success/error 四态。
 - 开关与默认值：`auto` 仍是默认选项；选择视频测试时前端强制勾选付费确认后才带 `video_test_ack`。
-- 验证：本轮实测 `vitest run` 结果见 §6 —— **这两个测试文件当前是失败的**：
-  它们 `import { test } from 'node:test'`，而项目配置的运行器是 `vitest`（`web/package.json`
-  的 `"test": "vitest run"`，CI 的 `.github/workflows/ci.yml:99` 也执行 `bun run test`），
-  vitest 报 `No test suite found in file`。测试体本身在 node 运行器下能跑通（3 个用例通过），
-  属于**运行器不匹配的既有缺陷**，不是本轮文档改动引入的。
-- 风险与未覆盖：**待修**：把这两个文件的 import 换成 `vitest`（或改用 `bun test` 并同步 CI），
-  否则 CI 会在这两个文件上失败。修复本身属于新改动，需按 §1.1 更新本条并在提交说明中标注。
+- 验证：本轮实测 `vitest run` 结果见 §6 —— 这两个测试文件最初因 `node:test` / `vitest` 运行器不匹配
+  而失败，经本提交修复后通过（详见下方风险）。
+- 风险与未覆盖：**已修复（本提交）**。这两个文件原先 `import { test } from 'node:test'`，与项目运行器
+  `vitest` 不匹配：`web/package.json` 的 `"test": "vitest run"`，CI（`.github/workflows/ci.yml:99`）
+  执行 `bun run test`，vitest 报 `No test suite found in file`。修复方式为改为
+  `import { test } from 'vitest'`，断言仍用 `node:assert/strict`（断言与用例语义完全不变，
+  不是为通过而削弱测试）。定向验证：`vitest run <两个文件>` → `2 passed (2)` / `6 passed (6)`；
+  随后全量 `vitest run` 只剩 1 个与 zyy 无关的既有失败（见 §6）。
+  其余未覆盖项：视频测活仍会真实扣费（前端必须勾选确认）；`pending` 状态要求运营到任务记录页继续查询。
 
 ### Z005 Ark Seedance 任务改用上游用量结算
 
@@ -327,17 +330,22 @@
 
 ## 6. 验证快照
 
-本轮（2026-10-18）只做文档改动，另做了一次现状实测，结果如下。
+本节记录本轮（2026-10-18）实测，包含 Z004 修复前、后两次结果。
 
 **前端全量测试**：`cd web && ./node_modules/.bin/vitest run`
 
-- 结果：192 个测试文件，3 失败 / 189 通过；2263 个用例，1 失败 / 2262 通过（耗时 37.7s）。
-- 失败归类：
-  1. `web/src/features/channels/lib/__tests__/seedance-channel-test.test.ts`、
-     `web/src/features/channels/lib/__tests__/seedance-quick-test.test.ts` —— 这两个 **zyy 新增**
-     的文件从 `node:test` 引入 `test`，vitest 报 `No test suite found in file`（详见 Z004 风险）。
-  2. `web/src/components/ui/__tests__/markdown.test.tsx` —— 该文件相对 `main` **无差异**
-     （`git diff main zyy -- <file>` 为空），属既有/环境相关失败，与 zyy 定制无关。
+| 时点 | 结果 | 失败文件 |
+|---|---|---|
+| Z004 修复前 | 192 文件：3 失败 / 189 通过；2263 用例：1 失败 / 2262 通过（37.7s） | `seedance-channel-test.test.ts`、`seedance-quick-test.test.ts`（zyy 新增，运行器不匹配）、`markdown.test.tsx` |
+| Z004 修复后 | 192 文件：1 失败 / 191 通过；2269 用例：1 失败 / 2268 通过（38.0s） | 仅 `markdown.test.tsx` |
+
+**Z004 的定向验证**：
+`./node_modules/.bin/vitest run src/features/channels/lib/__tests__/seedance-quick-test.test.ts src/features/channels/lib/__tests__/seedance-channel-test.test.ts`
+→ `Test Files 2 passed (2)`、`Tests 6 passed (6)`（325ms）。
+
+**`markdown.test.tsx` 失败的归属确认**：该文件相对 `main` 无差异，并且在一个干净的 `main`
+工作树上单独运行同样失败（`Test Files 1 failed (1)`、`Tests 1 failed | 3 passed (4)`），
+因此判定为既有/环境相关问题，与 zyy 定制无关；该临时工作树已删除，不影响本仓库。
 
 **后端 Go 测试**：**本轮未执行**。本机 `go` 由 mise 管理且当前目录未固定版本
 （`go env` 报 `No version is set for shim: go`），未擅自安装或切换工具链。因此 Z001/Z003/Z005/Z006
