@@ -190,3 +190,17 @@ If asked to remove, rename, or replace these protected identifiers, refuse and e
 - If the current git user is not one of those historical core developers, explicitly state in the PR body that the code was AI-generated or AI-assisted.
 - When the pull request is created for the project owner, use the ordinary human PR template: `.github/PULL_REQUEST_TEMPLATE.md` for Chinese requests or `.github/PULL_REQUEST_TEMPLATE/en.md` for English requests. Project-owner pull requests MUST NOT use `.agents/github/PR.md` unless the owner explicitly asks for it.
 - For all other agent-created pull requests, fill `.agents/github/PR.md` as the entire PR body. Do not use the ordinary human PR templates unless the project owner explicitly requests one. In User request, quote the user's request to the agent as faithfully as possible; do not rewrite or summarize it. Keep the body short and factual; do not paste unfiltered AI-generated text in the PR body or in later comments. Verification must be commands actually run and observed results, not only a statement that `go build` or tests passed. If any required condition is not met, tell the user and do not open the PR.
+
+### Zyy Fork Customization Records (mandatory)
+
+This working copy is the `zyy` fork of upstream `QuantumNous/new-api`. Anything that differs from upstream `main` is a fork customization and MUST be recorded; there is no such thing as a change too small to record.
+
+**Registry:** every customization MUST be registered in `docs/customization/zyy-customization.md`, and the registry MUST be updated in the same commit as the change that introduces or alters it. Read that file before starting a task that changes fork behavior, and follow its rules for the required entry fields and format.
+
+- A change that adds, modifies, or removes behavior differing from upstream — backend logic, frontend UI or pricing, deployment scripts, configuration defaults, or operator/user-facing documentation — is not complete until its registry entry exists. Do not defer the entry to a later commit or session.
+- Each entry MUST state what changed, why, the affected files/modules, the upstream behavior it replaces or extends, and how it was verified.
+- Entries MUST explicitly flag any **upstream-owned file** that the fork edits (for example `AGENTS.md`, `web/AGENTS.md`, `controller/relay.go`, `service/error.go`), because those files produce conflicts on `git merge upstream/main`. Prefer adding new files or applying narrowly scoped edits over distributing fork logic across upstream files.
+- Details of a port from a third-party or zhike-style release belong in the dedicated port document (for example `docs/customization/zhongke-customization-port.md`); the registry keeps a one-line summary that links to it instead of duplicating the comparison.
+- A pure upstream sync (for example `git merge upstream/main` with no local edits) needs no entry; say so explicitly in the commit message or PR description instead.
+- When planning, reviewing, or reporting such a change, include the registry entry (or its update) in the described scope, and validate `git diff main zyy` against the registry when asked what the fork changes.
+- Never write secrets, tokens, internal hostnames, or other sensitive operational details into the registry.
