@@ -56,6 +56,8 @@ type ApiKeyGroupComboboxProps = {
   onValueChange: (value: string) => void
   placeholder?: string
   disabled?: boolean
+  /** Render a single-line trigger for inline forms. Defaults to false. */
+  compact?: boolean
 }
 
 export function ApiKeyGroupCombobox({
@@ -64,6 +66,7 @@ export function ApiKeyGroupCombobox({
   onValueChange,
   placeholder,
   disabled,
+  compact = false,
 }: ApiKeyGroupComboboxProps) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
@@ -105,7 +108,10 @@ export function ApiKeyGroupCombobox({
             data-auto-group-effect={isAutoSelected ? 'trigger' : undefined}
             disabled={disabled}
             className={cn(
-              'border-input bg-muted/40 hover:bg-muted/55 hover:text-foreground active:bg-background data-popup-open:border-ring data-popup-open:bg-background data-popup-open:ring-ring/20 relative h-auto min-h-14 w-full justify-between gap-2 rounded-lg px-3 py-2 text-start shadow-none transition-[background-color,border-color,box-shadow] duration-150 data-popup-open:ring-[3px] sm:min-h-20 sm:gap-3 sm:px-4 sm:py-3',
+              'border-input bg-muted/40 hover:bg-muted/55 hover:text-foreground active:bg-background data-popup-open:border-ring data-popup-open:bg-background data-popup-open:ring-ring/20 relative h-auto w-full justify-between gap-2 rounded-lg px-3 py-2 text-start shadow-none transition-[background-color,border-color,box-shadow] duration-150 data-popup-open:ring-[3px]',
+              compact
+                ? 'min-h-10 sm:min-h-10'
+                : 'min-h-14 sm:min-h-20 sm:gap-3 sm:px-4 sm:py-3',
               isAutoSelected &&
                 cn(
                   AUTO_GROUP_FRAME_CLASS_NAME,
@@ -118,18 +124,23 @@ export function ApiKeyGroupCombobox({
         {isAutoSelected && (
           <AutoGroupFlowBorder shouldReduceMotion={shouldReduceMotion} />
         )}
-        <span className='flex min-w-0 flex-1 items-center justify-between gap-2 sm:gap-3'>
+        <span
+          className={cn(
+            'flex min-w-0 flex-1 items-center justify-between gap-2',
+            !compact && 'sm:gap-3'
+          )}
+        >
           <span className='min-w-0'>
             <span className='block truncate font-medium'>
               {selectedOption?.label || placeholder || t('Select a group')}
             </span>
-            {selectedOption?.desc && (
+            {!compact && selectedOption?.desc && (
               <span className='text-muted-foreground block truncate text-[11px] sm:text-xs'>
                 {selectedOption.desc}
               </span>
             )}
           </span>
-          <span className='hidden sm:block'>
+          <span className={cn(compact ? 'block' : 'hidden sm:block')}>
             <GroupRatioBadge
               ratio={selectedOption?.ratio}
               isAuto={isAutoSelected}
