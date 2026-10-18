@@ -6,6 +6,7 @@
 #   sudo ./blue-green-switch.sh update      # 完整零停机更新（默认）
 #   sudo ./blue-green-switch.sh rollback    # 快速回滚：Nginx 切回旧实例（旧实例未被删除时有效）
 #   sudo ./blue-green-switch.sh check       # 只做预检（含构建资源限制校验），不改动线上任何东西
+#   sudo ./blue-green-switch.sh prune       # 只清构建缓存（默认保留 7 天内用过的），不碰实例/Nginx/数据库
 #
 # 前置条件:
 #   1. /opt/new-api-deploy/compose.yaml 为双实例配置（new-api-a:3000 / new-api-b:3001）
@@ -44,6 +45,11 @@
 #      全局 OOM 被 SIGKILL（buildkitd 报 cannot allocate memory）。
 #      另：只构建本次要启动的备用 target，避免两个 service 各导出一份镜像。
 #      rollback 不构建，因此不受该检查影响。
+#   N8 构建缓存清理：两个 builder（default 与 BUILDX_BUILDER_NAME）的构建缓存
+#      互不共享且只增不减，是本机磁盘的主要增长项（2026-10-18 实测 30G/34G）。
+#      update 在构建成功后按 BUILD_CACHE_KEEP（默认 168h）各清一次；prune 子命令
+#      只做同样的清理，供 cron 做周度兜底（不依赖线上实例，任意时间可跑）。
+#      只删 build cache，不删镜像/容器/volume，不影响备份标签与回滚。
 #
 set -euo pipefail
 
@@ -85,6 +91,15 @@ BUILD_MEM="${BUILD_MEM:-off}"    # off = 不限制；同上，不写回
 # 1G swap 已被占满（空闲 swap 仅 ~23MiB），node 被内核全局 OOM SIGKILL。
 # 置 0 可跳过该检查（风险自担）。
 MIN_BUILD_HEADROOM_MB="${MIN_BUILD_HEADROOM_MB:-2048}"
+
+# N8: 构建缓存清理。build cache 只增不减：2026-10-18 实测根分区 34G 里有约 30G
+# 是构建缓存（默认 builder 在 /var/lib/containerd 20G + 受限 builder 的 state
+# volume 9.9G），而实际镜像只有 1.3G。两个 builder 的缓存互不共享，必须分别清理。
+# 清理只针对 build cache（docker system df 的 Build Cache 一类），不删镜像、
+# 容器、volume 数据，镜像备份标签与回滚流程都不受影响。保留期内用过的缓存会
+# 留下，所以正常情况下不会把每次部署都变成冷构建。
+BUILD_CACHE_KEEP="${BUILD_CACHE_KEEP:-168h}"     # 保留最近用过的时间窗（Go duration，不支持 'd'）
+PRUNE_BUILD_CACHE="${PRUNE_BUILD_CACHE:-true}"   # false = 跳过 update 构建后的自动清理
 
 NGINX_SEARCH_PATHS="/etc/nginx/sites-enabled /etc/nginx/sites-available /etc/nginx/conf.d"
 
@@ -228,6 +243,51 @@ ensure_build_headroom() {
   3) 确认风险可接受时覆盖阈值: MIN_BUILD_HEADROOM_MB=0 sudo $0 update"
 }
 
+# ==================== 构建缓存清理（N8） ====================
+validate_build_cache_config() {
+  # buildx 把 until= 当 Go duration 解析（支持 s/m/h，不支持 'd'）。格式错时 prune
+  # 只会失败/不生效，缓存继续累积却没人发现，所以这里提前 fail-closed。
+  [[ "$BUILD_CACHE_KEEP" =~ ^[0-9]+(s|m|h)([0-9]+(s|m|h))*$ ]] \
+    || die "N8: BUILD_CACHE_KEEP 需为 Go duration（例如 168h、30m、1h30m），不支持 'd'；当前为 '${BUILD_CACHE_KEEP}'"
+  case "$PRUNE_BUILD_CACHE" in
+    true|false) ;;
+    *) die "N8: PRUNE_BUILD_CACHE 只能是 true 或 false，当前为 '${PRUNE_BUILD_CACHE}'" ;;
+  esac
+}
+
+# 清理两个 builder 的构建缓存。$1=true 时清理失败会让脚本失败（prune 子命令用），
+# 否则只告警：update 里的这一步是 housekeeping，不该让一次已经构建成功的部署失败。
+prune_build_cache() {
+  local strict="${1:-false}" b out total targets rc=0
+  validate_build_cache_config
+
+  # 词分割是有意的：builder 名不含空格；两者同名（BUILDX_BUILDER_NAME=default）时去重
+  targets="default"
+  [ "$BUILDX_BUILDER_NAME" = "default" ] || targets="default ${BUILDX_BUILDER_NAME}"
+  for b in $targets; do
+    if ! docker buildx inspect "$b" >/dev/null 2>&1; then
+      warn "N8: builder '$b' 不存在，跳过构建缓存清理"
+      continue
+    fi
+    if out="$(docker buildx prune --builder "$b" --filter "until=${BUILD_CACHE_KEEP}" -f 2>&1)"; then
+      total="$(printf '%s\n' "$out" | sed -n 's/^Total:[[:space:]]*//p' | tail -1)"
+      if [ -n "$total" ]; then
+        log "N8 构建缓存清理 [$b]: 保留 ${BUILD_CACHE_KEEP} 内用过的缓存，回收 ${total}"
+      else
+        log "N8 构建缓存清理 [$b]: 保留 ${BUILD_CACHE_KEEP} 内用过的缓存"
+        printf '%s\n' "$out" | sed 's/^/    /'
+      fi
+    else
+      rc=1
+      warn "N8: 构建缓存清理失败 [$b]"
+      printf '%s\n' "$out" | tail -5 | sed 's/^/    /' >&2
+    fi
+  done
+  if [ "$rc" -ne 0 ] && [ "$strict" = true ]; then
+    die "N8: 构建缓存清理失败（见上方输出）"
+  fi
+}
+
 # ==================== 状态探测 ====================
 find_nginx_file() {
   local files f n
@@ -331,6 +391,15 @@ step_pull_and_build() { # $1 = 本次要启动的备用服务名（只构建它�
   git -C "$SRC_DIR" checkout -- VERSION
   trap - EXIT
   log "镜像构建完成 (version=${build_version})"
+
+  # N8: 清理过期构建缓存。放在构建之后、起备用实例之前：此时旧实例仍在服务，
+  # 清理不影响线上；刚构建出的缓存层在保留期内不会被删，所以下次部署依然是
+  # 热缓存。清理失败只告警，不会让本次部署失败。
+  if [ "$PRUNE_BUILD_CACHE" = true ]; then
+    prune_build_cache
+  else
+    log "N8: PRUNE_BUILD_CACHE=false，跳过构建缓存清理"
+  fi
 }
 
 step_start_standby() {
@@ -413,6 +482,8 @@ cmd_update() {
   # N7: 在任何副作用（数据库备份、git pull、构建）之前先确认构建资源限制可用
   ensure_build_limits
   ensure_build_headroom
+  # N8: 缓存清理的配置也在这里提前校验，避免构建完才发现保留期格式不合法
+  validate_build_cache_config
 
   local active_port active_svc running old standby standby_port
   active_port="$(active_port)"
@@ -488,15 +559,22 @@ cmd_check() { # 预检：只读校验，不改动线上任何东西
   check_preconditions
   ensure_build_limits
   ensure_build_headroom
+  validate_build_cache_config
 
   local port
   port="$(active_port)"
   log "预检通过: 活跃端口 ${port}，运行实例 $(running_instance)，构建 builder ${BUILDX_BUILDER_NAME}"
 }
 
+cmd_prune() { # N8: 定时兜底用的独立入口；只清构建缓存，不依赖线上实例/Nginx/MySQL
+  log "N8 清理构建缓存（保留 ${BUILD_CACHE_KEEP} 内用过的）"
+  prune_build_cache true
+}
+
 case "${1:-update}" in
   update)   cmd_update ;;
   rollback) cmd_rollback ;;
   check)    cmd_check ;;
-  *)        die "未知命令: $1（可用: update | rollback | check）" ;;
+  prune)    cmd_prune ;;
+  *)        die "未知命令: $1（可用: update | rollback | check | prune）" ;;
 esac

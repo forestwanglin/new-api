@@ -42,6 +42,7 @@ Nginx ──► 3001（新实例，新镜像）
 sudo /opt/new-api-deploy/blue-green-switch.sh update     # 零停机更新
 sudo /opt/new-api-deploy/blue-green-switch.sh rollback    # 快速回滚（旧实例未被删除前有效）
 sudo /opt/new-api-deploy/blue-green-switch.sh check       # 只做预检（含构建配额校验），不改动线上
+sudo /opt/new-api-deploy/blue-green-switch.sh prune        # 只清构建缓存（默认保留 7 天内用过的）
 ```
 
 脚本会自动探测当前活跃实例（解析 Nginx `proxy_pass` 指向的端口）、做状态一致性检查，并在以下情况安全中止（线上零影响）：新实例启动失败、Nginx 配置探测到 0 处或多处、运行实例与 Nginx 指向不匹配、rollback 方向错误。
@@ -65,6 +66,7 @@ sudo /opt/new-api-deploy/blue-green-switch.sh check       # 只做预检（含�
 | N5 | 新实例启动失败时脚本不会切流，线上零影响 |
 | N6 | 版本盖章：构建前把 `VERSION` 写成 `<branch>-<commit 前 8 位>`（界面版本号来源），构建后还原；手工 `compose build` 不会盖章 |
 | N7 | 构建必须有 CPU 配额（内存配额可选，默认不限制），且构建前内存余量须 ≥ `MIN_BUILD_HEADROOM_MB`（默认 2048MiB）：配额由 `setup-build-builder.sh` 写入 `build-limits.env`；`update` 只校验不修改，配额缺失/超过总资源、内存余量不足时直接中止 |
+| N8 | 构建缓存只增不减（两个 builder 各一份，共约 30G/34G 根分区）：`update` 在构建成功后按 `BUILD_CACHE_KEEP`（默认 `168h`）各清一次，`prune` 子命令供 cron 做周度兜底；只删 build cache，不动镜像/容器/volume |
 
 ### 构建资源限制（N7，必须）
 
@@ -132,6 +134,37 @@ docker logs --tail 50 buildx_buildkit_build-limited0 | grep -i session
 - **首次构建是冷缓存**：docker-container driver 与默认 builder 的层缓存不共享，第一次会全量构建（明显更慢），之后缓存在 builder 容器里。
 - **主机 swap（已扩容，不要再降回去）**：本机空闲时原 1G `/swap` 就长期 0.93–0.99G 占满（构建无关的长期状态），2026-10-18 因此发生构建期全局 OOM（见上）。现已新增 4G `/swap2`（合计 5G，写入 `/etc/fstab`）。这台 4G 内存的机器上 swap 是构建内存的硬约束，缩回会让 `ensure_build_headroom` 直接中止部署。
 - 配额存放在 builder 容器的 HostConfig 中，容器重启、宿主机重启后依然有效；只有 `docker buildx rm` 重建 builder 才会丢失，此时重跑 `setup-build-builder.sh` 即可。
+
+### 构建缓存占用与清理（N8）
+
+构建缓存（`docker system df` 里的 `Build Cache`）只在构建时写入，没有自动过期，是本机磁盘的主要增长项。2026-10-18 实测：根分区 34G/78G，其中 **约 30G 是构建缓存**，而实际在用的镜像只有 1.3G。
+
+| 位置 | 归属 | 实测 |
+| --- | --- | --- |
+| `/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots` | 默认 builder（docker driver）的构建缓存 | 20G |
+| `/var/lib/docker/volumes/buildx_buildkit_build-limited0_state` | 受限 builder（docker-container driver）的构建缓存 | 9.9G |
+
+两个 builder 的缓存**互不共享**（用 `docker buildx du --builder default` / `--builder build-limited` 可分别查看，`docker system df` 只反映默认 builder），所以清理也必须分别执行。脚本内置两道防线：
+
+```bash
+# ① 每次 update 构建成功后自动清理（保留 BUILD_CACHE_KEEP 内用过的缓存）
+#    关闭：PRUNE_BUILD_CACHE=false sudo /opt/new-api-deploy/blue-green-switch.sh update
+#    临时调大/调小保留期（Go duration，不支持 'd'）：BUILD_CACHE_KEEP=24h sudo … update
+# ② 定时兜底（建议周度）。prune 不依赖线上实例/Nginx/MySQL，任意时间可执行：
+sudo /opt/new-api-deploy/blue-green-switch.sh prune
+```
+
+cron 示例（root，`crontab -e`）：
+
+```cron
+30 3 * * 0 /opt/new-api-deploy/blue-green-switch.sh prune >> /var/log/new-api-prune.log 2>&1
+```
+
+只删 build cache，**不删镜像、容器、volume 数据**，镜像备份标签与回滚流程不受影响。保留期内用过的缓存会留着，所以正常不会把每次部署都变成冷构建；要一次性清空可用 `BUILD_CACHE_KEEP=0h sudo … prune`，代价是下一次构建为冷构建。
+
+> `until=` 过滤器由 buildx 按 Go duration 解析，脚本启动时会校验格式并对不合法值（如 `7d`）直接中止（fail-closed），避免清理静默失效、缓存继续累积。清理效果可在部署后核对：`docker buildx du --builder build-limited` 的总量应约为累计新增层，而不是归零。
+
+> **不要用 `docker buildx rm build-limited` 代替清理。** 它会连 state volume（≈10G）一起删，之后必须重跑 `setup-build-builder.sh`，否则 `update` 的 `ensure_build_limits` 会直接中止（fail-closed）。同理，`docker builder prune -f` 只覆盖默认 builder，清不到受限 builder 的缓存（脚本会两个都清）。
 
 下面的手动流程用于理解原理，以及脚本中止时的人工处理参考。
 
