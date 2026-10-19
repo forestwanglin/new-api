@@ -3535,6 +3535,7 @@
     "Look for a special ratio rule matching this user group and this billing group. If one exists, use its ratio. Otherwise use the billing group base ratio from the pricing table.": "Cherchez une règle de taux spécial correspondant à ce groupe d’utilisateurs et ce groupe de facturation. Si elle existe, utilisez son taux ; sinon le taux de base du groupe de facturation.",
     "Low balance": "Solde faible",
     "Lowest median first-token latency": "Latence médiane de premier jeton la plus faible",
+    "Lowest premium": "Minimum",
     "m": "m",
     "Maintenance": "Maintenance",
     "Make extra groups visible to, or hide default groups from, users of a specific group.": "Rendre des groupes supplémentaires visibles pour les utilisateurs d’un groupe donné, ou leur masquer des groupes par défaut.",

@@ -3535,6 +3535,7 @@
     "Look for a special ratio rule matching this user group and this billing group. If one exists, use its ratio. Otherwise use the billing group base ratio from the pricing table.": "Look for a special ratio rule matching this user group and this billing group. If one exists, use its ratio. Otherwise use the billing group base ratio from the pricing table.",
     "Low balance": "Low balance",
     "Lowest median first-token latency": "Lowest median first-token latency",
+    "Lowest premium": "Lowest premium",
     "m": "m",
     "Maintenance": "Maintenance",
     "Make extra groups visible to, or hide default groups from, users of a specific group.": "Make extra groups visible to, or hide default groups from, users of a specific group.",

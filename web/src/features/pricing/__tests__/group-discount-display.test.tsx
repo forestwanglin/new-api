@@ -156,6 +156,13 @@ describe('model card group discount', () => {
     expect(screen.getByLabelText('DeepSeek -40%')).toBeVisible()
   })
 
+  it('labels the cheapest group as the lowest premium when it is still a markup', () => {
+    renderCard({ enable_groups: ['Gemini'], group_ratio: { Gemini: 1.5 } })
+
+    expect(screen.getByText('Lowest premium +50%')).toBeVisible()
+    expect(screen.getByLabelText('Gemini +50%')).toBeVisible()
+  })
+
   it('keeps the seeded video price card free of the generic discount display', () => {
     renderCard(
       { model_name: 'sd2.0-720P', quota_type: 1, model_price: 1 },

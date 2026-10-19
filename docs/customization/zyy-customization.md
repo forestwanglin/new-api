@@ -427,6 +427,26 @@
 - 风险与未覆盖：仅在 `isBest`（未选中分组、取最小倍率分组）时出现；测试默认英文环境，
   断言 `Best group -40%` 不受影响。
 
+### Z016 折扣徽标前缀按正负号区分「最高 / 最少」
+
+- 需求与原因：Z015 把「最优分组」改成「最高」后，未选分组时的前缀不再区分方向——溢价分组会显示
+  「最高 +50%」。交付方要求按后面数字的正负号选词：负数（折扣）显示「最高」，正数（溢价）显示「最少」。
+- 变更内容（前端）：
+  - `components/price-discount-badge.tsx`：`isBest` 时的前缀改为按 `discount.percent < 0` 选择
+    `Best group`（中文「最高」）或新增的 `Lowest premium`（中文「最少」）；显式选中分组仍只显示百分比。
+  - i18n：7 个 locale 新增 `Lowest premium`，插在字母序位置 `Lowest median first-token latency` 之后
+    （en / en、zh 最少、zh-TW 最少、fr Minimum、ru Минимум、ja 最小、vi Thấp nhất）。
+  - `__tests__/group-discount-display.test.tsx`：新增「最优分组仍为溢价时渲染 `Lowest premium +50%`」用例。
+- 影响面：无新增文件；**上游自有文件**：
+  `web/src/features/pricing/components/price-discount-badge.tsx`、
+  `web/src/features/pricing/__tests__/group-discount-display.test.tsx`、
+  7 个 `web/src/i18n/locales/*.json`。
+- 与上游差异：该徽标与 `Best group` / `Lowest premium` 均为 Z013 / Z015 / Z016 引入，上游没有。
+- 开关与默认值：无；仅在 `isBest`（未选中分组、取最小倍率分组）时带前缀。
+- 验证：见 §6 的 Z016 小节。
+- 风险与未覆盖：其余 6 种语言的 `Lowest premium` 为本次新增译文，未做母语校对；
+  显式选中分组时不带前缀（与 Z013 一致）。
+
 ---
 
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
@@ -450,7 +470,7 @@
 
 ## 6. 验证快照
 
-本节记录实测结果：Z004 修复前、后两次，以及 Z012、Z013、Z014、Z015（同日，随改动一并更新）。
+本节记录实测结果：Z004 修复前、后两次，以及 Z012、Z013、Z014、Z015、Z016（同日，随改动一并更新）。
 
 **前端全量测试**：`cd web && ./node_modules/.bin/vitest run`
 
@@ -550,6 +570,25 @@ Cached 列同步原价、`PriceDiscountBadge` 在无折扣时渲染空。
 
 **中文文案校验**：`node -e` 读取 `src/i18n/locales/zh.json` 后解析得到
 `/translation/Best group => 最高`，JSON 可正常解析且值已更新；未改其它 locale。
+
+### Z016 验证快照
+
+**定向测试**：`./node_modules/.bin/vitest run src/features/pricing`
+→ `Test Files 15 passed (15)`、`Tests 294 passed (294)`；新增用例锁定最优分组为溢价时渲染 `Lowest premium +50%`。
+
+**i18n 校验**：`node -e` 读取 7 个 locale 的 `Lowest premium` →
+`en Lowest premium / zh 最少 / zh-TW 最少 / fr Minimum / ru Минимум / ja 最小 / vi Thấp nhất`，均可正常解析。
+
+**前端全量测试**：`cd web && ./node_modules/.bin/vitest run` → 197 文件：1 失败 / 196 通过；
+2321 用例：1 失败 / 2320 通过（39.08s），唯一失败仍为既有的 `markdown.test.tsx`。
+
+**类型检查与 lint**：`./node_modules/.bin/tsgo -b` 退出码 0；
+`./node_modules/.bin/oxlint -c .oxlintrc.json` 针对 `price-discount-badge.tsx` 与
+`group-discount-display.test.tsx` 无输出（无 error/warning）。
+
+**格式化**：`format-with-protected-headers.mjs --check` 列出 27 个未格式化文件，其中包含本次未改动的
+`web/src/features/pricing/components/pricing-columns.tsx`，且 `group-discount-display.test.tsx` 的 import
+顺序差异在 Z013 提交版本上同样存在，因此属于**既有格式漂移**，非本次引入；本次新增代码行本身无格式问题。
 
 ## 7. 与升级流程的关系
 

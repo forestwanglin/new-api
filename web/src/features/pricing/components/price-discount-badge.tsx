@@ -46,8 +46,10 @@ export function PriceDiscountBadge(props: {
   }
 
   const percentText = formatDiscountPercent(discount.percent)
+  const bestGroupLabel =
+    discount.percent < 0 ? t('Best group') : t('Lowest premium')
   const label = discount.isBest
-    ? `${t('Best group')} ${percentText}`
+    ? `${bestGroupLabel} ${percentText}`
     : percentText
   const hint = discount.group ? `${discount.group} ${percentText}` : percentText
   // Cheaper groups are the only true discount; override the shared badge's

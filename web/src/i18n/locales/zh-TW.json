@@ -3535,6 +3535,7 @@
     "Look for a special ratio rule matching this user group and this billing group. If one exists, use its ratio. Otherwise use the billing group base ratio from the pricing table.": "查找匹配「該用戶分組 + 該收費分組」的特殊倍率規則。有就用規則裡的倍率，沒有就用定價分組表中收費分組的基礎倍率。",
     "Low balance": "餘額偏低",
     "Lowest median first-token latency": "最低首 token 延遲中位數",
+    "Lowest premium": "最少",
     "m": "分鐘",
     "Maintenance": "維護",
     "Make extra groups visible to, or hide default groups from, users of a specific group.": "讓特定分組的用戶額外看到某些分組，或對其屏蔽預設可選的分組。",
