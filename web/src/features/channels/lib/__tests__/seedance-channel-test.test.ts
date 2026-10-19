@@ -60,3 +60,52 @@ test('Seedance resumed pending test only queries the existing task', async () =>
   )
   assert.equal(result.status, 'error')
 })
+test('Seedance video test submits the selected billing group once', async () => {
+  const submitted: Array<Record<string, unknown>> = []
+  const result = await runSeedanceChannelTest(
+    'doubao-seedance-2-0-mini-260615',
+    async (params) => {
+      if (params.video_test_ack) {
+        submitted.push({ ...params })
+        return {
+          success: true,
+          task_id: 'task_1',
+          stage: 'queued',
+          billing_group: 'Seedance mini 企业',
+        }
+      }
+      assert.equal(params.billing_group, undefined)
+      return {
+        success: true,
+        stage: 'completed',
+        billing_group: 'Seedance mini 企业',
+      }
+    },
+    () => {},
+    async () => {},
+    undefined,
+    'Seedance mini 企业'
+  )
+  assert.equal(submitted.length, 1)
+  assert.equal(submitted[0].billing_group, 'Seedance mini 企业')
+  assert.equal(result.status, 'success')
+  assert.equal(result.billingGroup, 'Seedance mini 企业')
+})
+
+test('Seedance video test omits the billing group when none is selected', async () => {
+  let submitted: Record<string, unknown> | undefined
+  await runSeedanceChannelTest(
+    'doubao-seedance-2-0-mini-260615',
+    async (params) => {
+      if (params.video_test_ack) {
+        submitted = { ...params }
+        return { success: true, task_id: 'task_2', stage: 'queued' }
+      }
+      return { success: true, stage: 'completed' }
+    },
+    () => {},
+    async () => {}
+  )
+  assert.ok(submitted)
+  assert.equal(submitted.billing_group, undefined)
+})

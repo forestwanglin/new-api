@@ -447,6 +447,43 @@
 - 风险与未覆盖：其余 6 种语言的 `Lowest premium` 为本次新增译文，未做母语校对；
   显式选中分组时不带前缀（与 Z013 一致）。
 
+### Z017 Seedance 视频测活按渠道分组计费，并支持指定计费分组
+
+- 需求与原因：Z003 的视频测活用「执行测试的管理员账号分组」计费（如 `business` 倍率 1.0），
+  但渠道 22（`Seedance mini 企业`，倍率 0.5）根本不分发该分组，真实流量永远不会按 1.0 计价。
+  实测同一条 87300 token 的任务：上游收 $1.0039（0.5x），本网关向 admin 收 ¥2.0079（1.0x），
+  正好差 2 倍，测活成本与真实成本不具可比性。
+- 变更内容（后端，`controller/seedance_channel_health.go`）：
+  - 新增 `seedanceTestBillingGroup`：优先用查询参数 `billing_group`（必须已在分组倍率表配置，
+    否则报 `seedance_test_billing_group`）；未指定时取渠道自身第一个分组；渠道未配置分组时才回退到
+    测试账号分组。结果同时写入 `ctx.Set("group")` 与 `ctx.Set("token_group")`，因此预扣、结算
+    （`task.Group`）与日志分组口径一致。
+  - `seedanceTestTaskResult` 在 `task.Group` 非空时返回 `billing_group`，让轮询阶段也能看到计费分组。
+  - 系统日志消息增加 `billing_group={{group}}`。
+  - 删除死代码 `ctx.Set("specific_channel_id", ...)`（全仓库无读取方；真正锁渠道靠
+    `seedance_test_channel` → `relayInfo.LockedChannel`），随之删除 `strconv` 导入。
+- 变更内容（前端）：
+  - `lib/seedance-channel-test.ts`：`runSeedanceChannelTest` 新增可选 `billingGroup` 参数，仅在提交
+    时携带 `billing_group`（轮询不携带），并把响应的 `billing_group` 透到 `SeedanceTestUpdate`。
+  - `api.ts`：`testChannel` 参数增加 `billing_group`。
+  - `channel-test-dialog.tsx`：`seedance-video` 端点新增「Billing group」选择器，选项来自渠道自身
+    分组（`currentRow.group` 逗号拆分），默认即渠道第一个分组；测试结果行同时显示计费分组。
+  - i18n：7 个 locale 新增 `Use the channel first group` 与
+    `The test is billed as this group, matching what real traffic to this channel pays. Defaults to the channel first group.`。
+- 影响面：无新增文件；**上游自有文件**：`web/src/features/channels/api.ts`、
+  `web/src/features/channels/components/dialogs/channel-test-dialog.tsx`、
+  7 个 `web/src/i18n/locales/*.json`；fork 自有文件：`controller/seedance_channel_health.go`、
+  `controller/seedance_channel_test_test.go`、`web/src/features/channels/lib/seedance-channel-test.ts`
+  及其测试。
+- 与上游差异：上游没有 Seedance 测活（Z003 引入）；本次把计费分组从「测试账号分组」改为
+  「渠道分组」，并开放 `billing_group` 覆盖。
+- 开关与默认值：无开关。默认取渠道第一个分组；`billing_group` 指定值必须存在于分组倍率配置中。
+  渠道无分组时仍回退到测试账号分组，保持旧行为。
+- 验证：见 §6 的 Z017 小节。
+- 风险与未覆盖：多分组渠道默认只测第一个分组，其余分组需要手动选；`billing_group` 只校验倍率表
+  是否存在，不校验该分组是否真的被这条渠道服务（便于验证「假如按该分组计费」的场景）；
+  历史任务的 `task.Group` 仍是旧口径，不会被回溯修正。
+
 ---
 
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
@@ -470,7 +507,7 @@
 
 ## 6. 验证快照
 
-本节记录实测结果：Z004 修复前、后两次，以及 Z012、Z013、Z014、Z015、Z016（同日，随改动一并更新）。
+本节记录实测结果：Z004 修复前、后两次，以及 Z012–Z017（同日，随改动一并更新）。
 
 **前端全量测试**：`cd web && ./node_modules/.bin/vitest run`
 
@@ -589,6 +626,28 @@ Cached 列同步原价、`PriceDiscountBadge` 在无折扣时渲染空。
 **格式化**：`format-with-protected-headers.mjs --check` 列出 27 个未格式化文件，其中包含本次未改动的
 `web/src/features/pricing/components/pricing-columns.tsx`，且 `group-discount-display.test.tsx` 的 import
 顺序差异在 Z013 提交版本上同样存在，因此属于**既有格式漂移**，非本次引入；本次新增代码行本身无格式问题。
+
+### Z017 验证快照
+
+**后端定向测试**：`go test ./controller/ -run 'TestSeedance' -count=1` → `ok github.com/QuantumNous/new-api/controller`。
+新增/加强的断言：单分组渠道默认取渠道分组、多分组渠道取第一个、`billing_group` 覆盖生效、
+未配置的分组被拒绝、`seedanceTestTaskResult` 在 `task.Group` 非空时返回 `billing_group`、
+历史任务无该字段。
+
+**前端定向测试**：`./node_modules/.bin/vitest run src/features/channels`
+→ `Test Files 31 passed (31)`、`Tests 365 passed (365)`（20.99s）；其中
+`seedance-channel-test.test.ts` 新增「仅在提交时携带 billing_group」与「未选择时省略」两个用例。
+
+**前端全量测试**：`cd web && ./node_modules/.bin/vitest run` → 209 文件：1 失败 / 208 通过；
+2435 用例：1 失败 / 2434 通过（36.34s），唯一失败仍为既有的 `markdown.test.tsx`
+（`does not load math resources when trust is inherited from a polluted prototype`，与本次无关）。
+
+**类型检查与 lint**：`./node_modules/.bin/tsgo -b` 退出码 0；`go vet ./controller/` 通过；
+`./node_modules/.bin/oxlint -c .oxlintrc.json` 针对本次改动的 3 个前端源文件无输出；
+`seedance-channel-test.test.ts` 仅剩既有第 39 行 `curly` error，在 HEAD 版本同样存在。
+
+**前端构建**：本机**未安装 `bun`**，按仓库约定改用 `./node_modules/.bin/rsbuild build`
+→ 构建成功（`Total: 66981.3 kB / gzip 20560.2 kB`，退出码 0）。
 
 ## 7. 与升级流程的关系
 

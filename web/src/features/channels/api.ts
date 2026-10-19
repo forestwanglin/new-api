@@ -288,6 +288,7 @@ export async function testChannel(
     stream?: boolean
     video_test_ack?: boolean
     seedance_task_id?: string
+    billing_group?: string
   }
 ): Promise<ChannelTestResponse> {
   const res = await api.get(

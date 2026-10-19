@@ -119,6 +119,7 @@ type TestResult = {
   stage?: SeedanceStage
   quickCheck?: boolean
   taskId?: string
+  billingGroup?: string
   responseTime?: number
   completedAt?: number
   error?: string
@@ -344,6 +345,7 @@ function ChannelTestDialogContent({
   > | null>(null)
   const [endpointType, setEndpointType] = useState('auto')
   const [isStreamTest, setIsStreamTest] = useState(false)
+  const [billingGroup, setBillingGroup] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [testResults, setTestResults] = useState<Record<string, TestResult>>({})
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
@@ -373,6 +375,17 @@ function ChannelTestDialogContent({
       })),
     [t]
   )
+  const channelGroupOptions = useMemo(() => {
+    const groups = (currentRow.group || '')
+      .split(',')
+      .map((group) => group.trim())
+      .filter(Boolean)
+    return groups.map((group) => ({ value: group, label: group }))
+  }, [currentRow.group])
+  const effectiveBillingGroup =
+    billingGroup && channelGroupOptions.some((o) => o.value === billingGroup)
+      ? billingGroup
+      : channelGroupOptions[0]?.value || ''
 
   const dismissBatchProgressToast = useCallback(() => {
     if (batchProgressToastIdRef.current === null) return
@@ -411,6 +424,7 @@ function ChannelTestDialogContent({
     batchStopRequestedRef.current = true
     setEndpointType('auto')
     setIsStreamTest(false)
+    setBillingGroup('')
     setSearchTerm('')
     setTestResults({})
     setRowSelection({})
@@ -583,7 +597,8 @@ function ChannelTestDialogContent({
             (params) => testChannel(currentRow.id, params),
             (update) => updateTestResult(model, update),
             undefined,
-            retainedTaskId
+            retainedTaskId,
+            effectiveBillingGroup || undefined
           )
           finalResult = { ...result, completedAt: Date.now() }
           updateTestResult(model, finalResult)
@@ -635,6 +650,7 @@ function ChannelTestDialogContent({
       endpointType,
       testResults,
       effectiveStreamTest,
+      effectiveBillingGroup,
       markModelTesting,
       refreshChannelLists,
       t,
@@ -1048,11 +1064,43 @@ function ChannelTestDialogContent({
                 </p>
               )}
               {endpointType === 'seedance-video' && (
-                <p className='text-xs text-amber-700' role='note'>
-                  {t(
-                    'Creates one paid 4-second video per selected model. Submission is not generation success. Closing this dialog does not cancel a submitted task; use task history to continue checking.'
-                  )}
-                </p>
+                <>
+                  <p className='text-xs text-amber-700' role='note'>
+                    {t(
+                      'Creates one paid 4-second video per selected model. Submission is not generation success. Closing this dialog does not cancel a submitted task; use task history to continue checking.'
+                    )}
+                  </p>
+                  <div className='grid gap-2'>
+                    <Label htmlFor='seedance-billing-group'>
+                      {t('Billing group')}
+                    </Label>
+                    {channelGroupOptions.length > 0 ? (
+                      <>
+                        <Combobox
+                          options={channelGroupOptions}
+                          value={effectiveBillingGroup || null}
+                          onValueChange={(value) =>
+                            setBillingGroup(value ?? '')
+                          }
+                          id='seedance-billing-group'
+                          className='w-full min-w-0'
+                          placeholder={t('Use the channel first group')}
+                        />
+                        <p className='text-muted-foreground text-xs'>
+                          {t(
+                            'The test is billed as this group, matching what real traffic to this channel pays. Defaults to the channel first group.'
+                          )}
+                        </p>
+                      </>
+                    ) : (
+                      <p className='text-muted-foreground text-xs'>
+                        {t(
+                          'This channel has no group configured, so the test is billed as your own account group.'
+                        )}
+                      </p>
+                    )}
+                  </div>
+                </>
               )}
             </div>
             <div className='grid gap-2'>
@@ -1276,6 +1324,7 @@ function TestResultCell({
               ? seedanceStageLabels[result.stage]
               : 'Video task retained; check task history'
           )}
+          {result.billingGroup && ` · ${result.billingGroup}`}
         </span>
         <code className='break-all'>{result.taskId}</code>
       </div>

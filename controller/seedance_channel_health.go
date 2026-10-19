@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/gin-gonic/gin"
 	"github.com/tidwall/gjson"
 )
@@ -44,6 +44,9 @@ func seedanceTestTaskResult(task *model.Task) gin.H {
 		stage = "failed"
 	}
 	result := gin.H{"success": stage != "failed", "stage": stage, "task_id": task.TaskID, "model": task.Properties.OriginModelName, "generation_success": stage == "completed"}
+	if task.Group != "" {
+		result["billing_group"] = task.Group
+	}
 	if stage == "failed" {
 		result["message"] = "video generation failed; inspect task details"
 	}
@@ -51,6 +54,30 @@ func seedanceTestTaskResult(task *model.Task) gin.H {
 		result["message"] = "video generation completed"
 	}
 	return result
+}
+
+// seedanceTestBillingGroup resolves the group a manual video test is billed as.
+//
+// The test account's own group is the wrong answer whenever the channel serves
+// other groups: a channel restricted to "Seedance mini 企业" (ratio 0.5) can
+// never route that account's real traffic, so billing the test at the account
+// group (ratio 1.0) reports twice the cost the channel actually incurs. An
+// explicit `billing_group` wins, otherwise the channel's own first group is
+// used, and the account group remains the fallback for channels without one.
+func seedanceTestBillingGroup(channel *model.Channel, userID int, requested string) (string, error) {
+	requested = strings.TrimSpace(requested)
+	if requested != "" {
+		if !ratio_setting.ContainsGroupRatio(requested) {
+			return "", fmt.Errorf("billing group %q is not configured", requested)
+		}
+		return requested, nil
+	}
+	if channel != nil {
+		if groups := channel.GetGroups(); len(groups) > 0 && strings.TrimSpace(groups[0]) != "" {
+			return strings.TrimSpace(groups[0]), nil
+		}
+	}
+	return model.GetUserGroup(userID, false)
 }
 
 // testSeedanceChannel is invoked only by the existing channel-operate-protected
@@ -103,16 +130,15 @@ func testSeedanceChannel(c *gin.Context, channel *model.Channel, userID int, req
 	}
 	cache.WriteContext(ctx)
 	ctx.Set("id", userID)
-	group, err := model.GetUserGroup(userID, false)
+	group, err := seedanceTestBillingGroup(channel, userID, c.Query("billing_group"))
 	if err != nil {
-		fail("cannot load account group", "seedance_test_account")
+		fail(err.Error(), "seedance_test_billing_group")
 		return
 	}
 	ctx.Set("group", group)
 	ctx.Set("token_group", group)
 	ctx.Set("token_unlimited_quota", true)
 	ctx.Set("token_name", "Seedance video channel test")
-	ctx.Set("specific_channel_id", strconv.Itoa(channel.Id))
 	ctx.Set("seedance_test_channel", channel)
 	if e := middleware.SetupContextForSelectedChannel(ctx, channel, name); e != nil {
 		fail("channel setup failed: "+string(e.GetErrorCode()), "seedance_test_setup")
@@ -150,8 +176,8 @@ func testSeedanceChannel(c *gin.Context, channel *model.Channel, userID int, req
 	result["time"] = time.Since(started).Seconds()
 	result["message"] = "video task submitted; generation is not completed yet"
 	model.RecordLog(userID, model.LogTypeSystem, common.NewMessage(
-		"Seedance channel test: channel={{channel}} model={{model}} task={{task}}",
-		map[string]any{"channel": channel.Id, "model": name, "task": taskID},
+		"Seedance channel test: channel={{channel}} model={{model}} task={{task}} billing_group={{group}}",
+		map[string]any{"channel": channel.Id, "model": name, "task": taskID, "group": group},
 	))
 	c.JSON(http.StatusOK, result)
 }
