@@ -273,6 +273,30 @@ func TestDoubaoImageSubmission(t *testing.T) {
 	})
 }
 
+// The task-plugin identity filter only admits VolcEngine/DoubaoVideo channels
+// for a claimed model, so a Seedance family served by a type 55 relay channel
+// must stay off the claim list; otherwise that channel has no eligible channel.
+func TestDoubaoRelayVideoModelsStayUnclaimed(t *testing.T) {
+	registry, plugin := newDoubaoPlugin(t)
+	for _, name := range []string{
+		"doubao-seedance-2-0-mini-260615",
+		"doubao-seedance-2-0-fast-260128",
+	} {
+		assert.NotContains(t, plugin.Meta.Models, name)
+		_, claimed := registry.Generation().LookupEndpoint(http.MethodPost, "/v1/videos", name)
+		assert.False(t, claimed, "%s must fall back to the relay path", name)
+		_, claimed = registry.Generation().LookupEndpoint(http.MethodPost, "/v1/responses", name)
+		assert.False(t, claimed, "%s must not be pinned through the responses bridge", name)
+		for _, profile := range plugin.Meta.UsageProfiles {
+			assert.NotContains(t, profile.Models, name, "an undeclared model cannot carry a usage profile")
+		}
+	}
+	for _, name := range []string{"doubao-seedance-2-0-260128", "doubao-seedance-2-5-260628"} {
+		_, claimed := registry.Generation().LookupEndpoint(http.MethodPost, "/v1/videos", name)
+		assert.True(t, claimed, "%s stays claimed", name)
+	}
+}
+
 // Capability profiles follow the Ark model list: pricing lists only the
 // resolutions each Seedance model offers, reference video input only on
 // Seedance 2.x, and audio output only on Seedance 1.5 pro.
@@ -294,7 +318,6 @@ func TestDoubaoSeedanceUsageFacts(t *testing.T) {
 		{[]string{pro10, "doubao-seedance-1-0-lite-t2v", "doubao-seedance-1-0-lite-i2v"}, []string{"480p", "720p", "1080p"}, []string{"resolution", "tokens"}},
 		{[]string{pro15}, []string{"480p", "720p", "1080p"}, []string{"generate_audio", "resolution", "tokens"}},
 		{[]string{v20}, []string{"480p", "720p", "1080p", "4k"}, []string{"resolution", "tokens", "video_input"}},
-		{[]string{fast20, mini20}, []string{"480p", "720p"}, []string{"resolution", "tokens", "video_input"}},
 		{[]string{v25}, []string{"480p", "720p", "1080p"}, []string{"resolution", "tokens", "video_input"}},
 	}
 	profiled := make([]string, 0, len(plugin.Meta.Models))
@@ -319,7 +342,7 @@ func TestDoubaoSeedanceUsageFacts(t *testing.T) {
 			videoModels = append(videoModels, name)
 		}
 	}
-	assert.ElementsMatch(t, videoModels, profiled, "every Seedance model selects a capability profile")
+	assert.ElementsMatch(t, videoModels, profiled, "every claimed Seedance model selects a capability profile")
 
 	// A table price saved when every Seedance model declared video_input: its
 	// last row is the unconditioned fallback.

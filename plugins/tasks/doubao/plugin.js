@@ -15,6 +15,19 @@ const VIDEO_MODELS = {
   "doubao-seedance-2-0-mini-260615": { resolutions: ["480p", "720p"], maxDuration: 15, videoInput: true },
   "doubao-seedance-2-5-260628": { resolutions: ["480p", "720p", "1080p"], maxDuration: 30, videoInput: true },
 };
+// Seedance models served by a type 55 (Sora-compatible) relay channel instead
+// of this plugin. A claimed model is pinned to the plugin, and the task-plugin
+// identity filter only admits VolcEngine (45) and DoubaoVideo (54) channels, so
+// claiming these names leaves the relay channel with no eligible channel at
+// all. Prefix matching keeps future dated variants on the relay path too;
+// delete an entry once a native Ark channel serves that family.
+const RELAY_VIDEO_MODEL_PREFIXES = ["doubao-seedance-2-0-mini-", "doubao-seedance-2-0-fast-"];
+function isRelayVideoModel(model) {
+  return RELAY_VIDEO_MODEL_PREFIXES.some((prefix) => String(model).startsWith(prefix));
+}
+const OWNED_VIDEO_MODELS = Object.fromEntries(
+  Object.entries(VIDEO_MODELS).filter(([model]) => !isRelayVideoModel(model)),
+);
 // Every Ark resolution tier; an endpoint ID reached through channel mapping
 // without a declared profile keeps them all and the longest Seedance duration.
 const SEEDANCE_RESOLUTIONS = ["480p", "720p", "1080p", "4k"];
@@ -303,16 +316,16 @@ export const meta = {
     en: "Volcengine Doubao Seedance video generation and Seedream image generation",
     zh: "火山引擎豆包 Seedance 视频生成与 Seedream 图片生成",
   },
-  version: "1.3.0",
+  version: "1.3.1",
   author: { name: "QuantumNous" },
   channelTypes: [54, 45], // VolcEngine-type channels serve Ark video models with the same wire format
-  models: Object.keys(VIDEO_MODELS).concat(Object.keys(IMAGE_MODELS)),
+  models: Object.keys(OWNED_VIDEO_MODELS).concat(Object.keys(IMAGE_MODELS)),
   fetchMode: "per_task",
   upstreams: ["vendor", "new_api"],
   requiredCapabilities: ["duration-auto@1"],
   usageSchema: seedanceUsageSchema(DEFAULT_VIDEO_PROFILE),
   usageExamples: seedanceUsageExamples(DEFAULT_VIDEO_PROFILE),
-  usageProfiles: capabilityUsageProfiles(VIDEO_MODELS, seedanceUsageSchema, seedanceUsageExamples).concat(
+  usageProfiles: capabilityUsageProfiles(OWNED_VIDEO_MODELS, seedanceUsageSchema, seedanceUsageExamples).concat(
     capabilityUsageProfiles(IMAGE_MODELS, seedreamUsageSchema, seedreamUsageExamples)
   ),
   routes: [
@@ -324,7 +337,7 @@ export const meta = {
   ],
   protocols: [
     { name: "openai_responses", supports: ["stream", "sync", "background"] },
-    { name: "openai_video", models: Object.keys(VIDEO_MODELS) },
+    { name: "openai_video", models: Object.keys(OWNED_VIDEO_MODELS) },
     { name: "openai_image", models: Object.keys(IMAGE_MODELS) },
   ],
 };
