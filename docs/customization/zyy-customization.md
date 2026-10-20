@@ -6,9 +6,9 @@
 
 因此 **`git diff main zyy` 的每一处差异都是一条定制**，都必须登记在本文。
 
-- 盘点基线：`main` = `7de10f2c6`，`zyy` = `273abb320`，盘点日期 2026-10-18
-- 差异规模：58 个文件（28 新增 / 30 修改 / 0 删除）（截至 Z012）；含 Z013 后为 78 个文件
-  （42 新增 / 35 修改 / 1 删除）。行数与提交数会随后续提交变化，
+- 盘点基线：`main` = `058c8231b`，`zyy` = `56a5ee183`，盘点日期 2026-10-20
+- 差异规模：84 个文件（43 新增 / 40 修改 / 1 删除），47 个提交（`main..zyy`，含 Z018）；
+  本文件（Z018 登记）提交后为 48 个提交、文件数不变。行数与提交数会随后续提交变化，
   以 `git diff main zyy --shortstat` 与 `git log --oneline main..zyy` 的输出为准
 - 差异来源：`git diff main zyy --name-status`、`git log main..zyy`（当前含 4 个合并提交）
 
@@ -484,13 +484,58 @@
   是否存在，不校验该分组是否真的被这条渠道服务（便于验证「假如按该分组计费」的场景）；
   历史任务的 `task.Group` 仍是旧口径，不会被回溯修正。
 
+### Z018 放行 type 55 中转渠道的 Seedance mini/fast 模型，并加构建期守卫
+
+- 需求与原因：`doubao` 任务插件声明 Seedance 视频模型后，`POST /v1/videos` 的请求会被 pin 到该插件，
+  并追加 `task_plugin_identity` 渠道过滤器；该过滤器只放行 VolcEngine(45)/DoubaoVideo(54)，或显式
+  绑定 `doubao` 的 NewAPI(60)/TaskPlugin(61) 渠道。本部署的 Seedance 渠道全部是 type 55（Sora 兼容
+  中转，指向 zhongkeyu），因此启用 doubao 后一律返回
+  `model_not_found ... 该模型由任务插件认领，但当前没有启用的渠道可服务此模型`。实测日志：
+  `task_plugin subsystem=distribution event=no_available_channel group="Seedance mini 企业"
+  model="doubao-seedance-2-0-mini-260615" plugins="doubao" reason=no_eligible_channel`；禁用 doubao 后
+  同一请求由渠道 22 走 `type 55 → sora` 链路成功。
+- 变更内容：
+  - `plugins/tasks/doubao/plugin.js`：新增
+    `RELAY_VIDEO_MODEL_PATTERN = /^doubao-seedance-.*-(?:mini|fast)-/`，用它过滤出仍由插件认领的
+    `OWNED_VIDEO_MODELS`，并同时用于 `meta.models`、`meta.usageProfiles` 与
+    `protocols.openai_video.models`（三者必须一致，只改其一要么启动时 `ValidateV1Meta` panic，要么
+    `/v1/videos` 仍被认领）。`VIDEO_MODELS` 保留全部能力条目与用法画像，恢复某个家族只需收窄正则。
+    插件版本 `1.3.0` → `1.3.1`。
+  - `plugins/doubao_responses_test.go`：新增 `TestDoubaoRelayVideoModelsStayUnclaimed`（两个家族不在
+    `meta.models`、`/v1/videos` 与 `/v1/responses` 均不绑定、不出现在任何 usage profile；
+    `doubao-seedance-2-0-260128` 与 `2-5-260628` 仍被认领）与 `TestDoubaoRelayVideoModelPattern`
+    （从插件源码提取正则，用 `2.0 mini/fast`、`2.1 mini`、`3.0 fast`、`2.0`、`2.5`、`1.5 pro`、
+    `fastest` 断言命中与不命中）；`TestDoubaoSeedanceUsageFacts` 的 family 列表相应去掉 mini/fast。
+  - 新增 `scripts/check-doubao-plugin-patch.sh`：逐个校验 4 个锚点（正则规则、`meta.models`、
+    `meta.usageProfiles`、`openai_video` claim），并要求 `OWNED_VIDEO_MODELS` 恰好出现 4 次；任一缺失
+    即以非 0 退出并打印具体锚点。
+  - `makefile`：新增 `check-plugin-patch` target，并让 `test` 依赖它（CI 的 `make test` 因此覆盖）。
+  - `Dockerfile`、`Dockerfile.dev`：在 `go build` 前执行同一脚本，补丁缺失时镜像构建直接失败。
+- 影响面：**上游自有文件**：`plugins/tasks/doubao/plugin.js`、`plugins/doubao_responses_test.go`、
+  `makefile`、`Dockerfile`、`Dockerfile.dev`；fork 自有文件：新增
+  `scripts/check-doubao-plugin-patch.sh`。不改路由、计费规则、渠道表结构与数据库结构。
+- 与上游差异：上游把 Seedance 2.0 mini/fast 全部算作 doubao 插件模型；本 fork 让这两类模型保持
+  “无人认领”，从而继续走 `type 55 → sora 插件` 的旧适配链路。仅被正则命中的模型名受影响。
+- 开关与默认值：无运行时开关，规则在插件编译期生效。前置条件：`sora` 插件必须保持启用
+  （type 55 的 adaptor 由 `relay/relay_adaptor.go` 的 `55 → sora` 映射解析），且
+  `TaskPluginDisabledFactoryKeys` 中不含 `doubao`。若通过插件管理上传 override 而非重建镜像：新版本
+  默认 inactive，必须手动激活，且不要使用插件市场的“更新”（会装上未打补丁的官方源码并自动激活）。
+- 验证：见 §6 的 Z018 小节。
+- 风险与未覆盖：上游更新 `plugins/tasks/doubao/plugin.js` 时需重放补丁，锚点校验负责拦截漏改（更新
+  规则时须同步修改脚本里的正则锚点行）；正则只覆盖 `mini`/`fast` 家族，其它新家族（如 `pro` 变体）
+  仍会被插件认领；这两个模型在插件侧不再提供 usage profile，定价仍按中转链路（sora，seconds/size）
+  口径，`model price not found` 的兜底不在本条目处理；价格页因此缺少这两个模型的
+  `billing_usage_schema`（与插件禁用时一致），Z002 未移植的 `ArkVideoPrice` 卡片仍是缺失状态（见
+  [zhongke-customization-port.md](zhongke-customization-port.md) §3.4）；override 路径存在
+  “镜像升级但 override 未更新”的漂移风险。
+
 ---
 
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
 确认定制没有被上游实现静默覆盖。清单按 `git diff main zyy --name-status` 的 `M` 记录整理
-（基线 `95287ef7d`，当时 28 个文件；含 Z012 后 30 个文件；含 Z013 后 35 个文件）：
+（基线 `95287ef7d`，当时 28 个文件；含 Z012 后 30 个文件；含 Z013 后 35 个文件；含 Z018 后 40 个文件）：
 
 | 区域 | 文件 | 关联条目 |
 |---|---|---|
@@ -498,6 +543,8 @@
 | 后端 controller / model | `controller/channel-test.go`、`controller/relay.go`、`controller/system_task_handlers.go`、`model/system_task.go`、`model/task.go` | Z003、Z006 |
 | 服务层 | `service/error.go` | Z001 |
 | Relay / 插件 | `relay/channel/openai/adaptor.go`、`relay/channel/task/jsplugin/adaptor.go`、`plugins/tasks/sora/plugin.js` | Z001、Z005 |
+| Relay / 插件（doubao 中转放行） | `plugins/tasks/doubao/plugin.js`、`plugins/doubao_responses_test.go` | Z018 |
+| 构建与 CI | `Dockerfile`、`Dockerfile.dev`、`makefile` | Z018 |
 | 前端渠道 | `web/src/features/channels/api.ts`、`web/src/features/channels/components/dialogs/channel-test-dialog.tsx` | Z004 |
 | 前端概览 | `web/src/features/dashboard/components/overview/overview-dashboard.tsx`、`web/src/features/dashboard/components/overview/__tests__/setup-guide.test.tsx` | Z012 |
 | 前端定价 | `web/src/features/pricing/components/model-billing-mode-badge.tsx`、`model-card.tsx`、`model-details.tsx`、`model-details-api.tsx`、`model-price-cell.tsx`、`web/src/features/pricing/hooks/use-pricing-data.ts`、`web/src/features/pricing/lib/price.ts` | Z002 |
@@ -507,7 +554,7 @@
 
 ## 6. 验证快照
 
-本节记录实测结果：Z004 修复前、后两次，以及 Z012–Z017（同日，随改动一并更新）。
+本节记录实测结果：Z004 修复前、后两次，以及 Z012–Z018（随改动一并更新）。
 
 **前端全量测试**：`cd web && ./node_modules/.bin/vitest run`
 
@@ -648,6 +695,28 @@ Cached 列同步原价、`PriceDiscountBadge` 在无折扣时渲染空。
 
 **前端构建**：本机**未安装 `bun`**，按仓库约定改用 `./node_modules/.bin/rsbuild build`
 → 构建成功（`Total: 66981.3 kB / gzip 20560.2 kB`，退出码 0）。
+
+### Z018 验证快照
+
+**补丁锚点校验**：`make check-plugin-patch` → `check-doubao-plugin-patch: ok (4 anchors)`。
+另在只含空壳 `plugin.js` 的临时目录验证失败路径 →
+`check-doubao-plugin-patch: RELAY_VIDEO_MODEL_PATTERN rule is missing or changed`，退出码 1；
+从 `/` 等任意工作目录调用同样通过（脚本按自身路径定位仓库根）。
+
+**Go 测试**：`go test ./plugins/... -count=1` → ok；`go test ./plugins -run 'TestDoubao' -v` →
+`TestDoubaoRelayVideoModelsStayUnclaimed`、`TestDoubaoRelayVideoModelPattern` 均 PASS；
+`go test ./middleware -run 'TaskPlugin|Distributor' -count=1` → ok；
+`go test ./service -run 'TaskPlugin|ChannelSelect' -count=1` → ok；`go build ./...` 退出码 0。
+本机 `go` 由 mise 管理但未设全局默认版本，使用 `~/.local/share/mise/installs/go/1.26.8/bin/go`
+绝对路径执行，未切换全局工具链；`gofmt` 检查无差异。
+
+**插件元数据**：`node --input-type=module` 直接 import `plugins/tasks/doubao/plugin.js` →
+`meta.models` 12 个、`openai_video` claim 6 个、mini/fast 均不在其中、`version=1.3.1`，导出面与
+改动前一致（未新增引擎 hook）。
+
+**构建期守卫**：`Dockerfile` / `Dockerfile.dev` 在 `COPY . .` 后执行同一脚本；`.dockerignore`
+未排除 `scripts/`，golang:alpine 构建阶段可读取。本轮**未实际执行 `docker build`**，镜像构建链路的
+验证仅覆盖脚本本身与上下文可达性。
 
 ## 7. 与升级流程的关系
 

@@ -228,10 +228,15 @@ if a.plugin.Meta.Key == "sora" {
 
 ### 3.4 未移植：火山 Fast/Mini 的 `¥/百万 token` 卡片
 
-发行包的 `ArkVideoPrice` 卡片（无 / 有视频输入的 `¥/百万 token`）**未移植**。原因：当前分支的
+发行包的 `ArkVideoPrice` 卡片（无 / 有视频输入的 `¥/百万 token`）**未移植**。原判断依据：当时分支的
 `plugins/tasks/doubao/plugin.js` 已为这两个模型声明 `usageSchema`/`usageProfiles`，价格页会通过
 通用 task 定价矩阵渲染，再叠加卡片会重复显示。`getArkVideoSpec` 仅保留用于 §3.3 的 endpoint
 归一化与示例选择。
+
+> **Z018（2026-10-20）之后本节前提已变化**：这两个模型不再由 doubao 插件认领，插件侧也不再提供
+> 它们的 `usageProfiles`，价格页缺少 `billing_usage_schema`（与 doubao 插件禁用时一致），通用 task
+> 定价矩阵不再渲染。若要恢复规格/价格展示，需要重新评估是否移植发行包的 `ArkVideoPrice` 卡片。
+> 详见 [zyy-customization.md](zyy-customization.md) 的 Z018 条目与风险说明。
 
 ---
 
