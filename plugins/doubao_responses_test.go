@@ -7,6 +7,7 @@ import (
 	"maps"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -294,6 +295,38 @@ func TestDoubaoRelayVideoModelsStayUnclaimed(t *testing.T) {
 	for _, name := range []string{"doubao-seedance-2-0-260128", "doubao-seedance-2-5-260628"} {
 		_, claimed := registry.Generation().LookupEndpoint(http.MethodPost, "/v1/videos", name)
 		assert.True(t, claimed, "%s stays claimed", name)
+	}
+}
+
+// The exclusion matches the whole mini/fast family, so a new dated model from
+// upstream does not need another patch.
+func TestDoubaoRelayVideoModelPattern(t *testing.T) {
+	source, err := builtinplugins.Source("doubao")
+	require.NoError(t, err)
+	const anchor = "const RELAY_VIDEO_MODEL_PATTERN = /"
+	start := strings.Index(source, anchor)
+	require.GreaterOrEqual(t, start, 0, "RELAY_VIDEO_MODEL_PATTERN is missing")
+	rest := source[start+len(anchor):]
+	end := strings.Index(rest, "/;")
+	require.GreaterOrEqual(t, end, 0, "RELAY_VIDEO_MODEL_PATTERN is not a regex literal")
+	// Go's RE2 has no non-capturing groups; the JS rule only uses one to group.
+	pattern, err := regexp.Compile(strings.ReplaceAll(rest[:end], "(?:", "("))
+	require.NoError(t, err)
+
+	for _, testCase := range []struct {
+		model string
+		relay bool
+	}{
+		{"doubao-seedance-2-0-mini-260615", true},
+		{"doubao-seedance-2-0-fast-260128", true},
+		{"doubao-seedance-2-1-mini-260101", true},
+		{"doubao-seedance-3-0-fast-260101", true},
+		{"doubao-seedance-2-0-260128", false},
+		{"doubao-seedance-2-5-260628", false},
+		{"doubao-seedance-1-5-pro-251215", false},
+		{"doubao-seedance-2-0-fastest-260128", false},
+	} {
+		assert.Equal(t, testCase.relay, pattern.MatchString(testCase.model), testCase.model)
 	}
 }
 

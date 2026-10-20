@@ -15,15 +15,16 @@ const VIDEO_MODELS = {
   "doubao-seedance-2-0-mini-260615": { resolutions: ["480p", "720p"], maxDuration: 15, videoInput: true },
   "doubao-seedance-2-5-260628": { resolutions: ["480p", "720p", "1080p"], maxDuration: 30, videoInput: true },
 };
-// Seedance models served by a type 55 (Sora-compatible) relay channel instead
-// of this plugin. A claimed model is pinned to the plugin, and the task-plugin
-// identity filter only admits VolcEngine (45) and DoubaoVideo (54) channels, so
-// claiming these names leaves the relay channel with no eligible channel at
-// all. Prefix matching keeps future dated variants on the relay path too;
-// delete an entry once a native Ark channel serves that family.
-const RELAY_VIDEO_MODEL_PREFIXES = ["doubao-seedance-2-0-mini-", "doubao-seedance-2-0-fast-"];
+// Any dated mini/fast family (2.0, 2.1, 3.0, ...) is served by a type 55
+// (Sora-compatible) relay channel instead of this plugin. A claimed model is
+// pinned to the plugin, and the task-plugin identity filter only admits
+// VolcEngine (45) and DoubaoVideo (54) channels, so claiming these names
+// leaves the relay channel with no eligible channel at all. Match the whole
+// family so a new upstream model lands on the relay path without another
+// patch; narrow this rule once a native Ark channel serves a family.
+const RELAY_VIDEO_MODEL_PATTERN = /^doubao-seedance-.*-(?:mini|fast)-/;
 function isRelayVideoModel(model) {
-  return RELAY_VIDEO_MODEL_PREFIXES.some((prefix) => String(model).startsWith(prefix));
+  return RELAY_VIDEO_MODEL_PATTERN.test(String(model));
 }
 const OWNED_VIDEO_MODELS = Object.fromEntries(
   Object.entries(VIDEO_MODELS).filter(([model]) => !isRelayVideoModel(model)),

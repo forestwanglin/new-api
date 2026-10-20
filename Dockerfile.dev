@@ -20,6 +20,9 @@ RUN go mod download
 
 COPY . .
 
+# Fail the image build when the fork's doubao relay patch is missing.
+RUN sh scripts/check-doubao-plugin-patch.sh
+
 RUN mkdir -p web/dist && \
     echo '<!doctype html><html><head><title>dev</title></head><body>use frontend dev server</body></html>' > web/dist/index.html
 
