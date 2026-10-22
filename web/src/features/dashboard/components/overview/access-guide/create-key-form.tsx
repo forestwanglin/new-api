@@ -34,7 +34,6 @@ export type CreateKeyInput = {
 }
 
 type CreateKeyFormProps = {
-  defaultName: string
   groupOptions: ApiKeyGroupOption[]
   submitting: boolean
   onCancel: () => void
@@ -49,7 +48,7 @@ type CreateKeyFormProps = {
 export function CreateKeyForm(props: CreateKeyFormProps) {
   const { t } = useTranslation()
   const nameId = useId()
-  const [name, setName] = useState(props.defaultName)
+  const [name, setName] = useState('')
   const [group, setGroup] = useState('')
 
   return (

@@ -122,7 +122,7 @@ beforeEach(() => {
       const payload = body as { name?: string; group?: string }
       tokenList = [
         makeKey(99, {
-          name: payload?.name ?? 'my-key-1',
+          name: payload?.name ?? 'Create API Key',
           group: payload?.group ?? '',
         }),
       ]
@@ -224,6 +224,8 @@ describe('AccessGuideCard', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Create now' }))
     expect(screen.getByLabelText('Name')).toBeVisible()
+    // The name field starts empty; no generated default like "my-key-1".
+    expect(screen.getByLabelText('Name')).toHaveValue('')
     expect(screen.queryByText('Quota')).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Create key' }))
@@ -245,7 +247,7 @@ describe('AccessGuideCard', () => {
       expect(api.post).toHaveBeenCalledWith(
         '/api/token/',
         expect.objectContaining({
-          name: 'my-key-1',
+          name: 'Create API Key',
           group: 'default',
           unlimited_quota: true,
           expired_time: -1,
@@ -255,7 +257,9 @@ describe('AccessGuideCard', () => {
     expect(
       await screen.findByRole('combobox', { name: 'API Key' })
     ).toHaveValue('99')
-    expect(screen.getByRole('option', { name: /my-key-1/ })).toBeInTheDocument()
+    expect(
+      screen.getByRole('option', { name: /Create API Key/ })
+    ).toBeInTheDocument()
   })
 
   test('shows the first key by default and only its group models', async () => {

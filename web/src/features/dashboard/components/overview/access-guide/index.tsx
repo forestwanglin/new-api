@@ -263,7 +263,6 @@ export function AccessGuideCard(props: { onHide: () => void }) {
   } else if (creating) {
     apiKeyContent = (
       <CreateKeyForm
-        defaultName={`my-key-${keys.length + 1}`}
         groupOptions={groupOptions}
         submitting={createMutation.isPending}
         onCancel={() => setCreating(false)}
