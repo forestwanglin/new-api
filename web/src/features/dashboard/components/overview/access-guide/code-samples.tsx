@@ -37,6 +37,7 @@ type AccessCodeSamplesProps = {
   hasKey: boolean
   copying: boolean
   onCopyCommand: (tab: Exclude<AccessCodeSampleTab, 'client'>) => void
+  onCopyFullKey: () => void
 }
 
 /**
@@ -91,18 +92,39 @@ export function AccessCodeSamples(props: AccessCodeSamplesProps) {
     sampleContent = (
       <div className='bg-muted/20 flex flex-col gap-2 rounded-lg border p-3'>
         {clientRows.map((row) => (
-          <div key={row.key} className='flex items-center justify-between gap-3'>
+          <div
+            key={row.key}
+            className='flex items-center justify-between gap-3'
+          >
             <span className='text-muted-foreground shrink-0 text-xs'>
               {t(row.key)}
             </span>
             <span className='flex min-w-0 items-center gap-1'>
               <code className='truncate font-mono text-xs'>{row.value}</code>
-              <CopyButton
-                value={row.value}
-                aria-label={t('Copy to clipboard')}
-                iconClassName='size-3.5'
-                className='size-7'
-              />
+              {row.key === 'API Key' ? (
+                <Button
+                  type='button'
+                  variant='ghost'
+                  size='icon'
+                  className='size-7 shrink-0'
+                  aria-label={t('Copy to clipboard')}
+                  disabled={props.copying}
+                  onClick={props.onCopyFullKey}
+                >
+                  {props.copying ? (
+                    <Loader2 className='size-3.5 animate-spin' />
+                  ) : (
+                    <Copy className='size-3.5' />
+                  )}
+                </Button>
+              ) : (
+                <CopyButton
+                  value={row.value}
+                  aria-label={t('Copy to clipboard')}
+                  iconClassName='size-3.5'
+                  className='size-7'
+                />
+              )}
             </span>
           </div>
         ))}

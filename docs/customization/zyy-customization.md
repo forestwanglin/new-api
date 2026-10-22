@@ -531,6 +531,18 @@
 
 ---
 
+### Z019 概览客户端填法复制完整 API 密钥
+
+- 需求与原因：概览页「客户端填法」的 API 密钥行此前直接复制展示用的掩码，无法用于客户端鉴权。
+- 变更内容：密钥行复用接入卡现有的完整密钥复制回调，点击时请求所选密钥的 `/api/token/:id/key`，成功后复制带 `sk-` 前缀的完整密钥；请求期间禁用按钮，失败沿用统一错误提示。页面继续展示掩码。
+- 影响面：fork 自有文件 `web/src/features/dashboard/components/overview/access-guide/{index,code-samples}.tsx` 及其 `__tests__/access-guide.test.tsx`；上游自有文件无。
+- 与上游差异：扩展 fork 的概览接入卡；不修改后端接口或通用复制组件。通用 `CopyButton` 只接受同步字符串，密钥行组合已有 `Button` 与卡片异步复制回调，端点和模型行继续复用 `CopyButton`。
+- 开关与默认值：无开关，当前选中密钥生效，完整密钥按点击获取。
+- 验证：新增用例先复现未调用完整密钥接口的失败，再验证剪贴板内容为完整测试密钥；`cd web && ./node_modules/.bin/vitest run src/features/dashboard` → 7 文件、76 用例通过；`./node_modules/.bin/tsgo -b` 和改动 TSX 文件的 `oxlint -c .oxlintrc.json` 均退出码 0。
+- 风险与未覆盖：未做真实浏览器与线上剪贴板验证，未发布；本机未安装 Bun，使用现有依赖中的工具执行验证。
+
+---
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，

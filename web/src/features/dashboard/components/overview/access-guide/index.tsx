@@ -351,6 +351,7 @@ export function AccessGuideCard(props: { onHide: () => void }) {
           hasKey={Boolean(currentKey)}
           copying={copying}
           onCopyCommand={handleCopyCommand}
+          onCopyFullKey={handleCopyFullKey}
         />
       </div>
     </CardStaggerItem>

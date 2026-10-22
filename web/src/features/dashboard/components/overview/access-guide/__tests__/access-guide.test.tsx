@@ -352,6 +352,29 @@ describe('AccessGuideCard', () => {
     )
   })
 
+  test('copies the full key from the client configuration row', async () => {
+    const user = userEvent.setup()
+    const writeText = vi
+      .spyOn(navigator.clipboard, 'writeText')
+      .mockResolvedValue()
+    tokenList = [makeKey(5, { name: 'Newest key', group: 'vip' })]
+    await renderCard()
+
+    await user.click(
+      await screen.findByRole('tab', { name: 'Client configuration' })
+    )
+    const apiKeyRow = screen.getAllByText('API Key').at(-1)?.parentElement
+    expect(apiKeyRow).not.toBeNull()
+    await user.click(within(apiKeyRow as HTMLElement).getByRole('button'))
+
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith('/api/token/5/key')
+    )
+    await waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith('sk-realkey123456')
+    )
+  })
+
   test('copies a runnable command that contains the real key and model', async () => {
     const user = userEvent.setup()
     const writeText = vi
