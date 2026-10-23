@@ -128,6 +128,12 @@ export const SIDEBAR_WIDTH = 'w-64'
 /** Excluded groups */
 export const EXCLUDED_GROUPS = ['', 'auto']
 
+/**
+ * Group name the backend treats as "visible to every group": a model whose
+ * abilities carry it is offered to all groups, whatever group is filtered.
+ */
+export const UNIVERSAL_GROUP = 'all'
+
 /** Quota type values */
 export const QUOTA_TYPE_VALUES = {
   TOKEN: 0,

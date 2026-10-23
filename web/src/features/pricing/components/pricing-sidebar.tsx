@@ -34,6 +34,7 @@ import {
   ENDPOINT_TYPES,
   FILTER_ALL,
   QUOTA_TYPES,
+  UNIVERSAL_GROUP,
   getEndpointTypeLabels,
   getQuotaTypeLabels,
 } from '../constants'
@@ -156,7 +157,12 @@ export const PricingSidebar = memo(function PricingSidebar(
     const vendors = new Map<string, number>()
     const tags = new Map<string, number>()
     const endpoints = new Map<string, number>()
+    const groups = new Map<string, number>()
     const quotas = { token: 0, request: 0, task: 0 }
+    // The backend treats a model whose abilities carry the literal "all" group
+    // as visible to every group (see filterPricingByUsableGroups), so such
+    // models must be counted in every group's total as well.
+    let universalGroupModels = 0
     for (const model of props.models) {
       if (model.vendor_name) {
         vendors.set(
@@ -172,6 +178,13 @@ export const PricingSidebar = memo(function PricingSidebar(
       for (const endpoint of new Set(model.supported_endpoint_types ?? [])) {
         endpoints.set(endpoint, (endpoints.get(endpoint) ?? 0) + 1)
       }
+      const modelGroups = new Set(model.enable_groups ?? [])
+      if (modelGroups.has(UNIVERSAL_GROUP)) {
+        universalGroupModels++
+      }
+      for (const group of modelGroups) {
+        groups.set(group, (groups.get(group) ?? 0) + 1)
+      }
       if (hasTaskUsageSchema(model)) {
         quotas.task++
       } else if (model.quota_type === 0) {
@@ -180,7 +193,7 @@ export const PricingSidebar = memo(function PricingSidebar(
         quotas.request++
       }
     }
-    return { vendors, tags, endpoints, quotas }
+    return { vendors, tags, endpoints, groups, quotas, universalGroupModels }
   }, [props.models])
   const quotaTypeLabels = getQuotaTypeLabels(t)
   const endpointTypeLabels = getEndpointTypeLabels(t)
@@ -206,11 +219,20 @@ export const PricingSidebar = memo(function PricingSidebar(
       value: FILTER_ALL,
       label: t('All Groups'),
     },
-    ...props.groups.map((group) => ({
-      value: group,
-      label: group,
-      suffix: formatGroupRatio(props.groupRatios?.[group]),
-    })),
+    // Groups without any model are dead ends here: they come from the user's
+    // usable groups, not from the catalog. Keep the active one so a shared URL
+    // never loses its visible filter.
+    ...props.groups
+      .filter(
+        (group) =>
+          (counts.groups.get(group) ?? 0) + counts.universalGroupModels > 0 ||
+          group === props.groupFilter
+      )
+      .map((group) => ({
+        value: group,
+        label: group,
+        suffix: formatGroupRatio(props.groupRatios?.[group]),
+      })),
   ]
 
   const quotaOptions: FilterOption[] = [

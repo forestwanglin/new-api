@@ -60,6 +60,18 @@ function toolbarProps(): PricingToolbarProps {
   }
 }
 
+function makeModel(overrides: Partial<PricingModel> = {}): PricingModel {
+  return {
+    id: 1,
+    model_name: 'text-model',
+    quota_type: 0,
+    model_ratio: 1,
+    completion_ratio: 1,
+    enable_groups: ['default'],
+    ...overrides,
+  }
+}
+
 describe('pricing controls', () => {
   it('counts each model once per filter and updates counts when the catalog changes', () => {
     const props = toolbarProps()
@@ -197,10 +209,57 @@ describe('pricing controls', () => {
     expect(props.onSortChange).toHaveBeenCalledWith('input-price-low')
   })
 
+  it('hides groups that have no models in the catalog', () => {
+    const props = toolbarProps()
+    const { rerender } = render(
+      <PricingSidebar
+        {...props}
+        groups={['default', 'business']}
+        groupRatios={{ default: 1, business: 1 }}
+        models={[makeModel()]}
+      />
+    )
+
+    expect(screen.getByRole('button', { name: /^default/ })).toBeVisible()
+    expect(screen.queryByRole('button', { name: /^business/ })).toBeNull()
+
+    // A group that only owns models through the universal "all" group stays
+    // listed, because the backend offers those models to every group.
+    rerender(
+      <PricingSidebar
+        {...props}
+        groups={['default', 'business']}
+        groupRatios={{ default: 1, business: 1 }}
+        models={[makeModel({ enable_groups: ['all'] })]}
+      />
+    )
+    expect(screen.getByRole('button', { name: /^business/ })).toBeVisible()
+
+    // The group selected through a shared URL keeps its chip for reversal.
+    rerender(
+      <PricingSidebar
+        {...props}
+        groupFilter='business'
+        groups={['default', 'business']}
+        groupRatios={{ default: 1, business: 1 }}
+        models={[makeModel()]}
+      />
+    )
+    expect(screen.getByRole('button', { name: /^business/ })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+  })
+
   it('opens mobile filters from the left, selects a group, and restores focus on close', async () => {
     const props = toolbarProps()
     const user = userEvent.setup()
-    const { rerender } = render(<PricingToolbar {...props} />)
+    const { rerender } = render(
+      <PricingToolbar
+        {...props}
+        models={[makeModel({ enable_groups: ['premium'] })]}
+      />
+    )
     await user.click(screen.getByRole('button', { name: 'Filter' }))
     const dialog = await screen.findByRole('dialog', { name: 'Filter' })
     expect(dialog).toHaveAttribute('data-side', 'left')
