@@ -458,6 +458,8 @@ http://127.0.0.1:13000
 
 > 如果线上已有较多用户在使用转发服务、不能接受中断，请改用 [zero-downtime-update.md](zero-downtime-update.md) 的蓝绿切换流程（本流程作为其简化版，适用于无用户或可接受短暂中断的场景）。
 
+> 任务插件（任务插件页 / `task_plugins` 表）有两套存储，重新部署只替换镜像层、不会清掉数据库里已安装的版本；反过来点市场「安装」会静默覆盖镜像里的内置定制。改动过 `plugins/tasks/*/plugin.js` 时，务必先读 [task-plugins.md](task-plugins.md)。
+
 先备份数据库，并备份当前镜像：
 
 ```bash
@@ -530,5 +532,7 @@ docker image prune -f
 # 备份标签只保留最近 3 个，其余删除
 docker images new-api-zyy:backup-* --format '{{.Tag}}' | sort -r | tail -n +4 | xargs -r -I{} docker rmi "new-api-zyy:{}"
 ```
+
+5. **任务插件的定制。** 内置任务插件由 `go:embed` 编进镜像，线上「安装/更新」的插件则存在数据库 `task_plugins` 表。重建镜像不会清掉已安装的版本，但这些版本会覆盖镜像里的内置定制；本分支的 doubao 1.3.1 正是定制版本，线上显示「已装 v1.3.1 不在索引中」属于正常状态。详见 [task-plugins.md](task-plugins.md)。
 
 下一步应当根据准备绑定到该服务器的域名，配置 Nginx 反向代理和免费 HTTPS 证书。
