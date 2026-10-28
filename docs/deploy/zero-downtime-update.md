@@ -36,7 +36,7 @@ Nginx ──► 3001（新实例，新镜像）
 
 ## 脚本化执行（推荐）
 
-"备份 → 构建 → 起备用 → 切流 → 排空 → 停旧"的完整流程已脚本化为 [blue-green-switch.sh](blue-green-switch.sh)（放到服务器的 `/opt/new-api-deploy/` 下）：
+"备份 → 构建 → 起备用 → 切流 → 排空 → 停旧 → 清理镜像"的完整流程已脚本化为 [blue-green-switch.sh](blue-green-switch.sh)（放到服务器的 `/opt/new-api-deploy/` 下）：
 
 ```bash
 sudo /opt/new-api-deploy/blue-green-switch.sh update     # 零停机更新
@@ -67,6 +67,7 @@ sudo /opt/new-api-deploy/blue-green-switch.sh prune        # 只清构建缓存�
 | N6 | 版本盖章：构建前把 `VERSION` 写成 `<branch>-<commit 前 8 位>`（界面版本号来源），构建后还原；手工 `compose build` 不会盖章 |
 | N7 | 构建必须有 CPU 配额（内存配额可选，默认不限制），且构建前内存余量须 ≥ `MIN_BUILD_HEADROOM_MB`（默认 2048MiB）：配额由 `setup-build-builder.sh` 写入 `build-limits.env`；`update` 只校验不修改，配额缺失/超过总资源、内存余量不足时直接中止 |
 | N8 | 构建缓存只增不减（两个 builder 各一份，共约 30G/34G 根分区）：`update` 在构建成功后按 `BUILD_CACHE_KEEP`（默认 `168h`）各清一次，`prune` 子命令供 cron 做周度兜底；只删 build cache，不动镜像/容器/volume |
+| N9 | 镜像清理：`update` 排空旧实例并验证通过后自动清理 `new-api-zyy` 的 `backup-*` 标签，保留 `latest` + 最近 `BACKUP_KEEP`（默认 3）个；仍被容器引用（含已停止的旧实例）的镜像跳过不删；清理失败只告警，不影响已完成的发布。关闭：`PRUNE_IMAGES=false` |
 
 ### 构建资源限制（N7，必须）
 
@@ -383,7 +384,7 @@ docker compose logs --tail=100 new-api-b
 
 - **快速回滚（推荐）**：在旧实例停止前执行 `sudo /opt/new-api-deploy/blue-green-switch.sh rollback`，脚本会把 Nginx 切回旧端口并在必要时重启旧实例（仍为旧镜像）。
 - **切换后、停止旧实例前**（约 5–7 分钟窗口内）：把 Nginx 上游改回旧端口并 `nginx -s reload` 即可，旧实例还在运行，秒级回滚。
-- **停止旧实例后**：按 deploy-zyy-branch.md 第十步的镜像回滚流程，用备份标签在备用端口启动旧版本，再切 Nginx。
+- **停止旧实例后**：按 deploy-zyy-branch.md 第十步的镜像回滚流程，用备份标签在备用端口启动旧版本，再切 Nginx。注意 `update` 完成后会自动清理较旧的备份标签（只保留最近 `BACKUP_KEEP` 个，默认 3），备份标签回滚窗口即最近 3 次部署；更早的版本需重新构建。
 - **数据库**：更新前已做 mysqldump 备份。注意新版本启动时（切流量之前）已执行过迁移，若回滚后旧版本与新表结构不兼容，需要恢复数据库备份——这正是每次更新前必须备份的原因。
 
 ## 风险与注意事项

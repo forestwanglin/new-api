@@ -69,7 +69,8 @@ LEGACY_CONTAINER="new-api-zyy"   # 旧单容器时代的容器名（如仍存在
 
 MYSQL_DB="new_api"
 BACKUP_DIR="/opt/new-api-backups"
-BACKUP_KEEP=3                    # 数据库备份与镜像备份标签各保留份数
+BACKUP_KEEP="${BACKUP_KEEP:-3}"                  # 数据库备份与镜像备份标签各保留份数
+PRUNE_IMAGES="${PRUNE_IMAGES:-true}"             # update 排空旧实例后清理镜像（保留 latest + 最近 BACKUP_KEEP 个 backup 标签）；false 关闭
 
 HEALTH_TIMEOUT=300               # W1: 等待新实例 healthy 的最长秒数
 DRAIN_WAIT=300                   # W2: 切流后等待在途请求排空的秒数
@@ -252,6 +253,14 @@ validate_build_cache_config() {
   case "$PRUNE_BUILD_CACHE" in
     true|false) ;;
     *) die "N8: PRUNE_BUILD_CACHE 只能是 true 或 false，当前为 '${PRUNE_BUILD_CACHE}'" ;;
+  esac
+  # BACKUP_KEEP 用于裁剪 backup 标签（step_backup / step_prune_images）。非正整数时
+  # tail -n +$((BACKUP_KEEP + 1)) 会退化成 +1 删掉全部备份标签，所以 fail-closed。
+  [[ "$BACKUP_KEEP" =~ ^[1-9][0-9]*$ ]] \
+    || die "BACKUP_KEEP 必须是正整数（当前为 '${BACKUP_KEEP}'）"
+  case "$PRUNE_IMAGES" in
+    true|false) ;;
+    *) die "PRUNE_IMAGES 只能是 true 或 false，当前为 '${PRUNE_IMAGES}'" ;;
   esac
 }
 
@@ -476,6 +485,49 @@ step_verify() {
   warn "N4: 快速回滚窗口已结束（旧实例已停止）。如后续发现问题，按 zero-downtime-update.md 用备份标签回滚"
 }
 
+# 部署完成后清理镜像：保留 latest + 最近 BACKUP_KEEP 个 backup-* 标签，删除更旧的。
+# 只动 new-api-zyy 仓库的 backup-* 标签（latest 与其他仓库不碰）；仍被容器引用
+# （含已停止的旧实例，快速回滚依赖它）的镜像跳过并告警，不强制删除。
+# 尽力而为：清理失败只告警，不影响已完成的发布。
+step_prune_images() {
+  if [ "$PRUNE_IMAGES" != "true" ]; then
+    log "⑦ PRUNE_IMAGES=false，跳过镜像清理"
+    return 0
+  fi
+  log "⑦ 清理镜像（保留 latest + 最近 ${BACKUP_KEEP} 个 backup 标签）"
+
+  local total=0 kept=0 removed=0 skipped=0 tag containers
+  while IFS= read -r tag; do
+    [ -n "$tag" ] || continue
+    case "$tag" in backup-*) ;; *) continue ;; esac
+    total=$((total + 1))
+    if [ "$total" -le "$BACKUP_KEEP" ]; then
+      kept=$((kept + 1))
+      continue
+    fi
+    containers="$(docker ps -a -q --filter "ancestor=new-api-zyy:$tag" 2>/dev/null)"
+    if [ -n "$containers" ]; then
+      skipped=$((skipped + 1))
+      warn "跳过 $tag（仍被容器引用：$(echo "$containers" | tr '\n' ' ')）"
+      continue
+    fi
+    if docker rmi "new-api-zyy:$tag" >/dev/null 2>&1; then
+      removed=$((removed + 1))
+      log "已删除 $tag"
+    else
+      skipped=$((skipped + 1))
+      warn "删除 $tag 失败（镜像可能仍被引用），保留"
+    fi
+  done < <(docker images "new-api-zyy:backup-*" --format '{{.Tag}}' 2>/dev/null | sort -r)
+
+  if [ "$total" -eq 0 ]; then
+    log "没有 backup 标签，无需清理"
+  else
+    log "镜像清理完成：共 ${total} 个 backup 标签，保留 ${kept}，删除 ${removed}，跳过 ${skipped}"
+  fi
+  return 0
+}
+
 # ==================== 命令入口 ====================
 cmd_update() {
   check_preconditions
@@ -512,6 +564,7 @@ cmd_update() {
   step_switch_nginx "$standby_port" update
   step_drain_and_stop_old "$old"
   step_verify "$standby_port"
+  step_prune_images
 }
 
 cmd_rollback() {
