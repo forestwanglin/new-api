@@ -50,6 +50,12 @@
 #      update 在构建成功后按 BUILD_CACHE_KEEP（默认 168h）各清一次；prune 子命令
 #      只做同样的清理，供 cron 做周度兜底（不依赖线上实例，任意时间可跑）。
 #      只删 build cache，不删镜像/容器/volume，不影响备份标签与回滚。
+#   N9 Nginx 配置快照清理：step_switch_nginx 每次执行（update 与 rollback 都算）
+#      都会先在配置文件旁边留一份 <conf>.bak-<时间戳>，历史上只增不减。
+#      现在每次切换后只保留最近 NGINX_BAK_KEEP 份（默认 3），更旧的删除。
+#      快照只用于 nginx -t 失败时回退和事后人工比对，rollback 不读它；
+#      清理放在 reload 之后且失败只告警 —— 那时切流已完成，不能让清理影响发布结果。
+#      快照名不以 .conf 结尾，不会被 nginx 的 include 加载。
 #
 set -euo pipefail
 
@@ -71,6 +77,7 @@ MYSQL_DB="new_api"
 BACKUP_DIR="/opt/new-api-backups"
 BACKUP_KEEP="${BACKUP_KEEP:-3}"                  # 数据库备份与镜像备份标签各保留份数
 PRUNE_IMAGES="${PRUNE_IMAGES:-true}"             # update 排空旧实例后清理镜像（保留 latest + 最近 BACKUP_KEEP 个 backup 标签）；false 关闭
+NGINX_BAK_KEEP="${NGINX_BAK_KEEP:-3}"              # N9: 每个 Nginx 配置文件保留的 .bak-<ts> 快照份数（正整数）
 
 HEALTH_TIMEOUT=300               # W1: 等待新实例 healthy 的最长秒数
 DRAIN_WAIT=300                   # W2: 切流后等待在途请求排空的秒数
@@ -297,6 +304,46 @@ prune_build_cache() {
   fi
 }
 
+# ==================== Nginx 配置快照清理（N9） ====================
+# NGINX_BAK_KEEP 的格式校验。切流前的预检（cmd_update / cmd_check）调用它做
+# fail-closed；prune_nginx_baks 内部不调用它，因为那时 reload 已经完成，只降级告警。
+validate_nginx_bak_config() {
+  [[ "$NGINX_BAK_KEEP" =~ ^[1-9][0-9]*$ ]] \
+    || die "N9: NGINX_BAK_KEEP 必须是正整数（当前为 '${NGINX_BAK_KEEP}'）"
+}
+
+# 只保留某个配置文件最近 NGINX_BAK_KEEP 份 <conf>.bak-<ts> 快照。
+# $1 = 配置文件路径（find_nginx_file 输出的 readlink -f 绝对路径）。
+# 时间戳格式 YYYYmmdd-HHMMSS 可按字典序排序，所以 sort -r 就是“新→旧”。
+# 本函数不删配置文件本身，也永不返回失败：它跑在 reload 之后。
+prune_nginx_baks() {
+  local conf="$1" dir base keep="$NGINX_BAK_KEEP" bak total=0 removed=0
+  case "$keep" in
+    ''|*[!0-9]*|0)
+      warn "N9: NGINX_BAK_KEEP='${keep}' 不是正整数，跳过 Nginx 配置快照清理"
+      return 0 ;;
+  esac
+
+  dir="$(dirname "$conf")"
+  base="$(basename "$conf")"
+  while IFS= read -r bak; do
+    [ -n "$bak" ] || continue
+    total=$((total + 1))
+    if [ "$total" -le "$keep" ]; then
+      continue
+    fi
+    if rm -f -- "$bak"; then
+      removed=$((removed + 1))
+    else
+      warn "N9: 删除 Nginx 配置快照失败: $bak"
+    fi
+  done < <(find "$dir" -maxdepth 1 -type f -name "${base}.bak-*" 2>/dev/null | sort -r)
+
+  [ "$total" -gt 0 ] \
+    && log "N9 Nginx 配置快照清理: ${dir}/${base}.bak-* 共 ${total} 份，保留最近 ${keep} 份，删除 ${removed} 份"
+  return 0
+}
+
 # ==================== 状态探测 ====================
 find_nginx_file() {
   local files f n
@@ -449,6 +496,11 @@ step_switch_nginx() {
   fi
   nginx -s reload
   log "Nginx 已切换并 reload（存量连接不受影响，新请求走 ${target_port}）"
+
+  # N9: 保留最近的快照，避免每次 update/rollback 都往配置目录里堆一个 .bak。
+  # 这一步在 reload 之后，失败只告警（详见函数注释）。
+  prune_nginx_baks "$nginx_file"
+
   if [ "$mode" = "update" ]; then
     warn "N3: 从现在到旧实例停止之间是快速回滚窗口，发现异常立即执行: $0 rollback"
   fi
@@ -536,6 +588,8 @@ cmd_update() {
   ensure_build_headroom
   # N8: 缓存清理的配置也在这里提前校验，避免构建完才发现保留期格式不合法
   validate_build_cache_config
+  # N9: 快照保留份数同理；rollback 不走这里，它在清理时降级为告警
+  validate_nginx_bak_config
 
   local active_port active_svc running old standby standby_port
   active_port="$(active_port)"
@@ -613,6 +667,7 @@ cmd_check() { # 预检：只读校验，不改动线上任何东西
   ensure_build_limits
   ensure_build_headroom
   validate_build_cache_config
+  validate_nginx_bak_config
 
   local port
   port="$(active_port)"

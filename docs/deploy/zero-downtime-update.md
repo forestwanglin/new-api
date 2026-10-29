@@ -354,6 +354,14 @@ location / {
 nginx -t && nginx -s reload
 ```
 
+> 走脚本（`blue-green-switch.sh`）时，这一步会顺手把原配置备份成 `<conf>.bak-<时间戳>`，并且每次 `update`/`rollback` 都会留一份。脚本现在只保留最近 `NGINX_BAK_KEEP` 份（默认 3），更旧的自动删除；手工操作若要清理：
+>
+> ```bash
+> find /etc/nginx/{sites-available,sites-enabled,conf.d} -maxdepth 1 -name '*.bak-*' -mtime +14 -print -delete
+> ```
+>
+> 注意这些快照**只用于 `nginx -t` 失败回退和事后比对**，`rollback` 不读它们（回滚同样是就地改 `proxy_pass` 端口）。所以不要手工把某个旧 `.bak` 覆盖回配置目录来充当回滚。
+
 reload 后：新请求走 B（新版本）；已经建立的 SSE 流继续由 A 处理，不会被切断。
 
 ### ⑤ 等待旧实例排空，然后停止
