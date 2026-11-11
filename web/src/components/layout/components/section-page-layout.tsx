@@ -24,9 +24,7 @@ import {
   type ReactNode,
 } from 'react'
 
-import { ROLE } from '@/lib/roles'
 import { cn } from '@/lib/utils'
-import { useAuthStore } from '@/stores/auth-store'
 
 import { Main } from './main'
 import { PageFooterProvider } from './page-footer'
@@ -62,15 +60,12 @@ export type SectionPageLayoutProps = {
   children: ReactNode
   fixedContent?: boolean
   stackActionsOnMobile?: boolean
-  /** Opt-in user foundation; elevated roles always retain the original layout. */
+  /** Opt-in page foundation, shared by all account roles. */
   variant?: 'default' | 'user'
 }
 
 export function SectionPageLayout(props: SectionPageLayoutProps) {
-  const isOrdinaryUser = useAuthStore(
-    (state) => state.auth.user?.role === ROLE.USER
-  )
-  const userAppearance = props.variant === 'user' && isOrdinaryUser
+  const userAppearance = props.variant === 'user'
   const [footerContainer, setFooterContainer] = useState<HTMLDivElement | null>(
     null
   )

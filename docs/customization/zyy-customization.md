@@ -567,6 +567,18 @@
 
 ---
 
+### Z022 已接入 A1 页面统一所有账号角色，并更新页面计划
+
+- 需求与原因：用户明确所有用户都用新布局，并要求把已完成代码进度同步到 `c-dev/frontend-phase-one-page-plan.md`。
+- 变更内容：取消 Z020/Z021 的 ROLE.USER 样式限制，`variant='user'` 仅表示视觉类型，普通用户、管理员、超级管理员在已接入页面统一新外观；个人资料同样统一。未接入的管理页保持默认布局，接口和权限不变。页面计划记录已接入页面、提交、验证与尚未完成的浏览器验收，不将 A1 标成全部验收通过。
+- 影响面：**上游自有文件** `web/src/components/layout/components/section-page-layout.tsx`、`web/src/features/profile/index.tsx`、`web/src/features/security/__tests__/page.test.tsx`、`web/src/features/usage-logs/audit/__tests__/viewer.test.tsx`；fork 骨架测试和 `c-dev/frontend-phase-one-page-plan.md`。该决策覆盖 Z020/Z021 中“管理员旧视觉”的历史边界。
+- 与上游差异：页面显式 opt-in 机制保留，仅移除外观的角色条件，不更改认证、角色、个人/全量查询及服务端权限。
+- 开关与默认值：已接入页面所有角色一致；组件默认 variant 仍不改变未接入页面。
+- 验证：更新预期后实现前 6 用例失败；取消限制后定向 3 文件/49 用例通过；typecheck、build 与改动文件 lint/format 通过。全量 215 文件通过、1 文件失败，2580 用例通过、1 超时；失败仍是已在干净 HEAD 副本复现过的 `detail-preview.test.tsx` 中 `task log prices use localized unit labels from pricing metadata`，上一批该用例曾通过，存在不稳定性，不修改超时阈值或测试断言。
+- 风险与未覆盖：缺少授权登录会话，真实账号视觉验收未完成；任务仍待补验，不声称管理页像素级无变化。
+
+---
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，

@@ -22,8 +22,6 @@ import {
   CardStaggerItem,
 } from '@/components/page-transition'
 import { useStatus } from '@/hooks/use-status'
-import { ROLE } from '@/lib/roles'
-import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
 
 import { CheckinCalendarCard } from './components/checkin-calendar-card'
@@ -37,7 +35,6 @@ export function Profile() {
   const { profile, loading, refreshProfile } = useProfile()
   const { status } = useStatus()
   const permissions = useAuthStore((s) => s.auth.user?.permissions)
-  const isOrdinaryUser = useAuthStore((s) => s.auth.user?.role === ROLE.USER)
 
   const checkinEnabled = status?.checkin_enabled === true
   const turnstileEnabled = !!(
@@ -50,13 +47,8 @@ export function Profile() {
   const quotaRemindThreshold = status?.quota_remind_threshold ?? 0
 
   return (
-    <Main className={isOrdinaryUser ? 'user-page' : undefined}>
-      <div
-        className={cn(
-          'min-h-0 flex-1 overflow-auto px-3 py-3 sm:px-4 sm:py-6',
-          isOrdinaryUser && 'user-page-profile-content'
-        )}
-      >
+    <Main className='user-page'>
+      <div className='user-page-profile-content min-h-0 flex-1 overflow-auto'>
         <CardStaggerContainer className='mx-auto flex w-full max-w-7xl flex-col gap-4 sm:gap-6'>
           <CardStaggerItem>
             <ProfileHeader profile={profile} loading={loading} />

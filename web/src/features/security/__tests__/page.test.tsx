@@ -166,11 +166,11 @@ describe('security page migration', () => {
   )
 
   it.each(['/security', '/profile'])(
-    'keeps the original administrator appearance at %s',
+    'uses the same foundation for administrators at %s',
     async (path) => {
       useAuthStore.getState().auth.setUser({ ...profile, role: 10 })
       await renderPage(path)
-      expect(await screen.findByRole('main')).not.toHaveClass('user-page')
+      expect(await screen.findByRole('main')).toHaveClass('user-page')
     }
   )
 

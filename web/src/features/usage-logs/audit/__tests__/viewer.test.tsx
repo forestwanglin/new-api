@@ -632,7 +632,7 @@ it.each([10, 100])(
     )
     expect(get).not.toHaveBeenCalledWith('/api/audit/self', expect.anything())
     await userEvent.click(screen.getByRole('tab', { name: 'Only Mine' }))
-    expect(screen.getByRole('main')).not.toHaveClass('user-page')
+    expect(screen.getByRole('main')).toHaveClass('user-page')
     await waitFor(() =>
       expect(get).toHaveBeenLastCalledWith('/api/audit/self', expect.anything())
     )

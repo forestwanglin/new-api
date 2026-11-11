@@ -85,12 +85,12 @@ it('opts ordinary users into a wrapping title and includes instructions and pagi
 })
 
 it.each([ROLE.GUEST, ROLE.ADMIN, ROLE.SUPER_ADMIN])(
-  'keeps role %s on the original layout even when a user variant is requested',
+  'uses the opted-in layout for role %s without changing access permissions',
   (role) => {
     useAuthStore.getState().auth.setUser({ id: 1, username: 'viewer', role })
     render(<Page variant='user' />)
-    expect(screen.getByRole('main')).not.toHaveClass('user-page')
-    expect(screen.getByRole('heading')).toHaveClass('truncate')
+    expect(screen.getByRole('main')).toHaveClass('user-page')
+    expect(screen.getByRole('heading')).not.toHaveClass('truncate')
   }
 )
 
@@ -106,7 +106,7 @@ it('keeps keyboard navigation to the action and the portaled pagination', async 
   expect(screen.getByRole('button', { name: 'Next page' })).toHaveFocus()
 })
 
-it('removes the user appearance immediately when the account changes to an administrator', () => {
+it('retains the opted-in appearance when the account changes to an administrator', () => {
   useAuthStore
     .getState()
     .auth.setUser({ id: 1, username: 'user', role: ROLE.USER })
@@ -115,5 +115,5 @@ it('removes the user appearance immediately when the account changes to an admin
     .getState()
     .auth.setUser({ id: 2, username: 'admin', role: ROLE.ADMIN })
   view.rerender(<Page variant='user' />)
-  expect(screen.getByRole('main')).not.toHaveClass('user-page')
+  expect(screen.getByRole('main')).toHaveClass('user-page')
 })
