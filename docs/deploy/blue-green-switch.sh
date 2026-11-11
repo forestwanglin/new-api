@@ -62,7 +62,7 @@ set -euo pipefail
 # ==================== 可配置项 ====================
 DEPLOY_DIR="/opt/new-api-deploy"
 SRC_DIR="/opt/new-api-src"
-BRANCH="zyy-c"
+BRANCH="zyy-b"
 COMPOSE_FILE="${DEPLOY_DIR}/compose.yaml"
 
 PORT_A=3000                      # new-api-a 监听端口
