@@ -171,7 +171,7 @@ export function OverviewDashboard() {
   const showContentPanels = showLeftContentPanels || showUptimePanel
 
   return (
-    <SectionPageLayout>
+    <SectionPageLayout variant='user'>
       <SectionPageLayout.Title>{t('Overview')}</SectionPageLayout.Title>
       <SectionPageLayout.Actions>
         <Button

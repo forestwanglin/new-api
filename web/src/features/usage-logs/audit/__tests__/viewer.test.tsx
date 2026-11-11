@@ -583,6 +583,26 @@ it('changing rows per page resets pagination and sends the selected page size', 
   )
 })
 
+it('uses the user page foundation for personal audit records', async () => {
+  useAuthStore.getState().auth.setUser({ id: 1, username: 'user', role: 1 })
+  const get = vi.spyOn(api, 'get').mockResolvedValue({
+    data: { success: true, data: { items: [], total: 0 } },
+  })
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  render(
+    <QueryClientProvider client={client}>
+      <AuditLogs />
+    </QueryClientProvider>
+  )
+  expect(screen.getByRole('main')).toHaveClass('user-page')
+  await waitFor(() =>
+    expect(get).toHaveBeenCalledWith('/api/audit/self', expect.anything())
+  )
+  client.clear()
+})
+
 it.each([10, 100])(
   'role %i defaults to all audit records and can switch both ways',
   async (role) => {
@@ -612,6 +632,7 @@ it.each([10, 100])(
     )
     expect(get).not.toHaveBeenCalledWith('/api/audit/self', expect.anything())
     await userEvent.click(screen.getByRole('tab', { name: 'Only Mine' }))
+    expect(screen.getByRole('main')).not.toHaveClass('user-page')
     await waitFor(() =>
       expect(get).toHaveBeenLastCalledWith('/api/audit/self', expect.anything())
     )

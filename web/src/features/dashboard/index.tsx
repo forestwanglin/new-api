@@ -327,7 +327,7 @@ export function Dashboard() {
   }
 
   return (
-    <SectionPageLayout>
+    <SectionPageLayout variant='user'>
       <SectionPageLayout.Title>{t(meta.titleKey)}</SectionPageLayout.Title>
       <SectionPageLayout.Content>
         <div className='space-y-3 sm:space-y-4'>

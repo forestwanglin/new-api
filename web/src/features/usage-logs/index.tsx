@@ -124,10 +124,7 @@ function UsageLogsContent() {
 
   return (
     <>
-      <SectionPageLayout
-        fixedContent
-        variant={activeCategory === 'common' ? 'user' : 'default'}
-      >
+      <SectionPageLayout fixedContent variant='user'>
         <SectionPageLayout.Title>
           {t(pageMeta.titleKey)}
         </SectionPageLayout.Title>

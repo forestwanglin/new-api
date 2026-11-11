@@ -555,6 +555,18 @@
 
 ---
 
+### Z021 A1 剩余普通用户控制台页面接入
+
+- 需求与原因：用户确认在代表页之后，将 A1 基础外观扩展到剩余普通用户控制台内容页，公共页与聊天/Playground 另批处理。
+- 变更内容：概览、数据看板、任务/绘图日志、审计日志、钱包、安全与访问显式接入既有 user variant；个人资料保留 ProfileHeader 和原卡片结构，仅按普通用户角色应用同一局部留白。管理员与超级管理员继续旧视觉，审计“仅我的”不例外。
+- 影响面：**上游自有文件** `web/src/features/dashboard/index.tsx`、`web/src/features/dashboard/components/overview/overview-dashboard.tsx`、`web/src/features/profile/index.tsx`、`web/src/features/security/index.tsx`、`web/src/features/usage-logs/index.tsx`、`web/src/features/usage-logs/audit/index.tsx`、`web/src/features/wallet/index.tsx` 及 overview/security/audit 对应既有测试；fork 自有 `web/src/styles/user-page.css` 增加个人资料内容留白。上游合并时复核 opt-in 和角色隔离。
+- 与上游差异：复用 Z020 的局部骨架，不修改表格列、筛选、统计、支付、资料字段、安全验证、权限、路由或接口；个人资料不增加重复页头。
+- 开关与默认值：只有普通用户生效，继承原主题偏好；管理员、公共页、认证页、聊天和 Playground 不改变。
+- 验证：新增概览/安全/个人资料接入断言实现前 3 个失败，实现后通过；包含管理员隔离及审计个人范围回归。`bun run test -- src/features/security src/features/profile src/features/wallet src/features/dashboard src/features/usage-logs/audit src/features/usage-logs/__tests__ src/components/layout/components/__tests__` → 28 文件、288 用例通过；`bun run test` → 216 文件、2581 用例全部通过（存在既有 JSDOM scrollTo/canvas 提示）；`bun run typecheck`、`bun run build`、改动 TSX 定向 oxlint 和改动文件 oxfmt 检查通过。
+- 风险与未覆盖：Chrome 访问本地 `/profile` 仍重定向登录，缺少可用会话；真实账号下多屏宽、主题、业务操作、焦点恢复未验收，不宣称视觉验收全部完成。未调整部署或后端。
+
+---
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
@@ -573,6 +585,7 @@
 | 前端概览 | `web/src/features/dashboard/components/overview/overview-dashboard.tsx`、`web/src/features/dashboard/components/overview/__tests__/setup-guide.test.tsx` | Z012 |
 | 前端定价 | `web/src/features/pricing/components/model-billing-mode-badge.tsx`、`model-card.tsx`、`model-details.tsx`、`model-details-api.tsx`、`model-price-cell.tsx`、`web/src/features/pricing/hooks/use-pricing-data.ts`、`web/src/features/pricing/lib/price.ts` | Z002 |
 | 前端定价（折扣/原价） | `web/src/features/pricing/components/model-card.tsx`、`model-price-cell.tsx`、`cached-price-cell.tsx`、`pricing-columns.tsx`、`pricing-table.tsx`、`model-details.tsx`、`web/src/features/pricing/index.tsx` | Z013 |
+| 前端控制台基础扩展 | `web/src/features/dashboard/index.tsx`、`web/src/features/dashboard/components/overview/overview-dashboard.tsx`、`web/src/features/profile/index.tsx`、`web/src/features/security/index.tsx`、`web/src/features/usage-logs/audit/index.tsx`、`web/src/features/wallet/index.tsx` 及相关测试 | Z021 |
 | 前端用户端基础 | `web/src/components/layout/components/section-page-layout.tsx`、`web/src/features/keys/index.tsx`、`web/src/features/usage-logs/index.tsx`、`web/src/styles/index.css` | Z020 |
 | 前端系统信息 | `web/src/features/system-info/constants.ts` | Z007 |
 | i18n | `web/src/i18n/locales/{en,zh,zh-TW,fr,ru,ja,vi}.json` | Z002 / Z004 / Z007 / Z012 / Z013 |

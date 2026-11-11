@@ -44,6 +44,10 @@ For commercial licensing, please contact support@quantumnous.com
   padding: 0 var(--user-page-gutter) var(--user-page-section-gap);
 }
 
+.user-page .user-page-profile-content {
+  padding: 1.5rem var(--user-page-gutter) var(--user-page-section-gap);
+}
+
 .user-page .user-page-footer {
   padding-inline: var(--user-page-gutter);
   background: var(--background);

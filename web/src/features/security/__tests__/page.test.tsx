@@ -156,6 +156,24 @@ async function renderPage(path = '/security') {
 }
 
 describe('security page migration', () => {
+  it.each(['/security', '/profile'])(
+    'applies the user foundation at %s without adding a second main region',
+    async (path) => {
+      await renderPage(path)
+      expect(await screen.findByRole('main')).toHaveClass('user-page')
+      expect(screen.getAllByRole('main')).toHaveLength(1)
+    }
+  )
+
+  it.each(['/security', '/profile'])(
+    'keeps the original administrator appearance at %s',
+    async (path) => {
+      useAuthStore.getState().auth.setUser({ ...profile, role: 10 })
+      await renderPage(path)
+      expect(await screen.findByRole('main')).not.toHaveClass('user-page')
+    }
+  )
+
   it('places account management on the left and verification and privacy on the right', async () => {
     await renderPage()
     const login = await screen.findByRole('region', {

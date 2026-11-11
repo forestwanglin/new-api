@@ -139,6 +139,11 @@ afterEach(() => {
   window.localStorage.clear()
 })
 
+test('applies the user foundation to the overview content', async () => {
+  await renderOverview()
+  expect(await screen.findByRole('main')).toHaveClass('user-page')
+})
+
 async function renderOverview() {
   const router = createRouter({
     routeTree: createRootRoute({ component: OverviewDashboard }),
