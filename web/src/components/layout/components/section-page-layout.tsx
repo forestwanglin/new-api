@@ -24,10 +24,19 @@ import {
   type ReactNode,
 } from 'react'
 
+import { ROLE } from '@/lib/roles'
+import { cn } from '@/lib/utils'
+import { useAuthStore } from '@/stores/auth-store'
+
 import { Main } from './main'
 import { PageFooterProvider } from './page-footer'
 
 type SlotProps = { children?: ReactNode }
+
+function SectionPageLayoutDescription(_props: SlotProps) {
+  return null
+}
+SectionPageLayoutDescription.displayName = 'SectionPageLayout.Description'
 
 function SectionPageLayoutTitle(_props: SlotProps) {
   return null
@@ -53,9 +62,15 @@ export type SectionPageLayoutProps = {
   children: ReactNode
   fixedContent?: boolean
   stackActionsOnMobile?: boolean
+  /** Opt-in user foundation; elevated roles always retain the original layout. */
+  variant?: 'default' | 'user'
 }
 
 export function SectionPageLayout(props: SectionPageLayoutProps) {
+  const isOrdinaryUser = useAuthStore(
+    (state) => state.auth.user?.role === ROLE.USER
+  )
+  const userAppearance = props.variant === 'user' && isOrdinaryUser
   const [footerContainer, setFooterContainer] = useState<HTMLDivElement | null>(
     null
   )
@@ -64,12 +79,16 @@ export function SectionPageLayout(props: SectionPageLayoutProps) {
   let actions: ReactNode = null
   let content: ReactNode = null
   let breadcrumb: ReactNode = null
+  let description: ReactNode = null
 
   Children.forEach(props.children, (node) => {
     if (!isValidElement(node)) return
     const child = node as ReactElement<SlotProps>
-    if (child.type === SectionPageLayoutTitle) title = child.props.children
-    else if (child.type === SectionPageLayoutActions) {
+    if (child.type === SectionPageLayoutDescription) {
+      description = child.props.children
+    } else if (child.type === SectionPageLayoutTitle) {
+      title = child.props.children
+    } else if (child.type === SectionPageLayoutActions) {
       actions = child.props.children
     } else if (child.type === SectionPageLayoutContent) {
       content = child.props.children
@@ -80,22 +99,38 @@ export function SectionPageLayout(props: SectionPageLayoutProps) {
 
   return (
     <PageFooterProvider container={footerContainer}>
-      <Main>
-        <div className='shrink-0 px-3 pt-3 pb-2.5 sm:px-4 sm:pt-5 sm:pb-3'>
+      <Main className={userAppearance ? 'user-page' : undefined}>
+        <div
+          className={cn(
+            'shrink-0 px-3 pt-3 pb-2.5 sm:px-4 sm:pt-5 sm:pb-3',
+            userAppearance && 'user-page-header'
+          )}
+        >
           {breadcrumb != null && (
             <div className='mb-2 sm:mb-3'>{breadcrumb}</div>
           )}
           <div className='flex flex-wrap items-center justify-between gap-x-3 gap-y-2 sm:gap-x-4'>
             <div
               className={
-                props.stackActionsOnMobile
+                props.stackActionsOnMobile || userAppearance
                   ? 'min-w-0 flex-1 max-sm:basis-full'
                   : 'min-w-0 flex-1'
               }
             >
-              <h2 className='truncate text-base font-bold tracking-tight sm:text-lg'>
+              <h2
+                className={
+                  userAppearance
+                    ? 'user-page-title'
+                    : 'truncate text-base font-bold tracking-tight sm:text-lg'
+                }
+              >
                 {title}
               </h2>
+              {description != null && (
+                <p className='text-muted-foreground mt-2 max-w-prose text-sm leading-relaxed'>
+                  {description}
+                </p>
+              )}
             </div>
             {actions != null && (
               <div className='flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2 sm:gap-x-4'>
@@ -106,24 +141,29 @@ export function SectionPageLayout(props: SectionPageLayoutProps) {
         </div>
 
         <div
-          className={
+          className={cn(
             props.fixedContent
               ? 'min-h-0 flex-1 overflow-hidden px-3 pt-1 pb-3 sm:px-4 sm:pt-1.5 sm:pb-4'
-              : 'min-h-0 flex-1 overflow-auto px-3 pt-1 pb-3 sm:px-4 sm:pt-1.5 sm:pb-4'
-          }
+              : 'min-h-0 flex-1 overflow-auto px-3 pt-1 pb-3 sm:px-4 sm:pt-1.5 sm:pb-4',
+            userAppearance && 'user-page-content'
+          )}
         >
           {content}
         </div>
 
         <div
           ref={setFooterContainer}
-          className='bg-background shrink-0 border-t px-3 py-2.5 empty:hidden sm:px-4 sm:py-3'
+          className={cn(
+            'bg-background shrink-0 border-t px-3 py-2.5 empty:hidden sm:px-4 sm:py-3',
+            userAppearance && 'user-page-footer'
+          )}
         />
       </Main>
     </PageFooterProvider>
   )
 }
 
+SectionPageLayout.Description = SectionPageLayoutDescription
 SectionPageLayout.Title = SectionPageLayoutTitle
 SectionPageLayout.Actions = SectionPageLayoutActions
 SectionPageLayout.Content = SectionPageLayoutContent

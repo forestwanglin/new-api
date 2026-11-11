@@ -1,0 +1,70 @@
+/*
+Copyright (C) 2023-2026 QuantumNous
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+For commercial licensing, please contact support@quantumnous.com
+*/
+/* A1: Demo spacing and surface hierarchy, scoped to opted-in user pages.
+ * Colors and radius intentionally inherit the active theme/preferences.
+ * Demo bg/bg2 -> background/muted; line -> border; tx/tx2 -> foreground/muted-foreground.
+ * Do not apply these tokens to body: admin pages and portal dialogs keep their theme.
+ */
+.user-page {
+  --user-page-gutter: 1rem;
+  --user-page-section-gap: 1rem;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.user-page .user-page-header {
+  padding: 1.5rem var(--user-page-gutter) var(--user-page-section-gap);
+}
+
+.user-page-title {
+  overflow-wrap: anywhere;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -0.025em;
+}
+
+.user-page .user-page-content {
+  padding: 0 var(--user-page-gutter) var(--user-page-section-gap);
+}
+
+.user-page .user-page-footer {
+  padding-inline: var(--user-page-gutter);
+  background: var(--background);
+}
+
+/* Existing table controls, row states and focus rings remain owned by DataTable. */
+.user-page {
+  --table-header: color-mix(in oklch, var(--foreground) 2%, var(--background));
+}
+
+@media (min-width: 640px) {
+  .user-page {
+    --user-page-gutter: 1.75rem;
+    --user-page-section-gap: 1.5rem;
+  }
+
+  .user-page .user-page-header {
+    padding-top: 2rem;
+  }
+
+  .user-page-title {
+    font-size: 1.75rem;
+  }
+}

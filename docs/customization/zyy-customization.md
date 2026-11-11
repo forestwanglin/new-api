@@ -543,6 +543,18 @@
 
 ---
 
+### Z020 A1 用户端页面设计基础（代表页接入）
+
+- 需求与原因：参考新版 Demo 的留白与视觉层级，为后续用户端改版建立兼容的页面骨架，先在 API 密钥与普通使用日志验证，不扩大到业务流程重构。
+- 变更内容：`SectionPageLayout` 新增显式 `variant='user'` 与可选 `Description` 插槽；仅当前账号角色为普通用户时启用局部页头、间距、可换行标题和表头层级。分页保留现有 portal 容器，移动端操作可换行；管理员、超级管理员（包括日志“仅我的”）和未接入页面保持默认布局。
+- 影响面：**上游自有文件** `web/src/components/layout/components/section-page-layout.tsx`、`web/src/features/keys/index.tsx`、`web/src/features/usage-logs/index.tsx`、`web/src/styles/index.css`；新增 `web/src/styles/user-page.css` 和 layout 专属 `__tests__/section-page-layout.test.tsx`。升级上游时重点复核 variant、角色保护和局部样式导入。
+- 与上游差异：扩展现有布局而非重建页面；仅 `/keys` 和 `/usage-logs/common` 请求新 variant，任务/绘图/审计和公共页不接入；列、筛选、请求、权限、弹层与业务操作保持原契约。
+- 开关与默认值：组件默认仍为旧布局；非普通用户即使请求 user variant 也不启用。没有全局主题或持久化开关；颜色、字体、字号与圆角继承现有主题偏好，不固定 Demo 蓝色。body portal 弹层仍使用既有全局主题。
+- 验证：新增用例先观察到缺少 user 外观的失败，实现后骨架 7 用例通过（默认隔离、角色隔离、账号切换、标题/说明、分页与键盘）；相关 8 文件测试在追加键盘用例前共 60 用例通过；`bun run typecheck`、`bun run build` 通过，改动 TSX 的定向 oxlint 及改动文件的 oxfmt 检查通过。最终全量测试为 215 文件通过、1 文件失败，2574 用例通过、1 超时：`detail-preview.test.tsx` 的 `task log prices use localized unit labels from pricing metadata`；未修改 HEAD 临时副本单独复跑同样超时。全量 lint/format 均有既有失败，HEAD 副本也失败，本次不修无关问题。
+- 风险与未覆盖：Chrome 访问本地 `/keys` 重定向到登录页，当前没有可用登录会话；未完成真实普通用户/管理员页面截图、多屏宽、深浅/预设主题、焦点恢复及真实业务闭环验收。不宣称 A1 已完成全部视觉验收；需有授权会话后补验。未修改 Demo、Compose、后端或部署配置。
+
+---
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
@@ -561,6 +573,7 @@
 | 前端概览 | `web/src/features/dashboard/components/overview/overview-dashboard.tsx`、`web/src/features/dashboard/components/overview/__tests__/setup-guide.test.tsx` | Z012 |
 | 前端定价 | `web/src/features/pricing/components/model-billing-mode-badge.tsx`、`model-card.tsx`、`model-details.tsx`、`model-details-api.tsx`、`model-price-cell.tsx`、`web/src/features/pricing/hooks/use-pricing-data.ts`、`web/src/features/pricing/lib/price.ts` | Z002 |
 | 前端定价（折扣/原价） | `web/src/features/pricing/components/model-card.tsx`、`model-price-cell.tsx`、`cached-price-cell.tsx`、`pricing-columns.tsx`、`pricing-table.tsx`、`model-details.tsx`、`web/src/features/pricing/index.tsx` | Z013 |
+| 前端用户端基础 | `web/src/components/layout/components/section-page-layout.tsx`、`web/src/features/keys/index.tsx`、`web/src/features/usage-logs/index.tsx`、`web/src/styles/index.css` | Z020 |
 | 前端系统信息 | `web/src/features/system-info/constants.ts` | Z007 |
 | i18n | `web/src/i18n/locales/{en,zh,zh-TW,fr,ru,ja,vi}.json` | Z002 / Z004 / Z007 / Z012 / Z013 |
 
