@@ -32,6 +32,7 @@ export function usePlanColumns(props: {
   onEdit: (plan: CustomSubscriptionPlan) => void
   onDelete: (plan: CustomSubscriptionPlan) => void
   onToggle: (plan: CustomSubscriptionPlan) => void
+  complianceConfirmed: boolean
   isPending: boolean
 }): ColumnDef<CustomSubscriptionPlan, unknown>[] {
   const { t, i18n } = useTranslation()
@@ -156,6 +157,7 @@ export function usePlanColumns(props: {
           <Button
             size='sm'
             variant='ghost'
+            disabled={!props.complianceConfirmed}
             onClick={() => props.onEdit(row.original)}
           >
             {t('Edit')}
@@ -163,7 +165,7 @@ export function usePlanColumns(props: {
           <Button
             size='sm'
             variant='ghost'
-            disabled={props.isPending}
+            disabled={props.isPending || !props.complianceConfirmed}
             onClick={() => props.onToggle(row.original)}
           >
             {t(row.original.enabled ? 'Disable' : 'Enable')}
@@ -172,7 +174,7 @@ export function usePlanColumns(props: {
             size='sm'
             variant='ghost'
             className='text-destructive'
-            disabled={props.isPending}
+            disabled={props.isPending || !props.complianceConfirmed}
             onClick={() => props.onDelete(row.original)}
           >
             {t('Delete')}

@@ -10,6 +10,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
@@ -18,6 +19,10 @@ import (
 )
 
 func TestCustomSubscriptionAdminAPI(t *testing.T) {
+	payment := operation_setting.GetPaymentSetting()
+	oldConfirmed, oldVersion := payment.ComplianceConfirmed, payment.ComplianceTermsVersion
+	payment.ComplianceConfirmed, payment.ComplianceTermsVersion = true, operation_setting.CurrentComplianceTermsVersion
+	t.Cleanup(func() { payment.ComplianceConfirmed, payment.ComplianceTermsVersion = oldConfirmed, oldVersion })
 	gin.SetMode(gin.TestMode)
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
@@ -104,6 +109,36 @@ func TestCustomSubscriptionAdminAPI(t *testing.T) {
 	assert.Equal(t, false, saved["enabled"])
 	assert.Equal(t, "2", saved["version"])
 	assert.False(t, request(t, "PUT", path, update, admin, 200).Success)
+	t.Run("compliance locks writes but preserves reads", func(t *testing.T) {
+		defer func() {
+			payment.ComplianceConfirmed, payment.ComplianceTermsVersion = true, operation_setting.CurrentComplianceTermsVersion
+		}()
+		for _, state := range []struct {
+			confirmed bool
+			version   string
+		}{
+			{false, operation_setting.CurrentComplianceTermsVersion},
+			{true, "outdated"},
+		} {
+			payment.ComplianceConfirmed, payment.ComplianceTermsVersion = state.confirmed, state.version
+			for _, route := range []struct{ method, path, body string }{
+				{"POST", base, payload("compliance-blocked")},
+				{"PUT", path, strings.Replace(update, `"version":"1"`, `"version":"2"`, 1)},
+				{"DELETE", path, ""},
+			} {
+				response := request(t, route.method, route.path, route.body, admin, 200)
+				assert.False(t, response.Success, route.method)
+				assert.Equal(t, "Payment, redemption, subscription, and invitation reward features are disabled. The administrator must confirm compliance terms before enabling them.", response.Message)
+			}
+			assert.True(t, request(t, "GET", base, "", admin, 200).Success)
+			response := request(t, "GET", path, "", admin, 200)
+			require.True(t, response.Success)
+			var unchanged map[string]any
+			require.NoError(t, common.Unmarshal(response.Data, &unchanged))
+			assert.Equal(t, "2", unchanged["version"])
+			assert.Equal(t, false, unchanged["enabled"])
+		}
+	})
 	for _, query := range []string{"?p=0", "?page_size=101", "?p=1&p=2", "?unknown=x", "?enabled=1", "?billing_cycle=week", "?p=9223372036854775807&page_size=100"} {
 		assert.False(t, request(t, "GET", base+query, "", admin, 200).Success)
 	}

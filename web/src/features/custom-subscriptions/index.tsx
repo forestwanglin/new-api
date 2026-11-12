@@ -29,7 +29,9 @@ import { ConfirmDialog } from '@/components/confirm-dialog'
 import { DataTablePage, useDataTable } from '@/components/data-table'
 import { ErrorState } from '@/components/error-state'
 import { SectionPageLayout } from '@/components/layout'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { usePaymentCompliance } from '@/features/system-settings/hooks/use-payment-compliance'
 import { handleServerError } from '@/lib/handle-server-error'
 import { getServerErrorMessage } from '@/lib/server-error-message'
 import { useAuthStore } from '@/stores/auth-store'
@@ -63,6 +65,7 @@ export function CustomSubscriptions() {
 function CustomSubscriptionsContent(props: { viewer: string; title: string }) {
   const { t } = useTranslation()
   const client = useQueryClient()
+  const complianceConfirmed = usePaymentCompliance()
   const [selection, setSelection] = useState<PlanDrawerSelection | null>(null)
   const [deleting, setDeleting] = useState<CustomSubscriptionPlan | null>(null)
   const [pagination, setPagination] = useState<PaginationState>({
@@ -127,6 +130,7 @@ function CustomSubscriptionsContent(props: { viewer: string; title: string }) {
     },
     onToggle: (row) => toggle.mutate(row),
     isPending: toggle.isPending || remove.isPending,
+    complianceConfirmed,
   })
   const onFiltersChange: OnChangeFn<ColumnFiltersState> = (update) => {
     setColumnFilters(update)
@@ -159,13 +163,26 @@ function CustomSubscriptionsContent(props: { viewer: string; title: string }) {
         <SectionPageLayout.Actions>
           <Button
             onClick={() => setSelection({ mode: 'create' })}
-            disabled={query.isError || !query.data?.point_types.length}
+            disabled={
+              !complianceConfirmed ||
+              query.isError ||
+              !query.data?.point_types.length
+            }
           >
             {t('Create plan')}
           </Button>
         </SectionPageLayout.Actions>
         <SectionPageLayout.Content>
-          <div className='flex h-full min-h-0 max-w-full min-w-0 flex-col overflow-hidden'>
+          <div className='flex h-full min-h-0 max-w-full min-w-0 flex-col gap-4 overflow-hidden'>
+            {!complianceConfirmed && (
+              <Alert variant='destructive' className='shrink-0'>
+                <AlertDescription>
+                  {t(
+                    'Subscription plan creation and changes are locked until the administrator confirms compliance terms in Payment Gateway settings.'
+                  )}
+                </AlertDescription>
+              </Alert>
+            )}
             {query.isError ? (
               <ErrorState
                 description={getServerErrorMessage(query.error)}
@@ -252,8 +269,9 @@ function CustomSubscriptionsContent(props: { viewer: string; title: string }) {
         destructive
         confirmText={t('Delete')}
         isLoading={remove.isPending}
+        disabled={!complianceConfirmed}
         handleConfirm={() => {
-          if (deleting) remove.mutate(deleting.id)
+          if (deleting && complianceConfirmed) remove.mutate(deleting.id)
         }}
       />
     </>

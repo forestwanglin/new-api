@@ -282,6 +282,10 @@ func GetCustomSubscriptionPlan(c *gin.Context) {
 	writeCustomSubscription(c, p)
 }
 func CreateCustomSubscriptionPlan(c *gin.Context) {
+	if !requirePaymentCompliance(c) {
+		return
+	}
+
 	input, _, ok := customSubscriptionInput(c, false)
 	if !ok {
 		return
@@ -294,6 +298,10 @@ func CreateCustomSubscriptionPlan(c *gin.Context) {
 	writeCustomSubscription(c, p)
 }
 func UpdateCustomSubscriptionPlan(c *gin.Context) {
+	if !requirePaymentCompliance(c) {
+		return
+	}
+
 	id, ok := pointAdminID(c, "id")
 	if !ok {
 		return
@@ -310,6 +318,10 @@ func UpdateCustomSubscriptionPlan(c *gin.Context) {
 	writeCustomSubscription(c, p)
 }
 func DeleteCustomSubscriptionPlan(c *gin.Context) {
+	if !requirePaymentCompliance(c) {
+		return
+	}
+
 	id, ok := pointAdminID(c, "id")
 	if !ok {
 		return

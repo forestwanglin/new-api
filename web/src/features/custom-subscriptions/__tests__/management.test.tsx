@@ -56,9 +56,16 @@ const plan: CustomSubscriptionPlan = {
   bonus_point_type: null,
   auto_bonus_point_type: null,
 }
-function renderPage() {
+function renderPage(confirmed = true, version = 'v1') {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  })
+  client.setQueryData(['system-options'], {
+    success: true,
+    data: [
+      { key: 'payment_setting.compliance_confirmed', value: String(confirmed) },
+      { key: 'payment_setting.compliance_terms_version', value: version },
+    ],
   })
   render(
     <QueryClientProvider client={client}>
@@ -622,5 +629,82 @@ describe('automatic renewal rewards without automatic renewal', () => {
         name: 'Automatic renewal bonus point type',
       })
     ).toBeDisabled()
+  })
+})
+
+describe('custom subscription payment compliance', () => {
+  it.each([
+    [false, 'v1'],
+    [true, 'outdated'],
+  ])(
+    'locks changes for confirmed=%s, version=%s while preserving details',
+    async (confirmed, version) => {
+      const user = userEvent.setup()
+      const post = vi.spyOn(api, 'post')
+      const put = vi.spyOn(api, 'put')
+      const remove = vi.spyOn(api, 'delete')
+      renderPage(confirmed, version)
+      await screen.findByText('Basic plan')
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Subscription plan creation and changes are locked'
+      )
+      for (const name of ['Create plan', 'Edit', 'Disable', 'Delete']) {
+        const button = screen.getByRole('button', { name })
+        expect(button).toBeDisabled()
+        await user.click(button)
+      }
+      expect(post).not.toHaveBeenCalled()
+      expect(put).not.toHaveBeenCalled()
+      expect(remove).not.toHaveBeenCalled()
+      await user.click(screen.getByRole('button', { name: 'View details' }))
+      expect(await screen.findByText('Full benefit')).toBeVisible()
+    }
+  )
+  it('blocks an already open deletion confirmation when compliance becomes unavailable', async () => {
+    const user = userEvent.setup()
+    const remove = vi.spyOn(api, 'delete')
+    const client = renderPage()
+    await user.click(await screen.findByRole('button', { name: 'Delete' }))
+    const dialog = screen.getByRole('alertdialog')
+    await act(async () => {
+      client.setQueryData(['system-options'], { success: true, data: [] })
+    })
+    const confirm = within(dialog).getByRole('button', { name: 'Delete' })
+    await waitFor(() => expect(confirm).toBeDisabled())
+    await user.click(confirm)
+    expect(remove).not.toHaveBeenCalled()
+    expect(dialog).toBeVisible()
+  })
+  it('blocks saving an open form when confirmation becomes unavailable, and unlocks on current confirmation', async () => {
+    const user = userEvent.setup()
+    const put = vi.spyOn(api, 'put')
+    const client = renderPage()
+    await user.click(await screen.findByRole('button', { name: 'Edit' }))
+    const title = await screen.findByRole('textbox', { name: 'Plan name' })
+    await user.clear(title)
+    await user.type(title, 'Unsaved configuration')
+    await act(async () => {
+      client.setQueryData(['system-options'], { success: true, data: [] })
+    })
+    expect(title).toHaveValue('Unsaved configuration')
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Save changes' })
+      ).toBeDisabled()
+    )
+    await user.type(title, '{Enter}')
+    expect(put).not.toHaveBeenCalled()
+    await act(async () => {
+      client.setQueryData(['system-options'], {
+        success: true,
+        data: [
+          { key: 'payment_setting.compliance_confirmed', value: 'true' },
+          { key: 'payment_setting.compliance_terms_version', value: 'v1' },
+        ],
+      })
+    })
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled()
+    )
   })
 })

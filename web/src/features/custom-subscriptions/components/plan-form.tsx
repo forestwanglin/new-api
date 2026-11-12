@@ -30,6 +30,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
 import { SheetFooter } from '@/components/ui/sheet'
+import { usePaymentCompliance } from '@/features/system-settings/hooks/use-payment-compliance'
 import { handleServerError } from '@/lib/handle-server-error'
 import { getServerErrorMessage } from '@/lib/server-error-message'
 
@@ -52,6 +53,7 @@ export function PlanForm(props: {
   onRetry: () => void
 }) {
   const { t } = useTranslation()
+  const complianceConfirmed = usePaymentCompliance()
   const form = useForm<PlanFormValues>({
     resolver: zodResolver(createPlanSchema(props.types ?? [])),
     defaultValues: props.plan ? planFormValues(props.plan) : defaultPlanValues,
@@ -89,7 +91,9 @@ export function PlanForm(props: {
         id='custom-subscription-form'
         className={sideDrawerFormClassName()}
         onSubmit={form.handleSubmit((values) => {
-          if (!catalogUnavailable) mutation.mutate(values)
+          if (!catalogUnavailable && complianceConfirmed) {
+            mutation.mutate(values)
+          }
         })}
       >
         {catalogUnavailable && (
@@ -201,7 +205,9 @@ export function PlanForm(props: {
         <Button
           type='submit'
           form='custom-subscription-form'
-          disabled={catalogUnavailable || mutation.isPending}
+          disabled={
+            !complianceConfirmed || catalogUnavailable || mutation.isPending
+          }
         >
           {mutation.isPending ? t('Saving...') : t('Save changes')}
         </Button>
