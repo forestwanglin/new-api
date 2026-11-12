@@ -603,6 +603,18 @@
 
 ---
 
+### Z024 A1.5 顶部菜单视觉对齐及移动端功能保留
+
+- 需求与原因：实施 A1.5，以 Demo 通栏与圆角导航视觉取代公共滚动胶囊，保留语言、主题、公告及原有账号/搜索/更新能力。
+- 变更内容：公共顶栏 64px 固定通栏、1200px 内容容器，右侧工具桌面/移动共用；移动导航复用现有 Sheet，关闭时不保留隐藏可聚焦链接，支持 Escape/焦点恢复，保留工作台/登录入口。控制台 Header 添加背景/底边并同步高度，TopNav 移动下拉不再被外层隐藏，导航增加语义色 hover/active。公共头部插槽及显隐参数保留。
+- 影响面：**上游自有文件** `web/src/components/layout/components/{header,app-header,public-header,top-nav}.tsx`、`web/src/styles/theme.css`（高度变量）；新增 layout `__tests__/{public-header,app-header}.test.tsx`；更新 fork 页面计划。升级时重点复核顶栏结构、移动 Sheet 和高度变量与侧栏/内容区消费者的一致性。
+- 与上游差异：改变顶部菜单视觉与移动端可达性，不改导航目的地、动态配置优先级、账号数据、通知读取逻辑、认证和后端；未新增依赖。
+- 开关与默认值：沿用 show*、rightContent/leftContent、navContent、mobileLinks 等配置；所有角色视觉一致，搜索、更新、账号等仍受现有权限/显隐控制。--app-header-height 为 4rem，SidebarInset/Sidebar 继续依赖同一变量。
+- 验证：新增公共入口/移动菜单回归实现前失败（调试中修正 notice fixture 类型）；最终顶栏及主题定向 4 文件/23 用例通过，typecheck/build/修改文件 format 通过，定向 lint 无 error（TopNav 有既有 self-closing warning）。最终全量 218 文件通过、1 失败，2591 用例通过、1 超时；仍为已在历史干净 HEAD 副本复现的 detail-preview.test.tsx / task log prices use localized unit labels from pricing metadata，未弱化断言或提高超时。Chrome 公共模型页检查 360/390px 移动端工具和菜单截图、1440px 深色与滚动高度稳定，页面无横向溢出。
+- 风险与未覆盖：受保护工作台缺登录会话；768/1280px、长品牌/昵称、真实公告数据交互和更新权限尚未完成浏览器验证。工作台移动下拉和 showSearch 显隐已有组件测试，但不替代真实布局验收。本地为验收启动前端 dev server，未改部署配置。
+
+---
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
