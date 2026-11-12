@@ -170,6 +170,10 @@ export function SidebarModulesSection({
         title: t('Subscription Management'),
         description: t('Manage subscription plans and pricing.'),
       },
+      custom_subscription: {
+        title: t('Custom Subscriptions'),
+        description: t('Manage point subscription configuration.'),
+      },
     },
   }
   const formDefaults = useMemo(() => config, [config])

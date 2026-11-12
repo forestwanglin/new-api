@@ -84,6 +84,7 @@ export const SIDEBAR_MODULES_DEFAULT: SidebarModulesAdminConfig = {
     points: true,
     setting: true,
     subscription: true,
+    custom_subscription: true,
   },
 }
 

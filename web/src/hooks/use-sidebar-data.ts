@@ -165,6 +165,12 @@ export function useSidebarData(badges: SidebarBadges = {}): SidebarData {
             icon: CreditCard,
           },
           {
+            title: t('Custom Subscriptions'),
+            url: '/custom-subscriptions',
+            icon: CreditCard,
+            requiredRole: ROLE.ADMIN,
+          },
+          {
             title: t('System Info'),
             url: '/system-info',
             icon: ServerCog,

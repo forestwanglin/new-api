@@ -743,6 +743,15 @@
 - 验证：`go test ./router -run '^TestPointLedgerDatabaseMatrix$' -count=1 -v` 在隔离真实 SQLite、MySQL 8.4.13、PostgreSQL 17.11 全部通过；API 定向测试以及 model/router/middleware 整包通过。前端最终受影响 8 文件/66 用例通过（`bun run test src/features/points src/features/point-ledger src/hooks/__tests__/points-sidebar.test.tsx src/hooks/__tests__/sidebar-config.test.tsx`）；类型检查、改动文件 oxlint、生产构建和 diff 空白检查通过，覆盖语言切换、时间边界与键盘详情操作。Chrome 隔离服务验证个人流水与分页、管理员按用户筛选和跨类型分摊、空态、冻结变化、精确大整数、详情快照和 Escape 关闭；390px 窄屏页面宽度保持390px，表格在容器内滚动，无控制台错误。
 - 风险与未覆盖：不实现实际消费、发放、退款、撤销或冻结链路，不修改 quota，不承诺跨页并发快照。未实测最低支持数据库版本。扩大检查发现已有 `TestOpenAIChatSamplingCompatibility` 4 个子例失败（移除新 controller 的 Go overlay 仍复现）；全量前端 2665 用例通过，既有 `detail-preview.test.tsx` 的本地化单位用例在整套与单文件重跑均超时；全仓 lint 存在无关既有错误，未改动这些路径。项目声明的 shadcn-ui 技能文件缺失，已按详细前端规则检索和复用现有业务组件。
 
+### Z038 自定义订阅套餐管理
+
+- 需求与原因：独立维护 Demo 对应的自定义订阅套餐，实付积分、常规赠送和自动续费赠送分别引用现有 `point_types`，避免与旧订阅和 quota 账务混用。
+- 变更内容：主库增量迁移 `custom_subscription_plans`、`custom_subscription_orders` 两表；管理员 `/custom-subscriptions` 提供套餐分页、搜索、周期/启用筛选、新增、详情、编辑、启停与删除。订单本期仅建表；自动续费仅保存配置，不接支付、发放、排期或退款，不预置套餐。
+- 数据契约：人民币分和积分使用 signed int64，API 的 ID/版本/金额/积分使用十进制字符串。三个积分类型独立配置，零赠送规范化为 NULL；额外赠送按 floor 取整并检查总额溢出。编码唯一、version 条件更新；有订单引用拒绝删除。详情见 [custom-subscriptions.md](custom-subscriptions.md)。
+- 权限与菜单：五个接口均使用现有管理员会话鉴权并列入 session-only，拒绝 PAT；前端路由和菜单限制管理员。旧侧栏配置缺项继承默认开启，显式 false 保留。复用现有管理表格、分页、Sheet、详情和确认弹窗，不新增运行依赖。
+- 影响面：新增模型、controller、router/model 测试、前端 `features/custom-subscriptions/` 及路由/测试；**上游自有文件**：`model/main.go`、`router/api-router.go`、`middleware/access_token_routes.go`、侧栏数据/默认配置、maintenance 配置与开关、七种 locale、`i18n/static-keys.ts` 和 `routeTree.gen.ts`。
+- 验证与边界：前端相关9文件/74用例、typecheck、改动文件lint/format、生产构建通过；分页使用与用户/渠道相同的默认完整组件，覆盖每页条数、数字页码、首末页及服务端参数。Chrome隔离实例验证空态、新增、详情、精确9,007,199,254,740,993积分、两类积分类型、编辑清零/禁用、搜索空态/恢复、删除取消、键盘关闭以及每页20→50；390px页面与详情均宽390px，表格在容器内滚动，未观察到console error。主题/语言切换和真实多页数据的浏览器交互未逐项实测，语言/多页行为由回归测试覆盖。隔离真实 SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 17.11 的新建/代表性旧库、重复迁移、索引/NULL 唯一键、精确整数和 CRUD 测试通过；实际 router 权限与无账务写入检查通过。后端 vet/build 与 model/router/middleware 包测试通过。项目声明 Go 1.26.10 下载失败，本机使用 Go 1.27.3 验证，未改 go.mod。controller 整包存在既有 `TestOpenAIChatSamplingCompatibility` 四个子例失败，恢复本次集成文件至 HEAD 的 overlay 仍复现，未改无关路径。未验证最低数据库版本或完整发行版数据库升级；回滚代码保留新增表和数据。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
@@ -751,6 +760,7 @@
 
 | 区域 | 文件 | 关联条目 |
 |---|---|---|
+| 自定义订阅套餐管理 | `model/main.go`、`router/api-router.go`、`middleware/access_token_routes.go`、侧栏数据/配置、maintenance 配置/开关、七种 locale、`i18n/static-keys.ts`、`routeTree.gen.ts` | Z038 |
 | 仓库规则与配置 | `AGENTS.md`、`.gitignore` | Z011、Z003 |
 | 后端 controller / model | `controller/channel-test.go`、`controller/relay.go`、`controller/system_task_handlers.go`、`model/system_task.go`、`model/task.go` | Z003、Z006 |
 | 积分主库迁移 | `model/main.go` | Z034 |
