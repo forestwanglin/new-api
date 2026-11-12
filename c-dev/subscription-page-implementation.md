@@ -1,5 +1,14 @@
 # 自定义订阅页面：前端演示实施记录
 
+## Footer 专项对齐
+
+- 使用自定义 `footer.tsx` 与 `subscriptions-custom-footer.css`，仅影响本页，替代上次公共 Footer。
+- 按 Demo：背景 `#fafbfc`，边线 `#e8ebf0`；44px/40px 上下留白；1200px 容器/28px 边距；帮助/合作两列间隔64px，文案、Z标识、介绍与版权对齐 Demo。
+- Footer 放在主内容容器外：上边线通栏，版权上方分割线仅占内部内容宽度。浏览器桌面实测内部线1144px；390px设备上334px，无横向溢出。
+- 帮助/合作三项联系操作复用客服弹窗；仓库没有 Demo 文档路由，常见报错用 Dialog 展示 Demo d6a 原文，避免链接到不存在的 `/docs`。
+- 保留 new-api 版权归属作为额外一行，这是与 Demo 单行版权的有意差异。
+- 验证：定向2文件8用例、typecheck、lint、build通过；本轮未重跑全量。
+
 ## 最新修订（用户反馈）
 
 - 功能目录改名为 `web/src/features/subscriptions-custom/`，组件 `SubscriptionsCustom`，样式 `web/src/styles/subscriptions-custom.css`，与 new-api 原生订阅隔离；公开 URL `/subscription` 保持兼容。

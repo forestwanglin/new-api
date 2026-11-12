@@ -31,10 +31,21 @@ vi.mock('@/components/layout/components/footer', () => ({
   Footer: () => <footer>自定义页脚</footer>,
 }))
 afterEach(cleanup)
+it('renders Demo footer columns, copyright and working FAQ', async () => {
+  const user = userEvent.setup()
+  render(<SubscriptionsCustom />)
+  const footer = within(screen.getByRole('contentinfo'))
+  expect(footer.getByText('帮助')).toBeVisible()
+  expect(footer.getByText('合作')).toBeVisible()
+  expect(footer.getByText('© 2026 ZYY AI')).toBeVisible()
+  await user.click(footer.getByRole('button', { name: '常见报错' }))
+  expect(screen.getByRole('dialog', { name: '常见报错' })).toBeVisible()
+  expect(screen.getByText('认证失败 / 401')).toBeVisible()
+})
 it('opens customer support with the demo contact details', async () => {
   const user = userEvent.setup()
   render(<SubscriptionsCustom />)
-  await user.click(screen.getByRole('button', { name: '联系客服' }))
+  await user.click(screen.getAllByRole('button', { name: '联系客服' })[0])
   const dialog = screen.getByRole('dialog', { name: '联系客服' })
   expect(within(dialog).getByText('企业微信（响应最快）')).toBeVisible()
   expect(
