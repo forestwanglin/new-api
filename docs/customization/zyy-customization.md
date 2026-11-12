@@ -733,6 +733,16 @@
 - 影响面：新增用户积分批量查询/响应 DTO、积分单元格及回归测试；**上游自有文件**：`controller/user.go`、前端 users API/类型/列配置、公共数字格式化、共享 QuotaDetailsPopover（长名称换行与高度限制/滚动）、七种 locale 及对应既有测试。复用现有表格、Tooltip、QuotaDetailsPopover。
 - 验证：SQLite、MySQL 8.4、PostgreSQL 17 真实数据库矩阵均通过；列表/搜索真实鉴权、PAT、分页、只读、批量查询、错误响应与 int64 精度定向测试通过。前端 users/data-table 相关 9 文件 60 用例通过；移动端修复后定向 38 用例、修改文件 lint/format、生产构建通过。tsgo 在并行流水文件出现前通过，最终检查被并行新增 `features/point-ledger/index.tsx:64` 的 TS2740 阻断；Go build 和受影响包 vet 通过，model/middleware 整包通过。扩大 router 整包时，并行积分流水功能的 `TestPointLedgerAPI` 出现 404，未修改该并行功能。隔离 Chrome 桌面/390px 移动端验证多类型、冻结、大整数、长名称、弹层滚动、键盘/触摸、搜索/分页/刷新及中文切换，无 JS 异常或页面横向溢出。
 
+### Z037 积分流水只读查询
+
+- 需求与原因：积分记账记录需要独立可发现的查询入口，用户查看本人积分变动，管理员查看全体或指定用户，避免与调用日志、管理审计和异步任务记录混淆。
+- 变更内容：新增个人 `/point-ledger` 菜单和 `/api/points/ledger/self`；管理员积分管理增加流水 Tab，通过 `/api/points/ledger` 查询。支持时间（起含止不含）、类型、动作、分页及管理端用户 ID 筛选；详情显示流水快照、账户/交易/业务标识和备注。不存在真实流水时显示空态，不生成数据或虚构跳转。
+- 与上游差异：在现有控制台和独立积分表基础上增加只读查询，复用现有表格、分页、Dialog、Tabs、React Query 和会话鉴权。64 位 ID、版本、积分和余额使用十进制字符串传输、BigInt 格式化，冻结和可用余额分别展示，不将业务总积分重复分摊到每条账户流水。
+- 影响面：新增 `model/point_ledger_query.go`、`controller/point_ledger.go`、`router/point_ledger_test.go`、前端 `features/point-ledger/`、个人路由及管理员 Tab 测试；**上游自有文件**：`router/api-router.go`、`middleware/access_token_routes.go`、侧栏数据/默认配置/既有测试、maintenance 配置与开关、七种 locale、`i18n/static-keys.ts` 和生成路由树。现有 `features/points/index.tsx` 增加 Tab。无新依赖、schema、账务写入或部署变更。
+- 开关与默认值：新增 `console.point_ledger` 默认开启；旧配置缺失时继承默认值，显式关闭保留。self 接口仅接受登录身份，拒绝 user_id；管理接口要求管理员；两者均 session-only，PAT 拒绝。数据库同时约束交易与账户归属，异常跨用户或缺失关联不可见。
+- 验证：`go test ./router -run '^TestPointLedgerDatabaseMatrix$' -count=1 -v` 在隔离真实 SQLite、MySQL 8.4.13、PostgreSQL 17.11 全部通过；API 定向测试以及 model/router/middleware 整包通过。前端最终受影响 8 文件/66 用例通过（`bun run test src/features/points src/features/point-ledger src/hooks/__tests__/points-sidebar.test.tsx src/hooks/__tests__/sidebar-config.test.tsx`）；类型检查、改动文件 oxlint、生产构建和 diff 空白检查通过，覆盖语言切换、时间边界与键盘详情操作。Chrome 隔离服务验证个人流水与分页、管理员按用户筛选和跨类型分摊、空态、冻结变化、精确大整数、详情快照和 Escape 关闭；390px 窄屏页面宽度保持390px，表格在容器内滚动，无控制台错误。
+- 风险与未覆盖：不实现实际消费、发放、退款、撤销或冻结链路，不修改 quota，不承诺跨页并发快照。未实测最低支持数据库版本。扩大检查发现已有 `TestOpenAIChatSamplingCompatibility` 4 个子例失败（移除新 controller 的 Go overlay 仍复现）；全量前端 2665 用例通过，既有 `detail-preview.test.tsx` 的本地化单位用例在整套与单文件重跑均超时；全仓 lint 存在无关既有错误，未改动这些路径。项目声明的 shadcn-ui 技能文件缺失，已按详细前端规则检索和复用现有业务组件。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
@@ -744,7 +754,8 @@
 | 仓库规则与配置 | `AGENTS.md`、`.gitignore` | Z011、Z003 |
 | 后端 controller / model | `controller/channel-test.go`、`controller/relay.go`、`controller/system_task_handlers.go`、`model/system_task.go`、`model/task.go` | Z003、Z006 |
 | 积分主库迁移 | `model/main.go` | Z034 |
-| 积分管理权限与路由 | `router/api-router.go`、`middleware/access_token_routes.go` | Z035 |
+| 积分管理权限与路由 | `router/api-router.go`、`middleware/access_token_routes.go` | Z035、Z037 |
+| 积分流水控制台集成 | `web/src/features/points/index.tsx`、侧栏数据/配置/测试、maintenance 配置/开关、七种 locale、`web/src/i18n/static-keys.ts`、`web/src/routeTree.gen.ts` | Z037 |
 | 用户列表积分 | `controller/user.go`、`web/src/components/quota-details-popover.tsx`、`web/src/features/users/api.ts`、`web/src/features/users/types.ts`、`web/src/features/users/components/users-columns.tsx`、`web/src/lib/format.ts`、七种 `web/src/i18n/locales/*.json` | Z036 |
 | 积分管理控制台集成 | `web/src/hooks/use-sidebar-data.ts`、`use-sidebar-config.ts`、`web/src/features/system-settings/maintenance/config.ts`、`sidebar-modules-section.tsx`、`web/src/routeTree.gen.ts`、七种 `web/src/i18n/locales/*.json` | Z035 |
 | 服务层 | `service/error.go` | Z001 |

@@ -365,6 +365,9 @@ func SetApiRouter(router *gin.Engine) {
 			groupRoute.GET("/", controller.GetGroups)
 		}
 
+		apiRouter.GET("/points/ledger/self", middleware.UserAuth(), controller.GetSelfPointLedger)
+		apiRouter.GET("/points/ledger", middleware.AdminAuth(), controller.GetAdminPointLedger)
+
 		pointsRoute := apiRouter.Group("/points")
 		pointsRoute.Use(middleware.AdminAuth())
 		{

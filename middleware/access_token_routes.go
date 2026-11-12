@@ -250,7 +250,9 @@ var accessTokenRouteRules = map[string]accessTokenRouteRule{
 	"GET /api/data/flow":                        accessTokenScopeRule("log:read"),
 	"GET /api/data/flow/self":                   accessTokenScopeRule("usage:read"),
 
-	// Points configuration is managed through authenticated dashboard sessions.
+	// Points configuration and ledger queries require authenticated dashboard sessions.
+	"GET /api/points/ledger/self":                      accessTokenSessionRule,
+	"GET /api/points/ledger":                           accessTokenSessionRule,
 	"GET /api/points/types":                            accessTokenSessionRule,
 	"GET /api/points/types/:type_id/rules":             accessTokenSessionRule,
 	"POST /api/points/types/:type_id/rules":            accessTokenSessionRule,

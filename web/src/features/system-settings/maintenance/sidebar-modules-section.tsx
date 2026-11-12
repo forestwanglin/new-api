@@ -110,6 +110,10 @@ export function SidebarModulesSection({
         title: t('Usage logs'),
         description: t('Detailed request logs for investigations.'),
       },
+      point_ledger: {
+        title: t('Point Ledger'),
+        description: t('View point changes and historical balances.'),
+      },
       audit: {
         title: t('Audit Logs'),
         description: t('Login, security and access records'),

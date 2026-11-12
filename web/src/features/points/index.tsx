@@ -26,6 +26,8 @@ import { ErrorState } from '@/components/error-state'
 import { SectionPageLayout } from '@/components/layout'
 import { LoadingState } from '@/components/loading-state'
 import { Button } from '@/components/ui/button'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { PointLedger } from '@/features/point-ledger'
 import { toIntlLocale } from '@/i18n/languages'
 import { formatNumber } from '@/lib/format'
 import { getServerErrorMessage } from '@/lib/server-error-message'
@@ -98,19 +100,32 @@ export function Points() {
     <SectionPageLayout fixedContent>
       <SectionPageLayout.Title>{t('Points')}</SectionPageLayout.Title>
       <SectionPageLayout.Content>
-        <p className='text-muted-foreground mb-4 text-sm'>
-          {t(
-            'Point types are maintained through scripts or the database. Manage their supported models here.'
-          )}
-        </p>
-        {content}
-        {selectedType && (
-          <PointRulesDialog
-            key={selectedType.id}
-            pointType={selectedType}
-            onClose={() => setSelectedType(null)}
-          />
-        )}
+        <Tabs defaultValue='configuration'>
+          <TabsList className='mb-4'>
+            <TabsTrigger value='configuration'>
+              {t('Point configuration')}
+            </TabsTrigger>
+            <TabsTrigger value='ledger'>{t('Point Ledger')}</TabsTrigger>
+          </TabsList>
+          <TabsContent value='configuration'>
+            <p className='text-muted-foreground mb-4 text-sm'>
+              {t(
+                'Point types are maintained through scripts or the database. Manage their supported models here.'
+              )}
+            </p>
+            {content}
+            {selectedType && (
+              <PointRulesDialog
+                key={selectedType.id}
+                pointType={selectedType}
+                onClose={() => setSelectedType(null)}
+              />
+            )}
+          </TabsContent>
+          <TabsContent value='ledger'>
+            <PointLedger scope='admin' />
+          </TabsContent>
+        </Tabs>
       </SectionPageLayout.Content>
     </SectionPageLayout>
   )

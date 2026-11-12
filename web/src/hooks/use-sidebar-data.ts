@@ -94,6 +94,7 @@ export function useSidebarData(badges: SidebarBadges = {}): SidebarData {
             url: '/usage-logs/common',
             icon: FileText,
           },
+          { title: t('Point Ledger'), url: '/point-ledger', icon: Coins },
           {
             title: t('Audit Logs'),
             url: '/usage-logs/audit',

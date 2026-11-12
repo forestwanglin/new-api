@@ -44,6 +44,7 @@ import { Route as AuthenticatedKeysIndexRouteImport } from './routes/_authentica
 import { Route as AuthenticatedModelsIndexRouteImport } from './routes/_authenticated/models/index'
 import { Route as AuthenticatedModelsSectionRouteImport } from './routes/_authenticated/models/$section'
 import { Route as AuthenticatedPlaygroundIndexRouteImport } from './routes/_authenticated/playground/index'
+import { Route as AuthenticatedPointLedgerIndexRouteImport } from './routes/_authenticated/point-ledger/index'
 import { Route as AuthenticatedPointsIndexRouteImport } from './routes/_authenticated/points/index'
 import { Route as AuthenticatedProfileIndexRouteImport } from './routes/_authenticated/profile/index'
 import { Route as AuthenticatedRedemptionCodesIndexRouteImport } from './routes/_authenticated/redemption-codes/index'
@@ -254,6 +255,12 @@ const AuthenticatedPlaygroundIndexRoute =
   AuthenticatedPlaygroundIndexRouteImport.update({
     id: '/playground/',
     path: '/playground/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedPointLedgerIndexRoute =
+  AuthenticatedPointLedgerIndexRouteImport.update({
+    id: '/point-ledger/',
+    path: '/point-ledger/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedPointsIndexRoute =
@@ -471,6 +478,7 @@ export interface FileRoutesByFullPath {
   '/keys/': typeof AuthenticatedKeysIndexRoute
   '/models/': typeof AuthenticatedModelsIndexRoute
   '/playground/': typeof AuthenticatedPlaygroundIndexRoute
+  '/point-ledger/': typeof AuthenticatedPointLedgerIndexRoute
   '/points/': typeof AuthenticatedPointsIndexRoute
   '/profile/': typeof AuthenticatedProfileIndexRoute
   '/redemption-codes/': typeof AuthenticatedRedemptionCodesIndexRoute
@@ -535,6 +543,7 @@ export interface FileRoutesByTo {
   '/keys': typeof AuthenticatedKeysIndexRoute
   '/models': typeof AuthenticatedModelsIndexRoute
   '/playground': typeof AuthenticatedPlaygroundIndexRoute
+  '/point-ledger': typeof AuthenticatedPointLedgerIndexRoute
   '/points': typeof AuthenticatedPointsIndexRoute
   '/profile': typeof AuthenticatedProfileIndexRoute
   '/redemption-codes': typeof AuthenticatedRedemptionCodesIndexRoute
@@ -603,6 +612,7 @@ export interface FileRoutesById {
   '/_authenticated/keys/': typeof AuthenticatedKeysIndexRoute
   '/_authenticated/models/': typeof AuthenticatedModelsIndexRoute
   '/_authenticated/playground/': typeof AuthenticatedPlaygroundIndexRoute
+  '/_authenticated/point-ledger/': typeof AuthenticatedPointLedgerIndexRoute
   '/_authenticated/points/': typeof AuthenticatedPointsIndexRoute
   '/_authenticated/profile/': typeof AuthenticatedProfileIndexRoute
   '/_authenticated/redemption-codes/': typeof AuthenticatedRedemptionCodesIndexRoute
@@ -670,6 +680,7 @@ export interface FileRouteTypes {
     | '/keys/'
     | '/models/'
     | '/playground/'
+    | '/point-ledger/'
     | '/points/'
     | '/profile/'
     | '/redemption-codes/'
@@ -734,6 +745,7 @@ export interface FileRouteTypes {
     | '/keys'
     | '/models'
     | '/playground'
+    | '/point-ledger'
     | '/points'
     | '/profile'
     | '/redemption-codes'
@@ -801,6 +813,7 @@ export interface FileRouteTypes {
     | '/_authenticated/keys/'
     | '/_authenticated/models/'
     | '/_authenticated/playground/'
+    | '/_authenticated/point-ledger/'
     | '/_authenticated/points/'
     | '/_authenticated/profile/'
     | '/_authenticated/redemption-codes/'
@@ -1096,6 +1109,13 @@ declare module '@tanstack/react-router' {
       path: '/playground'
       fullPath: '/playground/'
       preLoaderRoute: typeof AuthenticatedPlaygroundIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/point-ledger/': {
+      id: '/_authenticated/point-ledger/'
+      path: '/point-ledger'
+      fullPath: '/point-ledger/'
+      preLoaderRoute: typeof AuthenticatedPointLedgerIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/points/': {
@@ -1414,6 +1434,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedKeysIndexRoute: typeof AuthenticatedKeysIndexRoute
   AuthenticatedModelsIndexRoute: typeof AuthenticatedModelsIndexRoute
   AuthenticatedPlaygroundIndexRoute: typeof AuthenticatedPlaygroundIndexRoute
+  AuthenticatedPointLedgerIndexRoute: typeof AuthenticatedPointLedgerIndexRoute
   AuthenticatedPointsIndexRoute: typeof AuthenticatedPointsIndexRoute
   AuthenticatedProfileIndexRoute: typeof AuthenticatedProfileIndexRoute
   AuthenticatedRedemptionCodesIndexRoute: typeof AuthenticatedRedemptionCodesIndexRoute
@@ -1441,6 +1462,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedKeysIndexRoute: AuthenticatedKeysIndexRoute,
   AuthenticatedModelsIndexRoute: AuthenticatedModelsIndexRoute,
   AuthenticatedPlaygroundIndexRoute: AuthenticatedPlaygroundIndexRoute,
+  AuthenticatedPointLedgerIndexRoute: AuthenticatedPointLedgerIndexRoute,
   AuthenticatedPointsIndexRoute: AuthenticatedPointsIndexRoute,
   AuthenticatedProfileIndexRoute: AuthenticatedProfileIndexRoute,
   AuthenticatedRedemptionCodesIndexRoute:

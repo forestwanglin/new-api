@@ -157,7 +157,7 @@ describe('audit log sidebar entry', () => {
     expect(titles).toContain('Usage Logs')
   })
 
-  it('legacy configurations show a separate Audit Logs link immediately after Usage Logs', () => {
+  it('legacy configurations retain a separate Audit Logs link after usage and point ledger', () => {
     const { result } = sidebarFor(
       { console: { enabled: true, log: true } },
       { console: { enabled: true, log: true } }
@@ -165,7 +165,7 @@ describe('audit log sidebar entry', () => {
     const items =
       result.current.find((group) => group.id === 'general')?.items ?? []
     const usageIndex = items.findIndex((item) => item.title === 'Usage Logs')
-    expect(items[usageIndex + 1]).toMatchObject({
+    expect(items[usageIndex + 2]).toMatchObject({
       title: 'Audit Logs',
       url: '/usage-logs/audit',
     })
@@ -319,4 +319,37 @@ describe('model pricing badge', () => {
     expect(get).not.toHaveBeenCalledWith('/api/option/model_pricing/issues')
     expect(badgedEntries()).toHaveLength(0)
   })
+})
+
+describe('point ledger sidebar visibility', () => {
+  it('inherits the independent ledger entry for old configs immediately after usage logs', () => {
+    const { result } = sidebarFor({ console: { enabled: true, log: true } })
+    const items = result.current.flatMap((group) => group.items)
+    const usage = items.findIndex((item) => item.title === 'Usage Logs')
+    expect(items[usage + 1]).toMatchObject({
+      title: 'Point Ledger',
+      url: '/point-ledger',
+    })
+    const defaults = parseSidebarModulesAdmin('')
+    expect(defaults.console.point_ledger).toBe(true)
+    defaults.console.point_ledger = false
+    expect(
+      parseSidebarModulesAdmin(serializeSidebarModulesAdmin(defaults)).console
+        .point_ledger
+    ).toBe(false)
+  })
+  it.each([
+    [{ console: { enabled: true, point_ledger: false } }, undefined],
+    [undefined, { console: { enabled: true, point_ledger: false } }],
+  ])(
+    'hides point ledger for an explicit admin or user switch (%j, %j)',
+    (admin, user) => {
+      const { result } = sidebarFor(admin, user)
+      expect(
+        result.current
+          .flatMap((group) => group.items)
+          .some((item) => item.title === 'Point Ledger')
+      ).toBe(false)
+    }
+  )
 })
