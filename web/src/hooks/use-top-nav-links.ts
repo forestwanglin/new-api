@@ -80,7 +80,7 @@ export function useTopNavLinks(): TopNavLink[] {
   }
 
   // Fork frontend-only subscription showcase. Existing module flags stay unchanged.
-  links.push({ title: t('Subscription'), href: '/subscription' })
+  links.push({ title: '订阅', href: '/subscription' })
 
   // Rankings
   const rankings = modules?.rankings

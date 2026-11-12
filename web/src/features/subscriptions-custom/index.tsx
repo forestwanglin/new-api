@@ -17,10 +17,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useState } from 'react'
-import { useTranslation } from 'react-i18next'
 
 import { Dialog } from '@/components/dialog'
 import { PublicLayout } from '@/components/layout'
+import { Footer } from '@/components/layout/components/footer'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -32,14 +32,16 @@ import {
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
+import { subscriptionCopy as t } from './copy'
 import { PlanCard } from './plan-card'
 import { offerId, plans, type Offer } from './plans'
 import rules from './rules.json'
+import { SupportDialog } from './support-dialog'
 
-import '@/styles/subscription-demo.css'
+import '@/styles/subscriptions-custom.css'
 
-export function SubscriptionDemo() {
-  const { t } = useTranslation()
+export function SubscriptionsCustom() {
+  const [supportOpen, setSupportOpen] = useState(false)
   const [pending, setPending] = useState<Offer | null>(null)
   const [enabled, setEnabled] = useState<string | null>(null)
   const [consent, setConsent] = useState(false)
@@ -52,7 +54,7 @@ export function SubscriptionDemo() {
   }
   return (
     <PublicLayout>
-      <div className='subscription-demo'>
+      <div className='subscriptions-custom'>
         <header className='sub-page-head'>
           <h1>{t('Subscription plans')}</h1>
           <p>
@@ -188,17 +190,20 @@ export function SubscriptionDemo() {
               <ol className='sub-rules'>
                 {rules.map((rule) => (
                   <li key={rule.title}>
-                    <strong>{t(rule.title)}</strong>
-                    <p>{t(rule.body)}</p>
+                    <strong>{rule.title}</strong>
+                    <p>
+                      {rule.body.map((part) =>
+                        part.emphasis ? (
+                          <b key={part.text}>{part.text}</b>
+                        ) : (
+                          part.text
+                        )
+                      )}
+                    </p>
                   </li>
                 ))}
               </ol>
-              <Button
-                variant='outline'
-                onClick={() =>
-                  setMessage(t('Demo only. Customer support is not connected.'))
-                }
-              >
+              <Button variant='outline' onClick={() => setSupportOpen(true)}>
                 {t('Contact support')}
               </Button>
             </section>
@@ -304,6 +309,8 @@ export function SubscriptionDemo() {
           )}
         </Dialog>
       </div>
+      <SupportDialog open={supportOpen} onOpenChange={setSupportOpen} />
+      <Footer />
     </PublicLayout>
   )
 }

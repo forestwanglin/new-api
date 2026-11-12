@@ -20,49 +20,67 @@ import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, expect, it, vi } from 'vitest'
 
-import { SubscriptionDemo } from '..'
+import { SubscriptionsCustom } from '..'
 
 vi.mock('@/components/layout', () => ({
   PublicLayout: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
   ),
 }))
+vi.mock('@/components/layout/components/footer', () => ({
+  Footer: () => <footer>自定义页脚</footer>,
+}))
 afterEach(cleanup)
+it('opens customer support with the demo contact details', async () => {
+  const user = userEvent.setup()
+  render(<SubscriptionsCustom />)
+  await user.click(screen.getByRole('button', { name: '联系客服' }))
+  const dialog = screen.getByRole('dialog', { name: '联系客服' })
+  expect(within(dialog).getByText('企业微信（响应最快）')).toBeVisible()
+  expect(
+    within(dialog).getByRole('button', { name: '复制微信号' })
+  ).toBeVisible()
+  expect(within(dialog).getByText(/support@ai.winzyy.com/)).toBeVisible()
+  const write = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue()
+  await user.click(within(dialog).getByRole('button', { name: '复制微信号' }))
+  expect(write).toHaveBeenCalledWith('zyy-ai-support')
+  await user.click(within(dialog).getByRole('button', { name: '复制邮箱' }))
+  expect(write).toHaveBeenCalledWith('support@ai.winzyy.com')
+  await user.click(within(dialog).getByRole('button', { name: '知道了' }))
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+})
 it('shows six offers, exact annual points and all rules', () => {
-  render(<SubscriptionDemo />)
+  render(<SubscriptionsCustom />)
+  expect(screen.getByRole('contentinfo')).toBeVisible()
   expect(screen.getAllByRole('article')).toHaveLength(6)
   expect(screen.getByText('2,388,000')).toBeVisible()
-  expect(
-    screen.getByRole('heading', { name: 'Subscription rules' })
-  ).toBeVisible()
+  expect(screen.getByRole('heading', { name: '订阅规则' })).toBeVisible()
 })
 it('requires consent, simulates one renewal selection and never claims payment', async () => {
   const user = userEvent.setup()
-  render(<SubscriptionDemo />)
+  render(<SubscriptionsCustom />)
   await user.click(screen.getAllByRole('switch')[0])
   const dialog = screen.getByRole('dialog')
   expect(
-    within(dialog).getByRole('button', { name: 'Confirm demo' })
+    within(dialog).getByRole('button', { name: '确认演示' })
   ).toBeDisabled()
   await user.click(within(dialog).getByRole('checkbox'))
-  await user.click(within(dialog).getByRole('button', { name: 'Confirm demo' }))
+  await user.click(within(dialog).getByRole('button', { name: '确认演示' }))
   expect(screen.getAllByRole('switch')[0]).toHaveAttribute(
     'aria-checked',
     'true'
   )
-  expect(screen.getByRole('status')).toHaveTextContent(
-    'No payment or subscription has been made.'
-  )
+  expect(screen.getByRole('status')).toHaveTextContent('未实际支付或开通订阅。')
 })
 it('replaces renewal selections, supports cancellation and resets on remount', async () => {
   const user = userEvent.setup()
-  const view = render(<SubscriptionDemo />)
+  const view = render(<SubscriptionsCustom />)
   for (const index of [0, 1]) {
     await user.click(screen.getAllByRole('switch')[index])
     await user.click(within(screen.getByRole('dialog')).getByRole('checkbox'))
     await user.click(
       within(screen.getByRole('dialog')).getByRole('button', {
-        name: 'Confirm demo',
+        name: '确认演示',
       })
     )
   }
@@ -81,7 +99,7 @@ it('replaces renewal selections, supports cancellation and resets on remount', a
     'false'
   )
   view.unmount()
-  render(<SubscriptionDemo />)
+  render(<SubscriptionsCustom />)
   expect(
     screen
       .getAllByRole('switch')
@@ -90,7 +108,7 @@ it('replaces renewal selections, supports cancellation and resets on remount', a
 })
 it('cancels a purchase with Escape without enabling renewal', async () => {
   const user = userEvent.setup()
-  render(<SubscriptionDemo />)
+  render(<SubscriptionsCustom />)
   await user.click(screen.getAllByRole('switch')[0])
   await user.keyboard('{Escape}')
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
@@ -101,7 +119,7 @@ it('cancels a purchase with Escape without enabling renewal', async () => {
 })
 it('shows demo empty states rather than account records', async () => {
   const user = userEvent.setup()
-  render(<SubscriptionDemo />)
-  await user.click(screen.getByRole('tab', { name: 'Orders' }))
-  expect(screen.getByText('No demo subscription orders.')).toBeVisible()
+  render(<SubscriptionsCustom />)
+  await user.click(screen.getByRole('tab', { name: '订单' }))
+  expect(screen.getByText('暂无演示订阅订单。')).toBeVisible()
 })

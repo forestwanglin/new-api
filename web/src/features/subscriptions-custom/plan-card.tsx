@@ -1,3 +1,7 @@
+import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
+import { formatNumber } from '@/lib/format'
+
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -16,13 +20,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useTranslation } from 'react-i18next'
-
-import { Button } from '@/components/ui/button'
-import { Switch } from '@/components/ui/switch'
-import { toIntlLocale } from '@/i18n/languages'
-import { formatNumber } from '@/lib/format'
-
+import { subscriptionCopy as t } from './copy'
 import type { Offer } from './plans'
 
 type Props = {
@@ -32,11 +30,10 @@ type Props = {
   onCancel: () => void
 }
 export function PlanCard(props: Props) {
-  const { t, i18n } = useTranslation()
   const offer = props.offer
   const price = offer.yearly ? offer.plan.yearly : offer.plan.monthly
   const points = offer.plan.monthly * (offer.yearly ? 12000 : 1000)
-  const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
+  const locale = 'zh-CN'
   const number = (value: number) => formatNumber(value, locale)
   const period = offer.yearly ? t('year') : t('month')
   return (

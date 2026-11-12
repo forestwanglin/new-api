@@ -18,8 +18,8 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { createFileRoute } from '@tanstack/react-router'
 
-import { SubscriptionDemo } from '@/features/subscription-demo'
+import { SubscriptionsCustom } from '@/features/subscriptions-custom'
 
 export const Route = createFileRoute('/subscription/')({
-  component: SubscriptionDemo,
+  component: SubscriptionsCustom,
 })

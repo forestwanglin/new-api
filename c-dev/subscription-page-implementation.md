@@ -1,4 +1,15 @@
-# 订阅页面：前端演示实施记录
+# 自定义订阅页面：前端演示实施记录
+
+## 最新修订（用户反馈）
+
+- 功能目录改名为 `web/src/features/subscriptions-custom/`，组件 `SubscriptionsCustom`，样式 `web/src/styles/subscriptions-custom.css`，与 new-api 原生订阅隔离；公开 URL `/subscription` 保持兼容。
+- 自定义页面仅中文，文案在 feature 内的 `copy.json`/`rules.json`，不依赖全局 i18n；已移除上次提交新增的七语言资源 key 和 static-keys 条目，保留原有全局翻译。共享顶栏/页脚仍沿用项目自身国际化。
+- 订阅规则按 Demo 恢复11条编号、逐行分隔线、标题16px/1.6、正文15px/1.8、段落间距和8处蓝色加粗强调；使用结构化文字片段而非 HTML 注入。
+- 页面底部复用现有 `Footer`，不新增一套全局页脚。
+- 客服按钮打开实际 Dialog：工作日9:00–21:00、企业微信 `zyy-ai-support`、邮箱 `support@ai.winzyy.com`；复用 CopyButton，支持复制、关闭及 Escape。联系方式按 Demo 静态展示，不表示已核实真实服务可用性。
+- 验证：修订定向2文件/7用例通过（客服、页脚、原演示交互和导航）；typecheck、定向 lint、build 通过；浏览器确认11条规则、8处强调、分隔线和 Footer 存在且无横向溢出。未重跑全量套件，前次全量结果保留在下文。
+
+以下为首版实施记录；涉及目录、多语言及客服占位的旧描述已被以上修订替代。
 
 ## 1. 需求与边界
 
