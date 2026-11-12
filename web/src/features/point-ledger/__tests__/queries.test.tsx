@@ -142,6 +142,36 @@ describe('point ledger queries', () => {
     )
     expect(get).toHaveBeenCalledTimes(count)
   })
+  it('applies chip filters only after search and clears them on reset', async () => {
+    const get = vi.spyOn(api, 'get').mockResolvedValue(response(page))
+    const user = userEvent.setup()
+    setup('admin')
+    await screen.findByText('FUTURE_ACTION')
+    const requestCount = get.mock.calls.length
+    await user.click(screen.getByRole('button', { name: 'Point type' }))
+    await user.click(
+      screen.getByRole('option', { name: 'General points (GENERAL)' })
+    )
+    await user.keyboard('{Escape}')
+    expect(get).toHaveBeenCalledTimes(requestCount)
+    await user.click(screen.getByRole('button', { name: 'Action' }))
+    await user.click(screen.getByRole('option', { name: 'Freeze' }))
+    await user.keyboard('{Escape}')
+    await user.click(screen.getByRole('button', { name: 'Search' }))
+    await waitFor(() =>
+      expect(get).toHaveBeenLastCalledWith('/api/points/ledger', {
+        params: { p: 1, page_size: 20, point_type_id: '1', action: 'FREEZE' },
+      })
+    )
+    await user.click(screen.getByRole('button', { name: 'Reset' }))
+    await waitFor(() =>
+      expect(get).toHaveBeenLastCalledWith('/api/points/ledger', {
+        params: { p: 1, page_size: 20 },
+      })
+    )
+    expect(screen.getByRole('button', { name: 'Point type' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Reset' })).toBeDisabled()
+  })
   it('shows empty results after retrying a failed request', async () => {
     vi.spyOn(api, 'get')
       .mockRejectedValueOnce(new Error('Offline'))
@@ -158,6 +188,7 @@ describe('point ledger queries', () => {
     const get = vi.spyOn(api, 'get').mockResolvedValue(response(page))
     setup()
     await screen.findByText('FUTURE_ACTION')
+    await userEvent.click(screen.getByRole('button', { name: 'Time range' }))
     fireEvent.change(screen.getByLabelText('Start time'), {
       target: { value: '2026-11-12T08:00' },
     })
@@ -181,6 +212,7 @@ describe('point ledger queries', () => {
     setup()
     await screen.findByText('FUTURE_ACTION')
     const requestCount = get.mock.calls.length
+    await userEvent.click(screen.getByRole('button', { name: 'Time range' }))
     fireEvent.change(screen.getByLabelText('Start time'), {
       target: { value: '2026-11-12T09:00' },
     })
@@ -275,6 +307,9 @@ it('reacts to language changes without losing exact integer precision', async ()
       { normalizer: (value) => value }
     )
   ).toBeVisible()
+  await userEvent.click(
+    screen.getByRole('button', { name: fr.translation['Time range'] })
+  )
   expect(screen.getByLabelText('Heure de début')).toBeVisible()
 })
 

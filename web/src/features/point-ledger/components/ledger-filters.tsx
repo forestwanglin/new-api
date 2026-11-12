@@ -17,20 +17,21 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
+import { PlusCircle } from 'lucide-react'
 import { Controller, useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
 
+import { DataTableFacetedFilter } from '@/components/data-table'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 
 import { POINT_LEDGER_ACTIONS } from '../lib/actions'
 import type { PointLedgerFilters, PointLedgerType } from '../types'
@@ -88,107 +89,108 @@ export function LedgerFilters(props: {
     if (values.end) filters.end_timestamp = new Date(values.end).getTime()
     props.onApply(filters)
   }
-  const typeItems = [
-    { value: 'all', label: t('All point types') },
-    ...props.types.map((type) => ({
-      value: type.id,
-      label: `${type.name} (${type.code})`,
-    })),
-  ]
-  const actionItems = [
-    { value: 'all', label: t('All actions') },
-    ...POINT_LEDGER_ACTIONS.map((action) => ({
-      value: action.value,
-      label: t(action.labelKey),
-    })),
-  ]
+  const typeItems = props.types.map((type) => ({
+    value: type.id,
+    label: `${type.name} (${type.code})`,
+  }))
+  const actionItems = POINT_LEDGER_ACTIONS.map((action) => ({
+    value: action.value,
+    label: t(action.labelKey),
+  }))
+  const values = form.watch()
+  const hasFilters = Object.keys(defaults).some(
+    (key) =>
+      values[key as keyof FilterValues] !== defaults[key as keyof FilterValues]
+  )
+  const timeFilterCount = Number(!!values.start) + Number(!!values.end)
   return (
     <form
       onSubmit={form.handleSubmit(apply)}
-      className='mb-4 flex flex-wrap items-end gap-3'
+      className='mb-4 flex min-w-0 flex-wrap items-center gap-2 sm:gap-3'
     >
       {props.admin && (
-        <div>
-          <Label htmlFor='ledger-user'>{t('User ID')}</Label>
-          <Input
-            id='ledger-user'
-            inputMode='numeric'
-            {...form.register('user_id')}
-            aria-invalid={!!form.formState.errors.user_id}
-            className='w-40'
-          />
-        </div>
+        <Input
+          id='ledger-user'
+          inputMode='numeric'
+          aria-label={t('User ID')}
+          placeholder={t('User ID')}
+          {...form.register('user_id')}
+          aria-invalid={!!form.formState.errors.user_id}
+          className='w-full sm:w-[200px] lg:w-[240px]'
+        />
       )}
-      <div>
-        <Label htmlFor='ledger-type'>{t('Point type')}</Label>
-        <Controller
-          control={form.control}
-          name='point_type_id'
-          render={({ field }) => (
-            <Select
-              items={typeItems}
-              value={field.value}
-              onValueChange={(value) => field.onChange(value ?? 'all')}
-            >
-              <SelectTrigger id='ledger-type' className='w-48'>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {typeItems.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+      <Controller
+        control={form.control}
+        name='point_type_id'
+        render={({ field }) => (
+          <DataTableFacetedFilter
+            title={t('Point type')}
+            options={typeItems}
+            singleSelect
+            value={field.value === 'all' ? [] : [field.value]}
+            onValueChange={(value) => field.onChange(value[0] ?? 'all')}
+          />
+        )}
+      />
+      <Controller
+        control={form.control}
+        name='action'
+        render={({ field }) => (
+          <DataTableFacetedFilter
+            title={t('Action')}
+            options={actionItems}
+            singleSelect
+            value={field.value === 'all' ? [] : [field.value]}
+            onValueChange={(value) => field.onChange(value[0] ?? 'all')}
+          />
+        )}
+      />
+      <Popover>
+        <PopoverTrigger
+          render={
+            <Button
+              type='button'
+              variant='outline'
+              size='sm'
+              className='h-8 border-dashed'
+            />
+          }
+        >
+          <PlusCircle className='size-4' />
+          {t('Time range')}
+          {timeFilterCount > 0 && (
+            <Badge variant='secondary'>{timeFilterCount}</Badge>
           )}
-        />
-      </div>
-      <div>
-        <Label htmlFor='ledger-action'>{t('Action')}</Label>
-        <Controller
-          control={form.control}
-          name='action'
-          render={({ field }) => (
-            <Select
-              items={actionItems}
-              value={field.value}
-              onValueChange={(value) => field.onChange(value ?? 'all')}
-            >
-              <SelectTrigger id='ledger-action' className='w-40'>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {actionItems.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        />
-      </div>
-      <div>
-        <Label htmlFor='ledger-start'>{t('Start time')}</Label>
-        <Input
-          id='ledger-start'
-          type='datetime-local'
-          {...form.register('start')}
-        />
-      </div>
-      <div>
-        <Label htmlFor='ledger-end'>{t('End time (exclusive)')}</Label>
-        <Input
-          id='ledger-end'
-          type='datetime-local'
-          {...form.register('end')}
-        />
-      </div>
+        </PopoverTrigger>
+        <PopoverContent
+          align='start'
+          className='grid w-80 max-w-[calc(100vw-2rem)] gap-3'
+        >
+          <div className='grid min-w-0 gap-1.5'>
+            <Label htmlFor='ledger-start'>{t('Start time')}</Label>
+            <Input
+              id='ledger-start'
+              type='datetime-local'
+              className='min-w-0'
+              {...form.register('start')}
+            />
+          </div>
+          <div className='grid min-w-0 gap-1.5'>
+            <Label htmlFor='ledger-end'>{t('End time (exclusive)')}</Label>
+            <Input
+              id='ledger-end'
+              type='datetime-local'
+              className='min-w-0'
+              {...form.register('end')}
+            />
+          </div>
+        </PopoverContent>
+      </Popover>
       <Button type='submit'>{t('Search')}</Button>
       <Button
         type='button'
-        variant='outline'
+        variant='ghost'
+        disabled={!hasFilters}
         onClick={() => {
           form.reset(defaults)
           props.onApply({})
