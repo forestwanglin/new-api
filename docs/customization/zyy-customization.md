@@ -731,7 +731,7 @@
 - 与上游差异：在原有用户列表增加独立积分账户信息，不将 points 与 quota 换算，不修改原有余额操作、排序或筛选。保留现有管理员和 PAT 鉴权；积分查询失败使列表报错，不当作零积分。
 - 兼容与精度：只为列表添加响应字段，积分以十进制字符串传输，前端通过 BigInt 精确格式化 int64，保留现有数字格式语义；不扩展全局 User ORM 或单用户响应。无新依赖、schema、部署、账户写入、实际积分消费或冻结操作。
 - 影响面：新增用户积分批量查询/响应 DTO、积分单元格及回归测试；**上游自有文件**：`controller/user.go`、前端 users API/类型/列配置、公共数字格式化、共享 QuotaDetailsPopover（长名称换行与高度限制/滚动）、七种 locale 及对应既有测试。复用现有表格、Tooltip、QuotaDetailsPopover。
-- 验证：SQLite、MySQL 8.4、PostgreSQL 17 真实数据库矩阵均通过；列表/搜索真实鉴权、PAT、分页、只读、批量查询、错误响应与 int64 精度定向测试通过。前端 users/data-table 相关 9 文件 60 用例、tsgo、修改文件 lint/format、生产构建通过；Go build 和受影响包 vet 通过，model/middleware 整包通过。扩大 router 整包时，并行积分流水功能的 `TestPointLedgerAPI` 出现 404，未修改该并行功能。隔离 Chrome 桌面/390px 移动端验证多类型、冻结、大整数、长名称、弹层滚动、键盘/触摸、搜索/分页/刷新及中文切换，无 JS 异常或页面横向溢出。
+- 验证：SQLite、MySQL 8.4、PostgreSQL 17 真实数据库矩阵均通过；列表/搜索真实鉴权、PAT、分页、只读、批量查询、错误响应与 int64 精度定向测试通过。前端 users/data-table 相关 9 文件 60 用例通过；移动端修复后定向 38 用例、修改文件 lint/format、生产构建通过。tsgo 在并行流水文件出现前通过，最终检查被并行新增 `features/point-ledger/index.tsx:64` 的 TS2740 阻断；Go build 和受影响包 vet 通过，model/middleware 整包通过。扩大 router 整包时，并行积分流水功能的 `TestPointLedgerAPI` 出现 404，未修改该并行功能。隔离 Chrome 桌面/390px 移动端验证多类型、冻结、大整数、长名称、弹层滚动、键盘/触摸、搜索/分页/刷新及中文切换，无 JS 异常或页面横向溢出。
 
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
