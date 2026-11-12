@@ -389,7 +389,7 @@ describe('custom subscription form safeguards', () => {
       screen.getByText('Point type catalog unavailable. Retry before saving.')
     ).toBeVisible()
   })
-  it('clears bonus type and automatic renewal rate/type when those bonuses are disabled', async () => {
+  it('clears zero regular bonus type but preserves automatic rewards when the switch is disabled', async () => {
     const user = userEvent.setup()
     const bonusPlan = {
       ...plan,
@@ -432,7 +432,12 @@ describe('custom subscription form safeguards', () => {
       screen.getByRole('textbox', {
         name: 'Automatic renewal bonus (basis points)',
       })
-    ).toHaveValue('0')
+    ).toHaveValue('1000')
+    expect(
+      screen.getByRole('combobox', {
+        name: 'Automatic renewal bonus point type',
+      })
+    ).toHaveValue('1')
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
     await waitFor(() =>
       expect(put).toHaveBeenCalledWith(
@@ -441,8 +446,8 @@ describe('custom subscription form safeguards', () => {
           bonus_points: '0',
           bonus_point_type_id: null,
           auto_renew_enabled: false,
-          auto_renew_bonus_bps: 0,
-          auto_bonus_point_type_id: null,
+          auto_renew_bonus_bps: 1000,
+          auto_bonus_point_type_id: '1',
         })
       )
     )
@@ -500,5 +505,122 @@ describe('custom subscription standard administrator pagination', () => {
         params: expect.objectContaining({ p: 1, page_size: 50 }),
       })
     )
+  })
+})
+
+describe('automatic renewal rewards without automatic renewal', () => {
+  it('lets a new plan configure and submit rewards while its default switch remains off', async () => {
+    const user = userEvent.setup()
+    const post = vi
+      .spyOn(api, 'post')
+      .mockResolvedValue({ data: { success: true, data: plan } })
+    renderPage()
+    await screen.findByText('Basic plan')
+    await user.click(screen.getByRole('button', { name: 'Create plan' }))
+    const rewardRate = screen.getByRole('textbox', {
+      name: 'Automatic renewal bonus (basis points)',
+    })
+    expect(
+      screen.getByRole('switch', { name: 'Automatic renewal' })
+    ).not.toBeChecked()
+    expect(rewardRate).toBeEnabled()
+    for (const [label, value] of [
+      ['Plan code', 'reward-preview'],
+      ['Plan name', 'Preview'],
+      ['Tier code', 'basic'],
+      ['Price (CNY yuan)', '0.29'],
+      ['Paid points', '101'],
+    ]) {
+      await user.type(screen.getByRole('textbox', { name: label }), value)
+    }
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Paid point type' }),
+      '1'
+    )
+    await user.clear(rewardRate)
+    await user.type(rewardRate, '1250')
+    const rewardType = screen.getByRole('combobox', {
+      name: 'Automatic renewal bonus point type',
+    })
+    expect(rewardType).toBeEnabled()
+    await user.selectOptions(rewardType, '1')
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    await waitFor(() =>
+      expect(post).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          auto_renew_enabled: false,
+          auto_renew_bonus_bps: 1250,
+          auto_bonus_point_type_id: '1',
+        })
+      )
+    )
+  })
+  it('shows configured rewards in the disabled list, details and editable form', async () => {
+    const user = userEvent.setup()
+    const rewardPlan = {
+      ...plan,
+      paid_points: '101',
+      bonus_points: '2',
+      bonus_point_type_id: '1',
+      auto_renew_bonus_bps: 1000,
+      auto_bonus_point_type_id: '1',
+      auto_bonus_point_type: {
+        id: '1',
+        code: 'GENERAL',
+        name: 'Reward preview',
+      },
+    }
+    vi.mocked(api.get).mockImplementation(async (url) => ({
+      data: {
+        success: true,
+        data: url.endsWith('/1')
+          ? rewardPlan
+          : {
+              page: 1,
+              page_size: 20,
+              total: 1,
+              items: [rewardPlan],
+              point_types: [plan.paid_point_type],
+            },
+      },
+    }))
+    renderPage()
+    expect(await screen.findByText('10% · Reward preview')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'View details' }))
+    const details = await screen.findByRole('dialog')
+    expect(
+      await within(details).findByText('Reward preview (GENERAL)')
+    ).toBeVisible()
+    expect(
+      within(details).getByText('Automatic renewal extra points').parentElement
+    ).toHaveTextContent('10')
+    await user.keyboard('{Escape}')
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    )
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    const rewardRate = await screen.findByRole('textbox', {
+      name: 'Automatic renewal bonus (basis points)',
+    })
+    expect(rewardRate).toBeEnabled()
+    expect(rewardRate).toHaveValue('1000')
+    expect(
+      screen.getByRole('combobox', {
+        name: 'Automatic renewal bonus point type',
+      })
+    ).toHaveValue('1')
+    await user.clear(rewardRate)
+    await user.type(rewardRate, '0')
+    expect(
+      screen.getByRole('combobox', {
+        name: 'Automatic renewal bonus point type',
+      })
+    ).toHaveValue('')
+    expect(
+      screen.getByRole('combobox', {
+        name: 'Automatic renewal bonus point type',
+      })
+    ).toBeDisabled()
   })
 })

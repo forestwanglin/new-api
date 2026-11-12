@@ -104,3 +104,63 @@ describe('custom subscription precision and validation', () => {
     )
   })
 })
+
+describe('automatic renewal reward configuration independent of switch', () => {
+  it('preserves configured rewards in the payload while automatic renewal is off', () => {
+    const values = {
+      ...valid,
+      auto_renew_bonus_bps: '1250',
+      auto_bonus_point_type_id: '1',
+    }
+    const input = toPlanInput(createPlanSchema(types).parse(values))
+    expect(input).toMatchObject({
+      auto_renew_enabled: false,
+      auto_renew_bonus_bps: 1250,
+      auto_bonus_point_type_id: '1',
+    })
+  })
+  it.each(['', '99'])(
+    'requires an existing reward type %s even when automatic renewal is off',
+    (auto_bonus_point_type_id) => {
+      expect(
+        createPlanSchema(types).safeParse({
+          ...valid,
+          auto_renew_bonus_bps: '1250',
+          auto_bonus_point_type_id,
+        }).success
+      ).toBe(false)
+    }
+  )
+  it('checks configured reward overflow and exact floor boundaries even when automatic renewal is off', () => {
+    expect(
+      createPlanSchema(types).safeParse({
+        ...valid,
+        paid_points: '9222449791875588249',
+        auto_renew_bonus_bps: '1',
+        auto_bonus_point_type_id: '1',
+      }).success
+    ).toBe(true)
+    expect(
+      createPlanSchema(types).safeParse({
+        ...valid,
+        paid_points: '9222449791875588250',
+        auto_renew_bonus_bps: '1',
+        auto_bonus_point_type_id: '1',
+      }).success
+    ).toBe(false)
+  })
+  it('normalizes a zero reward rate to a null type regardless of the switch', () => {
+    for (const auto_renew_enabled of [false, true]) {
+      expect(
+        toPlanInput({
+          ...valid,
+          auto_renew_enabled,
+          auto_bonus_point_type_id: '1',
+        })
+      ).toMatchObject({
+        auto_renew_bonus_bps: 0,
+        auto_bonus_point_type_id: null,
+      })
+    }
+  })
+})

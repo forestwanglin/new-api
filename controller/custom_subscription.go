@@ -85,7 +85,7 @@ func customSubscriptionInput(c *gin.Context, update bool) (model.CustomSubscript
 	if common.Unmarshal(body, &in) != nil {
 		return fail()
 	}
-	if !customSubscriptionCode.MatchString(in.Code) || len(in.Code) > 64 || !customSubscriptionCode.MatchString(in.TierCode) || len(in.TierCode) > 32 || !customSubscriptionText(in.Title, 128, true) || !customSubscriptionText(in.Subtitle, 255, false) || in.TierRank < 1 || in.TierRank > math.MaxInt32 || in.Sort < 0 || in.Sort > math.MaxInt32 || in.Currency != "CNY" || !(in.BillingCycle == "month" && in.DurationMonths == 1 || in.BillingCycle == "year" && in.DurationMonths == 12) || in.Bps < 0 || in.Bps > 10000 || (!in.Auto && in.Bps != 0) || len(in.Benefits) > 20 {
+	if !customSubscriptionCode.MatchString(in.Code) || len(in.Code) > 64 || !customSubscriptionCode.MatchString(in.TierCode) || len(in.TierCode) > 32 || !customSubscriptionText(in.Title, 128, true) || !customSubscriptionText(in.Subtitle, 255, false) || in.TierRank < 1 || in.TierRank > math.MaxInt32 || in.Sort < 0 || in.Sort > math.MaxInt32 || in.Currency != "CNY" || !(in.BillingCycle == "month" && in.DurationMonths == 1 || in.BillingCycle == "year" && in.DurationMonths == 12) || in.Bps < 0 || in.Bps > 10000 || len(in.Benefits) > 20 {
 		return fail()
 	}
 	for _, benefit := range in.Benefits {

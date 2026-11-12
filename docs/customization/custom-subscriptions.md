@@ -18,12 +18,14 @@
 | currency / price_amount_minor | CNY与人民币分，整数保存 |
 | paid_points / paid_point_type_id | 实付获得积分及现有point_types类型ID |
 | bonus_points / bonus_point_type_id | 常规赠送数量与类型，零赠送类型为NULL |
-| auto_renew_enabled | 套餐是否支持自动续费的配置 |
+| auto_renew_enabled | 自动续费是否启用；与用于展示的续费奖励配置独立 |
 | auto_renew_bonus_bps / auto_bonus_point_type_id | 自动续费额外赠送基点比例及类型，1000为10%；未配置赠送时类型为NULL |
 | benefits_json | 展示权益数组，不替代point_model_rules的使用范围配置 |
 | enabled / sort_order | 是否启用、降序排列权重 |
 | version | 版本号，更新时匹配并递增，拒绝覆盖其他管理员的新版本 |
 | created_at / updated_at | Unix毫秒 |
+
+未开启自动续费也可配置并展示续费奖励；关闭开关保留奖励比例和积分类型。奖励比例大于零时仍要求有效积分类型并检查潜在总积分溢出，比例为零时类型规范化为NULL。
 
 额外赠送按 `floor((paid_points + bonus_points) × auto_renew_bonus_bps / 10000)` 计算，仅用于配置有效性和溢出检查，当前不会发放积分。积分类型从数据库读取，不写死GENERAL/GPT。金额及积分使用signed int64，API中ID、版本、金额和积分均使用十进制字符串，避免JavaScript精度损失。
 

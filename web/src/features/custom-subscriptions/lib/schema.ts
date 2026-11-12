@@ -140,7 +140,6 @@ export function createPlanSchema(types: PointTypeOption[]) {
       issue('bonus_point_type_id', 'Select an available point type')
     }
     if (
-      values.auto_renew_enabled &&
       bpsValid &&
       BigInt(values.auto_renew_bonus_bps) > 0n &&
       !typeExists(values.auto_bonus_point_type_id)
@@ -149,9 +148,7 @@ export function createPlanSchema(types: PointTypeOption[]) {
     }
     if (paidValid && bonusValid && bpsValid) {
       const base = BigInt(values.paid_points) + BigInt(values.bonus_points)
-      const bps = values.auto_renew_enabled
-        ? BigInt(values.auto_renew_bonus_bps)
-        : 0n
+      const bps = BigInt(values.auto_renew_bonus_bps)
       if (base + (base * bps) / 10000n > MAX_INT64) {
         issue('paid_points', 'Total points exceed the supported range')
       }
@@ -168,8 +165,7 @@ export function createPlanSchema(types: PointTypeOption[]) {
 }
 
 export function toPlanInput(values: PlanFormValues): PlanInput {
-  const auto = values.auto_renew_enabled
-  const bps = auto ? Number(values.auto_renew_bonus_bps) : 0
+  const bps = Number(values.auto_renew_bonus_bps)
   return {
     code: values.code,
     title: values.title,
@@ -185,7 +181,7 @@ export function toPlanInput(values: PlanFormValues): PlanInput {
     bonus_points: values.bonus_points,
     bonus_point_type_id:
       values.bonus_points === '0' ? null : values.bonus_point_type_id,
-    auto_renew_enabled: auto,
+    auto_renew_enabled: values.auto_renew_enabled,
     auto_renew_bonus_bps: bps,
     auto_bonus_point_type_id:
       bps === 0 ? null : values.auto_bonus_point_type_id,

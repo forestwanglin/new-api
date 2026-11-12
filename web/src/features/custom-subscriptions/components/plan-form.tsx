@@ -56,7 +56,6 @@ export function PlanForm(props: {
     resolver: zodResolver(createPlanSchema(props.types ?? [])),
     defaultValues: props.plan ? planFormValues(props.plan) : defaultPlanValues,
   })
-  const auto = form.watch('auto_renew_enabled')
   const bonus = form.watch('bonus_points')
   const bps = form.watch('auto_renew_bonus_bps')
   const cycle = form.watch('billing_cycle')
@@ -151,12 +150,6 @@ export function PlanForm(props: {
           <PlanSwitchField
             name='auto_renew_enabled'
             label='Automatic renewal'
-            onValueChange={(checked) => {
-              if (!checked) {
-                form.setValue('auto_renew_bonus_bps', '0')
-                form.setValue('auto_bonus_point_type_id', '')
-              }
-            }}
           />
           <p className='text-muted-foreground text-sm'>
             {t('Configuration only; automatic charging is not connected.')}
@@ -165,7 +158,6 @@ export function PlanForm(props: {
             name='auto_renew_bonus_bps'
             label='Automatic renewal bonus (basis points)'
             numeric
-            disabled={!auto}
             onValueChange={(value) => {
               if (value === '0') form.setValue('auto_bonus_point_type_id', '')
             }}
@@ -179,7 +171,7 @@ export function PlanForm(props: {
             name='auto_bonus_point_type_id'
             label='Automatic renewal bonus point type'
             options={typeOptions}
-            disabled={!auto || bps === '0'}
+            disabled={bps === '0'}
           />
         </SideDrawerSection>
         <SideDrawerSection>

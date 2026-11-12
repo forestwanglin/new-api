@@ -185,21 +185,80 @@ func TestCustomSubscriptionAdminAPI(t *testing.T) {
 		assert.Nil(t, persisted.BonusPointTypeId)
 		assert.Nil(t, persisted.AutoBonusPointTypeId)
 	})
+	t.Run("automatic renewal rewards independent of switch", func(t *testing.T) {
+		var fields map[string]any
+		require.NoError(t, common.UnmarshalJsonStr(payload("independent-auto-reward"), &fields))
+		fields["paid_points"] = "101"
+		fields["bonus_points"] = "7"
+		fields["bonus_point_type_id"] = fmt.Sprint(types[1].Id)
+		fields["auto_renew_bonus_bps"] = 1250
+		fields["auto_bonus_point_type_id"] = fmt.Sprint(types[2].Id)
+		encode := func() string {
+			t.Helper()
+			body, err := common.Marshal(fields)
+			require.NoError(t, err)
+			return string(body)
+		}
+		response := request(t, "POST", base, encode(), admin, 200)
+		require.True(t, response.Success, response.Message)
+		var got map[string]any
+		require.NoError(t, common.Unmarshal(response.Data, &got))
+		rewardPath := base + "/" + got["id"].(string)
+		assert.Equal(t, false, got["auto_renew_enabled"])
+		assert.EqualValues(t, 1250, got["auto_renew_bonus_bps"])
+		assert.Equal(t, fmt.Sprint(types[2].Id), got["auto_bonus_point_type_id"])
+		response = request(t, "GET", rewardPath, "", admin, 200)
+		require.True(t, response.Success, response.Message)
+		require.NoError(t, common.Unmarshal(response.Data, &got))
+		assert.EqualValues(t, 1250, got["auto_renew_bonus_bps"])
+		assert.Equal(t, map[string]any{"id": fmt.Sprint(types[2].Id), "code": types[2].Code, "name": types[2].Name}, got["auto_bonus_point_type"])
+		// Update rewards while disabled, then enable and disable without clearing them.
+		fields["auto_renew_bonus_bps"] = 2500
+		for _, enabled := range []bool{false, true, false} {
+			fields["auto_renew_enabled"] = enabled
+			fields["version"] = got["version"]
+			response = request(t, "PUT", rewardPath, encode(), admin, 200)
+			require.True(t, response.Success, response.Message)
+			require.NoError(t, common.Unmarshal(response.Data, &got))
+			assert.Equal(t, enabled, got["auto_renew_enabled"])
+			assert.EqualValues(t, 2500, got["auto_renew_bonus_bps"])
+			assert.Equal(t, fmt.Sprint(types[2].Id), got["auto_bonus_point_type_id"])
+		}
+		var persisted model.CustomSubscriptionPlan
+		require.NoError(t, db.Where("code = ?", "independent-auto-reward").First(&persisted).Error)
+		assert.False(t, persisted.AutoRenewEnabled)
+		assert.Equal(t, 2500, persisted.AutoRenewBonusBps)
+		require.NotNil(t, persisted.AutoBonusPointTypeId)
+		assert.Equal(t, types[2].Id, *persisted.AutoBonusPointTypeId)
+		delete(fields, "version")
+		fields["code"] = "invalid-disabled-reward"
+		for _, invalidType := range []any{nil, "99999"} {
+			fields["auto_bonus_point_type_id"] = invalidType
+			assert.False(t, request(t, "POST", base, encode(), admin, 200).Success)
+		}
+		fields["auto_bonus_point_type_id"] = fmt.Sprint(types[2].Id)
+		fields["paid_points"] = "9223372036854775807"
+		fields["bonus_points"] = "0"
+		assert.False(t, request(t, "POST", base, encode(), admin, 200).Success)
+	})
 	t.Run("floor bonus and total overflow boundaries", func(t *testing.T) {
 		for _, tc := range []struct {
-			name, paid string
-			accepted   bool
+			name, paid            string
+			accepted, autoEnabled bool
 		}{
-			{"floor-zero", "1", true},
+			{"floor-zero", "1", true, true},
 			// floor(base/10000) leaves total exactly MaxInt64; ceil would overflow.
-			{"floor-max-total", "9222449791875588249", true},
-			{"overflow-total", "9222449791875588250", false},
+			{"floor-max-total", "9222449791875588249", true, true},
+			{"overflow-total", "9222449791875588250", false, true},
+			{"disabled-floor-zero", "1", true, false},
+			{"disabled-floor-max-total", "9222449791875588249", true, false},
+			{"disabled-overflow-total", "9222449791875588250", false, false},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				var fields map[string]any
 				require.NoError(t, common.UnmarshalJsonStr(payload(tc.name), &fields))
 				fields["paid_points"] = tc.paid
-				fields["auto_renew_enabled"] = true
+				fields["auto_renew_enabled"] = tc.autoEnabled
 				fields["auto_renew_bonus_bps"] = 1
 				fields["auto_bonus_point_type_id"] = fmt.Sprint(types[2].Id)
 				body, err := common.Marshal(fields)

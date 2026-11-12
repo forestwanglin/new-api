@@ -747,8 +747,9 @@
 
 - 需求与原因：独立维护 Demo 对应的自定义订阅套餐，实付积分、常规赠送和自动续费赠送分别引用现有 `point_types`，避免与旧订阅和 quota 账务混用。
 - 变更内容：主库增量迁移 `custom_subscription_plans`、`custom_subscription_orders` 两表；管理员 `/custom-subscriptions` 提供套餐分页、搜索、周期/启用筛选、新增、详情、编辑、启停与删除。订单本期仅建表；自动续费仅保存配置，不接支付、发放、排期或退款，不预置套餐。
-- 数据契约：人民币分和积分使用 signed int64，API 的 ID/版本/金额/积分使用十进制字符串。三个积分类型独立配置，零赠送规范化为 NULL；额外赠送按 floor 取整并检查总额溢出。编码唯一、version 条件更新；有订单引用拒绝删除。详情见 [custom-subscriptions.md](custom-subscriptions.md)。
+- 数据契约：人民币分和积分使用 signed int64，API 的 ID/版本/金额/积分使用十进制字符串。三个积分类型独立配置，零赠送规范化为 NULL；自动续费开关与奖励配置独立，关闭时仍可维护并展示奖励，切换开关保留比例与类型。正奖励仍校验类型和潜在总额溢出，零比例才清空其类型。额外赠送按 floor 取整并检查总额溢出。编码唯一、version 条件更新；有订单引用拒绝删除。详情见 [custom-subscriptions.md](custom-subscriptions.md)。
 - 权限与菜单：五个接口均使用现有管理员会话鉴权并列入 session-only，拒绝 PAT；前端路由和菜单限制管理员。旧侧栏配置缺项继承默认开启，显式 false 保留。复用现有管理表格、分页、Sheet、详情和确认弹窗，不新增运行依赖。
+- 奖励配置解耦验证：未开启自动续费也可新建并保存正比例奖励；开关切换保留比例/类型，列表与详情展示不受开关影响。实际 router 回归、前端6文件49用例、typecheck、改动lint/format、Go vet和生产构建通过；Chrome隔离实例确认未开启时1000基点/GPT类型保存及回填，29,000积分对应2,900额外积分，控制台未捕获error。表结构和订单范围不变。
 - 影响面：新增模型、controller、router/model 测试、前端 `features/custom-subscriptions/` 及路由/测试；**上游自有文件**：`model/main.go`、`router/api-router.go`、`middleware/access_token_routes.go`、侧栏数据/默认配置、maintenance 配置与开关、七种 locale、`i18n/static-keys.ts` 和 `routeTree.gen.ts`。
 - 验证与边界：前端相关9文件/74用例、typecheck、改动文件lint/format、生产构建通过；分页使用与用户/渠道相同的默认完整组件，覆盖每页条数、数字页码、首末页及服务端参数。Chrome隔离实例验证空态、新增、详情、精确9,007,199,254,740,993积分、两类积分类型、编辑清零/禁用、搜索空态/恢复、删除取消、键盘关闭以及每页20→50；390px页面与详情均宽390px，表格在容器内滚动，未观察到console error。主题/语言切换和真实多页数据的浏览器交互未逐项实测，语言/多页行为由回归测试覆盖。隔离真实 SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 17.11 的新建/代表性旧库、重复迁移、索引/NULL 唯一键、精确整数和 CRUD 测试通过；实际 router 权限与无账务写入检查通过。后端 vet/build 与 model/router/middleware 包测试通过。项目声明 Go 1.26.10 下载失败，本机使用 Go 1.27.3 验证，未改 go.mod。controller 整包存在既有 `TestOpenAIChatSamplingCompatibility` 四个子例失败，恢复本次集成文件至 HEAD 的 overlay 仍复现，未改无关路径。未验证最低数据库版本或完整发行版数据库升级；回滚代码保留新增表和数据。
 

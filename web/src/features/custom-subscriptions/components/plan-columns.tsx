@@ -111,7 +111,7 @@ export function usePlanColumns(props: {
           <span>
             {t(row.original.auto_renew_enabled ? 'Enabled' : 'Disabled')}
           </span>
-          {row.original.auto_renew_enabled && (
+          {row.original.auto_renew_bonus_bps > 0 && (
             <p>
               {formatNumber(row.original.auto_renew_bonus_bps / 100, locale)}% ·{' '}
               {row.original.auto_bonus_point_type?.name ?? '—'}
