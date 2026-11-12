@@ -79,6 +79,9 @@ export function useTopNavLinks(): TopNavLink[] {
     links.push({ title: t('Model Square'), href: '/pricing', requiresAuth })
   }
 
+  // Fork frontend-only subscription showcase. Existing module flags stay unchanged.
+  links.push({ title: t('Subscription'), href: '/subscription' })
+
   // Rankings
   const rankings = modules?.rankings
   if (rankings && typeof rankings === 'object' && rankings.enabled) {

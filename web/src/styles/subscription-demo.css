@@ -1,0 +1,287 @@
+.subscription-demo {
+  --sub-color-0: #f2f6ff;
+  --sub-color-1: #dbe6fb;
+  --sub-color-2: #dce6f7;
+  --sub-color-3: #f7faff;
+  --sub-color-4: #0052d9;
+  --sub-color-5: #f2f6ff;
+  --sub-color-6: #0052d9;
+  --sub-color-7: #c8daf9;
+}
+.dark .subscription-demo {
+  --sub-color-0: #17253d;
+  --sub-color-1: #34496b;
+  --sub-color-2: #34496b;
+  --sub-color-3: #18253a;
+  --sub-color-4: #8ab4ff;
+  --sub-color-5: #17253d;
+  --sub-color-6: #8ab4ff;
+  --sub-color-7: #34496b;
+}
+.subscription-demo {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 36px 28px 40px;
+  color: var(--foreground);
+  font-size: 14px;
+  line-height: 1.7;
+}
+.subscription-demo h1 {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.4;
+  margin: 0 0 6px;
+}
+.subscription-demo h2 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 12px;
+}
+.subscription-demo p {
+  color: var(--muted-foreground);
+}
+.subscription-demo .sub-page-head {
+  margin-bottom: 20px;
+}
+.subscription-demo .sub-demo-notice {
+  border: 1px solid var(--border);
+  background: var(--muted);
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin: 12px 0;
+}
+.subscription-demo .sub-service-guide {
+  margin: 22px 0 12px;
+  padding: 18px 20px;
+  background: var(--sub-color-0);
+  border: 1px solid var(--sub-color-1);
+  border-radius: 8px;
+}
+.subscription-demo .sub-muted {
+  font-size: 14px;
+  color: var(--muted-foreground);
+  margin-bottom: 20px;
+}
+.subscription-demo .sub-cycle-block {
+  margin: 26px 0;
+}
+.subscription-demo .sub-cycle-heading {
+  display: flex;
+  gap: 18px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.subscription-demo .sub-cycle-heading h2 {
+  font-size: 23px;
+  margin: 0;
+}
+.subscription-demo .sub-cycle-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+.subscription-demo .sub-plan {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--card);
+  display: flex;
+  flex-direction: column;
+}
+.subscription-demo .sub-plan.is-auto-enabled {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary);
+}
+.subscription-demo .sub-plan-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 15px 18px;
+  min-height: 58px;
+}
+.subscription-demo .sub-plan-top h3 {
+  font-size: 18px;
+  font-weight: 600;
+}
+.subscription-demo .sub-plan-top > span {
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+.subscription-demo .sub-purchase-focus {
+  padding: 0 18px 16px;
+}
+.subscription-demo .sub-option-price {
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+.subscription-demo small {
+  font-size: 14px;
+  font-weight: 400;
+  margin-left: 4px;
+  color: var(--muted-foreground);
+}
+.subscription-demo .sub-current-points {
+  padding: 12px 14px;
+  border: 1px solid var(--sub-color-2);
+  border-radius: 8px;
+  background: var(--sub-color-3);
+}
+.subscription-demo .sub-current-points > span {
+  display: block;
+  color: var(--muted-foreground);
+}
+.subscription-demo .sub-current-points > strong {
+  font-size: 28px;
+  line-height: 1.5;
+  color: var(--sub-color-4);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.subscription-demo .sub-plan-benefits {
+  list-style: disc;
+  padding: 0 18px 15px 32px;
+  display: grid;
+  gap: 4px;
+  color: var(--muted-foreground);
+}
+.subscription-demo .sub-option-auto {
+  padding: 18px;
+  background: var(--sub-color-5);
+  border-top: 1px solid var(--border);
+  flex: 1;
+}
+.subscription-demo .sub-auto-control {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.subscription-demo .sub-auto-control h4 {
+  font-size: 17px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.subscription-demo .sub-auto-control p {
+  margin-top: 4px;
+  font-size: 14px;
+}
+.subscription-demo .sub-recommend {
+  color: var(--sub-color-6);
+  border: 1px solid var(--sub-color-7);
+  background: var(--card);
+  padding: 3px 7px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 400;
+}
+.subscription-demo .sub-renew-benefit {
+  padding: 12px 0;
+  margin: 14px 0 10px;
+  border-block: 1px solid var(--border);
+}
+.subscription-demo .sub-renew-benefit span,
+.subscription-demo .sub-renew-benefit strong {
+  display: block;
+}
+.subscription-demo .sub-renew-benefit span {
+  color: var(--muted-foreground);
+  font-size: 14px;
+}
+.subscription-demo .sub-renew-benefit strong {
+  font-size: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.subscription-demo .sub-option-auto > p {
+  font-size: 13px;
+  margin: 10px 0 14px;
+}
+.subscription-demo .sub-plan button:not([role='switch']) {
+  width: 100%;
+  min-height: 40px;
+  height: auto;
+  white-space: normal;
+  padding-block: 8px;
+}
+.subscription-demo .sub-option-once {
+  padding: 16px 18px 18px;
+  border-top: 1px solid var(--border);
+}
+.subscription-demo .sub-once-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.subscription-demo .sub-once-heading h4 {
+  font-size: 16px;
+  font-weight: 600;
+}
+.subscription-demo .sub-once-heading > strong {
+  font-size: 22px;
+}
+.subscription-demo .sub-option-once p {
+  margin: 8px 0 12px;
+}
+.subscription-demo .sub-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  padding: 24px;
+  margin: 22px 0;
+}
+.subscription-demo .sub-management {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.subscription-demo .sub-management span,
+.subscription-demo .sub-management strong {
+  display: block;
+}
+.subscription-demo .sub-management span {
+  color: var(--muted-foreground);
+}
+.subscription-demo .sub-empty {
+  padding: 32px 0;
+  text-align: center;
+}
+.subscription-demo .sub-rules {
+  list-style: decimal;
+  padding-left: 23px;
+  margin-bottom: 20px;
+}
+.subscription-demo .sub-rules li {
+  margin-bottom: 16px;
+}
+.subscription-demo .sub-rules strong {
+  font-size: 15px;
+  font-weight: 600;
+}
+.subscription-demo [role='tablist'] {
+  max-width: 100%;
+  flex-wrap: wrap;
+  height: auto;
+}
+@media (max-width: 820px) {
+  .subscription-demo {
+    padding: 24px 16px 32px;
+  }
+  .subscription-demo .sub-cycle-grid {
+    grid-template-columns: 1fr;
+  }
+  .subscription-demo .sub-cycle-heading {
+    gap: 6px;
+  }
+  .subscription-demo .sub-card {
+    padding: 20px;
+  }
+}

@@ -1,0 +1,46 @@
+[
+  {
+    "title": "Monthly pricing: ¥29 / ¥89 / ¥199",
+    "body": "29,000 / 89,000 / 199,000 regular points for a one-month term. Entry: selected stable models, docs and FAQs, standard support. Standard: stabilized new models, integration assistance, priority support. Pro: early model access, complex integration assistance, high-priority support. Monthly and yearly plans have the same tier benefits."
+  },
+  {
+    "title": "Yearly pricing: ¥290 / ¥890 / ¥1,990",
+    "body": "348,000 / 1,068,000 / 2,388,000 regular points for 12 months; save two months compared with monthly purchases. All points are credited after payment."
+  },
+  {
+    "title": "Purchase options: one-time or auto renewal",
+    "body": "The same tier and cycle have the same price. A one-time purchase does not create an authorization or cancel an existing matching authorization."
+  },
+  {
+    "title": "Auto renewal: scheduled charges after authorization",
+    "body": "Renewals use the confirmed tier, cycle and payment method. Authorizing an already purchased plan does not immediately charge or credit points."
+  },
+  {
+    "title": "10% bonus: only after successful auto renewal",
+    "body": "The bonus is based on regular points for the same tier and cycle. Initial purchases, authorization alone and failed payments receive no bonus."
+  },
+  {
+    "title": "Cancel auto renewal: stops future charges only",
+    "body": "Cancel using the plan switch or renewal management. Purchased service terms and credited points are unaffected."
+  },
+  {
+    "title": "Auto renewal: one plan at a time",
+    "body": "Authorizing another tier or cycle replaces the old setting. Check the cycle, amount and payment method in the confirmation dialog."
+  },
+  {
+    "title": "Same-plan renewal extends the service term",
+    "body": "Points arrive after payment and service extends from the existing expiry. Matching renewal authorization remains, with the next charge deferred."
+  },
+  {
+    "title": "Upgrade: immediate higher tier, remaining lower-tier time retained",
+    "body": "Purchase the higher tier at full price, without prorating the difference. Unused lower-tier service time is paused and resumed according to the schedule."
+  },
+  {
+    "title": "Downgrade: immediate points, scheduled service",
+    "body": "New points arrive after payment. Lower-tier service starts after current and retained terms; it does not immediately replace higher-tier benefits."
+  },
+  {
+    "title": "Changing plan or cycle requires reviewing auto renewal",
+    "body": "A manual purchase of a different tier or cycle cancels the old auto renewal setting. Confirm authorization again to continue auto renewal."
+  }
+]

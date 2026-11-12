@@ -627,6 +627,18 @@
 
 ---
 
+### Z026 订阅页面前端演示
+
+- 需求与原因：在模型广场后增加订阅入口，按 `c-dev/ZYY-AI-demo.html` 还原订阅页面；用户确认本次只做前端演示，不接后端 API。
+- 变更内容：新增公开 `/subscription` 页面、月付/年付三档套餐、自动续费和单次购买演示、确认弹窗、规则、订单/发票空态；入口复用 `useTopNavLinks`，置于 Model Square 后。演示不会支付、授权、改余额、改订阅或生成订单。
+- 影响面：`web/src/features/subscription-demo/`、`web/src/routes/subscription/`、`web/src/styles/subscription-demo.css`、`web/src/hooks/use-top-nav-links.ts`、前端翻译文件、生成路由树；新增 `c-dev/subscription-page-implementation.md`。
+- 与上游差异：全部为 fork 前端页面和文案，不修改后端、接口、部署及真实钱包订阅功能；未新增依赖。静态价格/积分规则不是后端契约。
+- 开关与默认值：入口为前端固定入口；页面状态只存在组件内，刷新清空。沿用公共布局、主题、语言、Dialog、Button、Switch、Tabs、Checkbox、Select。
+- 验证：订阅/顶栏定向 5 文件/18 用例、typecheck、build 通过；Chrome 1440px 中文浅色、390px 深色、360px 弹窗检查无横向溢出。全量 2597 通过、1 个已知日志详情超时；完整多角色和全部语言人工校对未覆盖。
+- 风险与未覆盖：未来真实接入前必须重新确认套餐、价格、支付授权、订单、发票、积分和权益契约，不能将演示确认回调直接视为支付成功。
+
+---
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
