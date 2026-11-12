@@ -689,6 +689,14 @@
 
 ---
 
+### Z033 Agent 目录跟踪范围
+
+- 需求/内容：`new-api/.agents/` 仅 `rules/` 纳入 Git，`.gitignore` 忽略其他直接子项；已跟踪的 `github/`、`skills/` 共16文件取消索引跟踪，保留本地文件。
+- 影响/兼容：新克隆不再携带上述本地助手文档/技能，AGENTS 中既有相关引用需由开发者本地提供；规则文件继续跟踪。不修改根仓库、子模块指针、产品代码或后端。
+- 验证：`git ls-files .agents` 仅剩 billing.md/points.md；`git check-ignore` 确认 github/skills 被忽略，本地文件仍存在，diff 检查通过；无运行代码变更，未运行测试/构建。
+
+---
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
