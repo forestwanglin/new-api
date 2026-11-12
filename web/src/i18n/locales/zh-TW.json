@@ -7481,6 +7481,14 @@
     "Video generation failed": "视频生成失败",
     "Video task retained; check task history": "任务已保留，可在任务记录中继续查询",
     "By clicking sign in, you agree to our": "點擊登入即表示您同意我們的",
-    "By creating an account, you agree to our": "建立帳戶即表示您同意我們的"
+    "By creating an account, you agree to our": "建立帳戶即表示您同意我們的",
+    "General points": "通用",
+    "Available points": "可用積分",
+    "Frozen points": "凍結積分",
+    "Points details": "積分明細",
+    "Available points are shown; frozen points are listed separately.": "顯示可用積分，凍結積分單獨列出。",
+    "More point types_one": "另 {{count}} 種",
+    "More point types_other": "另 {{count}} 種",
+    "More point types": "另 {{count}} 種"
   }
 }

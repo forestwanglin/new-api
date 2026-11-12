@@ -60,14 +60,16 @@ export function QuotaDetailsPopover(props: QuotaDetailsPopoverProps) {
       </div>
       <PopoverContent
         align='start'
-        className='w-72 max-w-[calc(100vw-2rem)] gap-3 p-3'
+        className='max-h-(--available-height) w-72 max-w-[calc(100vw-2rem)] gap-3 overflow-y-auto overscroll-contain p-3'
       >
         <PopoverTitle>{props.title}</PopoverTitle>
-        <dl className='grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 text-sm tabular-nums'>
+        <dl className='grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm tabular-nums'>
           {props.details.map((detail) => (
             <Fragment key={detail.label}>
-              <dt className='text-muted-foreground'>{detail.label}</dt>
-              <dd className='text-right break-all'>{detail.value}</dd>
+              <dt className='text-muted-foreground min-w-0 break-words'>
+                {detail.label}
+              </dt>
+              <dd className='min-w-0 text-right break-all'>{detail.value}</dd>
             </Fragment>
           ))}
         </dl>

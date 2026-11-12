@@ -17,22 +17,40 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import type { AxiosRequestConfig } from 'axios'
+import { t } from 'i18next'
 
 import type { PermissionCatalog } from '@/lib/admin-permissions'
 import { api } from '@/lib/api'
 import type { CustomOAuthBinding } from '@/lib/oauth'
 import { requireServerSuccess } from '@/lib/server-error-message'
 
-import type {
-  User,
-  GetUsersParams,
-  GetUsersResponse,
-  SearchUsersParams,
-  UserFormData,
-  ManageUserAction,
-  ManageUserQuotaPayload,
-  ApiResponse,
+import {
+  userPointBalanceSchema,
+  type User,
+  type GetUsersParams,
+  type GetUsersResponse,
+  type SearchUsersParams,
+  type UserFormData,
+  type ManageUserAction,
+  type ManageUserQuotaPayload,
+  type ApiResponse,
 } from './types'
+
+function validateUserPointBalances(
+  response: GetUsersResponse
+): GetUsersResponse {
+  if (response.success && response.data) {
+    for (const user of response.data.items) {
+      if (
+        user.point_balances !== undefined &&
+        !userPointBalanceSchema.array().safeParse(user.point_balances).success
+      ) {
+        throw new Error(t('Invalid response'))
+      }
+    }
+  }
+  return response
+}
 
 // A step-up proof is single-use, so the request carrying it must never be
 // replayed by the auth-refresh interceptor; it refreshes first instead.
@@ -63,7 +81,7 @@ export async function getUsers(
       sort_order,
     },
   })
-  return res.data
+  return validateUserPointBalances(res.data)
 }
 
 /**
@@ -92,7 +110,7 @@ export async function searchUsers(
   if (sort_by) queryParams.set('sort_by', sort_by)
   if (sort_order) queryParams.set('sort_order', sort_order)
   const res = await api.get(`/api/user/search?${queryParams.toString()}`)
-  return res.data
+  return validateUserPointBalances(res.data)
 }
 
 /**

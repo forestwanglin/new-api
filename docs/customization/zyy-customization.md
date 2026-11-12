@@ -722,6 +722,17 @@
 - 浏览器验证：隔离 Chrome + 独立 SQLite 服务验证桌面 EXACT 新增/编辑/停用/确认删除、390px 移动端 PATTERN 新增、重复错误保留表单、加载/空列表/失败重试、DB 插入 DS 类型后动态显示；无 JS 异常、无页面横向溢出。
 - 既有问题与限制：扩大到 `go test ./controller -count=1` 时，`TestOpenAIChatSamplingCompatibility` 的 4 个子例因缺少 `reasoning_effort:none` 失败；通过 Go overlay 移除本次唯一新增 controller 文件后同样复现，未改动该计费/协议路径。全仓版权检查另有 34 个既有文件缺少或不符合标准头，本次仅补齐 12 个新增前端文件。未实测最低 MySQL/PostgreSQL 版本；本次不实现配置的运行时匹配或实际积分扣费。
 
+---
+
+### Z036 管理员用户列表积分列
+
+- 需求与原因：管理员在余额列之后直接查看各用户持有的积分类型、可用积分和冻结积分，区分用途与冻结状态。
+- 变更内容：分页和搜索列表为当前页用户批量读取积分账户，附加只读 `point_balances`；按通用、GPT、其他类型稳定展示，双零隐藏，无账户显示 `—`。前端一列最多两行，更多类型通过现有明细弹层展开；冻结积分单独标示。
+- 与上游差异：在原有用户列表增加独立积分账户信息，不将 points 与 quota 换算，不修改原有余额操作、排序或筛选。保留现有管理员和 PAT 鉴权；积分查询失败使列表报错，不当作零积分。
+- 兼容与精度：只为列表添加响应字段，积分以十进制字符串传输，前端通过 BigInt 精确格式化 int64，保留现有数字格式语义；不扩展全局 User ORM 或单用户响应。无新依赖、schema、部署、账户写入、实际积分消费或冻结操作。
+- 影响面：新增用户积分批量查询/响应 DTO、积分单元格及回归测试；**上游自有文件**：`controller/user.go`、前端 users API/类型/列配置、公共数字格式化、共享 QuotaDetailsPopover（长名称换行与高度限制/滚动）、七种 locale 及对应既有测试。复用现有表格、Tooltip、QuotaDetailsPopover。
+- 验证：SQLite、MySQL 8.4、PostgreSQL 17 真实数据库矩阵均通过；列表/搜索真实鉴权、PAT、分页、只读、批量查询、错误响应与 int64 精度定向测试通过。前端 users/data-table 相关 9 文件 60 用例、tsgo、修改文件 lint/format、生产构建通过；Go build 和受影响包 vet 通过，model/middleware 整包通过。扩大 router 整包时，并行积分流水功能的 `TestPointLedgerAPI` 出现 404，未修改该并行功能。隔离 Chrome 桌面/390px 移动端验证多类型、冻结、大整数、长名称、弹层滚动、键盘/触摸、搜索/分页/刷新及中文切换，无 JS 异常或页面横向溢出。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
@@ -734,6 +745,7 @@
 | 后端 controller / model | `controller/channel-test.go`、`controller/relay.go`、`controller/system_task_handlers.go`、`model/system_task.go`、`model/task.go` | Z003、Z006 |
 | 积分主库迁移 | `model/main.go` | Z034 |
 | 积分管理权限与路由 | `router/api-router.go`、`middleware/access_token_routes.go` | Z035 |
+| 用户列表积分 | `controller/user.go`、`web/src/components/quota-details-popover.tsx`、`web/src/features/users/api.ts`、`web/src/features/users/types.ts`、`web/src/features/users/components/users-columns.tsx`、`web/src/lib/format.ts`、七种 `web/src/i18n/locales/*.json` | Z036 |
 | 积分管理控制台集成 | `web/src/hooks/use-sidebar-data.ts`、`use-sidebar-config.ts`、`web/src/features/system-settings/maintenance/config.ts`、`sidebar-modules-section.tsx`、`web/src/routeTree.gen.ts`、七种 `web/src/i18n/locales/*.json` | Z035 |
 | 服务层 | `service/error.go` | Z001 |
 | Relay / 插件 | `relay/channel/openai/adaptor.go`、`relay/channel/task/jsplugin/adaptor.go`、`plugins/tasks/sora/plugin.js` | Z001、Z005 |

@@ -26,6 +26,7 @@ import { GroupBadge } from '@/components/group-badge'
 import { LongText } from '@/components/long-text'
 import { StatusBadge } from '@/components/status-badge'
 import { TableId } from '@/components/table-id'
+import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
   Tooltip,
@@ -44,6 +45,7 @@ import {
 } from '../constants'
 import type { User } from '../types'
 import { DataTableRowActions } from './data-table-row-actions'
+import { UserPointsCell } from './user-points-cell'
 import { UserQuotaCell } from './user-quota-cell'
 
 export function useUsersColumns(): ColumnDef<User>[] {
@@ -193,6 +195,37 @@ export function useUsersColumns(): ColumnDef<User>[] {
         size: 180,
         minSize: 160,
         meta: { mobileOrder: 40 },
+      },
+      {
+        id: 'points',
+        header: () => (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant='ghost'
+                  size='sm'
+                  className='h-auto px-0 font-medium'
+                />
+              }
+            >
+              {t('Points')}
+            </TooltipTrigger>
+            <TooltipContent>
+              {t(
+                'Available points are shown; frozen points are listed separately.'
+              )}
+            </TooltipContent>
+          </Tooltip>
+        ),
+        cell: ({ row }) => (
+          <UserPointsCell balances={row.original.point_balances} />
+        ),
+        enableSorting: false,
+        enableColumnFilter: false,
+        size: 240,
+        minSize: 200,
+        meta: { label: t('Points'), mobileOrder: 45 },
       },
       {
         accessorKey: 'group',

@@ -30,13 +30,11 @@ import {
 // ============================================================================
 
 export function formatNumber(
-  value: number | null | undefined,
+  value: number | bigint | null | undefined,
   locales?: Intl.LocalesArgument
 ): string {
   if (value == null || Number.isNaN(value as number)) return '-'
-  return Intl.NumberFormat(locales, { maximumFractionDigits: 2 }).format(
-    value as number
-  )
+  return Intl.NumberFormat(locales, { maximumFractionDigits: 2 }).format(value)
 }
 
 export function formatCompactNumber(

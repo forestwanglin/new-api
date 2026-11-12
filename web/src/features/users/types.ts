@@ -32,6 +32,24 @@ export type UserStatus = z.infer<typeof userStatusSchema>
 export const userRoleSchema = z.number()
 export type UserRole = z.infer<typeof userRoleSchema>
 
+// Amounts stay decimal strings across the API boundary to preserve int64 precision.
+const pointAmountSchema = z
+  .string()
+  .regex(/^(0|-?[1-9]\d*)$/)
+  .refine((value) => {
+    if (!/^(0|-?[1-9]\d*)$/.test(value)) return false
+    const amount = BigInt(value)
+    return amount >= -9223372036854775808n && amount <= 9223372036854775807n
+  }, 'Points must be an int64 decimal string')
+
+export const userPointBalanceSchema = z.object({
+  code: z.string().min(1),
+  name: z.string(),
+  available_points: pointAmountSchema,
+  frozen_points: pointAmountSchema,
+})
+export type UserPointBalance = z.infer<typeof userPointBalanceSchema>
+
 export const userSchema = z.object({
   id: z.number(),
   username: z.string(),
@@ -43,6 +61,7 @@ export const userSchema = z.object({
   telegram_id: z.string().optional(),
   email: z.string().optional(),
   quota: z.number(),
+  point_balances: z.array(userPointBalanceSchema).optional(),
   used_quota: z.number(),
   request_count: z.number(),
   group: z.string(),

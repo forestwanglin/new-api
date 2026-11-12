@@ -7481,6 +7481,14 @@
     "Video generation failed": "Video generation failed",
     "Video task retained; check task history": "Video task retained; check task history",
     "By clicking sign in, you agree to our": "サインインをクリックすると、以下に同意したことになります：",
-    "By creating an account, you agree to our": "アカウントを作成すると、以下に同意したことになります："
+    "By creating an account, you agree to our": "アカウントを作成すると、以下に同意したことになります：",
+    "General points": "共通",
+    "Available points": "利用可能ポイント",
+    "Frozen points": "凍結ポイント",
+    "Points details": "ポイント明細",
+    "Available points are shown; frozen points are listed separately.": "利用可能ポイントを表示し、凍結ポイントは別途表示します。",
+    "More point types_one": "他 {{count}} 種類",
+    "More point types_other": "他 {{count}} 種類",
+    "More point types": "他 {{count}} 種類"
   }
 }

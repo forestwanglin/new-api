@@ -343,9 +343,14 @@ func GetAllUsers(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	items, err := model.AttachUserPointBalances(users)
+	if err != nil {
+		common.ApiErrorT(c, "Failed to load users")
+		return
+	}
 
 	pageInfo.SetTotal(int(total))
-	pageInfo.SetItems(users)
+	pageInfo.SetItems(items)
 
 	common.ApiSuccess(c, pageInfo)
 	return
@@ -373,9 +378,14 @@ func SearchUsers(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	items, err := model.AttachUserPointBalances(users)
+	if err != nil {
+		common.ApiErrorT(c, "Failed to search users")
+		return
+	}
 
 	pageInfo.SetTotal(int(total))
-	pageInfo.SetItems(users)
+	pageInfo.SetItems(items)
 	common.ApiSuccess(c, pageInfo)
 	return
 }

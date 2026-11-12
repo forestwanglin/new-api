@@ -2,8 +2,10 @@ package model
 
 import (
 	"errors"
+	"math"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -341,6 +343,87 @@ func TestPointRulesAdminDatabaseMatrix(t *testing.T) {
 			require.Len(t, gotRules, 3)
 			assert.Less(t, gotRules[0].Id, gotRules[1].Id)
 			assert.Less(t, gotRules[1].Id, gotRules[2].Id)
+		})
+	}
+}
+
+// The enrichment is bounded by the current user page and must remain read-only.
+func TestUserPointBalancesDatabaseMatrix(t *testing.T) {
+	for _, dialect := range []string{"sqlite", "mysql", "postgres"} {
+		t.Run(dialect, func(t *testing.T) {
+			dsn := os.Getenv("TEST_" + strings.ToUpper(dialect) + "_DSN")
+			if dialect == "sqlite" {
+				dsn = "local"
+				previousPath := common.SQLitePath
+				common.SQLitePath = filepath.Join(t.TempDir(), "user-points.db")
+				t.Cleanup(func() { common.SQLitePath = previousPath })
+			}
+			if dsn == "" {
+				t.Skip("isolated test database DSN is not configured")
+			}
+			t.Setenv("USER_POINTS_TEST_DSN", dsn)
+			db, databaseType, err := chooseDB("USER_POINTS_TEST_DSN", false)
+			require.NoError(t, err)
+			sqlDB, err := db.DB()
+			require.NoError(t, err)
+			t.Cleanup(func() { require.NoError(t, sqlDB.Close()) })
+			previousDB, previousType := DB, common.MainDatabaseType()
+			common.SetMainDatabaseType(databaseType)
+			t.Cleanup(func() { DB = previousDB; common.SetMainDatabaseType(previousType) })
+			for _, table := range []any{&PointAccount{}, &PointType{}} {
+				require.False(t, db.Migrator().HasTable(table), "requires an isolated database")
+			}
+			require.NoError(t, db.AutoMigrate(&PointType{}, &PointAccount{}))
+			t.Cleanup(func() {
+				require.NoError(t, db.Migrator().DropTable(&PointAccount{}, &PointType{}))
+			})
+			types := []PointType{
+				{Code: "ZZ", Name: "Future last"}, {Code: PointTypeGPT, Name: "GPT"},
+				{Code: "DS", Name: "Future first"}, {Code: PointTypeGeneral, Name: "General"},
+			}
+			require.NoError(t, db.Create(&types).Error)
+			accounts := []PointAccount{
+				{UserId: 7, PointTypeId: types[0].Id, AvailablePoints: -1},
+				{UserId: 7, PointTypeId: types[1].Id, AvailablePoints: math.MaxInt64},
+				{UserId: 7, PointTypeId: types[2].Id, FrozenPoints: 300},
+				{UserId: 7, PointTypeId: types[3].Id, AvailablePoints: 9007199254740993, FrozenPoints: 2000},
+				{UserId: 8, PointTypeId: types[1].Id, FrozenPoints: 500},
+				{UserId: 9, PointTypeId: types[0].Id},
+				{UserId: 99, PointTypeId: types[0].Id, AvailablePoints: 123},
+			}
+			require.NoError(t, db.Create(&accounts).Error)
+			recorder := &migrationSQLRecorder{}
+			DB = db.Session(&gorm.Session{Logger: recorder})
+			users := []*User{{Id: 8}, {Id: 7}, {Id: 9}, {Id: 10}}
+			items, err := AttachUserPointBalances(users)
+			require.NoError(t, err)
+			require.Len(t, recorder.statements, 1, "one batch read regardless of page size; no writes")
+			assert.True(t, strings.HasPrefix(strings.ToUpper(recorder.statements[0]), "SELECT "))
+			require.Len(t, items, 4)
+			for i := range users {
+				assert.Same(t, users[i], items[i].User, "preserve page order and fields")
+			}
+			assert.Equal(t, []UserPointBalance{{Code: "GPT", Name: "GPT", AvailablePoints: "0", FrozenPoints: "500"}}, items[0].PointBalances)
+			assert.Equal(t, []UserPointBalance{
+				{Code: "GENERAL", Name: "General", AvailablePoints: "9007199254740993", FrozenPoints: "2000"},
+				{Code: "GPT", Name: "GPT", AvailablePoints: "9223372036854775807", FrozenPoints: "0"},
+				{Code: "DS", Name: "Future first", AvailablePoints: "0", FrozenPoints: "300"},
+				{Code: "ZZ", Name: "Future last", AvailablePoints: "-1", FrozenPoints: "0"},
+			}, items[1].PointBalances)
+			assert.Equal(t, []UserPointBalance{}, items[2].PointBalances)
+			assert.Equal(t, []UserPointBalance{}, items[3].PointBalances)
+			var after []PointAccount
+			require.NoError(t, db.Order("id").Find(&after).Error)
+			assert.Equal(t, accounts, after, "viewing a list must not change accounts")
+			recorder.reset()
+			empty, err := AttachUserPointBalances(nil)
+			require.NoError(t, err)
+			assert.Equal(t, []UserWithPointBalances{}, empty)
+			assert.Empty(t, recorder.statements, "empty pages issue no points query")
+			require.NoError(t, db.Migrator().DropTable(&PointAccount{}))
+			items, err = AttachUserPointBalances(users)
+			require.Error(t, err)
+			assert.Nil(t, items, "read failure must not fabricate empty balances")
 		})
 	}
 }
