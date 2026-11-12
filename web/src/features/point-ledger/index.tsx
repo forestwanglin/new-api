@@ -157,7 +157,7 @@ export function PointLedger(props: { scope: PointLedgerScope }) {
           emptyContent={<EmptyState title={t('No point ledger entries')} />}
         />
         <div className='mt-3'>
-          <DataTablePagination table={table} compact />
+          <DataTablePagination table={table} />
         </div>
       </>
     )
