@@ -70,6 +70,11 @@
   color: #2563eb;
 }
 .subscriptions-custom-footer .sub-footer-copy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 24px;
   color: #5b6b80;
   font-size: 13.5px;
   margin-top: 36px;
@@ -77,9 +82,8 @@
   border-top: 1px solid #e8ebf0;
 }
 .subscriptions-custom-footer .sub-footer-attribution {
-  display: block;
-  margin-top: 6px;
   font-size: 12px;
+  line-height: 1.7;
 }
 .subscriptions-custom-footer a:focus-visible {
   outline: 2px solid #2563eb;
@@ -102,6 +106,9 @@
   border-color: #344155;
 }
 @media (max-width: 600px) {
+  .subscriptions-custom-footer .sub-footer-attribution {
+    flex-basis: 100%;
+  }
   .subscriptions-custom-footer .sub-footer-main {
     gap: 28px;
   }

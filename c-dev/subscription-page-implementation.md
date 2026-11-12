@@ -1,5 +1,9 @@
 # 自定义订阅页面：前端演示实施记录
 
+## Footer 归属信息排版调整
+
+保留完整 New API 归属文字：桌面端与 ZYY AI 版权同行、两端对齐；600px以下归属信息独立换行，字号12px/行高1.7。颜色、分割线、背景不变，不使用隐藏或透明样式。
+
 ## Footer 专项对齐
 
 - 使用自定义 `footer.tsx` 与 `subscriptions-custom-footer.css`，仅影响本页，替代上次公共 Footer。
