@@ -2,13 +2,6 @@
 
 Mandatory conventions for quota, pricing, pre-consume, settlement, refund, and usage-quantity code in the Go backend. `AGENTS.md` defines when a task touches billing (see **Billing rules (mandatory read gate)**); any task that matches MUST read this whole file before planning, coding, or reviewing. Tasks that match none of those triggers may skip it. Rules use the same MUST / Do NOT wording as `AGENTS.md` and carry the same weight.
 
-## Custom fork: RMB and points
-
-- 自定义业务的人民币与积分兑换基准：**1 RMB（人民币1元）= 1,000积分**。金额转积分：`points = amountRMB × 1000`；积分对应的人民币参考金额：`amountRMB = points ÷ 1000`。例如：¥29 对应29,000基础积分。
-- 订阅、钱包、价格展示及相关文档采用该基准；优惠或赠送积分单独计算、单独说明，不将包含赠送的到账总积分反推为实际支付金额，也不据此承诺积分可提现。
-- 业务积分与 new-api 底层整数 `quota` 是不同概念。此规则不定义 `points ↔ quota` 映射，不修改 `QuotaPerUnit` 或美元计价逻辑；涉及真实扣费、充值、结算或存量数据转换时，先核实已有单位、币种与换算链路，不能直接把积分当作 quota。
-- 本条是业务约定，不表示该比例已经在所有现有后端功能中实现；金额小数精度和积分取整方式须遵循对应业务的明确契约，不能由兑换比例自行推断。
-
 **Billing expression system:** When working on tiered/dynamic billing (expression-based pricing), MUST read `pkg/billingexpr/expr.md` first. It documents the design philosophy, expression language, full architecture, token normalization rules, quota conversion, and expression versioning. All billing expression changes must follow that document.
 
 **Built-in model pricing:** New built-in model prices MUST be defined as self-contained billing expressions in `setting/billing_setting/builtin_billing.go`, using real USD per million tokens. Do not add new built-in prices to the legacy model/completion/cache ratio tables. Preserve explicit administrator pricing overrides. Existing legacy prices are migrated only when explicitly requested. Verify published prices and cover applicable context-length thresholds and cache categories.
