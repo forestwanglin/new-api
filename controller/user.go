@@ -499,6 +499,7 @@ func buildSelfUserData(user *model.User) map[string]any {
 		"id":                user.Id,
 		"username":          user.Username,
 		"display_name":      user.DisplayName,
+		"avatar_url":        user.AvatarURL,
 		"has_password":      user.HasPassword,
 		"role":              user.Role,
 		"status":            user.Status,

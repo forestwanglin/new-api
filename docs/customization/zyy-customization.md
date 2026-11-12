@@ -579,6 +579,18 @@
 
 ---
 
+### Z023 微信可选资料同步与通用用户头像
+
+- 需求与原因：接入 wechat-server 可选 `profile`，为微信用户补齐昵称并在账号入口显示头像，兼容无资料的原登录链路。
+- 变更内容：用户增加 `avatar_url` / 内部 `avatar_source`；新用户使用有效微信资料，已有登录仅补齐空/默认昵称及空/微信来源头像，绑定仅补齐空头像；空资料不清空已有值。资料失败不绕过二次验证或阻断有效登录/绑定。共享 self DTO 返回头像，桌面菜单和移动入口复用头像图片/默认降级。
+- 影响面：**上游自有文件** `controller/wechat.go`、`controller/user.go`、`model/user.go`、`web/src/stores/auth-store.ts`、`web/src/components/profile-dropdown.tsx`、`web/src/components/layout/components/mobile-drawer.tsx`；新增 `model/wechat_profile.go`、`controller/wechat_profile_test.go`、`web/src/components/__tests__/account-avatar.test.tsx`。
+- 与上游差异：扩展原 OpenID-only 微信资料和字母头像；OpenID 身份、注册开关、封禁、绑定安全证明和会话策略不变；资料更新使用绑定标识和当前字段所有权条件，不保存过期整用户快照。
+- 开关与默认值：无新增开关；无头像默认空，来源不对外序列化；头像仅接受 HTTPS、无 URL 凭据、最长 2048 字节；昵称移除控制字符并限制 20 个 Unicode 字符；不代理下载图片。外部头像设置 no-referrer。
+- 验证：定向 `go test ./controller -run '^TestWeChat' -count=1` 通过，含解析/策略/绑定安全证明/二次验证及资料更新失败；SQLite 3.50.4、Docker MySQL 8.4.13、临时 Docker PostgreSQL 17.11 新建、旧结构升级和重复迁移通过（使用独立一次性测试库或容器，完成后清理，不修改开发库）。前端头像 6 用例、`bun check -b`、定向 oxlint、生产构建通过；`go build ./...`、`go vet ./controller ./model` 通过。
+- 风险与未覆盖：数据库验证覆盖上述具体版本，未覆盖最低支持版本；旧结构升级用当前用户表去除新增两列构造，不代表所有历史版本升级组合。`go test ./...` 的采样兼容 4 用例及 advancedcustom 代理错误用例失败；采样失败已用 HEAD 文件 overlay 复现，后者未修改且定向复跑仍失败。前端全量 216 文件通过、1 文件失败（2586 通过、1 超时），为 Z022 已记录的日志详情超时，单文件 30 用例通过。不更改无关断言或超时。未做真实账号浏览器验收或真实微信接口验证。遵循 OWASP Authentication / Session Management Cheat Sheets 的绑定再认证、会话不降级、无敏感日志原则；未宣称完整 ASVS 合规。未部署；回滚可保留新增列，不删除用户资料。
+
+---
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
