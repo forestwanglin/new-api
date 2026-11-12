@@ -697,6 +697,17 @@
 
 ---
 
+### Z034 积分六表与 GORM 持久化模型
+
+- 需求与原因：为 GENERAL 与 GPT 积分提供独立账户、模型适用规则、业务幂等记录、变化流水及冻结记录，为后续积分业务准备持久化结构。
+- 变更内容：新增六个 GORM 模型，接入主库启动迁移；初始化 GENERAL（优先级 100、`*`）和 GPT（优先级 10、`gpt-*`），后续启动保留管理员修改及删除的规则。详见 [points-schema.md](points-schema.md)。
+- 影响面：新增 `model/point.go`、`model/point_test.go`、`docs/customization/points-schema.md`；**上游自有文件**：`model/main.go` 增加积分主库迁移调用。
+- 与上游差异：在原有 quota 账户之外增加独立业务积分表；没有接入或替换原有扣费、充值、Redis 或日志库逻辑。
+- 开关与默认值：由现有主节点启动迁移执行，无新增环境开关；积分使用 int64，时间使用毫秒；默认规则只在对应类型首次创建时插入；MySQL 模型规则值使用列级大小写敏感排序规则。
+- 验证：隔离真实数据库 SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 17.11；配置 `TEST_MYSQL_DSN` / `TEST_POSTGRES_DSN` 后执行 `go test ./model -run '^TestPointsDatabaseMatrix$' -count=5` 全通过（MySQL 同时启用 `clientFoundRows=true`），`go test ./model -count=1` 全通过。覆盖空库、代表性既有表升级、重复迁移无 DDL、配置保留、大小写规则、并发初始化、唯一约束及 64 位往返。`go build ./...`、`go vet ./model`、`gofmt` 与 `git diff --check` 通过；本机 Go 1.27.3，未修改模块声明的 Go 1.26.10。
+- 补充验证：`go test ./model -run '^TestPoints' -count=1` 三库聚合通过；包含 SQLite 故障注入测试，验证初始规则写入失败时类型与规则回滚、错误上抛并可重试。
+- 风险与未覆盖：本次只建表与 ORM，尚未实现真实消费、模型匹配、冻结或管理接口；没有完整最新发行版数据库 fixture，升级测试为代表性既有余额表样本；未实测最低支持版本 MySQL 5.7.8 / PostgreSQL 9.6；不声称仅靠表结构保证余额一致性和流水不可变性。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
@@ -707,6 +718,7 @@
 |---|---|---|
 | 仓库规则与配置 | `AGENTS.md`、`.gitignore` | Z011、Z003 |
 | 后端 controller / model | `controller/channel-test.go`、`controller/relay.go`、`controller/system_task_handlers.go`、`model/system_task.go`、`model/task.go` | Z003、Z006 |
+| 积分主库迁移 | `model/main.go` | Z034 |
 | 服务层 | `service/error.go` | Z001 |
 | Relay / 插件 | `relay/channel/openai/adaptor.go`、`relay/channel/task/jsplugin/adaptor.go`、`plugins/tasks/sora/plugin.js` | Z001、Z005 |
 | Relay / 插件（doubao 中转放行） | `plugins/tasks/doubao/plugin.js`、`plugins/doubao_responses_test.go` | Z018 |
