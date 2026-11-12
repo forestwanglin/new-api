@@ -708,6 +708,20 @@
 - 补充验证：`go test ./model -run '^TestPoints' -count=1` 三库聚合通过；包含 SQLite 故障注入测试，验证初始规则写入失败时类型与规则回滚、错误上抛并可重试。
 - 风险与未覆盖：本次只建表与 ORM，尚未实现真实消费、模型匹配、冻结或管理接口；没有完整最新发行版数据库 fixture，升级测试为代表性既有余额表样本；未实测最低支持版本 MySQL 5.7.8 / PostgreSQL 9.6；不声称仅靠表结构保证余额一致性和流水不可变性。
 
+---
+
+### Z035 管理员积分类型与模型规则配置
+
+- 需求与原因：在 Admin 菜单 Users 下方增加积分入口，动态查看数据库中全部积分类型，并管理每种类型支持的模型规则。
+- 变更内容：新增 `/points` 页面与 `/api/points/types` 管理接口；类型名称、编码与消费优先级只读，模型规则支持 EXACT/PATTERN、新增、编辑、启停及删除。类型新增/删除仍通过脚本或数据库完成，没有类型写接口。
+- 权限与兼容：全部接口要求管理员，控制台页面有角色守卫，PAT 不可调用；旧侧栏配置缺少 points 项时继承默认值，显式关闭继续生效。规则按父类型隔离，唯一约束处理重复，更新保留 `enabled=false`，严格拒绝越权字段。
+- 规则语义：区分大小写、完整字符串；PATTERN 仅 `*`、`?` 为通配符，其他字符为字面值。允许未来模型名，多条启用规则为 OR，允许清空规则。这里只保存配置，未接入实际模型匹配、积分扣费、冻结或充值，不修改 quota。
+- 影响面：新增积分管理 model/controller 与前端 feature/route；**上游自有文件**：`router/api-router.go`、`middleware/access_token_routes.go`、前端侧栏数据/默认配置、maintenance 配置/侧栏设置、生成路由树、七种语言文件及相关既有测试。无新依赖、无 schema 或部署变更。
+- 与上游差异：扩展原有管理员菜单与接口目录，为独立积分表增加管理入口；复用现有控制台组件、管理员鉴权和会话机制，不修改原有计费路径。
+- 验证：`go test ./model -run '^TestPointRulesAdminDatabaseMatrix$' -count=1 -v` 在隔离真实 SQLite、MySQL 8.4.13（`clientFoundRows=true`）、PostgreSQL 17.11 全通过，覆盖 CRUD、false/no-op 更新、大小写、归属与并发重复；`go test ./model ./controller ./router ./middleware -count=1` 中 model/router/middleware 三包全通过，真实路由覆盖管理员/Root、普通用户、匿名、PAT、受保护字段及类型写接口不存在；`go build ./...` 与四包 `go vet` 通过。前端定向 Vitest 6 文件/46 用例、`tsgo -b`、改动文件 oxlint/oxfmt、生产构建与 diff 检查通过；独立全范围检查通过。
+- 浏览器验证：隔离 Chrome + 独立 SQLite 服务验证桌面 EXACT 新增/编辑/停用/确认删除、390px 移动端 PATTERN 新增、重复错误保留表单、加载/空列表/失败重试、DB 插入 DS 类型后动态显示；无 JS 异常、无页面横向溢出。
+- 既有问题与限制：扩大到 `go test ./controller -count=1` 时，`TestOpenAIChatSamplingCompatibility` 的 4 个子例因缺少 `reasoning_effort:none` 失败；通过 Go overlay 移除本次唯一新增 controller 文件后同样复现，未改动该计费/协议路径。全仓版权检查另有 34 个既有文件缺少或不符合标准头，本次仅补齐 12 个新增前端文件。未实测最低 MySQL/PostgreSQL 版本；本次不实现配置的运行时匹配或实际积分扣费。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
@@ -719,6 +733,8 @@
 | 仓库规则与配置 | `AGENTS.md`、`.gitignore` | Z011、Z003 |
 | 后端 controller / model | `controller/channel-test.go`、`controller/relay.go`、`controller/system_task_handlers.go`、`model/system_task.go`、`model/task.go` | Z003、Z006 |
 | 积分主库迁移 | `model/main.go` | Z034 |
+| 积分管理权限与路由 | `router/api-router.go`、`middleware/access_token_routes.go` | Z035 |
+| 积分管理控制台集成 | `web/src/hooks/use-sidebar-data.ts`、`use-sidebar-config.ts`、`web/src/features/system-settings/maintenance/config.ts`、`sidebar-modules-section.tsx`、`web/src/routeTree.gen.ts`、七种 `web/src/i18n/locales/*.json` | Z035 |
 | 服务层 | `service/error.go` | Z001 |
 | Relay / 插件 | `relay/channel/openai/adaptor.go`、`relay/channel/task/jsplugin/adaptor.go`、`plugins/tasks/sora/plugin.js` | Z001、Z005 |
 | Relay / 插件（doubao 中转放行） | `plugins/tasks/doubao/plugin.js`、`plugins/doubao_responses_test.go` | Z018 |

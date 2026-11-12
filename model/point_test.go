@@ -235,3 +235,112 @@ func TestPointsDatabaseMatrix(t *testing.T) {
 		})
 	}
 }
+
+func TestPointRulesAdminDatabaseMatrix(t *testing.T) {
+	for _, dialect := range []string{"sqlite", "mysql", "postgres"} {
+		t.Run(dialect, func(t *testing.T) {
+			var dsn string
+			switch dialect {
+			case "sqlite":
+				dsn = "local"
+				oldPath := common.SQLitePath
+				common.SQLitePath = filepath.Join(t.TempDir(), "points-admin.db")
+				t.Cleanup(func() { common.SQLitePath = oldPath })
+			case "mysql":
+				dsn = os.Getenv("TEST_MYSQL_DSN")
+			case "postgres":
+				dsn = os.Getenv("TEST_POSTGRES_DSN")
+			}
+			if dsn == "" {
+				t.Skip("isolated test database DSN is not configured")
+			}
+			t.Setenv("POINT_ADMIN_TEST_DSN", dsn)
+			db, databaseType, err := chooseDB("POINT_ADMIN_TEST_DSN", false)
+			require.NoError(t, err)
+			oldDB, oldType := DB, common.MainDatabaseType()
+			DB = db
+			common.SetMainDatabaseType(databaseType)
+			sqlDB, err := db.DB()
+			require.NoError(t, err)
+			if dialect == "sqlite" {
+				sqlDB.SetMaxOpenConns(1)
+			}
+			t.Cleanup(func() {
+				DB = oldDB
+				common.SetMainDatabaseType(oldType)
+				require.NoError(t, sqlDB.Close())
+			})
+			for _, table := range []any{&PointType{}, &PointModelRule{}} {
+				require.False(t, db.Migrator().HasTable(table), "isolated DB must have no existing point tables")
+			}
+			require.NoError(t, db.AutoMigrate(&PointType{}, &PointModelRule{}))
+			t.Cleanup(func() { require.NoError(t, db.Migrator().DropTable(&PointModelRule{}, &PointType{})) })
+			types := []PointType{{Code: "GENERAL", Name: "General", ConsumePriority: 100}, {Code: "GPT", Name: "GPT", ConsumePriority: 10}, {Code: "DS", Name: "Future", ConsumePriority: 10}}
+			require.NoError(t, db.Create(&types).Error)
+			gotTypes, err := GetPointTypes()
+			require.NoError(t, err)
+			require.Len(t, gotTypes, 3)
+			assert.Equal(t, []string{"GPT", "DS", "GENERAL"}, []string{gotTypes[0].Code, gotTypes[1].Code, gotTypes[2].Code})
+			gotRules, err := GetPointModelRules(types[1].Id)
+			require.NoError(t, err)
+			assert.Empty(t, gotRules)
+			_, err = GetPointModelRules(99999)
+			require.ErrorIs(t, err, ErrPointTypeNotFound)
+			rule := &PointModelRule{MatchType: PointMatchExact, MatchValue: "Vendor/[model].v1", Enabled: true}
+			require.NoError(t, CreatePointModelRule(types[1].Id, rule))
+			require.Positive(t, rule.Id)
+			updated, err := UpdatePointModelRule(types[1].Id, rule.Id, &PointModelRule{MatchType: PointMatchPattern, MatchValue: "future-?*", Enabled: false})
+			require.NoError(t, err)
+			assert.False(t, updated.Enabled)
+			assert.Equal(t, rule.CreatedAt, updated.CreatedAt)
+			_, err = UpdatePointModelRule(types[1].Id, rule.Id, updated)
+			require.NoError(t, err, "no-op update must succeed on MySQL")
+			_, err = UpdatePointModelRule(types[0].Id, rule.Id, updated)
+			require.ErrorIs(t, err, ErrPointModelRuleNotFound)
+			require.ErrorIs(t, DeletePointModelRule(types[0].Id, rule.Id), ErrPointModelRuleNotFound)
+			require.ErrorIs(t, CreatePointModelRule(99999, &PointModelRule{MatchType: PointMatchExact, MatchValue: "missing"}), ErrPointTypeNotFound)
+			_, err = UpdatePointModelRule(99999, rule.Id, updated)
+			require.ErrorIs(t, err, ErrPointTypeNotFound)
+			require.ErrorIs(t, DeletePointModelRule(99999, rule.Id), ErrPointTypeNotFound)
+			// The unique constraint is the arbiter even with concurrent creators.
+			var workers sync.WaitGroup
+			results := make(chan error, 2)
+			for range 2 {
+				workers.Go(func() {
+					results <- CreatePointModelRule(types[1].Id, &PointModelRule{MatchType: PointMatchExact, MatchValue: "race"})
+				})
+			}
+			workers.Wait()
+			close(results)
+			successes, duplicates := 0, 0
+			for err := range results {
+				if err == nil {
+					successes++
+				} else {
+					require.ErrorIs(t, err, ErrPointModelRuleDuplicate)
+					duplicates++
+				}
+			}
+			assert.Equal(t, 1, successes)
+			assert.Equal(t, 1, duplicates)
+			_, err = UpdatePointModelRule(types[1].Id, rule.Id, &PointModelRule{MatchType: PointMatchExact, MatchValue: "race"})
+			require.ErrorIs(t, err, ErrPointModelRuleDuplicate)
+			for _, value := range []PointModelMatchValue{"Model-X", "model-x"} {
+				require.NoError(t, CreatePointModelRule(types[1].Id, &PointModelRule{MatchType: PointMatchExact, MatchValue: value}))
+			}
+			require.NoError(t, DeletePointModelRule(types[1].Id, rule.Id))
+			require.ErrorIs(t, DeletePointModelRule(types[1].Id, rule.Id), ErrPointModelRuleNotFound)
+			_, err = UpdatePointModelRule(types[1].Id, rule.Id, updated)
+			require.ErrorIs(t, err, ErrPointModelRuleNotFound)
+			// No CRUD operation can mutate a type or restore removed rules.
+			var savedTypes []PointType
+			require.NoError(t, db.Order("id").Find(&savedTypes).Error)
+			assert.Equal(t, types, savedTypes)
+			gotRules, err = GetPointModelRules(types[1].Id)
+			require.NoError(t, err)
+			require.Len(t, gotRules, 3)
+			assert.Less(t, gotRules[0].Id, gotRules[1].Id)
+			assert.Less(t, gotRules[1].Id, gotRules[2].Id)
+		})
+	}
+}

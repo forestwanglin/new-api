@@ -250,6 +250,13 @@ var accessTokenRouteRules = map[string]accessTokenRouteRule{
 	"GET /api/data/flow":                        accessTokenScopeRule("log:read"),
 	"GET /api/data/flow/self":                   accessTokenScopeRule("usage:read"),
 
+	// Points configuration is managed through authenticated dashboard sessions.
+	"GET /api/points/types":                            accessTokenSessionRule,
+	"GET /api/points/types/:type_id/rules":             accessTokenSessionRule,
+	"POST /api/points/types/:type_id/rules":            accessTokenSessionRule,
+	"PUT /api/points/types/:type_id/rules/:rule_id":    accessTokenSessionRule,
+	"DELETE /api/points/types/:type_id/rules/:rule_id": accessTokenSessionRule,
+
 	// router/api-router.go: /api/group, /api/prefill_group
 	"GET /api/group/":               accessTokenScopeRule("group:read"),
 	"GET /api/prefill_group/":       accessTokenScopeRule("group:read"),

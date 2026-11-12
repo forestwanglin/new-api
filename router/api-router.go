@@ -365,6 +365,16 @@ func SetApiRouter(router *gin.Engine) {
 			groupRoute.GET("/", controller.GetGroups)
 		}
 
+		pointsRoute := apiRouter.Group("/points")
+		pointsRoute.Use(middleware.AdminAuth())
+		{
+			pointsRoute.GET("/types", controller.GetPointTypes)
+			pointsRoute.GET("/types/:type_id/rules", controller.GetPointModelRules)
+			pointsRoute.POST("/types/:type_id/rules", controller.CreatePointModelRule)
+			pointsRoute.PUT("/types/:type_id/rules/:rule_id", controller.UpdatePointModelRule)
+			pointsRoute.DELETE("/types/:type_id/rules/:rule_id", controller.DeletePointModelRule)
+		}
+
 		prefillGroupRoute := apiRouter.Group("/prefill_group")
 		prefillGroupRoute.Use(middleware.AdminAuth())
 		{

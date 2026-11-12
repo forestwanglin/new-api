@@ -20,6 +20,7 @@ import {
   Activity,
   Box,
   ClipboardList,
+  Coins,
   CreditCard,
   FileText,
   FlaskConical,
@@ -146,6 +147,11 @@ export function useSidebarData(badges: SidebarBadges = {}): SidebarData {
             title: t('Users'),
             url: '/users',
             icon: Users,
+          },
+          {
+            title: t('Points'),
+            url: '/points',
+            icon: Coins,
           },
           {
             title: t('Redemption Codes'),
