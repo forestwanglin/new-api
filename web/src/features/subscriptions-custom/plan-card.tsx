@@ -1,5 +1,9 @@
+import { Fragment } from 'react'
+
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
+import { formatPlanPrice } from '@/features/custom-subscriptions/lib/format'
+import { autoBonusPoints } from '@/features/custom-subscriptions/lib/schema'
 import { formatNumber } from '@/lib/format'
 
 /*
@@ -21,7 +25,25 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { subscriptionCopy as t } from './copy'
-import type { Offer } from './plans'
+import {
+  formatOfferPoints,
+  offerPointAmounts,
+  type Offer,
+  type PublicSubscriptionPlan,
+} from './plans'
+
+function PlanPoints(props: {
+  plan: PublicSubscriptionPlan
+  locale: string
+  renewal?: boolean
+}) {
+  return offerPointAmounts(props.plan, props.renewal).map((entry, index) => (
+    <Fragment key={entry.id}>
+      {index > 0 && ' + '}
+      {formatNumber(entry.amount, props.locale)} <small>{entry.name}</small>
+    </Fragment>
+  ))
+}
 
 type Props = {
   offer: Offer
@@ -31,37 +53,63 @@ type Props = {
 }
 export function PlanCard(props: Props) {
   const offer = props.offer
-  const price = offer.yearly ? offer.plan.yearly : offer.plan.monthly
-  const points = offer.plan.monthly * (offer.yearly ? 12000 : 1000)
   const locale = 'zh-CN'
-  const number = (value: number) => formatNumber(value, locale)
+  const price = formatPlanPrice(offer.plan.price_amount_minor, locale)
+  const points = formatOfferPoints(offer.plan, locale)
+  const benefitCounts = new Map<string, number>()
+  const benefits = offer.plan.benefits.map((text) => {
+    const occurrence = (benefitCounts.get(text) ?? 0) + 1
+    benefitCounts.set(text, occurrence)
+    return { id: JSON.stringify([text, occurrence]), text }
+  })
+  const extra = autoBonusPoints(
+    offer.plan.paid_points,
+    offer.plan.bonus_points,
+    offer.plan.auto_renew_bonus_bps
+  )
+  const reward = `${formatNumber(offer.plan.auto_renew_bonus_bps / 100, locale)}%`
+  let renewalInstruction = t(
+    'Confirm using the switch or button below. Cancel anytime. An existing purchase requires authorization only, with no immediate charge.'
+  )
+  if (!offer.plan.auto_renew_enabled) {
+    renewalInstruction = t('Auto renewal is unavailable for this plan.')
+  } else if (props.enabled) {
+    renewalInstruction = t(
+      'Demo setting only; no scheduled charge. Turn off the switch to cancel.'
+    )
+  }
   const period = offer.yearly ? t('year') : t('month')
   return (
     <article
       className={`sub-plan ${props.enabled ? 'is-auto-enabled' : ''}`}
-      aria-label={`${t(offer.plan.name)} · ${period}`}
+      aria-label={`${offer.plan.title} · ${period}`}
     >
       <header className='sub-plan-top'>
-        <h3>{t(offer.plan.name)}</h3>
+        <h3>{offer.plan.title}</h3>
         <span>
-          {t('{{count}} months per term', { count: offer.yearly ? 12 : 1 })}
+          {t('{{count}} months per term', {
+            count: offer.plan.duration_months,
+          })}
         </span>
       </header>
+      {offer.plan.subtitle && (
+        <p className='sub-muted'>{offer.plan.subtitle}</p>
+      )}
       <div className='sub-purchase-focus'>
         <div className='sub-option-price'>
-          ¥{price}
+          {price}
           <small>/ {period}</small>
         </div>
         <div className='sub-current-points'>
           <span>{t('Points credited with this purchase')}</span>
           <strong>
-            {number(points)} <small>{t('points')}</small>
+            <PlanPoints plan={offer.plan} locale={locale} />
           </strong>
         </div>
       </div>
       <ul className='sub-plan-benefits'>
-        {offer.plan.benefits.map((text) => (
-          <li key={text}>{t(text)}</li>
+        {benefits.map((benefit) => (
+          <li key={benefit.id}>{benefit.text}</li>
         ))}
       </ul>
       <section className='sub-option-auto'>
@@ -69,17 +117,22 @@ export function PlanCard(props: Props) {
           <div>
             <h4>
               {t('Auto renewal')}{' '}
-              <span className='sub-recommend'>{t('Recommended')}</span>
+              <span className='sub-recommend'>
+                {offer.plan.auto_renew_enabled
+                  ? t('Recommended')
+                  : t('Unavailable')}
+              </span>
             </h4>
             <p>
-              {props.enabled
-                ? t('Demo enabled · 10% extra on future auto renewals')
-                : t('10% extra points on each future auto renewal')}
+              {t('Future auto renewals add {{rate}} extra points', {
+                rate: reward,
+              })}
             </p>
           </div>
           <Switch
             checked={props.enabled}
-            aria-label={`${t(offer.plan.name)} ${period} ${t('Auto renewal')}`}
+            disabled={!offer.plan.auto_renew_enabled}
+            aria-label={`${offer.plan.title} ${period} ${t('Auto renewal')}`}
             onCheckedChange={() =>
               props.enabled
                 ? props.onCancel()
@@ -92,11 +145,12 @@ export function PlanCard(props: Props) {
             {t('Points credited after each successful automatic payment')}
           </span>
           <strong>
-            {number(points * 1.1)} <small>{t('points per term')}</small>
+            <PlanPoints plan={offer.plan} locale={locale} renewal />
           </strong>
           <span>
-            {t('Includes {{points}} extra points', {
-              points: number(points / 10),
+            {t('Includes {{points}} extra', {
+              points:
+                `${formatNumber(BigInt(extra), locale)} ${offer.plan.auto_bonus_point_type?.name ?? ''}`.trim(),
             })}
           </span>
         </div>
@@ -105,17 +159,12 @@ export function PlanCard(props: Props) {
             'Bonus points start with the first successful automatic renewal payment; authorization alone does not charge or credit points.'
           )}
         </p>
-        <p>
-          {props.enabled
-            ? t(
-                'Demo setting only; no scheduled charge. Turn off the switch to cancel.'
-              )
-            : t(
-                'Confirm using the switch or button below. Cancel anytime. An existing purchase requires authorization only, with no immediate charge.'
-              )}
-        </p>
-        <Button onClick={() => props.onSelect({ ...offer, auto: true })}>
-          ¥{price} · {t('Subscribe and enable auto renewal')}
+        <p>{renewalInstruction}</p>
+        <Button
+          disabled={!offer.plan.auto_renew_enabled}
+          onClick={() => props.onSelect({ ...offer, auto: true })}
+        >
+          {price} · {t('Subscribe and enable auto renewal')}
         </Button>
       </section>
       <section className='sub-option-once'>
@@ -126,20 +175,20 @@ export function PlanCard(props: Props) {
               : t('One-time monthly purchase')}
           </h4>
           <strong>
-            ¥{price}
+            {price}
             <small>/ {period}</small>
           </strong>
         </div>
         <p>
-          {t('{{points}} points credited · buy as needed', {
-            points: number(points),
+          {t('{{points}} credited · buy as needed', {
+            points,
           })}
         </p>
         <Button
           variant='outline'
           onClick={() => props.onSelect({ ...offer, auto: false })}
         >
-          ¥{price} · {t('One-time purchase')}
+          {price} · {t('One-time purchase')}
         </Button>
       </section>
     </article>

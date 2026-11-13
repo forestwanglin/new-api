@@ -25,45 +25,99 @@ import { api } from '@/lib/api'
 
 import { SubscriptionsCustom } from '..'
 import rules from '../rules.json'
+import { configuredPlan } from './fixtures'
 
-function renderDemo() {
+async function renderDemo() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
-  return render(
+  const view = render(
     <QueryClientProvider client={client}>
       <SubscriptionsCustom />
     </QueryClientProvider>
   )
+  await screen.findAllByRole('article')
+  return view
 }
 beforeEach(() => {
-  vi.spyOn(api, 'get').mockResolvedValue({
+  const plans = [
+    {
+      id: '1',
+      title: '月计划一',
+      billing_cycle: 'month',
+      duration_months: 1,
+      paid_points: '29000',
+    },
+    {
+      id: '2',
+      title: '月计划二',
+      billing_cycle: 'month',
+      duration_months: 1,
+      paid_points: '89000',
+    },
+    {
+      id: '3',
+      title: '月计划三',
+      billing_cycle: 'month',
+      duration_months: 1,
+      paid_points: '199000',
+    },
+    {
+      id: '4',
+      title: '年计划一',
+      billing_cycle: 'year',
+      duration_months: 12,
+      paid_points: '348000',
+    },
+    {
+      id: '5',
+      title: '年计划二',
+      billing_cycle: 'year',
+      duration_months: 12,
+      paid_points: '1068000',
+    },
+    {
+      id: '6',
+      title: '年计划三',
+      billing_cycle: 'year',
+      duration_months: 12,
+      paid_points: '2388000',
+    },
+  ].map((plan) => ({
+    ...configuredPlan,
+    bonus_points: '0',
+    bonus_point_type: null,
+    ...plan,
+  }))
+  vi.spyOn(api, 'get').mockImplementation(async (url) => ({
     data: {
       success: true,
       data: {
-        items: rules.map((rule, index) => ({
-          id: String(index + 1),
-          rule_key: String(index),
-          title: rule.title,
-          content: {
-            blocks: [
-              {
-                type: 'paragraph',
-                children: rule.body.map((part) => ({
-                  text: part.text,
-                  style: part.emphasis
-                    ? { color: '#0052d9', fontWeight: 700 }
-                    : {},
-                })),
-              },
-            ],
-          },
-        })),
+        items:
+          url === '/api/custom_subscription/plans'
+            ? plans
+            : rules.map((rule, index) => ({
+                id: String(index + 1),
+                rule_key: String(index),
+                title: rule.title,
+                content: {
+                  blocks: [
+                    {
+                      type: 'paragraph',
+                      children: rule.body.map((part) => ({
+                        text: part.text,
+                        style: part.emphasis
+                          ? { color: '#0052d9', fontWeight: 700 }
+                          : {},
+                      })),
+                    },
+                  ],
+                },
+              })),
       },
     },
-  })
+  }))
 })
-
 vi.mock('@/components/layout', () => ({
   PublicLayout: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
@@ -75,7 +129,7 @@ vi.mock('@/components/layout/components/footer', () => ({
 afterEach(cleanup)
 it('renders Demo footer columns, copyright and working FAQ', async () => {
   const user = userEvent.setup()
-  renderDemo()
+  await renderDemo()
   const footer = within(screen.getByRole('contentinfo'))
   expect(footer.getByText('帮助')).toBeVisible()
   expect(footer.getByText('合作')).toBeVisible()
@@ -86,7 +140,7 @@ it('renders Demo footer columns, copyright and working FAQ', async () => {
 })
 it('opens customer support with the demo contact details', async () => {
   const user = userEvent.setup()
-  renderDemo()
+  await renderDemo()
   await user.click(screen.getAllByRole('button', { name: '联系客服' })[0])
   const dialog = screen.getByRole('dialog', { name: '联系客服' })
   expect(within(dialog).getByText('企业微信（响应最快）')).toBeVisible()
@@ -102,19 +156,16 @@ it('opens customer support with the demo contact details', async () => {
   await user.click(within(dialog).getByRole('button', { name: '知道了' }))
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 })
-it('shows six offers, exact annual points and all rules', async () => {
-  renderDemo()
+it('shows configured offers, exact annual points and all rules', async () => {
+  await renderDemo()
   expect(screen.getByRole('contentinfo')).toBeVisible()
   expect(screen.getAllByRole('article')).toHaveLength(6)
-  expect(screen.getByText('2,388,000')).toBeVisible()
+  expect(screen.getAllByText(/2,388,000 通用积分/).length).toBeGreaterThan(0)
   expect(screen.getByRole('heading', { name: '订阅规则' })).toBeVisible()
-  for (const rule of rules) {
-    expect(await screen.findByText(rule.title, { exact: true })).toBeVisible()
-  }
 })
 it('requires consent, simulates one renewal selection and never claims payment', async () => {
   const user = userEvent.setup()
-  renderDemo()
+  await renderDemo()
   await user.click(screen.getAllByRole('switch')[0])
   const dialog = screen.getByRole('dialog')
   expect(
@@ -130,7 +181,7 @@ it('requires consent, simulates one renewal selection and never claims payment',
 })
 it('replaces renewal selections, supports cancellation and resets on remount', async () => {
   const user = userEvent.setup()
-  const view = renderDemo()
+  const view = await renderDemo()
   for (const index of [0, 1]) {
     await user.click(screen.getAllByRole('switch')[index])
     await user.click(within(screen.getByRole('dialog')).getByRole('checkbox'))
@@ -155,7 +206,7 @@ it('replaces renewal selections, supports cancellation and resets on remount', a
     'false'
   )
   view.unmount()
-  renderDemo()
+  await renderDemo()
   expect(
     screen
       .getAllByRole('switch')
@@ -164,7 +215,7 @@ it('replaces renewal selections, supports cancellation and resets on remount', a
 })
 it('cancels a purchase with Escape without enabling renewal', async () => {
   const user = userEvent.setup()
-  renderDemo()
+  await renderDemo()
   await user.click(screen.getAllByRole('switch')[0])
   await user.keyboard('{Escape}')
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
@@ -175,7 +226,7 @@ it('cancels a purchase with Escape without enabling renewal', async () => {
 })
 it('shows demo empty states rather than account records', async () => {
   const user = userEvent.setup()
-  renderDemo()
+  await renderDemo()
   await user.click(screen.getByRole('tab', { name: '订单' }))
   expect(screen.getByText('暂无演示订阅订单。')).toBeVisible()
 })

@@ -16,10 +16,14 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 
 import { Dialog } from '@/components/dialog'
+import { EmptyState } from '@/components/empty-state'
+import { ErrorState } from '@/components/error-state'
 import { PublicLayout } from '@/components/layout'
+import { LoadingState } from '@/components/loading-state'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -30,19 +34,35 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { formatPlanPrice } from '@/features/custom-subscriptions/lib/format'
 import { PublicSubscriptionRules } from '@/features/custom-subscriptions/rules/public-rules'
+import { getServerErrorMessage } from '@/lib/server-error-message'
 
+import { getPublicPlans, publicPlanKey } from './api'
 import { subscriptionCopy as t } from './copy'
 import { SubscriptionsCustomFooter } from './footer'
 import { PlanCard } from './plan-card'
-import { offerId, plans, type Offer } from './plans'
+import { offerId, type Offer } from './plans'
 import { SupportDialog } from './support-dialog'
 
 import '@/styles/subscriptions-custom.css'
 
 export function SubscriptionsCustom() {
+  const query = useQuery({ queryKey: publicPlanKey, queryFn: getPublicPlans })
+  const plans = query.isSuccess ? query.data : []
   const [supportOpen, setSupportOpen] = useState(false)
-  const [pending, setPending] = useState<Offer | null>(null)
+  const [selection, setPending] = useState<Offer | null>(null)
+  const selectedPlan = plans.find((plan) => plan.id === selection?.plan.id)
+  const pending =
+    selection &&
+    selectedPlan &&
+    (!selection.auto || selectedPlan.auto_renew_enabled)
+      ? {
+          ...selection,
+          plan: selectedPlan,
+          yearly: selectedPlan.billing_cycle === 'year',
+        }
+      : null
   const [enabled, setEnabled] = useState<string | null>(null)
   const [consent, setConsent] = useState(false)
   const [payment, setPayment] = useState<string | null>('alipay')
@@ -103,55 +123,79 @@ export function SubscriptionsCustom() {
               </section>
               <p className='sub-muted'>
                 {t(
-                  'Choose points based on price and credit amount, then select one-time purchase or auto renewal. Each successful future automatic renewal adds 10% extra points.'
+                  'Choose a monthly or yearly plan. Prices, points and renewal rewards follow the configured offer.'
                 )}
               </p>
-              {([false, true] as const).map((yearly) => (
-                <section className='sub-cycle-block' key={String(yearly)}>
-                  <div className='sub-cycle-heading'>
-                    <h2>
-                      {yearly
-                        ? t('Subscription yearly')
-                        : t('Subscription monthly')}
-                    </h2>
-                    <p>
-                      {yearly
-                        ? t(
-                            'Twelve months of points credited at once; save two months compared with monthly purchases'
-                          )
-                        : t('One month per term; choose the points you need')}
-                    </p>
-                  </div>
-                  <div className='sub-cycle-grid'>
-                    {plans.map((plan) => {
-                      const offer = { plan, yearly, auto: false }
-                      return (
-                        <PlanCard
-                          key={plan.id}
-                          offer={offer}
-                          enabled={enabled === offerId(offer)}
-                          onSelect={select}
-                          onCancel={() => {
-                            setEnabled(null)
-                            setMessage(
-                              t(
-                                'Demo canceled. No payment or subscription has been made.'
-                              )
+              {query.isPending && (
+                <LoadingState message={t('Loading subscription plans…')} />
+              )}
+              {query.isError && (
+                <ErrorState
+                  description={getServerErrorMessage(query.error)}
+                  onRetry={() => void query.refetch()}
+                />
+              )}
+              {query.isSuccess && !plans.length && (
+                <EmptyState title={t('No subscription plans')} />
+              )}
+              {query.isSuccess &&
+                plans.length > 0 &&
+                ([false, true] as const).map((yearly) => (
+                  <section className='sub-cycle-block' key={String(yearly)}>
+                    <div className='sub-cycle-heading'>
+                      <h2>
+                        {yearly
+                          ? t('Subscription yearly')
+                          : t('Subscription monthly')}
+                      </h2>
+                      <p>
+                        {yearly
+                          ? t(
+                              'Twelve months per term; prices and points follow each yearly plan'
                             )
-                          }}
-                        />
-                      )
-                    })}
-                  </div>
-                </section>
-              ))}
+                          : t('One month per term; choose the points you need')}
+                      </p>
+                    </div>
+                    <div className='sub-cycle-grid'>
+                      {plans
+                        .filter(
+                          (plan) =>
+                            plan.billing_cycle === (yearly ? 'year' : 'month')
+                        )
+                        .map((plan) => {
+                          const offer = { plan, yearly, auto: false }
+                          return (
+                            <PlanCard
+                              key={plan.id}
+                              offer={offer}
+                              enabled={
+                                plan.auto_renew_enabled &&
+                                enabled === offerId(offer)
+                              }
+                              onSelect={select}
+                              onCancel={() => {
+                                setEnabled(null)
+                                setMessage(
+                                  t(
+                                    'Demo canceled. No payment or subscription has been made.'
+                                  )
+                                )
+                              }}
+                            />
+                          )
+                        })}
+                    </div>
+                  </section>
+                ))}
               <section className='sub-card'>
                 <h2>{t('Auto renewal management')}</h2>
                 <div className='sub-management'>
                   <div>
                     <span>{t('Current plan')}</span>
                     <strong>
-                      {enabled
+                      {plans.some(
+                        (plan) => plan.auto_renew_enabled && plan.id === enabled
+                      )
                         ? t('Demo renewal selection enabled')
                         : t('No demo renewal selection')}
                     </strong>
@@ -162,7 +206,11 @@ export function SubscriptionsCustom() {
                   </div>
                   <Button
                     variant='outline'
-                    disabled={!enabled}
+                    disabled={
+                      !plans.some(
+                        (plan) => plan.auto_renew_enabled && plan.id === enabled
+                      )
+                    }
                     onClick={() => {
                       setEnabled(null)
                       setMessage(
@@ -253,12 +301,11 @@ export function SubscriptionsCustom() {
             {pending && (
               <div className='space-y-4'>
                 <h3 className='font-semibold'>
-                  {t(pending.plan.name)} ·{' '}
+                  {pending.plan.title} ·{' '}
                   {pending.yearly
                     ? t('Subscription yearly')
                     : t('Subscription monthly')}{' '}
-                  · ¥
-                  {pending.yearly ? pending.plan.yearly : pending.plan.monthly}
+                  · {formatPlanPrice(pending.plan.price_amount_minor, 'zh-CN')}
                 </h3>
                 <p>
                   {pending.auto

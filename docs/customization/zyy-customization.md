@@ -794,6 +794,17 @@
 - 验证：隔离 SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 17.11 的新建、代表性升级、重复/并发迁移、编辑保留、删除不重建和 CRUD/范围校验通过。Chrome 隔离实例确认合规锁定、新建/编辑、样式回填、公开高亮及 390px 编辑器无页面横向溢出；删除与分页参数由 API/组件回归覆盖，未逐项进行真实多页浏览器操作。对本次暂存内容建立隔离快照验证：前端 12 文件/81 用例、1,511 文件 typecheck、改动 lint/格式及生产构建通过；后端 model/router/middleware 整包测试、vet/build 和三库定向矩阵通过。Go 使用本地 1.27.3，未改 go.mod。未验证最低数据库版本或完整发行库升级。
 - 既有失败：controller 整包 `TestOpenAIChatSamplingCompatibility` 的 GPT5.1/GPT6.1 explicit-none 断言在干净 HEAD 同样失败，未修改该无关逻辑。
 
+### Z041 公开订阅页接入后台套餐配置
+
+- 需求与原因：订阅页套餐仍为静态三档，并按价格推算积分、固定展示 10% 奖励；改为读取管理员维护的计划，与既有后台规则共同展示，保持现有样式。
+- 变更内容：新增公开 GET `/api/custom_subscription/plans`，返回全部已启用计划，按权重和 ID 倒序；专用 DTO 排除管理元数据。公开页按月付、年付分组，卡片及确认弹窗读取名称、说明、权益、精确金额、积分类型和续费配置；空数据/失败不会恢复示例。续费关闭时禁用对应操作。既有全局规则接口与渲染保留，支付、授权和账务操作继续为演示。
+- 数据契约：金额/积分/ID 使用十进制字符串，前端以 BigInt 和既有金额格式化保留精度；只合并同种积分类型，奖励沿用向下取整公式，不假设固定 10% 或年付省两月。
+- 影响面：新增 `controller/custom_subscription_public.go`、`model/custom_subscription_public.go`、公开接口/model 测试及订阅页 API/类型/卡片/页面和回归测试，更新 [custom-subscriptions.md](custom-subscriptions.md)。**上游自有文件**：`router/api-router.go`；前端改动集中于已有 fork `features/subscriptions-custom/`，未修改 CSS。
+- 与上游差异：扩展 fork 自定义套餐读取；不替换上游旧订阅管理和支付接口，不改变权限或账务。
+- 开关与默认值：复用后台计划 enabled/sort_order/billing_cycle，无新环境变量、依赖或迁移；默认空库没有示例计划。
+- 验证：`go test ./model ./router -run 'CustomSubscription|PublicCustomSubscription' -count=1`、`go vet ./model ./controller ./router` 和根模块构建通过；隔离 SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 17.11 的公开读取与既有套餐矩阵通过，覆盖启用筛选、顺序、101 条结果、精确整数、错误传播及重复迁移。前端相关 Vitest 6 文件 / 25 用例、typecheck（1,516 文件）、改动文件 lint/format、生产构建通过。Chrome 使用隔离真实接口验证桌面三列与 390px 单列、月付/年付分组、禁用计划过滤、19.99 元、12.5% 奖励、混合类型及大整数；页面无横向溢出，演示确认无网络请求。独立审查追加确认弹窗周期刷新回归。
+- 风险与未覆盖：全局规则文案独立于计划字段，管理员需保持商业描述一致；本次不增加套餐专属规则 UI 或真实交易。未验证最低数据库版本或完整发行库升级；Go 使用现有本地 1.27.3，未改声明版本。测试期间格式恢复触发过 Rsbuild HMR 回退整页刷新，非订阅运行错误。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
@@ -802,6 +813,7 @@
 
 | 区域 | 文件 | 关联条目 |
 |---|---|---|
+| 公开订阅计划 | `router/api-router.go` | Z041 |
 | 自定义订阅规则 | `model/main.go`、`model/option.go`、`router/api-router.go`、`middleware/access_token_routes.go`、七种 locale、`i18n/static-keys.ts` | Z040 |
 | 自定义订阅套餐管理 | `model/main.go`、`router/api-router.go`、`middleware/access_token_routes.go`、侧栏数据/配置、maintenance 配置/开关、七种 locale、`i18n/static-keys.ts`、`routeTree.gen.ts` | Z038 |
 | 仓库规则与配置 | `AGENTS.md`、`.gitignore` | Z011、Z003 |

@@ -16,47 +16,90 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-export const plans = [
-  {
-    id: 'entry',
-    name: '29k points plan',
-    monthly: 29,
-    yearly: 290,
-    benefits: [
-      'Selected stable models',
-      'Integration docs and FAQs',
-      'Standard support',
-    ],
-  },
-  {
-    id: 'standard',
-    name: '89k points plan',
-    monthly: 89,
-    yearly: 890,
-    benefits: [
-      'New models after stabilization',
-      'Integration troubleshooting assistance',
-      'Priority support',
-    ],
-  },
-  {
-    id: 'pro',
-    name: '199k points plan',
-    monthly: 199,
-    yearly: 1990,
-    benefits: [
-      'Early access to new models',
-      'Complex integration and configuration assistance',
-      'High-priority support',
-    ],
-  },
-] as const
+import { z } from 'zod'
 
+import { autoBonusPoints } from '@/features/custom-subscriptions/lib/schema'
+import { formatNumber } from '@/lib/format'
+
+const quantity = z
+  .string()
+  .regex(/^(0|[1-9][0-9]*)$/)
+  .refine((value) => BigInt(value) <= 9223372036854775807n)
+const pointType = z.object({ id: quantity, code: z.string(), name: z.string() })
+export const publicPlanSchema = z
+  .object({
+    id: quantity,
+    title: z.string(),
+    subtitle: z.string(),
+    billing_cycle: z.enum(['month', 'year']),
+    duration_months: z.number().int().positive(),
+    currency: z.literal('CNY'),
+    price_amount_minor: quantity,
+    paid_points: quantity,
+    paid_point_type: pointType,
+    bonus_points: quantity,
+    bonus_point_type: pointType.nullable(),
+    auto_renew_enabled: z.boolean(),
+    auto_renew_bonus_bps: z.number().int().min(0).max(10000),
+    auto_bonus_point_type: pointType.nullable(),
+    benefits: z.array(z.string()),
+  })
+  .refine(
+    (plan) =>
+      (plan.bonus_points === '0' || plan.bonus_point_type !== null) &&
+      (plan.auto_renew_bonus_bps === 0 || plan.auto_bonus_point_type !== null),
+    'Missing configured point type'
+  )
+export type PublicSubscriptionPlan = z.infer<typeof publicPlanSchema>
 export type Offer = {
-  plan: (typeof plans)[number]
+  plan: PublicSubscriptionPlan
   yearly: boolean
   auto: boolean
 }
 export function offerId(offer: Offer): string {
-  return `${offer.plan.id}-${offer.yearly ? 'year' : 'month'}`
+  return offer.plan.id
+}
+
+// Sum only matching identities; distinct point currencies remain explicit.
+export function offerPointAmounts(
+  plan: PublicSubscriptionPlan,
+  renewal = false
+): { id: string; name: string; amount: bigint }[] {
+  const amounts = new Map<
+    string,
+    { id: string; name: string; amount: bigint }
+  >()
+  const entries = [
+    { type: plan.paid_point_type, value: plan.paid_points },
+    { type: plan.bonus_point_type, value: plan.bonus_points },
+  ]
+  if (renewal) {
+    entries.push({
+      type: plan.auto_bonus_point_type,
+      value: autoBonusPoints(
+        plan.paid_points,
+        plan.bonus_points,
+        plan.auto_renew_bonus_bps
+      ),
+    })
+  }
+  for (const entry of entries) {
+    if (!entry.type || entry.value === '0') continue
+    const current = amounts.get(entry.type.id)
+    amounts.set(entry.type.id, {
+      id: entry.type.id,
+      name: entry.type.name,
+      amount: (current?.amount ?? 0n) + BigInt(entry.value),
+    })
+  }
+  return [...amounts.values()]
+}
+
+export function formatOfferPoints(
+  plan: PublicSubscriptionPlan,
+  locale: string
+): string {
+  return offerPointAmounts(plan)
+    .map((entry) => `${formatNumber(entry.amount, locale)} ${entry.name}`)
+    .join(' + ')
 }

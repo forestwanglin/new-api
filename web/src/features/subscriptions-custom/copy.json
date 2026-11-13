@@ -97,5 +97,14 @@
   "Cancel": "取消",
   "WeChat Pay": "微信支付",
   "Alipay": "支付宝",
-  "Recommended": "推荐"
+  "Recommended": "推荐",
+  "Future auto renewals add {{rate}} extra points": "后续自动续费，每期额外赠{{rate}}",
+  "{{points}} credited · buy as needed": "本次到账 {{points}} · 按需购买",
+  "Unavailable": "暂未开放",
+  "Choose a monthly or yearly plan. Prices, points and renewal rewards follow the configured offer.": "按月付或年付选择方案，价格、到账积分与续费赠送以各方案配置为准。",
+  "Twelve months per term; prices and points follow each yearly plan": "每期12个月，价格与积分以各年付方案为准",
+  "Loading subscription plans…": "正在加载订阅计划…",
+  "No subscription plans": "暂无订阅计划",
+  "Includes {{points}} extra": "含额外赠送 {{points}}",
+  "Auto renewal is unavailable for this plan.": "此方案暂未开放自动续费。"
 }
