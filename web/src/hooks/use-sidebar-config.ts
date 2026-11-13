@@ -68,6 +68,7 @@ const DEFAULT_SIDEBAR_MODULES: SidebarModulesAdminConfig = {
     setting: true,
     subscription: true,
     custom_subscription: true,
+    config_tutorial: true,
   },
 }
 
@@ -124,6 +125,7 @@ const URL_TO_CONFIG_MAP: Record<string, { section: string; module: string }> = {
   '/redemption-codes': { section: 'admin', module: 'redemption' },
   '/subscriptions': { section: 'admin', module: 'subscription' },
   '/custom-subscriptions': { section: 'admin', module: 'custom_subscription' },
+  '/tutorial-management': { section: 'admin', module: 'config_tutorial' },
   '/system-settings': { section: 'admin', module: 'setting' },
   '/system-settings/site': { section: 'admin', module: 'setting' },
 }

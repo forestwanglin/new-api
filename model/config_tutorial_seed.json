@@ -1,0 +1,85 @@
+[
+  {
+    "group_key": "usage",
+    "title": "使用流程",
+    "chapters": [
+      {
+        "anchor": "d1",
+        "title": "使用流程",
+        "content_markdown": "按「创建密钥 → 准备可用额度 → 接入应用」准备使用。已有可用密钥和足够额度时，无需重复创建。复制接入信息后，在自己的应用中验证真实调用。\n\n本教程无需登录即可完整阅读，不检查账号进度，也不会替你创建密钥、购买订阅或调用接口。"
+      },
+      {
+        "anchor": "doc-create",
+        "title": "1. 创建密钥",
+        "content_markdown": "1. 登录后进入「首页 → 常用 → API 密钥」，创建密钥并妥善保存。\n2. 检查密钥状态、可用额度与模型访问限制。模型 ID 须使用平台实际开放的完整名称，不要用展示名称代替。\n3. 接入工具时填写完整密钥，不要填写密钥 ID 或打码后的文字。不要公开分享密钥。\n\n已有密钥无法调用时，检查是否停用、过期、额度耗尽或受到模型限制；删除的密钥须重新创建并更新应用配置。"
+      },
+      {
+        "anchor": "doc-points",
+        "title": "2. 准备积分",
+        "content_markdown": "在账号页面检查实际可用余额、额度与适用范围。密钥额度上限和账号余额是不同限制，提高密钥额度不会增加账号余额。\n\n[订阅方案](/subscription)展示管理员配置的价格、积分与说明。当前自定义订阅购买和自动续费为演示交互，不能作为支付、积分到账或权益生效的凭据。真实可用额度以账号和已启用的支付渠道实际处理结果为准。"
+      },
+      {
+        "anchor": "d2",
+        "title": "3. 接入应用",
+        "content_markdown": "将以下配置逐项填入自己的应用，并核对所选模型支持的接口类型。\n\n| 配置项 | 填写内容 | 说明 |\n| --- | --- | --- |\n| 接口基础地址 | `https://ai.winzyy.com/v1` | 适用于 Base URL / 基础地址字段。部署地址不同时，使用运营方提供的地址。 |\n| API 密钥 | `YOUR_API_KEY` | 替换为完整密钥，勿填写打码文字。 |\n| 模型 ID | `MODEL_ID` | 替换为该密钥有权调用的完整模型 ID。 |\n\nChat Completions 完整请求地址为 `https://ai.winzyy.com/v1/chat/completions`。仅当字段要求完整请求地址时才填写完整路径，避免重复拼接 `/v1` 或 `/chat/completions`。\n\n以下示例用于支持 Chat Completions 的文本模型，不用于视频等异步任务接口。"
+      }
+    ]
+  },
+  {
+    "group_key": "examples",
+    "title": "应用接入示例",
+    "chapters": [
+      {
+        "anchor": "doc-compat",
+        "title": "Codex CLI / WorkBuddy",
+        "content_markdown": "接入第三方工具时，分别核对工具版本、接口类型、认证方式及平台实际支持能力。不要将某一接口示例直接套用到要求其他接口类型的工具。\n\n参考资料：[Codex 官方配置文档](https://developers.openai.com/codex/config-reference) · [WorkBuddy 官方文档](https://www.codebuddy.cn/docs/workbuddy/Overview)。外部工具的配置入口和能力以对应版本官方说明为准。"
+      },
+      {
+        "anchor": "doc-curl",
+        "title": "curl示例",
+        "content_markdown": "复制示例，替换密钥与模型 ID，在自己的终端执行，再核对返回内容及使用日志。\n\n```bash\ncurl https://ai.winzyy.com/v1/chat/completions \\\n  -H \"Authorization: Bearer YOUR_API_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"model\":\"MODEL_ID\",\"messages\":[{\"role\":\"user\",\"content\":\"你好\"}]}'\n```\n\n以上为 POSIX shell 示例；Windows 可使用 WSL 或按终端语法调整。执行会发起真实请求，按平台实际计费配置消耗额度。不要分享含完整密钥的命令或截图。"
+      },
+      {
+        "anchor": "doc-python",
+        "title": "Python示例",
+        "content_markdown": "先创建 Python 虚拟环境，在自己的环境安装 SDK：`python -m pip install openai`。\n\n```python\nfrom openai import OpenAI\n\nclient = OpenAI(\n    api_key=\"YOUR_API_KEY\",\n    base_url=\"https://ai.winzyy.com/v1\",\n)\nresponse = client.chat.completions.create(\n    model=\"MODEL_ID\",\n    messages=[{\"role\": \"user\", \"content\": \"你好\"}],\n)\nprint(response.choices[0].message.content)\n```\n\n替换密钥、部署地址和模型 ID 后运行。代码会发起真实请求；不要将完整密钥提交到公开代码仓库。"
+      }
+    ]
+  },
+  {
+    "group_key": "troubleshooting",
+    "title": "问题与规则",
+    "chapters": [
+      {
+        "anchor": "d6",
+        "title": "验证是否接入成功",
+        "content_markdown": "在工具中发送测试消息，收到非空模型回答，并在「首页 → 常用 → 使用日志」找到时间、模型及密钥对应的真实请求，才能确认该次请求链路已经跑通。没有对应日志时，检查应用是否使用了其他服务或账号。\n\n使用日志记录真实请求；数据看板用于汇总趋势，任务日志用于相关异步任务。历史记录不能作为刚才请求成功的凭据。\n\n**复制配置 ≠ 真实接口连通 ≠ 外部工具配置成功。** 阅读教程或复制示例不会将账号标记为接入成功。"
+      },
+      {
+        "anchor": "d6a",
+        "title": "常见报错",
+        "content_markdown": "### 认证失败 / 401\n\n检查完整密钥、空格、启停、过期和删除状态，不要填写打码后的密钥。\n\n### 路径不存在 / 404\n\n区分基础地址和完整请求地址，排除重复路径，再根据实际错误检查模型和接口能力。\n\n### 模型不存在 / 无权调用\n\n检查完整模型 ID 及密钥模型限制；模型下架后使用平台实际开放的模型。\n\n### 余额或密钥额度不足\n\n分别检查账号可用余额与密钥额度；两项限制互不替代。\n\n### 限流 / 429、超时或服务错误\n\n按返回的重试说明降低并发，遵循 Retry-After，避免无限重试。保留请求时间、请求 ID 和错误信息以便排查，不要发送完整密钥。"
+      },
+      {
+        "anchor": "d6c",
+        "title": "积分",
+        "content_markdown": "业务积分与网关底层额度是不同计量，不能直接等同。参考兑换基准为 **1 元人民币 = 1,000 积分**，不代表所有业务均已完成兑换或记账。\n\n消费金额换算为业务积分时采用**向上取整**，正数不足 1 积分按 1 积分计；实际调用扣费以已启用的计费配置与账户记录为准。\n\n[积分明细](/point-ledger)用于查看已有记录。仅配置积分类型、订阅方案或文档不会向账号发放积分；人民币参考金额不是可提现余额。"
+      },
+      {
+        "anchor": "doc-subscription-rules",
+        "title": "订阅",
+        "content_markdown": "[订阅方案](/subscription)从后台读取已启用的套餐与说明，价格、积分、周期及赠送比例以当前页面配置为准。\n\n当前自定义订阅购买和自动续费确认属于演示，不会创建真实订单、扣款、发放积分或安排权益。不要将展示的预计到账、确认提示或文档说明作为实际支付与到账凭据。\n\n若使用平台另行开通的真实订阅或充值渠道，以对应订单、支付结果与账号记录为准。管理员修改本教程不能改变套餐价格、支付或权益规则。"
+      },
+      {
+        "anchor": "doc-invite-rules",
+        "title": "邀请好友",
+        "content_markdown": "邀请活动的参与条件、有效人数、奖励比例及发放时间应以平台实际启用的活动和账号记录为准。原型中的邀请奖励比例、满七天释放及自动发放流程不代表当前已开通的能力。\n\n不要仅凭文档、邀请人数或演示页面推断奖励已经到账。涉及订单或奖励疑问时联系运营方核实，不提供完整密钥或登录凭据。"
+      },
+      {
+        "anchor": "doc-support",
+        "title": "联系客服",
+        "content_markdown": "遇到接入报错、额度、订阅或活动疑问，通过平台公布的客服渠道获取帮助；联系方式与服务时间以运营方实际公布为准。\n\n### 联系前请准备\n\n1. 工具名称及版本、请求时间、模型 ID、请求 ID 和错误信息。\n2. 涉及真实支付时提供对应订单编号与处理结果。\n3. 密钥须打码，不发送完整密钥、登录凭据或含敏感内容的请求正文。"
+      }
+    ]
+  }
+]

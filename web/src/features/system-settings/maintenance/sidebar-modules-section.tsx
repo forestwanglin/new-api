@@ -170,6 +170,12 @@ export function SidebarModulesSection({
         title: t('Subscription Management'),
         description: t('Manage subscription plans and pricing.'),
       },
+      config_tutorial: {
+        title: t('Tutorial management'),
+        description: t(
+          'Manage the configuration tutorial directory and Markdown content.'
+        ),
+      },
       custom_subscription: {
         title: t('Custom Subscriptions'),
         description: t('Manage point subscription configuration.'),

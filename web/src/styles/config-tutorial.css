@@ -1,0 +1,282 @@
+/* Tutorial styling is scoped so existing Markdown and administrator pages keep their own layout. */
+.config-tutorial,
+.tutorial-content {
+  --tutorial-text: #0f172a;
+  --tutorial-muted: #475569;
+  --tutorial-line: #e8ebf0;
+  --tutorial-blue: #2563eb;
+}
+.config-tutorial {
+  color: var(--tutorial-text);
+  background: #fff;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Microsoft YaHei', sans-serif;
+  min-height: 100svh;
+  padding-top: 64px;
+}
+.tutorial-wrap {
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding-inline: 28px;
+}
+.tutorial-document {
+  display: grid;
+  grid-template-columns: 244px minmax(0, 1fr);
+  gap: 52px;
+  padding: 44px 0 70px;
+  align-items: start;
+}
+.tutorial-nav {
+  position: sticky;
+  top: 88px;
+  max-height: calc(100svh - 100px);
+  overflow-y: auto;
+  min-width: 0;
+}
+.tutorial-nav-group + .tutorial-nav-group {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--tutorial-line);
+}
+.tutorial-group-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--tutorial-text);
+  font-size: 15.5px;
+  font-weight: 700;
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+.tutorial-group-title::before {
+  content: '';
+  width: 4px;
+  height: 16px;
+  border-radius: 2px;
+  background: var(--tutorial-blue);
+  flex-shrink: 0;
+}
+.tutorial-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 2px;
+  padding: 6px 10px 6px 13px;
+  border-radius: 8px;
+  color: var(--tutorial-muted);
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.tutorial-nav-link::before {
+  content: '';
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #b9c3d0;
+  flex-shrink: 0;
+}
+.tutorial-nav-link:hover,
+.tutorial-group-title:hover {
+  background: #f3f5f8;
+  color: var(--tutorial-blue);
+}
+.tutorial-nav-link[aria-current] {
+  color: var(--tutorial-blue);
+  background: #eff4ff;
+  font-weight: 600;
+}
+.tutorial-nav-link[aria-current]::before {
+  background: var(--tutorial-blue);
+  box-shadow: 0 0 0 3px #2563eb29;
+}
+.tutorial-body,
+.tutorial-content {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.tutorial-intro h1 {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.5;
+  margin: 0 0 14px;
+}
+.tutorial-intro p {
+  color: var(--tutorial-muted);
+  font-size: 16px;
+  line-height: 1.8;
+  margin-bottom: 26px;
+}
+.tutorial-section {
+  padding-top: 34px;
+  margin-top: 58px;
+  border-top: 1px solid var(--tutorial-line);
+  scroll-margin-top: 88px;
+}
+.tutorial-intro + .tutorial-section {
+  padding-top: 0;
+  margin-top: 0;
+  border-top: none;
+}
+.tutorial-body h2 {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  line-height: 1.5;
+  margin: 0 0 12px;
+}
+.tutorial-content .tutorial-markdown {
+  font-size: 15px;
+  line-height: 1.8;
+  color: var(--tutorial-muted);
+}
+.tutorial-content .tutorial-markdown p {
+  margin: 0 0 14px;
+  line-height: 1.8;
+}
+.tutorial-content .tutorial-markdown h3 {
+  font-size: 19px;
+  font-weight: 600;
+  margin: 34px 0 12px;
+  color: var(--tutorial-text);
+}
+.tutorial-content .tutorial-markdown strong {
+  color: var(--tutorial-text);
+}
+.tutorial-content .tutorial-markdown pre {
+  background: #f7f9fc;
+  border: 1px solid #e1e8f1;
+  border-radius: 8px;
+  padding: 18px;
+  font-size: 14px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 16px 0 8px;
+  max-width: 100%;
+}
+.tutorial-content .tutorial-markdown code {
+  font-size: 14px;
+  background: #f1f4f9;
+  color: #334155;
+  border-radius: 5px;
+  padding: 2px 7px;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.tutorial-content .tutorial-markdown pre code {
+  padding: 0;
+  background: transparent;
+  white-space: pre-wrap;
+}
+.tutorial-content .tutorial-markdown table {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  margin: 14px 0 22px;
+  font-size: 14.5px;
+}
+.tutorial-content .tutorial-markdown th,
+.tutorial-content .tutorial-markdown td {
+  border: none;
+  border-bottom: 1px solid var(--tutorial-line);
+  padding: 12px 14px;
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+.tutorial-content .tutorial-markdown th {
+  color: #5b6b80;
+  background: transparent;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.tutorial-content .tutorial-markdown th:first-child {
+  width: 23%;
+}
+.tutorial-content .tutorial-markdown thead {
+  background: transparent;
+}
+.tutorial-content .tutorial-markdown li {
+  margin-bottom: 10px;
+}
+.tutorial-code-actions {
+  margin-bottom: 16px;
+}
+.tutorial-nav :is(a, button):focus-visible {
+  outline: 3px solid #93b4f7;
+  outline-offset: 3px;
+}
+.dark .config-tutorial,
+.dark .tutorial-content {
+  --tutorial-text: #e2e8f0;
+  --tutorial-muted: #b6c3d7;
+  --tutorial-line: #334155;
+}
+.dark .config-tutorial {
+  background: #111827;
+}
+.dark .tutorial-content .tutorial-markdown pre,
+.dark .tutorial-content .tutorial-markdown code {
+  background: #1e293b;
+  color: #e2e8f0;
+  border-color: #334155;
+}
+.dark .tutorial-nav-link[aria-current],
+.dark .tutorial-nav-link:hover {
+  background: #1e3a5f;
+}
+@media (max-width: 1080px) {
+  .tutorial-document {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+  .tutorial-nav {
+    position: static;
+    max-height: none;
+    overflow: visible;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--tutorial-line);
+  }
+  .tutorial-nav-group {
+    display: contents;
+  }
+  .tutorial-nav-group + .tutorial-nav-group {
+    border: none;
+    margin: 0;
+    padding: 0;
+  }
+  .tutorial-group-title {
+    flex: 0 0 100%;
+    font-size: 13.5px;
+    margin: 10px 0 0;
+  }
+  .tutorial-group-title::before {
+    width: 3px;
+    height: 12px;
+  }
+  .tutorial-nav-link {
+    margin: 0;
+    padding: 6px 11px;
+    border: 1px solid var(--tutorial-line);
+    border-radius: 8px;
+  }
+  .tutorial-nav-link::before {
+    display: none;
+  }
+}
+@media (max-width: 820px) {
+  .tutorial-wrap {
+    padding-inline: 16px;
+  }
+}
+
+.tutorial-group-title[aria-current] {
+  color: var(--tutorial-blue);
+}

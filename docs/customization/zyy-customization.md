@@ -823,7 +823,7 @@
 - 内嵌 3 组 13 章，事务性永久 marker 只导入一次，重启不覆盖编辑或恢复删除；marker 不可通过 options 接口操作。所有教程写操作串行仲裁，保护跨库初始化和删除/移动的引用一致性。
 - demo 内容按已实现能力校准：doc-create/doc-points/d2/d6/d6a/d6c/doc-subscription-rules/doc-invite-rules/doc-support 不承诺尚未实现的支付、自动续费、积分或邀请奖励；外部工具仅给配置参考，示例使用占位密钥。
 - 上游改动：model/{main,option}.go、router/api-router.go、middleware/access_token_routes.go、顶部/侧栏 hooks、维护侧栏配置、七种 locale 和生成路由。admin.config_tutorial 缺省开启，保留显式关闭；菜单可见性不替代服务端权限。
-- 验证：真实 SQLite 3.50.4 / MySQL 8.4.13 / PostgreSQL 16.16 定向模型与路由测试通过；Go vet、前端 13 文件 59 用例、类型检查、限定 lint/格式和生产构建通过。Chrome 验证匿名桌面与 390px 阅读、锚点定位、复制反馈和无整页横向溢出。管理员组件与真实路由已有测试；并行登录改造期间未完成管理员浏览器登录联调。未验证生产数据库升级快照，未部署。
+- 验证：真实 SQLite 3.50.4 / MySQL 8.4.13 / PostgreSQL 16.16 定向模型与路由测试通过；Go vet、前端定向测试、类型检查、限定 lint/格式和生产构建通过。Chrome 验证匿名桌面与 390px 阅读、锚点定位、复制反馈和无整页横向溢出。Chrome 管理端已验证登录、菜单进入、章节创建/编辑、Markdown 预览与保存后公开展示；删除/版本冲突/启停与失败交互由组件及真实路由测试覆盖。未验证生产数据库升级快照，未部署。
 
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 

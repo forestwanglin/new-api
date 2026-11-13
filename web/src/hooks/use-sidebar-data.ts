@@ -171,6 +171,12 @@ export function useSidebarData(badges: SidebarBadges = {}): SidebarData {
             requiredRole: ROLE.ADMIN,
           },
           {
+            title: t('Tutorial management'),
+            url: '/tutorial-management',
+            icon: FileText,
+            requiredRole: ROLE.ADMIN,
+          },
+          {
             title: t('System Info'),
             url: '/system-info',
             icon: ServerCog,

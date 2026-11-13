@@ -85,6 +85,7 @@ export const SIDEBAR_MODULES_DEFAULT: SidebarModulesAdminConfig = {
     setting: true,
     subscription: true,
     custom_subscription: true,
+    config_tutorial: true,
   },
 }
 
