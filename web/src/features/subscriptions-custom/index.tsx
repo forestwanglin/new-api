@@ -37,6 +37,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatPlanPrice } from '@/features/custom-subscriptions/lib/format'
 import { PublicSubscriptionRules } from '@/features/custom-subscriptions/rules/public-rules'
 import { getServerErrorMessage } from '@/lib/server-error-message'
+import { useAuthStore } from '@/stores/auth-store'
 
 import { getPublicPlans, publicPlanKey } from './api'
 import { subscriptionCopy as t } from './copy'
@@ -48,6 +49,7 @@ import { SupportDialog } from './support-dialog'
 import '@/styles/subscriptions-custom.css'
 
 export function SubscriptionsCustom() {
+  const isAuthenticated = useAuthStore((state) => !!state.auth.user)
   const query = useQuery({ queryKey: publicPlanKey, queryFn: getPublicPlans })
   const plans = query.isSuccess ? query.data : []
   const [supportOpen, setSupportOpen] = useState(false)
@@ -85,11 +87,6 @@ export function SubscriptionsCustom() {
               )}
             </p>
           </header>
-          <aside className='sub-demo-notice'>
-            {t(
-              'Frontend demo only. No payment, authorization, points or subscription changes will be made.'
-            )}
-          </aside>
           {message && (
             <p role='status' className='sub-demo-notice'>
               {message}
@@ -100,8 +97,12 @@ export function SubscriptionsCustom() {
               <TabsTrigger value='plans'>
                 {t('Subscription service')}
               </TabsTrigger>
-              <TabsTrigger value='orders'>{t('Orders')}</TabsTrigger>
-              <TabsTrigger value='invoices'>{t('Invoices')}</TabsTrigger>
+              {isAuthenticated && (
+                <>
+                  <TabsTrigger value='orders'>{t('Orders')}</TabsTrigger>
+                  <TabsTrigger value='invoices'>{t('Invoices')}</TabsTrigger>
+                </>
+              )}
             </TabsList>
             <TabsContent value='plans'>
               <section className='sub-service-guide'>
@@ -111,13 +112,15 @@ export function SubscriptionsCustom() {
                   )}
                 </h2>
                 <p>
+                  <strong>{t('Points balance:')}</strong>
                   {t(
-                    'Points balance: credited in full after payment, valid forever. Expiry or cancellation does not remove credited points; usage remains subject to applicable scope.'
+                    'Credited in full after payment, valid forever. Expiry or cancellation does not remove credited points; usage remains subject to applicable scope.'
                   )}
                 </p>
                 <p>
+                  <strong>{t('Subscription service:')}</strong>
                   {t(
-                    'Subscription service: one month per monthly term, twelve months per yearly term. Activation and expiry follow My subscription and entitlement schedule.'
+                    'One month per monthly term, twelve months per yearly term. Activation and expiry follow My subscription and entitlement schedule.'
                   )}
                 </p>
               </section>
@@ -187,56 +190,62 @@ export function SubscriptionsCustom() {
                     </div>
                   </section>
                 ))}
-              <section className='sub-card'>
-                <h2>{t('Auto renewal management')}</h2>
-                <div className='sub-management'>
-                  <div>
-                    <span>{t('Current plan')}</span>
-                    <strong>
-                      {plans.some(
-                        (plan) => plan.auto_renew_enabled && plan.id === enabled
-                      )
-                        ? t('Demo renewal selection enabled')
-                        : t('No demo renewal selection')}
-                    </strong>
-                  </div>
-                  <div>
-                    <span>{t('Payment method')}</span>
-                    <strong>{t('Demo only — not authorized')}</strong>
-                  </div>
-                  <Button
-                    variant='outline'
-                    disabled={
-                      !plans.some(
-                        (plan) => plan.auto_renew_enabled && plan.id === enabled
-                      )
-                    }
-                    onClick={() => {
-                      setEnabled(null)
-                      setMessage(
-                        t(
-                          'Demo canceled. No payment or subscription has been made.'
-                        )
-                      )
-                    }}
-                  >
-                    {t('Cancel auto renewal')}
-                  </Button>
-                </div>
-              </section>
-              <section className='sub-card'>
-                <h2>{t('My subscription and entitlement schedule')}</h2>
-                <p>
-                  {t(
-                    'Same-tier renewals extend benefits; upgrades take effect immediately and retain lower-tier time; downgrades follow current and paused terms. New points are credited after payment.'
-                  )}
-                </p>
-                <p className='sub-empty'>
-                  {t(
-                    'Demo only. Real subscription and entitlement data is not loaded.'
-                  )}
-                </p>
-              </section>
+              {isAuthenticated && (
+                <>
+                  <section className='sub-card'>
+                    <h2>{t('Auto renewal management')}</h2>
+                    <div className='sub-management'>
+                      <div>
+                        <span>{t('Current plan')}</span>
+                        <strong>
+                          {plans.some(
+                            (plan) =>
+                              plan.auto_renew_enabled && plan.id === enabled
+                          )
+                            ? t('Demo renewal selection enabled')
+                            : t('No demo renewal selection')}
+                        </strong>
+                      </div>
+                      <div>
+                        <span>{t('Payment method')}</span>
+                        <strong>{t('Demo only — not authorized')}</strong>
+                      </div>
+                      <Button
+                        variant='outline'
+                        disabled={
+                          !plans.some(
+                            (plan) =>
+                              plan.auto_renew_enabled && plan.id === enabled
+                          )
+                        }
+                        onClick={() => {
+                          setEnabled(null)
+                          setMessage(
+                            t(
+                              'Demo canceled. No payment or subscription has been made.'
+                            )
+                          )
+                        }}
+                      >
+                        {t('Cancel auto renewal')}
+                      </Button>
+                    </div>
+                  </section>
+                  <section className='sub-card'>
+                    <h2>{t('My subscription and entitlement schedule')}</h2>
+                    <p>
+                      {t(
+                        'Same-tier renewals extend benefits; upgrades take effect immediately and retain lower-tier time; downgrades follow current and paused terms. New points are credited after payment.'
+                      )}
+                    </p>
+                    <p className='sub-empty'>
+                      {t(
+                        'Demo only. Real subscription and entitlement data is not loaded.'
+                      )}
+                    </p>
+                  </section>
+                </>
+              )}
               <section className='sub-card'>
                 <h2>{t('Subscription rules')}</h2>
                 <PublicSubscriptionRules />
@@ -245,25 +254,33 @@ export function SubscriptionsCustom() {
                 </Button>
               </section>
             </TabsContent>
-            <TabsContent value='orders'>
-              <section className='sub-card'>
-                <h2>{t('Subscription orders')}</h2>
-                <p className='sub-empty'>{t('No demo subscription orders.')}</p>
-                <p>
-                  {t(
-                    'Invoices use actual payments only; promotional points, renewal bonuses and referral rewards are not invoiced again.'
-                  )}
-                </p>
-              </section>
-            </TabsContent>
-            <TabsContent value='invoices'>
-              <section className='sub-card'>
-                <h2>{t('Invoices')}</h2>
-                <p className='sub-empty'>
-                  {t('No demo invoices. Invoice requests are not connected.')}
-                </p>
-              </section>
-            </TabsContent>
+            {isAuthenticated && (
+              <>
+                <TabsContent value='orders'>
+                  <section className='sub-card'>
+                    <h2>{t('Subscription orders')}</h2>
+                    <p className='sub-empty'>
+                      {t('No demo subscription orders.')}
+                    </p>
+                    <p>
+                      {t(
+                        'Invoices use actual payments only; promotional points, renewal bonuses and referral rewards are not invoiced again.'
+                      )}
+                    </p>
+                  </section>
+                </TabsContent>
+                <TabsContent value='invoices'>
+                  <section className='sub-card'>
+                    <h2>{t('Invoices')}</h2>
+                    <p className='sub-empty'>
+                      {t(
+                        'No demo invoices. Invoice requests are not connected.'
+                      )}
+                    </p>
+                  </section>
+                </TabsContent>
+              </>
+            )}
           </Tabs>
           <Dialog
             open={!!pending}
@@ -271,9 +288,6 @@ export function SubscriptionsCustom() {
               if (!open) setPending(null)
             }}
             title={t('Confirm subscription')}
-            description={t(
-              'Frontend demo only. No payment, authorization, points or subscription changes will be made.'
-            )}
             contentClassName='sm:max-w-lg'
             footer={
               <>

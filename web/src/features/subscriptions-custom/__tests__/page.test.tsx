@@ -22,6 +22,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 import { api } from '@/lib/api'
+import { useAuthStore } from '@/stores/auth-store'
 
 import { SubscriptionsCustom } from '..'
 import rules from '../rules.json'
@@ -126,7 +127,13 @@ vi.mock('@/components/layout', () => ({
 vi.mock('@/components/layout/components/footer', () => ({
   Footer: () => <footer>自定义页脚</footer>,
 }))
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  useAuthStore.setState(useAuthStore.getInitialState(), true)
+})
+function signIn() {
+  useAuthStore.getState().auth.setUser({ id: 1, username: 'demo', role: 1 })
+}
 it('renders Demo footer columns, copyright and working FAQ', async () => {
   const user = userEvent.setup()
   await renderDemo()
@@ -224,9 +231,24 @@ it('cancels a purchase with Escape without enabling renewal', async () => {
     'false'
   )
 })
+it('hides account-only tabs and sections for signed-out visitors', async () => {
+  await renderDemo()
+  expect(screen.queryByRole('tab', { name: '订单' })).toBeNull()
+  expect(screen.queryByRole('tab', { name: '发票' })).toBeNull()
+  expect(screen.queryByRole('heading', { name: '自动续费管理' })).toBeNull()
+  expect(
+    screen.queryByRole('heading', { name: '我的订阅与权益排期' })
+  ).toBeNull()
+  expect(screen.getByRole('heading', { name: '订阅规则' })).toBeVisible()
+})
 it('shows demo empty states rather than account records', async () => {
   const user = userEvent.setup()
+  signIn()
   await renderDemo()
+  expect(screen.getByRole('heading', { name: '自动续费管理' })).toBeVisible()
+  expect(
+    screen.getByRole('heading', { name: '我的订阅与权益排期' })
+  ).toBeVisible()
   await user.click(screen.getByRole('tab', { name: '订单' }))
   expect(screen.getByText('暂无演示订阅订单。')).toBeVisible()
 })
