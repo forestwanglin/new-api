@@ -805,6 +805,26 @@
 - 验证：`go test ./model ./router -run 'CustomSubscription|PublicCustomSubscription' -count=1`、`go vet ./model ./controller ./router` 和根模块构建通过；隔离 SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 17.11 的公开读取与既有套餐矩阵通过，覆盖启用筛选、顺序、101 条结果、精确整数、错误传播及重复迁移。前端相关 Vitest 6 文件 / 25 用例、typecheck（1,516 文件）、改动文件 lint/format、生产构建通过。Chrome 使用隔离真实接口验证桌面三列与 390px 单列、月付/年付分组、禁用计划过滤、19.99 元、12.5% 奖励、混合类型及大整数；页面无横向溢出，演示确认无网络请求。独立审查追加确认弹窗周期刷新回归。
 - 风险与未覆盖：全局规则文案独立于计划字段，管理员需保持商业描述一致；本次不增加套餐专属规则 UI 或真实交易。未验证最低数据库版本或完整发行库升级；Go 使用现有本地 1.27.3，未改声明版本。测试期间格式恢复触发过 Rsbuild HMR 回退整页刷新，非订阅运行错误。
 
+### Z042 Demo 登录弹窗、阿里云短信与微信强制绑定手机号
+
+- 需求与行为：全局复用 Demo 注册/登录弹窗，保留微信扫码和手机号验证码；移除邮箱与邀请码。公共入口、受保护路由和认证过期均走弹窗；管理员恢复入口保留 `/sign-in?admin=true`。成功继续安全的本地目标，不自动重放付款或业务变更请求。
+- 认证契约：服务端图形验证后签发一次性短信发送授权，关联浏览器/号码/微信待绑定流程；六位短信最多五次尝试、五分钟有效，重发成功使旧码失效，数据库持久化限流，阿里云超时不重试。验证码使用 salted slow hash，正式会话仍经现有 `setupLogin` 与 TOTP/passkey 策略。
+- 微信与持久化：已绑定手机号继续共享登录，未绑定只签发十分钟受限流程；绑定完成才允许正式会话。已被其他账号占用的号码拒绝绑定并提示换号，不合并资产。复用 `external_identity_claims` 唯一归属，`auth_flows.attempts` 为默认零的增量列；回滚保留身份与列。
+- 配置：新增认证设置 `phone-sms`，默认关闭；非秘密 options 为 `phone.enabled/region/sign_name/template_code`。凭据仅由后端环境 `ALIYUN_SMS_ACCESS_KEY_ID`、`ALIYUN_SMS_ACCESS_KEY_SECRET`、可选 `ALIYUN_SMS_SECURITY_TOKEN` 读取；操作步骤见 [phone-authentication.md](phone-authentication.md)。未新增运行依赖或修改部署脚本。
+- 影响面：新增 phone model/service/controller/settings、阿里云发送边界、弹窗 store/forms/CSS/API 与定向回归。上游自有改动包括 `model/auth_flow.go`、`controller/{wechat,misc,option}.go`、`router/api-router.go`，前端 Dialog primitives、auth API/types、认证设置注册与 use-update-option 状态失效、七种 locale，以及全局布局/路由/导航/HTTP 认证入口。
+- 已验证：`go test ./service ./model -run '^TestPhone' -count=1` 通过（含过期、猜测/重放、跨浏览器/跨 purpose、号主冲突、撤销版本、注册关闭、重发失效、供应商失败与固定签名向量）；新增前端组件/API 3 文件 6 用例通过，后台真实配置表单与缓存失效另新增 5 个回归（短信/OAuth/passkey 三套件共 35 用例通过）。真实 SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 16.16 三库矩阵通过，覆盖旧表升级两次、已有数据、唯一索引、并发手机号归属和尝试预算。命令：设置专用 TEST_MYSQL_DSN/TEST_POSTGRES_DSN 后执行 `go test ./model -run TestPhoneIdentityDatabaseMatrix -count=1`。前端认证相关 21 文件 / 152 用例、typecheck、所属文件 lint/format、生产构建及 `go build ./...`、`go vet ./model ./service ./controller ./router ./middleware ./setting/system_setting` 通过。六个后端相关包在排除两组已于 bf5183f5b 副本复现的原有失败（TestOpenAIChatSamplingCompatibility、TestAccessTokenRouteRulesCoverEveryDashboardRoute）后通过；完整原样测试仍有这两组失败。本次暂存内容的独立副本亦通过六包测试、1535 文件类型检查和相同 152 个前端用例，确认没有依赖并行教程代码。Chrome 检查桌面及 390×844 移动布局、真实图形码加载、两个 TAB、验证前发送禁用及中文文案。Demo 浏览器文件访问受限，依据源码 CSS 核对，未做像素级截图差异验证。
+- 安全依据：OWASP ASVS stable 5.0.0 的认证节流（6.3.1）、一致认证路径（6.3.4）、一次使用/随机/有效期（6.5.1、6.5.3–6.5.5）与 OOB 猜测限制（6.6.3），以及 Authentication、Session Management、CSRF Cheat Sheets；服务器校验与集成测试落实本次相关控制，不作整体合规声明。
+- 限制：未配置真实阿里云凭据，真实送达待运营配置后验证；不声称完整 ASVS 合规或最低数据库版本兼容。前端其余语言暂以英文回退，简体中文已提供。
+
+### Z043 配置教程与管理员 Markdown 管理
+
+- 顶部订阅菜单后增加「配置教程」(/tutorial)，目录与连续正文沿用 c-dev/ZYY-AI-demo.html 的尺寸、色彩、锚点和响应式布局；原 Docs 外链保留。管理员增加「教程管理」(/tutorial-management)，支持分组/章节的新增、查询、编辑、删除、排序、启停和 Markdown 预览。
+- 独立 ConfigTutorialGroup/ConfigTutorialChapter 表；匿名只读接口、管理员会话写接口、严格 DTO、字符串 ID/version/时间戳和乐观锁；非空组禁止删除。Markdown 上限 65536 UTF-8 字节，使用现有 LongText。复用已有安全 Markdown、复制、表格、表单及确认组件，无新增依赖。
+- 内嵌 3 组 13 章，事务性永久 marker 只导入一次，重启不覆盖编辑或恢复删除；marker 不可通过 options 接口操作。所有教程写操作串行仲裁，保护跨库初始化和删除/移动的引用一致性。
+- demo 内容按已实现能力校准：doc-create/doc-points/d2/d6/d6a/d6c/doc-subscription-rules/doc-invite-rules/doc-support 不承诺尚未实现的支付、自动续费、积分或邀请奖励；外部工具仅给配置参考，示例使用占位密钥。
+- 上游改动：model/{main,option}.go、router/api-router.go、middleware/access_token_routes.go、顶部/侧栏 hooks、维护侧栏配置、七种 locale 和生成路由。admin.config_tutorial 缺省开启，保留显式关闭；菜单可见性不替代服务端权限。
+- 验证：真实 SQLite 3.50.4 / MySQL 8.4.13 / PostgreSQL 16.16 定向模型与路由测试通过；Go vet、前端 13 文件 59 用例、类型检查、限定 lint/格式和生产构建通过。Chrome 验证匿名桌面与 390px 阅读、锚点定位、复制反馈和无整页横向溢出。管理员组件与真实路由已有测试；并行登录改造期间未完成管理员浏览器登录联调。未验证生产数据库升级快照，未部署。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
@@ -813,6 +833,8 @@
 
 | 区域 | 文件 | 关联条目 |
 |---|---|---|
+| 登录认证弹窗与手机绑定 | `model/auth_flow.go`、`controller/{wechat,misc,option}.go`、`router/api-router.go`、前端 Dialog/auth/settings、布局/路由/导航/HTTP 入口、七种 locale | Z042 |
+| 配置教程 | model/{main,option}.go、router/api-router.go、middleware/access_token_routes.go、前端顶部/侧栏 hooks、维护侧栏配置、七种 locale、生成路由 | Z043 |
 | 公开订阅计划 | `router/api-router.go` | Z041 |
 | 自定义订阅规则 | `model/main.go`、`model/option.go`、`router/api-router.go`、`middleware/access_token_routes.go`、七种 locale、`i18n/static-keys.ts` | Z040 |
 | 自定义订阅套餐管理 | `model/main.go`、`router/api-router.go`、`middleware/access_token_routes.go`、侧栏数据/配置、maintenance 配置/开关、七种 locale、`i18n/static-keys.ts`、`routeTree.gen.ts` | Z038 |

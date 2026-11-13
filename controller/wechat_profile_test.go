@@ -214,6 +214,8 @@ func TestWeChatLoginProfileDoesNotBypassVerification(t *testing.T) {
 			user, _ := setupSecurityEnrollmentTest(t)
 			require.NoError(t, model.DB.Model(user).Updates(map[string]any{"wechat_id": "login-openid", "display_name": "WeChat User"}).Error)
 			newSecurityLoginPasskey(t, user.Id)
+			require.NoError(t, model.DB.AutoMigrate(&model.ExternalIdentityClaim{}))
+			require.NoError(t, model.DB.Create(&model.ExternalIdentityClaim{Provider: "phone", Subject: "13800138000", UserId: user.Id}).Error)
 			oldEnabled, oldAddress := common.WeChatAuthEnabled, common.WeChatServerAddress
 			calls := 0
 			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -232,7 +234,7 @@ func TestWeChatLoginProfileDoesNotBypassVerification(t *testing.T) {
 			if scenario == "banned" {
 				require.NoError(t, model.DB.Model(user).Update("status", common.UserStatusDisabled).Error)
 			}
-			response := securityEnrollmentRequest("GET", "/api/oauth/wechat?code=login-code", "", "", service.AuthIdentity{}, WeChatAuth)
+			response := phoneAuthControllerRequest("GET", "/api/oauth/wechat?code=login-code", "", strings.Repeat("a", 43), WeChatAuth)
 			if scenario == "banned" {
 				assert.NotContains(t, response.Body.String(), `"success":true`)
 			} else {

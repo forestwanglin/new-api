@@ -51,6 +51,13 @@ func SetApiRouter(router *gin.Engine) {
 		apiRouter.POST("/oauth/email/bind/start", middleware.UserAuth(), middleware.CriticalRateLimit(), middleware.UserCriticalRateLimit("account-security"), middleware.EmailVerificationRateLimit(), middleware.DisableCache(), controller.EmailBindStart)
 		apiRouter.POST("/oauth/email/bind/resend", middleware.UserAuth(), middleware.CriticalRateLimit(), middleware.UserCriticalRateLimit("account-security"), middleware.EmailVerificationRateLimit(), middleware.DisableCache(), controller.EmailBindResend)
 		apiRouter.POST("/oauth/email/bind", middleware.UserAuth(), middleware.CriticalRateLimit(), middleware.UserCriticalRateLimit("account-security"), middleware.DisableCache(), controller.EmailBind)
+		// Public phone authentication uses a browser-bound, single-use flow.
+		phoneAuth := apiRouter.Group("/phone", middleware.CriticalRateLimit(), middleware.DisableCache())
+		phoneAuth.GET("/captcha", controller.PhoneCaptcha)
+		phoneAuth.POST("/captcha/verify", middleware.SessionCookieOriginGuard(), anonymousRequestBodyLimit, controller.VerifyPhoneCaptcha)
+		phoneAuth.POST("/sms/send", middleware.SessionCookieOriginGuard(), anonymousRequestBodyLimit, controller.SendPhoneSMS)
+		phoneAuth.POST("/login", middleware.SessionCookieOriginGuard(), anonymousRequestBodyLimit, controller.PhoneLogin)
+		apiRouter.POST("/oauth/wechat", middleware.SessionCookieOriginGuard(), middleware.CriticalRateLimit(), middleware.DisableCache(), anonymousRequestBodyLimit, controller.WeChatAuth)
 		// WeChat uses its existing authorization-code service.
 		apiRouter.GET("/oauth/wechat", middleware.CriticalRateLimit(), middleware.DisableCache(), controller.WeChatAuth)
 		apiRouter.POST("/oauth/wechat/bind", middleware.UserAuth(), middleware.CriticalRateLimit(), controller.WeChatBind)

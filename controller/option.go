@@ -219,6 +219,11 @@ func UpdateOption(c *gin.Context) {
 		}
 	}
 	switch option.Key {
+	case "phone.enabled":
+		if option.Value == "true" && !service.PhoneSMSConfigurationReady() {
+			common.ApiErrorT(c, "Phone login is not configured. Please contact your administrator.")
+			return
+		}
 	case "GitHubOAuthEnabled":
 		if option.Value == "true" && common.GitHubClientId == "" {
 			common.ApiErrorT(c, "Cannot enable {{provider}}. Enter the {{provider}} Client ID and Client Secret first.", map[string]any{"provider": "GitHub OAuth"})

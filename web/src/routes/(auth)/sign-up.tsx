@@ -18,17 +18,20 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { createFileRoute, redirect } from '@tanstack/react-router'
 
-import { SignUp } from '@/features/auth/sign-up'
+import { resolveAuthentication } from '@/lib/auth-session'
 import { useAuthStore } from '@/stores/auth-store'
+import { useLoginModalStore } from '@/stores/login-modal-store'
 
 export const Route = createFileRoute('/(auth)/sign-up')({
-  component: SignUp,
-  beforeLoad: async () => {
+  beforeLoad: async ({ preload }) => {
+    await resolveAuthentication()
     const { auth } = useAuthStore.getState()
 
     // 如果已经有用户信息，说明已登录，注册页对其无意义，跳转到 dashboard
     if (auth.user) {
       throw redirect({ to: '/dashboard' })
     }
+    if (!preload) useLoginModalStore.getState().open()
+    throw redirect({ to: '/', replace: true })
   },
 })

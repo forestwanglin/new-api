@@ -27,6 +27,7 @@ import {
 import { applyAuthBundle, isAuthBundle } from '@/lib/api'
 import { AuthOperationError } from '@/lib/secure-verification'
 import { useAuthStore, type AuthBundle } from '@/stores/auth-store'
+import { useLoginModalStore } from '@/stores/login-modal-store'
 
 import { isLoginChallenge } from '../secure-verification/api'
 
@@ -81,6 +82,22 @@ export function useAuthRedirect() {
       ) {
         return false
       }
+      if (
+        typeof result === 'object' &&
+        result !== null &&
+        'require_phone_binding' in result &&
+        result.require_phone_binding === true &&
+        'bind_token' in result &&
+        typeof result.bind_token === 'string'
+      ) {
+        useLoginModalStore.getState().open({
+          bindToken: result.bind_token,
+          redirectTo:
+            sanitizeAuthRedirect(redirectTo, window.location.origin) ??
+            '/dashboard',
+        })
+        return false
+      }
       if (isAuthBundle(result)) {
         await handleLoginSuccess(result, redirectTo)
         return true
@@ -108,15 +125,15 @@ export function useAuthRedirect() {
    * Redirect to login page
    */
   const redirectToLogin = useCallback(() => {
-    void navigate({ to: '/sign-in', replace: true })
-  }, [navigate])
+    useLoginModalStore.getState().open()
+  }, [])
 
   /**
    * Redirect to register page
    */
   const redirectToRegister = useCallback(() => {
-    void navigate({ to: '/sign-up', replace: true })
-  }, [navigate])
+    useLoginModalStore.getState().open()
+  }, [])
 
   return {
     handleLoginSuccess,

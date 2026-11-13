@@ -99,7 +99,19 @@ func WeChatAuth(c *gin.Context) {
 		common.ApiErrorT(c, "{{provider}} login and registration has not been enabled by administrator", providerParams("WeChat"))
 		return
 	}
+	browser, ok := phoneBrowserIdentity(c)
+	if !ok {
+		return
+	}
 	code := c.Query("code")
+	if c.Request.Method == http.MethodPost {
+		var req wechatBindRequest
+		if common.DecodeJson(c.Request.Body, &req) != nil {
+			common.ApiErrorT(c, "Invalid request")
+			return
+		}
+		code = req.Code
+	}
 	identity, err := getWeChatIdentityByCode(code)
 	if err != nil {
 		common.ApiError(c, err)
@@ -150,6 +162,22 @@ func WeChatAuth(c *gin.Context) {
 	if err := model.SyncWeChatProfile(user.Id, wechatId, identity.Profile.Nickname, identity.Profile.AvatarURL, false); err != nil {
 		common.SysLog(fmt.Sprintf("WeChat optional profile synchronization failed for user %d", user.Id))
 	}
+	hasPhone, err := model.HasUserPhone(user.Id)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if !hasPhone {
+		token, err := service.StartWeChatPhoneFlow(&user, browser)
+		if err != nil {
+			common.ApiError(c, err)
+			return
+		}
+		setAuthNoStore(c)
+		common.ApiSuccess(c, gin.H{"require_phone_binding": true, "bind_token": token})
+		return
+	}
+	c.Set("login_method", "wechat")
 	setupLogin(&user, nil, c)
 }
 

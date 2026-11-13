@@ -24,6 +24,7 @@ import { Button } from '@/components/ui/button'
 import { SubscriptionsCustomFooter } from '@/features/subscriptions-custom/footer'
 import { SupportDialog } from '@/features/subscriptions-custom/support-dialog'
 import { useAuthStore } from '@/stores/auth-store'
+import { useLoginModalStore } from '@/stores/login-modal-store'
 
 import {
   bestTextDiscount,
@@ -202,7 +203,12 @@ export function ModelPlaza() {
       <Button
         size='sm'
         variant='outline'
-        render={<Link to={isAuthenticated ? '/keys' : '/sign-in'} />}
+        render={isAuthenticated ? <Link to='/keys' /> : undefined}
+        onClick={() => {
+          if (!isAuthenticated) {
+            useLoginModalStore.getState().open({ redirectTo: '/keys' })
+          }
+        }}
       >
         使用此模型
       </Button>

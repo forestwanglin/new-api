@@ -51,6 +51,7 @@ import { clearAuthenticatedClientState } from '@/lib/api'
 import { handleServerError } from '@/lib/handle-server-error'
 import { createServerError } from '@/lib/server-error-message'
 import type { LoginSession } from '@/stores/auth-store'
+import { useLoginModalStore } from '@/stores/login-modal-store'
 
 import { LoginSessionDialogs } from './login-session-dialogs'
 import { LoginSessionItem } from './login-session-item'
@@ -90,7 +91,8 @@ export function LoginSessionsCard() {
       setRevokeTarget(null)
       if (revokedCurrent) {
         clearAuthenticatedClientState(queryClient)
-        void navigate({ to: '/sign-in', replace: true })
+        useLoginModalStore.getState().open()
+        void navigate({ to: '/', replace: true })
         return
       }
       toast.success(t('Session signed out'))

@@ -21,6 +21,7 @@ import { ArrowRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
+import { useLoginModalStore } from '@/stores/login-modal-store'
 
 interface HeroButtonsProps {
   isAuthenticated: boolean
@@ -41,11 +42,15 @@ export function HeroButtons({ isAuthenticated }: HeroButtonsProps) {
 
   return (
     <>
-      <Button size='lg' render={<Link to='/sign-up' />}>
+      <Button size='lg' onClick={() => useLoginModalStore.getState().open()}>
         {t('Get Started')}
         <ArrowRight className='ml-2 h-5 w-5' />
       </Button>
-      <Button size='lg' variant='outline' render={<Link to='/sign-in' />}>
+      <Button
+        size='lg'
+        variant='outline'
+        onClick={() => useLoginModalStore.getState().open()}
+      >
         {t('Sign In')}
       </Button>
     </>

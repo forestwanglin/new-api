@@ -30,6 +30,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 import { api } from '@/lib/api'
 import { useAuthStore, type AuthBundle } from '@/stores/auth-store'
+import { useLoginModalStore } from '@/stores/login-modal-store'
 
 import { useAuthRedirect } from '../../hooks/use-auth-redirect'
 import type { LoginResult } from '../../secure-verification/types'
@@ -131,6 +132,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  useLoginModalStore.getState().close()
   cleanup()
   vi.restoreAllMocks()
   useAuthStore.getState().auth.reset('idle')
@@ -203,13 +205,14 @@ it('writes authentication only after verification and preserves the original des
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 })
 
-it('cancels verification with Escape and returns to sign-in without authenticating', async () => {
+it('cancels verification with Escape and reopens login without navigating or authenticating', async () => {
   const post = vi.spyOn(api, 'post')
   const { router } = renderLoginVerification()
   const user = userEvent.setup()
   await screen.findByLabelText('Authenticator code or backup code')
   await user.keyboard('{Escape}')
-  await waitFor(() => expect(router.state.location.pathname).toBe('/sign-in'))
+  await waitFor(() => expect(useLoginModalStore.getState().isOpen).toBe(true))
+  expect(router.state.location.pathname).toBe('/otp')
   expect(post).not.toHaveBeenCalled()
   expect(useAuthStore.getState().auth.user).toBeNull()
   expect(useAuthStore.getState().auth.pendingLoginVerification).toBeNull()
@@ -253,7 +256,8 @@ it.each(['unmount', 'account switch'] as const)(
 it('requires a new sign-in when the verification page has no in-memory challenge', async () => {
   const post = vi.spyOn(api, 'post')
   const { router } = renderLoginVerification(false)
-  await waitFor(() => expect(router.state.location.pathname).toBe('/sign-in'))
+  await waitFor(() => expect(useLoginModalStore.getState().isOpen).toBe(true))
+  expect(router.state.location.pathname).toBe('/otp')
   expect(post).not.toHaveBeenCalled()
 })
 

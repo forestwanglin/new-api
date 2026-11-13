@@ -22,7 +22,6 @@ import {
   createRootRouteWithContext,
   Outlet,
   redirect,
-  useNavigate,
 } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
 import { useEffect } from 'react'
@@ -30,6 +29,7 @@ import { useEffect } from 'react'
 import { NavigationProgress } from '@/components/navigation-progress'
 import { Toaster } from '@/components/ui/sonner'
 import { ThemeCustomizationProvider } from '@/context/theme-customization-provider'
+import { LoginModal } from '@/features/auth/components/login-modal'
 import { saveAffiliateCode } from '@/features/auth/lib/storage'
 import { GeneralError } from '@/features/errors/general-error'
 import { NotFoundError } from '@/features/errors/not-found-error'
@@ -43,9 +43,9 @@ import {
 import { subscribeAuthSessionEvents } from '@/lib/auth-session-sync'
 import { resolveLegacyRoute } from '@/lib/legacy-route'
 import { useAuthStore } from '@/stores/auth-store'
+import { useLoginModalStore } from '@/stores/login-modal-store'
 
 function RootComponent() {
-  const navigate = useNavigate()
   const queryClient = useQueryClient()
 
   // Load system configuration (logo, system name, etc.) from backend
@@ -86,16 +86,19 @@ function RootComponent() {
 
         if (currentSID && event.sid === currentSID) {
           clearAuthenticatedClientState(queryClient, false)
-          void navigate({ to: '/sign-in', replace: true })
+          useLoginModalStore.getState().open({
+            redirectTo: `${window.location.pathname}${window.location.search}${window.location.hash}`,
+          })
         }
       }),
-    [navigate, queryClient]
+    [queryClient]
   )
 
   return (
     <ThemeCustomizationProvider>
       <NavigationProgress />
       <Outlet />
+      <LoginModal />
       <Toaster closeButton duration={5000} position='top-center' richColors />
       {import.meta.env.MODE === 'development' && (
         <>

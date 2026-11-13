@@ -32,6 +32,7 @@ import {
 } from './lib/password-encryption'
 import { getAffiliateCode } from './lib/storage'
 import type { TelegramAuthorization } from './lib/telegram-login'
+import { getPhoneCaptcha, phoneAuthRequest } from './phone-api'
 import type { VerificationOperation } from './secure-verification/types'
 import type {
   LoginPayload,
@@ -225,8 +226,13 @@ export async function createOAuthFlow(
 
 // WeChat login by authorization code
 export async function wechatLoginByCode(code: string): Promise<ApiResponse> {
-  const res = await api.get('/api/oauth/wechat', { params: { code } })
-  return res.data
+  const captcha = await getPhoneCaptcha()
+  const data = await phoneAuthRequest<unknown>(
+    '/api/oauth/wechat',
+    { code },
+    captcha.browser_token
+  )
+  return { success: true, message: '', data }
 }
 
 export async function telegramLogin(

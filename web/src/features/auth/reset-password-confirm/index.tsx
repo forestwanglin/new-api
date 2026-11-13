@@ -16,7 +16,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useNavigate } from '@tanstack/react-router'
 import { CheckIcon, CopyIcon } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -32,6 +31,7 @@ import { copyToClipboard } from '@/lib/copy-to-clipboard'
 import { handleServerError } from '@/lib/handle-server-error'
 import { AuthOperationError } from '@/lib/secure-verification'
 import { createServerError } from '@/lib/server-error-message'
+import { useLoginModalStore } from '@/stores/login-modal-store'
 
 import { AuthLayout } from '../auth-layout'
 
@@ -47,7 +47,6 @@ export function ResetPasswordConfirm({
   token,
 }: ResetPasswordConfirmProps) {
   const { t } = useTranslation()
-  const navigate = useNavigate()
   const [newPassword, setNewPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -177,7 +176,7 @@ export function ResetPasswordConfirm({
             className='w-full'
             onClick={
               newPassword
-                ? () => navigate({ to: '/sign-in', replace: true })
+                ? () => useLoginModalStore.getState().open()
                 : handleSubmit
             }
             disabled={
@@ -199,7 +198,7 @@ export function ResetPasswordConfirm({
             <Button
               variant='link'
               className='w-full'
-              onClick={() => navigate({ to: '/sign-in', replace: true })}
+              onClick={() => useLoginModalStore.getState().open()}
             >
               {t('Back to login')}
             </Button>

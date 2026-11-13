@@ -25,6 +25,10 @@ import {
 } from './section-registry.tsx'
 
 const defaultAuthSettings: AuthSettings = {
+  'phone.enabled': false,
+  'phone.region': 'cn-hangzhou',
+  'phone.sign_name': '',
+  'phone.template_code': '',
   PasswordLoginEnabled: true,
   PasswordRegisterEnabled: true,
   EmailVerificationEnabled: false,

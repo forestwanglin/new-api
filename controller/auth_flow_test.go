@@ -350,6 +350,8 @@ func TestSecurityLoginAllPrimaryTransportsRequireAdditionalVerification(t *testi
 				state, code := telegram.authorization(t, "login", service.AuthIdentity{}, "", telegramIdentityClaims(42))
 				response = telegramOAuthCallback(state, code, service.AuthIdentity{})
 			case "wechat":
+				require.NoError(t, model.DB.AutoMigrate(&model.ExternalIdentityClaim{}))
+				require.NoError(t, model.DB.Create(&model.ExternalIdentityClaim{Provider: "phone", Subject: "13800138000", UserId: user.Id}).Error)
 				require.NoError(t, model.DB.Model(user).Update("wechat_id", "bound-wechat").Error)
 				upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					assert.Equal(t, "wechat-code", r.URL.Query().Get("code"))
@@ -359,7 +361,7 @@ func TestSecurityLoginAllPrimaryTransportsRequireAdditionalVerification(t *testi
 				previousEnabled, previousAddress := common.WeChatAuthEnabled, common.WeChatServerAddress
 				common.WeChatAuthEnabled, common.WeChatServerAddress = true, upstream.URL
 				t.Cleanup(func() { common.WeChatAuthEnabled, common.WeChatServerAddress = previousEnabled, previousAddress })
-				response = securityEnrollmentRequest("GET", "/api/oauth/wechat?code=wechat-code", "", "", service.AuthIdentity{}, WeChatAuth)
+				response = phoneAuthControllerRequest("GET", "/api/oauth/wechat?code=wechat-code", "", strings.Repeat("a", 43), WeChatAuth)
 			default:
 				const slug = "unified-login-test"
 				if transport == "custom oauth" {

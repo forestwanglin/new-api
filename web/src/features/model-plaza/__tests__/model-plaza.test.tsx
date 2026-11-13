@@ -20,6 +20,8 @@ import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, expect, it, vi } from 'vitest'
 
+import { useLoginModalStore } from '@/stores/login-modal-store'
+
 import { ModelPlaza } from '..'
 import {
   callsPerYuan,
@@ -45,7 +47,10 @@ vi.mock('@tanstack/react-router', async (importOriginal) => ({
   ),
 }))
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  useLoginModalStore.getState().close()
+})
 
 function renderPlaza() {
   return render(<ModelPlaza />)
@@ -86,10 +91,7 @@ it('derives per-call points, calls per yuan and discount from the catalog', () =
   expect(row.getByText('166 次')).toBeVisible()
   expect(row.getByText('7.5 折')).toBeVisible()
   expect(row.getByText('比官网省 25%')).toBeVisible()
-  expect(row.getByRole('link', { name: '使用此模型' })).toHaveAttribute(
-    'href',
-    '/sign-in'
-  )
+  expect(row.getByRole('button', { name: '使用此模型' })).toBeEnabled()
 })
 
 it('narrows the table by vendor and by keyword', async () => {
@@ -117,4 +119,14 @@ it('offers overseas models as read-only and keeps domestic ones actionable', () 
   const overseas = within(screen.getByRole('row', { name: /claude-sonnet-5/ }))
   expect(overseas.getByText('暂不开放')).toBeVisible()
   expect(overseas.queryByText('使用此模型')).toBeNull()
+})
+
+it('opens the login modal for an anonymous model action and retains its keys destination', async () => {
+  renderPlaza()
+  const row = within(
+    screen.getByRole('row', { name: /^deepseek-v4\.1-flash(?!-)/ })
+  )
+  await userEvent.setup().click(row.getByRole('button', { name: '使用此模型' }))
+  expect(useLoginModalStore.getState().isOpen).toBe(true)
+  expect(useLoginModalStore.getState().redirectTo).toBe('/keys')
 })

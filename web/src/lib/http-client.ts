@@ -31,6 +31,7 @@ import {
   safeServerErrorMessage,
 } from '@/lib/server-error-message'
 import { useAuthStore } from '@/stores/auth-store'
+import { useLoginModalStore } from '@/stores/login-modal-store'
 
 declare module 'axios' {
   export interface AxiosRequestConfig {
@@ -74,12 +75,11 @@ api.get = ((url: string, config: ApiRequestConfig = {}) => {
   return request
 }) as typeof api.get
 
-function redirectToSignIn(): void {
-  if (
-    typeof window !== 'undefined' &&
-    window.location.pathname !== '/sign-in'
-  ) {
-    window.location.replace('/sign-in')
+function requestSignIn(): void {
+  if (typeof window !== 'undefined') {
+    useLoginModalStore.getState().open({
+      redirectTo: `${window.location.pathname}${window.location.search}${window.location.hash}`,
+    })
   }
 }
 
@@ -119,7 +119,7 @@ api.interceptors.response.use(
               cause: error,
             })
           }
-          redirectToSignIn()
+          requestSignIn()
         }
       } else if (config?.authRetry) {
         clearAuthentication(false)
@@ -130,7 +130,7 @@ api.interceptors.response.use(
             cause: error,
           })
         }
-        redirectToSignIn()
+        requestSignIn()
       } else if (!skipErrorHandler) {
         handleServerError({
           message: t('Session expired!'),

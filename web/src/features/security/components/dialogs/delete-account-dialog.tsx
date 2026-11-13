@@ -29,6 +29,7 @@ import { Label } from '@/components/ui/label'
 import { SecureVerificationDialog } from '@/features/auth/secure-verification'
 import { deleteUserAccount } from '@/features/profile/api'
 import { clearAuthentication } from '@/lib/api'
+import { useLoginModalStore } from '@/stores/login-modal-store'
 
 import { useAccountSecurity } from '../../hooks/use-account-security'
 
@@ -72,7 +73,8 @@ export function DeleteAccountDialog(props: DeleteAccountDialogProps) {
     toast.success(t('Account deleted successfully'))
     props.onOpenChange(false)
     clearAuthentication()
-    navigate({ to: '/sign-in' })
+    useLoginModalStore.getState().open()
+    void navigate({ to: '/', replace: true })
   }
 
   return (

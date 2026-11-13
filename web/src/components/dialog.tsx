@@ -43,6 +43,7 @@ type DialogProps = React.ComponentProps<typeof DialogRoot> & {
   bodyClassName?: string
   footerClassName?: string
   initialFocus?: boolean
+  overlayClassName?: string
   showCloseButton?: boolean
 }
 
@@ -64,6 +65,7 @@ export function Dialog({
   footerClassName,
   initialFocus,
   showCloseButton,
+  overlayClassName,
   ...dialogProps
 }: DialogProps) {
   return (
@@ -77,6 +79,7 @@ export function Dialog({
         )}
         initialFocus={initialFocus}
         showCloseButton={showCloseButton}
+        overlayClassName={overlayClassName}
         style={
           {
             '--dialog-content-height': contentHeight,

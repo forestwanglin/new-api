@@ -19,9 +19,13 @@ For commercial licensing, please contact support@quantumnous.com
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import z from 'zod'
 
+import {
+  AuthenticatedModule,
+  AuthenticationRouteError,
+} from '@/features/auth/components/auth-required-gate'
 import { Rankings } from '@/features/rankings'
 import { getModuleAccessForGuard } from '@/lib/nav-modules'
-import { useAuthStore } from '@/stores/auth-store'
+import { requireAuthentication } from '@/lib/require-authentication'
 
 const rankingsSearchSchema = z.object({
   period: z
@@ -32,7 +36,7 @@ const rankingsSearchSchema = z.object({
 
 export const Route = createFileRoute('/rankings/')({
   validateSearch: rankingsSearchSchema,
-  beforeLoad: async ({ context, location }) => {
+  beforeLoad: async ({ context }) => {
     const access = await getModuleAccessForGuard(
       context.queryClient,
       'rankings'
@@ -41,14 +45,19 @@ export const Route = createFileRoute('/rankings/')({
       throw redirect({ to: '/' })
     }
     if (access.requireAuth) {
-      const { auth } = useAuthStore.getState()
-      if (!auth.user) {
-        throw redirect({
-          to: '/sign-in',
-          search: { redirect: location.href },
-        })
-      }
+      await requireAuthentication()
     }
+    return { requiresAuth: access.requireAuth }
   },
-  component: Rankings,
+  errorComponent: AuthenticationRouteError,
+  component: ModulePage,
 })
+
+function ModulePage() {
+  const { requiresAuth } = Route.useRouteContext()
+  return (
+    <AuthenticatedModule requiresAuth={requiresAuth}>
+      <Rankings />
+    </AuthenticatedModule>
+  )
+}

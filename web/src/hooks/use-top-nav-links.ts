@@ -69,7 +69,11 @@ export function useTopNavLinks(): TopNavLink[] {
 
   // Console -> /dashboard (new console path). This fork labels the entry 首页.
   if (modules?.console !== false) {
-    links.push({ title: t('Homepage'), href: '/dashboard' })
+    links.push({
+      title: t('Homepage'),
+      href: '/dashboard',
+      requiresAuth: !isAuthed,
+    })
   }
 
   // Fork-owned model plaza. Existing module flags stay unchanged.
@@ -84,6 +88,7 @@ export function useTopNavLinks(): TopNavLink[] {
 
   // Fork frontend-only subscription showcase. Existing module flags stay unchanged.
   links.push({ title: '订阅', href: '/subscription' })
+  links.push({ title: t('Configuration tutorial'), href: '/tutorial' })
 
   // Rankings
   const rankings = modules?.rankings

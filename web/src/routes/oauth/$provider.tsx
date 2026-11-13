@@ -27,6 +27,7 @@ import i18next from 'i18next'
 import { useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 
+import { wechatLoginByCode } from '@/features/auth/api'
 import { OAuthCallbackScreen } from '@/features/auth/components/oauth-callback-screen'
 import {
   OAUTH_POPUP_CALLBACK_MESSAGE,
@@ -49,6 +50,7 @@ import { api } from '@/lib/api'
 import { handleServerError } from '@/lib/handle-server-error'
 import { AuthOperationError } from '@/lib/secure-verification'
 import { getServerErrorMessageKey } from '@/lib/server-error-message'
+import { useLoginModalStore } from '@/stores/login-modal-store'
 
 type OAuthRequestConfig = AxiosRequestConfig & {
   skipBusinessError?: boolean
@@ -199,7 +201,8 @@ function OAuthCallback() {
 
     if (!code && !search.error) {
       toast.error(i18next.t('Missing code'))
-      safeNavigate('/sign-in', '/sign-in')
+      useLoginModalStore.getState().open()
+      safeNavigate('/', '/')
       return
     }
 
@@ -221,7 +224,12 @@ function OAuthCallback() {
         if (loginExchange.current?.key !== loginKey) {
           loginExchange.current = {
             key: loginKey,
-            request: api.get<LoginResponse>(`/api/oauth/${provider}`, config),
+            request:
+              provider === 'wechat'
+                ? wechatLoginByCode(code).then((data) => ({
+                    data: data as LoginResponse,
+                  }))
+                : api.get<LoginResponse>(`/api/oauth/${provider}`, config),
           }
         }
         const response = await loginExchange.current.request
@@ -251,7 +259,8 @@ function OAuthCallback() {
           AuthOperationError.from(error, i18next.t('OAuth failed'))
         )
       }
-      safeNavigate('/sign-in', '/sign-in')
+      useLoginModalStore.getState().open()
+      safeNavigate('/', '/')
     })()
     return () => {
       active = false

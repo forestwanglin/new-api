@@ -51,6 +51,7 @@ type AuthFlow struct {
 	UserId     int        `json:"user_id,omitempty" gorm:"index"`
 	SessionId  string     `json:"session_id,omitempty" gorm:"type:varchar(64);index"`
 	Payload    string     `json:"-" gorm:"type:text"`
+	Attempts   int        `json:"-" gorm:"not null;default:0"`
 	CreatedAt  time.Time  `json:"created_at"`
 	ExpiresAt  time.Time  `json:"expires_at" gorm:"not null;index:idx_auth_flow_purpose_expiry"`
 	ConsumedAt *time.Time `json:"consumed_at,omitempty" gorm:"index"`

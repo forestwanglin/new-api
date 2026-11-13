@@ -19,9 +19,13 @@ For commercial licensing, please contact support@quantumnous.com
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import z from 'zod'
 
+import {
+  AuthenticatedModule,
+  AuthenticationRouteError,
+} from '@/features/auth/components/auth-required-gate'
 import { ModelDetails } from '@/features/pricing/components/model-details'
 import { getModuleAccessForGuard } from '@/lib/nav-modules'
-import { useAuthStore } from '@/stores/auth-store'
+import { requireAuthentication } from '@/lib/require-authentication'
 
 const modelDetailsSearchSchema = z.object({
   search: z.string().optional(),
@@ -38,20 +42,25 @@ const modelDetailsSearchSchema = z.object({
 
 export const Route = createFileRoute('/pricing/$modelId/')({
   validateSearch: modelDetailsSearchSchema,
-  beforeLoad: async ({ context, location }) => {
+  beforeLoad: async ({ context }) => {
     const access = await getModuleAccessForGuard(context.queryClient, 'pricing')
     if (!access.enabled) {
       throw redirect({ to: '/' })
     }
     if (access.requireAuth) {
-      const { auth } = useAuthStore.getState()
-      if (!auth.user) {
-        throw redirect({
-          to: '/sign-in',
-          search: { redirect: location.href },
-        })
-      }
+      await requireAuthentication()
     }
+    return { requiresAuth: access.requireAuth }
   },
-  component: ModelDetails,
+  errorComponent: AuthenticationRouteError,
+  component: ModulePage,
 })
+
+function ModulePage() {
+  const { requiresAuth } = Route.useRouteContext()
+  return (
+    <AuthenticatedModule requiresAuth={requiresAuth}>
+      <ModelDetails />
+    </AuthenticatedModule>
+  )
+}

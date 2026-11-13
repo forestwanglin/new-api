@@ -18,17 +18,23 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { createFileRoute, useNavigate, useSearch } from '@tanstack/react-router'
 import i18next from 'i18next'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 
 import { wechatLoginByCode } from '@/features/auth/api'
-import { sanitizeAuthRedirect } from '@/features/auth/lib/auth-redirect'
-import { applyAuthBundle, isAuthBundle } from '@/lib/api'
+import { useAuthRedirect } from '@/features/auth/hooks/use-auth-redirect'
 import { handleServerError } from '@/lib/handle-server-error'
 import { AuthOperationError } from '@/lib/secure-verification'
 import { createServerError } from '@/lib/server-error-message'
+import { useLoginModalStore } from '@/stores/login-modal-store'
 
 function OAuthComponent() {
   const navigate = useNavigate()
+  const { handleLoginResult } = useAuthRedirect()
+  const loginExchange = useRef<{
+    key: string
+    request: ReturnType<typeof wechatLoginByCode>
+  } | null>(null)
+  const completedLogin = useRef<string | null>(null)
   const search = useSearch({ from: '/(auth)/oauth' }) as {
     redirect?: string
     provider?: 'github' | 'discord' | 'oidc' | 'linuxdo' | 'telegram' | 'wechat'
@@ -37,29 +43,47 @@ function OAuthComponent() {
   }
 
   useEffect(() => {
-    ;(async () => {
+    const loginKey = `${search.provider ?? ''}:${search.code ?? ''}`
+    if (completedLogin.current === loginKey) return
+    let active = true
+    void (async () => {
       try {
         if (search?.provider === 'wechat' && search.code) {
-          const res = await wechatLoginByCode(search.code)
-          if (res?.success && isAuthBundle(res.data)) {
-            applyAuthBundle(res.data)
-            const target =
-              sanitizeAuthRedirect(search?.redirect, window.location.origin) ??
-              '/dashboard'
-            navigate({ href: target, replace: true })
+          if (loginExchange.current?.key !== loginKey) {
+            loginExchange.current = {
+              key: loginKey,
+              request: wechatLoginByCode(search.code),
+            }
+          }
+          const res = await loginExchange.current.request
+          if (!active) return
+          if (res?.success) {
+            completedLogin.current = loginKey
+            await handleLoginResult(res.data, search.redirect)
             return
           }
           throw createServerError(res, i18next.t('OAuth failed'))
         }
         handleServerError(new AuthOperationError(i18next.t('OAuth failed')))
       } catch (error: unknown) {
+        if (!active) return
         handleServerError(
           AuthOperationError.from(error, i18next.t('OAuth failed'))
         )
       }
-      navigate({ to: '/sign-in', replace: true })
+      useLoginModalStore.getState().open()
+      navigate({ to: '/', replace: true })
     })()
-  }, [navigate, search])
+    return () => {
+      active = false
+    }
+  }, [
+    handleLoginResult,
+    navigate,
+    search.code,
+    search.provider,
+    search.redirect,
+  ])
 
   return null
 }

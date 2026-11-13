@@ -29,6 +29,7 @@ import useDialogState from '@/hooks/use-dialog'
 import { useIsSidebarModuleVisible } from '@/hooks/use-sidebar-config'
 import { useUserDisplay } from '@/hooks/use-user-display'
 import type { AuthUser } from '@/stores/auth-store'
+import { useLoginModalStore } from '@/stores/login-modal-store'
 
 import { MOBILE_DRAWER_ANIMATION, MOBILE_DRAWER_CONFIG } from '../constants'
 import type { TopNavLink } from '../types'
@@ -178,7 +179,10 @@ function MobileSignInButton({ onNavigate }: MobileSignInButtonProps) {
       variant='secondary'
       size='sm'
       className='h-10 w-full'
-      render={<Link to='/sign-in' onClick={onNavigate} />}
+      onClick={() => {
+        onNavigate?.()
+        useLoginModalStore.getState().open()
+      }}
     >
       {t('Sign in')}
     </Button>
@@ -287,7 +291,15 @@ export function MobileDrawer({
                         <Link
                           to={link.href}
                           className='text-primary/60 hover:text-primary/80 transition-colors'
-                          onClick={onClose}
+                          onClick={(event) => {
+                            onClose()
+                            if (link.requiresAuth && !user) {
+                              event.preventDefault()
+                              useLoginModalStore
+                                .getState()
+                                .open({ redirectTo: link.href })
+                            }
+                          }}
                         >
                           {link.title}
                         </Link>

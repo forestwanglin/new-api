@@ -23,8 +23,23 @@ import { BotProtectionSection } from './bot-protection-section'
 import { CustomOAuthSection } from './custom-oauth/custom-oauth-section'
 import { OAuthSection } from './oauth-section'
 import { PasskeySection } from './passkey-section'
+import { PhoneAuthSection } from './phone-auth-section'
 
 const AUTH_SECTIONS = [
+  {
+    id: 'phone-sms',
+    titleKey: 'Phone SMS authentication',
+    build: (settings: AuthSettings) => (
+      <PhoneAuthSection
+        defaultValues={{
+          'phone.enabled': settings['phone.enabled'],
+          'phone.region': settings['phone.region'],
+          'phone.sign_name': settings['phone.sign_name'],
+          'phone.template_code': settings['phone.template_code'],
+        }}
+      />
+    ),
+  },
   {
     id: 'basic-auth',
     titleKey: 'Basic Authentication',

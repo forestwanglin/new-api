@@ -157,6 +157,10 @@ export type SiteSettings = {
 }
 
 export type AuthSettings = {
+  'phone.enabled': boolean
+  'phone.region': string
+  'phone.sign_name': string
+  'phone.template_code': string
   PasswordLoginEnabled: boolean
   PasswordRegisterEnabled: boolean
   EmailVerificationEnabled: boolean

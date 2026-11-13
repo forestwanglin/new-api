@@ -35,6 +35,7 @@ import zh from '@/i18n/locales/zh.json'
 import { api } from '@/lib/api'
 import { STATUS_QUERY_KEY } from '@/lib/status-query'
 import { useAuthStore } from '@/stores/auth-store'
+import { useLoginModalStore } from '@/stores/login-modal-store'
 
 import { ChangePasswordDialog } from '../components/dialogs/change-password-dialog'
 import { DeleteAccountDialog } from '../components/dialogs/delete-account-dialog'
@@ -63,6 +64,7 @@ afterEach(() => {
   navigate.mockReset()
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
+  useLoginModalStore.getState().close()
   useAuthStore.getState().auth.reset('idle')
 })
 
@@ -187,7 +189,7 @@ it.each(['2fa', 'passkey'])(
     expect(remove).not.toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: 'Verify' }))
     await waitFor(() =>
-      expect(navigate).toHaveBeenCalledWith({ to: '/sign-in' })
+      expect(navigate).toHaveBeenCalledWith({ to: '/', replace: true })
     )
     expect(remove).toHaveBeenCalledExactlyOnceWith(
       '/api/user/self',
@@ -197,6 +199,7 @@ it.each(['2fa', 'passkey'])(
         signal: expect.any(AbortSignal),
       })
     )
+    expect(useLoginModalStore.getState().isOpen).toBe(true)
     expect(close).toHaveBeenCalledWith(false)
     expect(useAuthStore.getState().auth.user).toBeNull()
     expect(post.mock.calls.map(([url]) => url)).not.toContain(

@@ -28,6 +28,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, expect, it, vi } from 'vitest'
 
 import { api } from '@/lib/api'
+import { useLoginModalStore } from '@/stores/login-modal-store'
 import { useSystemConfigStore } from '@/stores/system-config-store'
 
 import { PublicHeader, type PublicHeaderProps } from '../public-header'
@@ -36,13 +37,17 @@ const initialSystemConfig = useSystemConfigStore.getState()
 const clients: QueryClient[] = []
 afterEach(() => {
   cleanup()
+  useLoginModalStore.getState().close()
   useSystemConfigStore.setState(initialSystemConfig)
   clients.splice(0).forEach((client) => client.clear())
 })
 
-async function renderHeader(props: PublicHeaderProps = {}) {
+async function renderHeader(
+  props: PublicHeaderProps = {},
+  status: Record<string, unknown> = {}
+) {
   vi.spyOn(api, 'get').mockImplementation(async (url) => ({
-    data: { success: true, data: url === '/api/notice' ? '' : {} },
+    data: { success: true, data: url === '/api/notice' ? '' : status },
   }))
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -149,8 +154,11 @@ it('matches demo branding and keeps navigation beside the brand with tools at th
 it('uses the combined registration and sign-in label and demo primary button', async () => {
   useSystemConfigStore.getState().setLoading(false)
   await renderHeader()
-  const entry = await screen.findByRole('link', { name: 'Register / Sign in' })
-  expect(entry).toHaveAttribute('href', '/sign-in')
+  const entry = await screen.findByRole('button', {
+    name: 'Register / Sign in',
+  })
+  await userEvent.setup().click(entry)
+  expect(useLoginModalStore.getState().isOpen).toBe(true)
   expect(entry).toHaveClass(
     'text-[15px]',
     'rounded-[9px]',
@@ -166,4 +174,19 @@ it('keeps the selected desktop menu radius at the demo 8px regardless of theme r
   expect(selected).toHaveAttribute('aria-current', 'page')
   expect(selected).toHaveClass('rounded-[8px]')
   expect(selected).not.toHaveClass('rounded-lg')
+})
+
+it('opens authentication immediately for restricted navigation and keeps its destination', async () => {
+  await renderHeader(
+    {},
+    { HeaderNavModules: { pricing: { enabled: true, requireAuth: true } } }
+  )
+  await userEvent
+    .setup()
+    .click(await screen.findByRole('link', { name: 'Model Square' }))
+  expect(useLoginModalStore.getState().isOpen).toBe(true)
+  expect(useLoginModalStore.getState().redirectTo).toBe('/pricing')
+  expect(
+    screen.queryByRole('dialog', { name: 'Sign in required' })
+  ).not.toBeInTheDocument()
 })
