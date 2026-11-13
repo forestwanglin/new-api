@@ -67,10 +67,13 @@ export function useTopNavLinks(): TopNavLink[] {
     links.push({ title: t('Home'), href: '/' })
   }
 
-  // Console -> /dashboard (new console path)
+  // Console -> /dashboard (new console path). This fork labels the entry 首页.
   if (modules?.console !== false) {
-    links.push({ title: t('Console'), href: '/dashboard' })
+    links.push({ title: t('Homepage'), href: '/dashboard' })
   }
+
+  // Fork-owned model plaza. Existing module flags stay unchanged.
+  links.push({ title: t('Models'), href: '/model' })
 
   // Pricing
   const pricing = modules?.pricing

@@ -19,7 +19,20 @@ For commercial licensing, please contact support@quantumnous.com
 import { createFileRoute } from '@tanstack/react-router'
 
 import { Home } from '@/features/home'
+import { useHomePageContent } from '@/features/home/hooks'
+import { ModelPlaza } from '@/features/model-plaza'
+
+/**
+ * Admin-configured home page content keeps priority (existing backend logic is
+ * untouched). Without custom content the system default landing page is the
+ * fork-owned model plaza instead of the built-in marketing home.
+ */
+function HomeRoute() {
+  const { content, isLoaded } = useHomePageContent()
+  if (isLoaded && !content) return <ModelPlaza />
+  return <Home />
+}
 
 export const Route = createFileRoute('/')({
-  component: Home,
+  component: HomeRoute,
 })
