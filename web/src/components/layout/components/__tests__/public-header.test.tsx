@@ -159,3 +159,11 @@ it('uses the combined registration and sign-in label and demo primary button', a
     'bg-[#2563eb]'
   )
 })
+
+it('keeps the selected desktop menu radius at the demo 8px regardless of theme radius', async () => {
+  await renderHeader()
+  const selected = screen.getByRole('link', { name: 'Home', exact: true })
+  expect(selected).toHaveAttribute('aria-current', 'page')
+  expect(selected).toHaveClass('rounded-[8px]')
+  expect(selected).not.toHaveClass('rounded-lg')
+})
