@@ -5,9 +5,22 @@
 ## 阿里云配置
 
 1. 在阿里云短信服务申请审核通过的短信签名和验证码模板，模板变量使用 `${code}`。当前仅支持中国大陆 `+86` 手机号。
-2. 在**后端进程或容器的环境变量**中配置 `ALIYUN_SMS_ACCESS_KEY_ID`、`ALIYUN_SMS_ACCESS_KEY_SECRET`；使用临时凭证时同时配置 `ALIYUN_SMS_SECURITY_TOKEN`。使用仅有短信发送所需权限的凭证。保存凭证到现有秘密管理渠道，重启后端使环境变量生效；不要写入前端环境、Git 或页面配置。
+2. 在**后端启动工作目录的 `.env`** 或后端进程/容器的环境变量中配置下面的短信凭据（参考仓库 `.env.example`）。两个 AccessKey 值均不能为空；使用临时凭证时还需 `ALIYUN_SMS_SECURITY_TOKEN`。使用仅有短信发送所需权限的凭证，保存后重启后端，再进行下一步；不要写入前端环境、Git 或页面配置。
 3. 进入**系统设置 → 身份认证 → 手机短信认证**，路径 `/system-settings/auth/phone-sms`，配置阿里云地域（默认 `cn-hangzhou`）、短信签名名称、短信模板编码（如 `SMS_...`），保存并开启手机号验证码登录。对应 options 键为 `phone.region`、`phone.sign_name`、`phone.template_code`、`phone.enabled`。
 4. 先验证真实短信送达，再对外启用微信入口。微信公众号二维码、启用开关及验证码来源继续使用原系统的微信登录配置，无需修改 wechat-server。
+
+后端 `.env` 示例（空值需替换为实际凭据）：
+
+```dotenv
+ALIYUN_SMS_ACCESS_KEY_ID=
+ALIYUN_SMS_ACCESS_KEY_SECRET=
+# 使用临时凭证时填写；长期 AccessKey 无需此项
+# ALIYUN_SMS_SECURITY_TOKEN=
+```
+
+后端启动时通过 `godotenv.Load(".env")` 读取**当前工作目录**的文件，不是按可执行文件位置查找。已有进程环境变量优先于 `.env`；如果环境中已设置空值或旧凭据，需要同步更新。修改文件后必须重启后端，管理页面保存不会重新加载文件。
+
+容器部署时，宿主机 Compose 项目目录的 `.env` 主要用于 Compose 变量替换，不会自动成为容器环境。当前镜像工作目录为 `/data`，仓库 `docker-compose.yml` 将 `./data` 挂载到 `/data`，因此可在宿主机 `./data/.env` 填写上述凭据供后端读取；也可通过现有容器环境配置渠道注入。其他部署方式应以实际容器工作目录、挂载及环境为准。
 
 后端只公开短信是否可用，不返回 AccessKey。缺少签名、模板或凭据时不能开启；环境变量轮换后需要重启后端。所有实例需使用相同 `SESSION_SECRET`，确保认证摘要和浏览器关联在多实例间一致。
 
