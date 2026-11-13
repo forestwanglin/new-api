@@ -784,6 +784,16 @@
   复核；fork 定制摘要为高层概述，逐项细节以 `docs/customization/zyy-customization.md` 为准，
   后续新增定制需同步更新该登记（本条不重复登记各定制细节）。
 
+### Z040 自定义订阅规则管理
+
+- 需求与行为：管理员在“自定义订阅 → 规则管理”维护规则，列表、筛选、完整分页和右侧抽屉复用用户/渠道管理组件。支持增删改查、启停、排序、全局或单套餐范围；规则标识全局唯一且创建后不可更改。
+- 持久化与接口：独立新增 `custom_subscription_rules`，保留套餐/订单表结构；管理 `/api/custom_subscription/admin/rules` 使用管理员会话与原订阅支付合规限制，公开 GET `/api/custom_subscription/rules` 仅返回启用内容。ID/version 为十进制字符串，条件版本更新拒绝覆盖并发修改；关联规则的套餐禁止删除。
+- 正文样式：段落/文本片段 JSON，支持 400/700 字重、六位 HEX 文字颜色和背景高亮；管理端实时预览与公开页共用安全渲染和 CSS。拒绝未知字段、任意 CSS、超限正文；文本由 React 转义。规则仅控制文案，不改变积分或支付逻辑。
+- 迁移与回滚：原 11 条规则一次性事务迁移，内部标记不向设置接口暴露或允许修改；重复/并发启动不覆盖编辑、停用和删除。规则空态或接口失败不回退静态配置。回滚保留新表和标记；旧前端会显示其内置静态规则。套餐专属规则可配置/查询，当前公开规则区仅消费全局规则。
+- 影响面：新增规则模型、controller、seed JSON、管理/公开规则组件及测试；**上游自有文件** `model/main.go`、`model/option.go`、`router/api-router.go`、`middleware/access_token_routes.go`、七种 locale、`web/src/i18n/static-keys.ts`。已有定制套餐 controller/model 与公开规则区同步接入；不新增运行依赖。
+- 验证：隔离 SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 17.11 的新建、代表性升级、重复/并发迁移、编辑保留、删除不重建和 CRUD/范围校验通过。Chrome 隔离实例确认合规锁定、新建/编辑、样式回填、公开高亮及 390px 编辑器无页面横向溢出；删除与分页参数由 API/组件回归覆盖，未逐项进行真实多页浏览器操作。对本次暂存内容建立隔离快照验证：前端 12 文件/81 用例、1,511 文件 typecheck、改动 lint/格式及生产构建通过；后端 model/router/middleware 整包测试、vet/build 和三库定向矩阵通过。Go 使用本地 1.27.3，未改 go.mod。未验证最低数据库版本或完整发行库升级。
+- 既有失败：controller 整包 `TestOpenAIChatSamplingCompatibility` 的 GPT5.1/GPT6.1 explicit-none 断言在干净 HEAD 同样失败，未修改该无关逻辑。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
@@ -792,6 +802,7 @@
 
 | 区域 | 文件 | 关联条目 |
 |---|---|---|
+| 自定义订阅规则 | `model/main.go`、`model/option.go`、`router/api-router.go`、`middleware/access_token_routes.go`、七种 locale、`i18n/static-keys.ts` | Z040 |
 | 自定义订阅套餐管理 | `model/main.go`、`router/api-router.go`、`middleware/access_token_routes.go`、侧栏数据/配置、maintenance 配置/开关、七种 locale、`i18n/static-keys.ts`、`routeTree.gen.ts` | Z038 |
 | 仓库规则与配置 | `AGENTS.md`、`.gitignore` | Z011、Z003 |
 | 后端 controller / model | `controller/channel-test.go`、`controller/relay.go`、`controller/system_task_handlers.go`、`model/system_task.go`、`model/task.go` | Z003、Z006 |

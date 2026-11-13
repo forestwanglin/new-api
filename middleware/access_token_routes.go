@@ -251,6 +251,12 @@ var accessTokenRouteRules = map[string]accessTokenRouteRule{
 	"GET /api/data/flow/self":                   accessTokenScopeRule("usage:read"),
 
 	// Points configuration and ledger queries require authenticated dashboard sessions.
+	"GET /api/custom_subscription/rules":               accessTokenAnyRule,
+	"GET /api/custom_subscription/admin/rules":         accessTokenSessionRule,
+	"POST /api/custom_subscription/admin/rules":        accessTokenSessionRule,
+	"GET /api/custom_subscription/admin/rules/:id":     accessTokenSessionRule,
+	"PUT /api/custom_subscription/admin/rules/:id":     accessTokenSessionRule,
+	"DELETE /api/custom_subscription/admin/rules/:id":  accessTokenSessionRule,
 	"GET /api/custom_subscription/admin/plans":         accessTokenSessionRule,
 	"POST /api/custom_subscription/admin/plans":        accessTokenSessionRule,
 	"GET /api/custom_subscription/admin/plans/:id":     accessTokenSessionRule,

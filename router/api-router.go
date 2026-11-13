@@ -368,6 +368,14 @@ func SetApiRouter(router *gin.Engine) {
 		apiRouter.GET("/points/ledger/self", middleware.UserAuth(), controller.GetSelfPointLedger)
 		apiRouter.GET("/points/ledger", middleware.AdminAuth(), controller.GetAdminPointLedger)
 
+		apiRouter.GET("/custom_subscription/rules", controller.ReadCustomSubscriptionRules)
+		customRules := apiRouter.Group("/custom_subscription/admin/rules", middleware.AdminAuth())
+		customRules.GET("", controller.ListCustomSubscriptionRules)
+		customRules.POST("", controller.CreateCustomSubscriptionRule)
+		customRules.GET("/:id", controller.GetCustomSubscriptionRule)
+		customRules.PUT("/:id", controller.UpdateCustomSubscriptionRule)
+		customRules.DELETE("/:id", controller.DeleteCustomSubscriptionRule)
+
 		customSubscriptions := apiRouter.Group("/custom_subscription/admin/plans", middleware.AdminAuth())
 		customSubscriptions.GET("", controller.ListCustomSubscriptionPlans)
 		customSubscriptions.POST("", controller.CreateCustomSubscriptionPlan)

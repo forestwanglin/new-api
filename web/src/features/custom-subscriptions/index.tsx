@@ -45,24 +45,40 @@ import {
 } from './api'
 import { usePlanColumns } from './components/plan-columns'
 import { PlanDrawer, type PlanDrawerSelection } from './components/plan-drawer'
+import { SubscriptionRulesManagement } from './rules'
 import type { CustomSubscriptionPlan, PlanFilters } from './types'
 
 export function CustomSubscriptions() {
   const { t } = useTranslation()
+  const [rulesOpen, setRulesOpen] = useState(false)
   const viewer = useAuthStore((state) =>
     String(state.auth.user?.id ?? 'anonymous')
   )
+  if (rulesOpen) {
+    return (
+      <SubscriptionRulesManagement
+        key={viewer}
+        viewer={viewer}
+        onBack={() => setRulesOpen(false)}
+      />
+    )
+  }
   // Remount on identity changes so open drawers and pagination cannot cross accounts.
   return (
     <CustomSubscriptionsContent
       key={viewer}
       viewer={viewer}
       title={t('Custom Subscriptions')}
+      onRules={() => setRulesOpen(true)}
     />
   )
 }
 
-function CustomSubscriptionsContent(props: { viewer: string; title: string }) {
+function CustomSubscriptionsContent(props: {
+  viewer: string
+  title: string
+  onRules: () => void
+}) {
   const { t } = useTranslation()
   const client = useQueryClient()
   const complianceConfirmed = usePaymentCompliance()
@@ -161,6 +177,9 @@ function CustomSubscriptionsContent(props: { viewer: string; title: string }) {
       <SectionPageLayout fixedContent>
         <SectionPageLayout.Title>{props.title}</SectionPageLayout.Title>
         <SectionPageLayout.Actions>
+          <Button variant='outline' onClick={props.onRules}>
+            {t('Rule management')}
+          </Button>
           <Button
             onClick={() => setSelection({ mode: 'create' })}
             disabled={

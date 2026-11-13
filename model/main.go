@@ -383,6 +383,9 @@ func migrateDB() error {
 	if err := migrateCustomSubscriptions(DB); err != nil {
 		return err
 	}
+	if err := InitializeCustomSubscriptionRules(DB); err != nil {
+		return err
+	}
 	if err := migratePoints(DB); err != nil {
 		return err
 	}

@@ -29,7 +29,7 @@ func TestCustomSubscriptionAdminAPI(t *testing.T) {
 	sqlDB, err := db.DB()
 	require.NoError(t, err)
 	sqlDB.SetMaxOpenConns(1)
-	require.NoError(t, db.AutoMigrate(&model.PointType{}, &model.PointModelRule{}, &model.CustomSubscriptionPlan{}, &model.CustomSubscriptionOrder{}, &model.PointAccount{}, &model.PointLedger{}, &model.PointTransaction{}, &model.User{}, &model.UserSession{}, &model.UserAccessToken{}, &model.AuditLog{}, &model.Option{}))
+	require.NoError(t, db.AutoMigrate(&model.PointType{}, &model.PointModelRule{}, &model.CustomSubscriptionPlan{}, &model.CustomSubscriptionOrder{}, &model.CustomSubscriptionRule{}, &model.PointAccount{}, &model.PointLedger{}, &model.PointTransaction{}, &model.User{}, &model.UserSession{}, &model.UserAccessToken{}, &model.AuditLog{}, &model.Option{}))
 	oldDB, oldLogDB, oldType, oldRedis, oldSecret := model.DB, model.LOG_DB, common.MainDatabaseType(), common.RedisEnabled, common.SessionSecret
 	model.DB, model.LOG_DB = db, db
 	common.SetMainDatabaseType(common.DatabaseTypeSQLite)
@@ -316,4 +316,80 @@ func TestCustomSubscriptionAdminAPI(t *testing.T) {
 	var deletable map[string]any
 	require.NoError(t, common.Unmarshal(second.Data, &deletable))
 	assert.True(t, request(t, "DELETE", base+"/"+deletable["id"].(string), "", admin, 200).Success)
+	t.Run("subscription rule administration and public presentation", func(t *testing.T) {
+		rulesBase := "/api/custom_subscription/admin/rules"
+		makeRule := func(key string) string {
+			return fmt.Sprintf(`{"plan_id":null,"rule_key":%q,"title":"Rule 100%%_literal","content":{"blocks":[{"type":"paragraph","children":[{"text":"Important <script>literal</script>","style":{"fontWeight":700,"color":"#0052d9","backgroundColor":"#eaf3ff"}}]}]},"enabled":true,"sort_order":0}`, key)
+		}
+		for _, route := range []struct{ method, path string }{{"GET", rulesBase}, {"POST", rulesBase}, {"GET", rulesBase + "/1"}, {"PUT", rulesBase + "/1"}, {"DELETE", rulesBase + "/1"}} {
+			request(t, route.method, route.path, makeRule("guard"), "", 401)
+			request(t, route.method, route.path, makeRule("guard"), tokens[common.RoleCommonUser], 403)
+			request(t, route.method, route.path, makeRule("guard"), adminPAT, 403)
+		}
+		res := request(t, "POST", rulesBase, makeRule("managed"), admin, 200)
+		require.True(t, res.Success, res.Message)
+		var row map[string]any
+		require.NoError(t, common.Unmarshal(res.Data, &row))
+		assert.Equal(t, "1", row["version"])
+		assert.Nil(t, row["plan_id"])
+		rulePath := rulesBase + "/" + row["id"].(string)
+		require.True(t, request(t, "GET", rulePath, "", admin, 200).Success)
+		assert.False(t, request(t, "POST", rulesBase, makeRule("managed"), admin, 200).Success)
+		public := request(t, "GET", "/api/custom_subscription/rules", "", "", 200)
+		require.True(t, public.Success)
+		var publicData struct {
+			Items []map[string]any `json:"items"`
+		}
+		require.NoError(t, common.Unmarshal(public.Data, &publicData))
+		require.Len(t, publicData.Items, 1)
+		assert.NotContains(t, publicData.Items[0], "version")
+		assert.NotContains(t, publicData.Items[0], "enabled")
+		for _, bad := range []string{`{}`, makeRule("bad") + `{}`, strings.Replace(makeRule("bad"), `"fontWeight":700`, `"fontWeight":700,"position":"fixed"`, 1), strings.Replace(makeRule("bad"), `"#0052d9"`, `"url(https://example.com)"`, 1), strings.Replace(makeRule("bad"), `"plan_id":null`, `"plan_id":"99999999"`, 1), strings.Replace(makeRule("bad"), `"sort_order":0`, `"sort_order":0,"id":"5"`, 1)} {
+			assert.False(t, request(t, "POST", rulesBase, bad, admin, 200).Success, bad)
+		}
+		for _, query := range []string{"?p=0", "?page_size=101", "?p=1&p=2", "?unknown=1", "?enabled=1", "?scope=global&plan_id=1", "?keyword="} {
+			assert.False(t, request(t, "GET", rulesBase+query, "", admin, 200).Success, query)
+		}
+		for _, query := range []string{"?plan_id=0", "?plan_id=99999999", "?enabled=true", "?plan_id=1&plan_id=2"} {
+			assert.False(t, request(t, "GET", "/api/custom_subscription/rules"+query, "", "", 200).Success, query)
+		}
+
+		scopePlan := model.CustomSubscriptionPlan{Code: "rule-scope", Title: "Rule scope", Enabled: true, Version: 1}
+		require.NoError(t, db.Create(&scopePlan).Error)
+		scopedBody := strings.Replace(makeRule("scoped"), `"plan_id":null`, fmt.Sprintf(`"plan_id":"%d"`, scopePlan.Id), 1)
+		scopedRes := request(t, "POST", rulesBase, scopedBody, admin, 200)
+		require.True(t, scopedRes.Success, scopedRes.Message)
+		var scopedRow map[string]any
+		require.NoError(t, common.Unmarshal(scopedRes.Data, &scopedRow))
+		assert.Equal(t, fmt.Sprint(scopePlan.Id), scopedRow["plan_id"])
+		assert.NotNil(t, scopedRow["plan"])
+		require.True(t, request(t, "GET", "/api/custom_subscription/rules?plan_id="+fmt.Sprint(scopePlan.Id), "", "", 200).Success)
+		assert.False(t, request(t, "DELETE", base+"/"+fmt.Sprint(scopePlan.Id), "", admin, 200).Success)
+		require.NoError(t, db.Model(&scopePlan).Update("enabled", false).Error)
+		assert.False(t, request(t, "GET", "/api/custom_subscription/rules?plan_id="+fmt.Sprint(scopePlan.Id), "", "", 200).Success)
+		require.True(t, request(t, "DELETE", rulesBase+"/"+scopedRow["id"].(string), "", admin, 200).Success)
+		require.True(t, request(t, "DELETE", base+"/"+fmt.Sprint(scopePlan.Id), "", admin, 200).Success)
+		update := strings.TrimSuffix(makeRule("managed"), "}") + `,"version":"1"}`
+		for _, state := range []struct {
+			confirmed bool
+			version   string
+		}{{false, operation_setting.CurrentComplianceTermsVersion}, {true, "outdated"}} {
+			payment.ComplianceConfirmed, payment.ComplianceTermsVersion = state.confirmed, state.version
+			assert.False(t, request(t, "POST", rulesBase, makeRule("locked"), admin, 200).Success)
+			assert.False(t, request(t, "PUT", rulePath, update, admin, 200).Success)
+			assert.False(t, request(t, "DELETE", rulePath, "", admin, 200).Success)
+			assert.True(t, request(t, "GET", rulePath, "", admin, 200).Success)
+			assert.True(t, request(t, "GET", rulesBase, "", admin, 200).Success)
+		}
+		payment.ComplianceConfirmed, payment.ComplianceTermsVersion = true, operation_setting.CurrentComplianceTermsVersion
+		update = strings.Replace(update, `"enabled":true`, `"enabled":false`, 1)
+		require.True(t, request(t, "PUT", rulePath, update, admin, 200).Success)
+		assert.False(t, request(t, "PUT", rulePath, update, admin, 200).Success)
+		public = request(t, "GET", "/api/custom_subscription/rules", "", "", 200)
+		require.NoError(t, common.Unmarshal(public.Data, &publicData))
+		assert.Empty(t, publicData.Items)
+		require.True(t, request(t, "DELETE", rulePath, "", admin, 200).Success)
+		assert.False(t, request(t, "GET", rulePath, "", admin, 200).Success)
+	})
+
 }

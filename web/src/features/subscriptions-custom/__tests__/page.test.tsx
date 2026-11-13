@@ -16,11 +16,53 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+
+import { api } from '@/lib/api'
 
 import { SubscriptionsCustom } from '..'
+import rules from '../rules.json'
+
+function renderDemo() {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  return render(
+    <QueryClientProvider client={client}>
+      <SubscriptionsCustom />
+    </QueryClientProvider>
+  )
+}
+beforeEach(() => {
+  vi.spyOn(api, 'get').mockResolvedValue({
+    data: {
+      success: true,
+      data: {
+        items: rules.map((rule, index) => ({
+          id: String(index + 1),
+          rule_key: String(index),
+          title: rule.title,
+          content: {
+            blocks: [
+              {
+                type: 'paragraph',
+                children: rule.body.map((part) => ({
+                  text: part.text,
+                  style: part.emphasis
+                    ? { color: '#0052d9', fontWeight: 700 }
+                    : {},
+                })),
+              },
+            ],
+          },
+        })),
+      },
+    },
+  })
+})
 
 vi.mock('@/components/layout', () => ({
   PublicLayout: ({ children }: { children: React.ReactNode }) => (
@@ -33,7 +75,7 @@ vi.mock('@/components/layout/components/footer', () => ({
 afterEach(cleanup)
 it('renders Demo footer columns, copyright and working FAQ', async () => {
   const user = userEvent.setup()
-  render(<SubscriptionsCustom />)
+  renderDemo()
   const footer = within(screen.getByRole('contentinfo'))
   expect(footer.getByText('帮助')).toBeVisible()
   expect(footer.getByText('合作')).toBeVisible()
@@ -44,7 +86,7 @@ it('renders Demo footer columns, copyright and working FAQ', async () => {
 })
 it('opens customer support with the demo contact details', async () => {
   const user = userEvent.setup()
-  render(<SubscriptionsCustom />)
+  renderDemo()
   await user.click(screen.getAllByRole('button', { name: '联系客服' })[0])
   const dialog = screen.getByRole('dialog', { name: '联系客服' })
   expect(within(dialog).getByText('企业微信（响应最快）')).toBeVisible()
@@ -60,16 +102,19 @@ it('opens customer support with the demo contact details', async () => {
   await user.click(within(dialog).getByRole('button', { name: '知道了' }))
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 })
-it('shows six offers, exact annual points and all rules', () => {
-  render(<SubscriptionsCustom />)
+it('shows six offers, exact annual points and all rules', async () => {
+  renderDemo()
   expect(screen.getByRole('contentinfo')).toBeVisible()
   expect(screen.getAllByRole('article')).toHaveLength(6)
   expect(screen.getByText('2,388,000')).toBeVisible()
   expect(screen.getByRole('heading', { name: '订阅规则' })).toBeVisible()
+  for (const rule of rules) {
+    expect(await screen.findByText(rule.title, { exact: true })).toBeVisible()
+  }
 })
 it('requires consent, simulates one renewal selection and never claims payment', async () => {
   const user = userEvent.setup()
-  render(<SubscriptionsCustom />)
+  renderDemo()
   await user.click(screen.getAllByRole('switch')[0])
   const dialog = screen.getByRole('dialog')
   expect(
@@ -85,7 +130,7 @@ it('requires consent, simulates one renewal selection and never claims payment',
 })
 it('replaces renewal selections, supports cancellation and resets on remount', async () => {
   const user = userEvent.setup()
-  const view = render(<SubscriptionsCustom />)
+  const view = renderDemo()
   for (const index of [0, 1]) {
     await user.click(screen.getAllByRole('switch')[index])
     await user.click(within(screen.getByRole('dialog')).getByRole('checkbox'))
@@ -110,7 +155,7 @@ it('replaces renewal selections, supports cancellation and resets on remount', a
     'false'
   )
   view.unmount()
-  render(<SubscriptionsCustom />)
+  renderDemo()
   expect(
     screen
       .getAllByRole('switch')
@@ -119,7 +164,7 @@ it('replaces renewal selections, supports cancellation and resets on remount', a
 })
 it('cancels a purchase with Escape without enabling renewal', async () => {
   const user = userEvent.setup()
-  render(<SubscriptionsCustom />)
+  renderDemo()
   await user.click(screen.getAllByRole('switch')[0])
   await user.keyboard('{Escape}')
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
@@ -130,7 +175,7 @@ it('cancels a purchase with Escape without enabling renewal', async () => {
 })
 it('shows demo empty states rather than account records', async () => {
   const user = userEvent.setup()
-  render(<SubscriptionsCustom />)
+  renderDemo()
   await user.click(screen.getByRole('tab', { name: '订单' }))
   expect(screen.getByText('暂无演示订阅订单。')).toBeVisible()
 })

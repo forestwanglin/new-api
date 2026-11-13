@@ -149,7 +149,7 @@ func customSubscriptionInput(c *gin.Context, update bool) (model.CustomSubscript
 }
 
 func customSubscriptionError(c *gin.Context, err error) {
-	for _, safe := range []error{model.ErrCustomSubscriptionNotFound, model.ErrCustomSubscriptionDuplicate, model.ErrCustomSubscriptionConflict, model.ErrCustomSubscriptionHasOrders, model.ErrPointTypeNotFound} {
+	for _, safe := range []error{model.ErrCustomSubscriptionNotFound, model.ErrCustomSubscriptionDuplicate, model.ErrCustomSubscriptionConflict, model.ErrCustomSubscriptionHasOrders, model.ErrCustomSubscriptionHasRules, model.ErrPointTypeNotFound} {
 		if errors.Is(err, safe) {
 			common.ApiErrorT(c, safe.Error())
 			return

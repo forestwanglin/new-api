@@ -1,0 +1,11 @@
+.subscription-rule-content {
+  font-size: 15px;
+  line-height: 1.8;
+  font-weight: 400;
+}
+.subscription-rule-content > p {
+  margin: 6px 0 0;
+  color: var(--muted-foreground);
+  font-size: 15px;
+  line-height: 1.8;
+}

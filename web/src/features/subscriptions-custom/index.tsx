@@ -30,12 +30,12 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { PublicSubscriptionRules } from '@/features/custom-subscriptions/rules/public-rules'
 
 import { subscriptionCopy as t } from './copy'
 import { SubscriptionsCustomFooter } from './footer'
 import { PlanCard } from './plan-card'
 import { offerId, plans, type Offer } from './plans'
-import rules from './rules.json'
 import { SupportDialog } from './support-dialog'
 
 import '@/styles/subscriptions-custom.css'
@@ -191,22 +191,7 @@ export function SubscriptionsCustom() {
               </section>
               <section className='sub-card'>
                 <h2>{t('Subscription rules')}</h2>
-                <ol className='sub-rules'>
-                  {rules.map((rule) => (
-                    <li key={rule.title}>
-                      <strong>{rule.title}</strong>
-                      <p>
-                        {rule.body.map((part) =>
-                          part.emphasis ? (
-                            <b key={part.text}>{part.text}</b>
-                          ) : (
-                            part.text
-                          )
-                        )}
-                      </p>
-                    </li>
-                  ))}
-                </ol>
+                <PublicSubscriptionRules />
                 <Button variant='outline' onClick={() => setSupportOpen(true)}>
                   {t('Contact support')}
                 </Button>

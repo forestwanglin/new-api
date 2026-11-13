@@ -81,7 +81,7 @@ var (
 )
 
 func migrateCustomSubscriptions(db *gorm.DB) error {
-	return db.AutoMigrate(&CustomSubscriptionPlan{}, &CustomSubscriptionOrder{})
+	return db.AutoMigrate(&CustomSubscriptionPlan{}, &CustomSubscriptionOrder{}, &CustomSubscriptionRule{})
 }
 
 // This input contains only editable configuration, never identity or metadata.
@@ -219,6 +219,12 @@ func DeleteCustomSubscriptionPlan(id int64) error {
 		}
 		if count > 0 {
 			return ErrCustomSubscriptionHasOrders
+		}
+		if err := tx.Model(&CustomSubscriptionRule{}).Where("plan_id = ?", id).Count(&count).Error; err != nil {
+			return err
+		}
+		if count > 0 {
+			return ErrCustomSubscriptionHasRules
 		}
 		return tx.Delete(&p).Error
 	})

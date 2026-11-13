@@ -26,7 +26,7 @@ type Option struct {
 func AllOption() ([]*Option, error) {
 	var options []*Option
 	var err error
-	err = DB.Find(&options).Error
+	err = DB.Not(map[string]any{"key": customSubscriptionRuleSeedKey}).Find(&options).Error
 	return options, err
 }
 
@@ -232,6 +232,9 @@ func SyncOptions(frequency int) {
 }
 
 func validateOptionValue(key string, value string) error {
+	if key == customSubscriptionRuleSeedKey {
+		return ErrSubscriptionRuleFields
+	}
 	if key == legacyAccessTokenRetireAtKey {
 		return errLegacyRetireAtReadOnly
 	}
@@ -374,7 +377,7 @@ func UpdateOptionsBulk(values map[string]string) error {
 }
 
 func updateOptionMap(key string, value string) (err error) {
-	if key == retiredThemeOptionKey || key == legacyAccessTokenRetireAtKey {
+	if key == customSubscriptionRuleSeedKey || key == retiredThemeOptionKey || key == legacyAccessTokenRetireAtKey {
 		common.OptionMapRWMutex.Lock()
 		delete(common.OptionMap, key)
 		common.OptionMapRWMutex.Unlock()
