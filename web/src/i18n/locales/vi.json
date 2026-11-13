@@ -7708,6 +7708,11 @@
     "Failed to manage configuration tutorials": "Không thể quản lý hướng dẫn cấu hình",
     "Find setup instructions, code examples and common questions in the contents. Use your browser search to find keywords.": "Tìm hướng dẫn cấu hình và mã mẫu trong mục lục. Dùng tính năng tìm kiếm của trình duyệt để tìm từ khóa.",
     "Title": "Tiêu đề",
-    "Failed to load custom subscriptions": "Không thể tải các gói đăng ký tùy chỉnh"
+    "Failed to load custom subscriptions": "Không thể tải các gói đăng ký tùy chỉnh",
+    "Invalid custom subscription checkout": "Invalid custom subscription checkout",
+    "Custom subscription checkout request conflict": "Custom subscription checkout request conflict",
+    "Failed to process custom subscription payment": "Failed to process custom subscription payment",
+    "Purchase purpose": "Purchase purpose",
+    "Custom subscription": "Custom subscription"
   }
 }

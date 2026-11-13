@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 export const configuredPlan = {
   id: '9007199254740993',
+  version: '1',
   title: '后台月付计划',
   subtitle: '来自后台的副标题',
   billing_cycle: 'month' as const,

@@ -25,6 +25,7 @@ import { BillingHistoryDialog } from '@/features/wallet/components/dialogs/billi
 import en from '@/i18n/locales/en.json'
 import zh from '@/i18n/locales/zh.json'
 import { api } from '@/lib/api'
+import { useAuthStore } from '@/stores/auth-store'
 
 import { RechargeFormCard } from '../components/recharge-form-card'
 
@@ -125,3 +126,40 @@ it.each([
     expect(screen.getByPlaceholderText('Minimum 1')).toBeVisible()
   }
 )
+
+it('labels custom subscription payments and hides ordinary manual completion for an administrator', async () => {
+  useAuthStore.getState().auth.setUser({ id: 1, username: 'admin', role: 10 })
+  vi.spyOn(api, 'get').mockResolvedValue({
+    data: {
+      success: true,
+      data: {
+        total: 1,
+        items: [
+          {
+            id: 1,
+            business_type: 'custom_subscription',
+            status: 'pending',
+            amount: 0,
+            money: 29,
+            trade_no: 'CUSTOM1',
+            payment_method: 'alipay',
+            create_time: 1,
+          },
+        ],
+      },
+    },
+  })
+  render(
+    <I18nextProvider i18n={i18n}>
+      <BillingHistoryDialog open onOpenChange={vi.fn()} />
+    </I18nextProvider>
+  )
+  expect(await screen.findByText('CUSTOM1')).toBeVisible()
+  expect(screen.getByText('自定义订阅')).toBeVisible()
+  expect(screen.getByText('购买用途')).toBeVisible()
+  expect(screen.getByText('29')).toBeVisible()
+  expect(
+    screen.queryByRole('button', { name: '完成订单' })
+  ).not.toBeInTheDocument()
+  useAuthStore.setState(useAuthStore.getInitialState(), true)
+})

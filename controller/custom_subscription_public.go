@@ -11,6 +11,7 @@ import (
 // Public offers deliberately exclude administrator identity and audit fields.
 type publicCustomSubscriptionPlan struct {
 	ID                 string            `json:"id"`
+	Version            string            `json:"version"`
 	Title              string            `json:"title"`
 	Subtitle           string            `json:"subtitle"`
 	BillingCycle       string            `json:"billing_cycle"`
@@ -65,7 +66,7 @@ func ReadPublicCustomSubscriptionPlans(c *gin.Context) {
 			benefits = []string{}
 		}
 		items = append(items, publicCustomSubscriptionPlan{
-			ID: strconv.FormatInt(plan.Id, 10), Title: plan.Title, Subtitle: plan.Subtitle,
+			ID: strconv.FormatInt(plan.Id, 10), Version: strconv.FormatInt(plan.Version, 10), Title: plan.Title, Subtitle: plan.Subtitle,
 			BillingCycle: plan.BillingCycle, DurationMonths: plan.DurationMonths, Currency: plan.Currency,
 			PriceAmountMinor: strconv.FormatInt(plan.PriceAmountMinor, 10), PaidPoints: strconv.FormatInt(plan.PaidPoints, 10), PaidPointType: paidType,
 			BonusPoints: strconv.FormatInt(plan.BonusPoints, 10), BonusPointType: bonusType,

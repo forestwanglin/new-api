@@ -7708,6 +7708,11 @@
     "Failed to manage configuration tutorials": "Failed to manage configuration tutorials",
     "Find setup instructions, code examples and common questions in the contents. Use your browser search to find keywords.": "Find setup instructions, code examples and common questions in the contents. Use your browser search to find keywords.",
     "Title": "Title",
-    "Failed to load custom subscriptions": "Failed to load custom subscriptions"
+    "Failed to load custom subscriptions": "Failed to load custom subscriptions",
+    "Invalid custom subscription checkout": "Invalid custom subscription checkout",
+    "Custom subscription checkout request conflict": "Custom subscription checkout request conflict",
+    "Failed to process custom subscription payment": "Failed to process custom subscription payment",
+    "Purchase purpose": "Purchase purpose",
+    "Custom subscription": "Custom subscription"
   }
 }

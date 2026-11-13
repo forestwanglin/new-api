@@ -13,6 +13,7 @@ import (
 )
 
 type TopUp struct {
+	BusinessType    string  `json:"business_type" gorm:"type:varchar(32);not null;default:''"`
 	Id              int     `json:"id"`
 	UserId          int     `json:"user_id" gorm:"index"`
 	Amount          int64   `json:"amount"`
@@ -158,6 +159,9 @@ func UpdatePendingTopUpStatus(tradeNo string, expectedPaymentProvider string, ta
 		if err := lockForUpdate(tx).Where(refCol+" = ?", tradeNo).First(topUp).Error; err != nil {
 			return ErrTopUpNotFound
 		}
+		if topUp.BusinessType == "custom_subscription" {
+			return ErrPaymentMethodMismatch
+		}
 		if expectedPaymentProvider != "" && topUp.PaymentProvider != expectedPaymentProvider {
 			return ErrPaymentMethodMismatch
 		}
@@ -189,6 +193,9 @@ func RechargeEpay(tradeNo string, actualPaymentMethod string, callerIp string) (
 	err = DB.Transaction(func(tx *gorm.DB) error {
 		if err := lockForUpdate(tx).Where(refCol+" = ?", tradeNo).First(topUp).Error; err != nil {
 			return ErrTopUpNotFound
+		}
+		if topUp.BusinessType == "custom_subscription" {
+			return ErrPaymentMethodMismatch
 		}
 		if topUp.PaymentProvider != PaymentProviderEpay {
 			return ErrPaymentMethodMismatch
@@ -467,6 +474,10 @@ func ManualCompleteTopUp(tradeNo string, callerIp string) error {
 		// 行级锁，避免并发补单
 		if err := lockForUpdate(tx).Where(refCol+" = ?", tradeNo).First(topUp).Error; err != nil {
 			return common.NewMessage("Top-up order does not exist")
+		}
+
+		if topUp.BusinessType == "custom_subscription" {
+			return ErrPaymentMethodMismatch
 		}
 
 		// 幂等处理：已成功直接返回

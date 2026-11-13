@@ -17,9 +17,22 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { createFileRoute } from '@tanstack/react-router'
+import { z } from 'zod'
 
 import { SubscriptionsCustom } from '@/features/subscriptions-custom'
 
 export const Route = createFileRoute('/subscription/')({
-  component: SubscriptionsCustom,
+  validateSearch: z.object({
+    trade_no: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{1,64}$/)
+      .optional()
+      .catch(undefined),
+  }),
+  component: SubscriptionPage,
 })
+
+function SubscriptionPage() {
+  const search = Route.useSearch()
+  return <SubscriptionsCustom tradeNo={search.trade_no} />
+}

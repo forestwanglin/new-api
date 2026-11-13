@@ -29,6 +29,8 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, expect, it, vi } from 'vitest'
 
 import { api } from '@/lib/api'
+import { useAuthStore } from '@/stores/auth-store'
+import { useLoginModalStore } from '@/stores/login-modal-store'
 
 import { SubscriptionsCustom } from '..'
 import { configuredPlan, yearlyPlan } from './fixtures'
@@ -38,7 +40,11 @@ vi.mock('@/components/layout', () => ({
     <div>{props.children}</div>
   ),
 }))
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  useAuthStore.setState(useAuthStore.getInitialState(), true)
+  useLoginModalStore.getState().close()
+})
 function renderPage() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -85,8 +91,9 @@ it('groups backend records by month/year and renders exact configured prices, po
   ).toBeGreaterThan(0)
   expect(screen.queryByText(/较逐月购买省2个月/)).not.toBeInTheDocument()
 })
-it('disables unavailable renewal and uses the selected database record in the demo confirmation', async () => {
+it('disables unavailable renewal and uses the selected database record in the purchase confirmation', async () => {
   const user = userEvent.setup()
+  useAuthStore.getState().auth.setUser({ id: 1, username: 'buyer', role: 1 })
   mockPlans([yearlyPlan])
   const post = vi.spyOn(api, 'post')
   renderPage()
@@ -102,11 +109,13 @@ it('disables unavailable renewal and uses the selected database record in the de
   await user.click(within(card).getByRole('button', { name: /单次购买/ }))
   const dialog = screen.getByRole('dialog')
   expect(within(dialog).getByRole('heading', { level: 3 })).toHaveTextContent(
-    '后台年付计划 · 年付 · ¥ 90,071,992,547,409.93'
+    '后台年付计划 · 年付'
   )
-  await user.click(within(dialog).getByRole('checkbox'))
-  await user.click(within(dialog).getByRole('button', { name: '确认演示' }))
-  expect(screen.getByRole('status')).toHaveTextContent('未实际支付或开通订阅')
+  expect(within(dialog).getByText(/本次支付/)).toHaveTextContent(
+    '¥ 90,071,992,547,409.93'
+  )
+  expect(within(dialog).getByText(/365 天/)).toBeVisible()
+  expect(within(dialog).queryByText(/演示|预览/)).not.toBeInTheDocument()
   expect(post).not.toHaveBeenCalled()
 })
 it('shows a distinct empty state without resurrecting sample offers', async () => {
@@ -173,7 +182,8 @@ it('uses no bonus for zero reward and discards a stale selection when a plan is 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   )
 })
-it('refreshes the confirmation cycle together with a changed configured plan', async () => {
+it('requires reconfirmation when the selected plan version and cycle change', async () => {
+  useAuthStore.getState().auth.setUser({ id: 1, username: 'buyer', role: 1 })
   const user = userEvent.setup()
   mockPlans([configuredPlan])
   const client = renderPage()
@@ -182,13 +192,20 @@ it('refreshes the confirmation cycle together with a changed configured plan', a
   await act(async () => {
     client.setQueryData(
       ['subscription-plans', 'public'],
-      [{ ...yearlyPlan, id: configuredPlan.id }]
+      [{ ...yearlyPlan, id: configuredPlan.id, version: '2' }]
     )
   })
   const dialog = screen.getByRole('dialog')
   await waitFor(() =>
     expect(within(dialog).getByRole('heading', { level: 3 })).toHaveTextContent(
-      '后台年付计划 · 年付 · ¥ 90,071,992,547,409.93'
+      '后台年付计划 · 年付'
     )
   )
+})
+
+it('uses the real enabled plan version as a required exact checkout identifier', async () => {
+  mockPlans([{ ...configuredPlan, version: undefined }])
+  renderPage()
+  expect(await screen.findByText(/version/)).toBeVisible()
+  expect(screen.queryAllByRole('article')).toHaveLength(0)
 })

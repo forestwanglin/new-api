@@ -170,61 +170,13 @@ it('shows configured offers, exact annual points and all rules', async () => {
   expect(screen.getAllByText(/2,388,000 通用积分/).length).toBeGreaterThan(0)
   expect(screen.getByRole('heading', { name: '订阅规则' })).toBeVisible()
 })
-it('requires consent, simulates one renewal selection and never claims payment', async () => {
+it('keeps automatic renewal disabled without creating a simulated authorization', async () => {
   const user = userEvent.setup()
   await renderDemo()
-  await user.click(screen.getAllByRole('switch')[0])
-  const dialog = screen.getByRole('dialog')
-  expect(
-    within(dialog).getByRole('button', { name: '确认演示' })
-  ).toBeDisabled()
-  await user.click(within(dialog).getByRole('checkbox'))
-  await user.click(within(dialog).getByRole('button', { name: '确认演示' }))
-  expect(screen.getAllByRole('switch')[0]).toHaveAttribute(
-    'aria-checked',
-    'true'
-  )
-  expect(screen.getByRole('status')).toHaveTextContent('未实际支付或开通订阅。')
-})
-it('replaces renewal selections, supports cancellation and resets on remount', async () => {
-  const user = userEvent.setup()
-  const view = await renderDemo()
-  for (const index of [0, 1]) {
-    await user.click(screen.getAllByRole('switch')[index])
-    await user.click(within(screen.getByRole('dialog')).getByRole('checkbox'))
-    await user.click(
-      within(screen.getByRole('dialog')).getByRole('button', {
-        name: '确认演示',
-      })
-    )
+  for (const toggle of screen.getAllByRole('switch')) {
+    expect(toggle).toHaveAttribute('aria-disabled', 'true')
   }
-  expect(
-    screen
-      .getAllByRole('switch')
-      .filter((el) => el.getAttribute('aria-checked') === 'true')
-  ).toHaveLength(1)
-  expect(screen.getAllByRole('switch')[0]).toHaveAttribute(
-    'aria-checked',
-    'false'
-  )
-  await user.click(screen.getAllByRole('switch')[1])
-  expect(screen.getAllByRole('switch')[1]).toHaveAttribute(
-    'aria-checked',
-    'false'
-  )
-  view.unmount()
-  await renderDemo()
-  expect(
-    screen
-      .getAllByRole('switch')
-      .every((el) => el.getAttribute('aria-checked') === 'false')
-  ).toBe(true)
-})
-it('cancels a purchase with Escape without enabling renewal', async () => {
-  const user = userEvent.setup()
-  await renderDemo()
   await user.click(screen.getAllByRole('switch')[0])
-  await user.keyboard('{Escape}')
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   expect(screen.getAllByRole('switch')[0]).toHaveAttribute(
     'aria-checked',
@@ -241,7 +193,7 @@ it('hides account-only tabs and sections for signed-out visitors', async () => {
   ).toBeNull()
   expect(screen.getByRole('heading', { name: '订阅规则' })).toBeVisible()
 })
-it('shows demo empty states rather than account records', async () => {
+it('labels unavailable order history rather than displaying fabricated account records', async () => {
   const user = userEvent.setup()
   signIn()
   await renderDemo()
@@ -250,5 +202,7 @@ it('shows demo empty states rather than account records', async () => {
     screen.getByRole('heading', { name: '我的订阅与权益排期' })
   ).toBeVisible()
   await user.click(screen.getByRole('tab', { name: '订单' }))
-  expect(screen.getByText('暂无演示订阅订单。')).toBeVisible()
+  expect(
+    screen.getByText('本次支付结果见页面上方，完整订单记录暂未开放。')
+  ).toBeVisible()
 })

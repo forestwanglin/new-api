@@ -7710,6 +7710,11 @@
     "Failed to manage configuration tutorials": "Не удалось управлять руководствами",
     "Find setup instructions, code examples and common questions in the contents. Use your browser search to find keywords.": "Инструкции и примеры кода доступны в содержании. Для поиска используйте поиск браузера.",
     "Title": "Заголовок",
-    "Failed to load custom subscriptions": "Не удалось загрузить пользовательские подписки"
+    "Failed to load custom subscriptions": "Не удалось загрузить пользовательские подписки",
+    "Invalid custom subscription checkout": "Invalid custom subscription checkout",
+    "Custom subscription checkout request conflict": "Custom subscription checkout request conflict",
+    "Failed to process custom subscription payment": "Failed to process custom subscription payment",
+    "Purchase purpose": "Purchase purpose",
+    "Custom subscription": "Custom subscription"
   }
 }

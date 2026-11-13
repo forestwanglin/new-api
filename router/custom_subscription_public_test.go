@@ -55,13 +55,14 @@ func TestCustomSubscriptionPublicPlans(t *testing.T) {
 	require.NoError(t, common.Unmarshal(response.Data, &data))
 	require.Len(t, data.Items, 101)
 	assert.Equal(t, "100", data.Items[0]["id"])
+	assert.IsType(t, "", data.Items[0]["version"])
 	assert.Equal(t, "101", data.Items[50]["id"])
 	assert.Equal(t, "9007199254740993", data.Items[0]["paid_points"])
 	assert.Equal(t, "9007199254740993", data.Items[0]["price_amount_minor"])
 	assert.Equal(t, false, data.Items[0]["auto_renew_enabled"])
 	assert.EqualValues(t, 1250, data.Items[0]["auto_renew_bonus_bps"])
 	assert.Equal(t, "Configured points", data.Items[0]["paid_point_type"].(map[string]any)["name"])
-	for _, key := range []string{"version", "enabled", "sort_order", "created_at", "updated_at", "code", "tier_code", "tier_rank"} {
+	for _, key := range []string{"enabled", "sort_order", "created_at", "updated_at", "code", "tier_code", "tier_rank"} {
 		assert.NotContains(t, data.Items[0], key)
 	}
 	assert.False(t, read(base+"?enabled=false").Success)

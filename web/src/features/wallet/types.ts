@@ -253,6 +253,7 @@ export type TopupStatus = 'success' | 'pending' | 'expired'
  * Topup billing record
  */
 export interface TopupRecord {
+  business_type?: string
   /** Record ID */
   id: number
   /** User ID */

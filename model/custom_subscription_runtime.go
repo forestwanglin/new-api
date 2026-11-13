@@ -315,50 +315,58 @@ func fulfillCustomSubscriptionOrder(orderID int64, clock func() int64) (*CustomU
 		}
 		return nil, err
 	}
-	var result CustomUserSubscription
+	var result *CustomUserSubscription
 	err := customSubscriptionTransaction(owner.UserId, clock, func(s *customSubscriptionSchedule) error {
-		var order CustomSubscriptionOrder
-		if err := lockForUpdate(s.tx).First(&order, orderID).Error; err != nil {
-			return err
-		}
-		if order.UserId != owner.UserId {
-			return ErrCustomSubscriptionOrderInvalid
-		}
-		existing := s.tx.Where("order_id = ?", orderID).Limit(1).Find(&result)
-		if existing.Error != nil {
-			return existing.Error
-		}
-		if existing.RowsAffected > 0 {
-			if order.FulfillmentStatus != CustomSubscriptionFulfillmentComplete || order.FulfilledAt == nil || result.UserId != owner.UserId {
-				return ErrCustomSubscriptionStateInvalid
-			}
-			return nil
-		}
-		duration, err := customSubscriptionDurationMs(order.BillingCycle, order.DurationMonths)
-		if err != nil {
-			return err
-		}
-		if order.Status != common.TopUpStatusSuccess || order.PaidAt == nil || *order.PaidAt <= 0 || *order.PaidAt > s.now || order.PlanId <= 0 || order.PlanVersion <= 0 || order.Priority < 0 || order.Priority > math.MaxInt32 || order.AmountDueMinor <= 0 || order.AmountPaidMinor < order.AmountDueMinor || order.RefundedAmountMinor != 0 || order.FulfilledAt != nil || order.FulfillmentStatus == CustomSubscriptionFulfillmentComplete {
-			return ErrCustomSubscriptionOrderInvalid
-		}
-		var snapshot map[string]common.RawMessage
-		if common.UnmarshalJsonStr(order.PlanSnapshot, &snapshot) != nil || snapshot == nil {
-			return ErrCustomSubscriptionOrderInvalid
-		}
-		result = CustomUserSubscription{UserId: order.UserId, OrderId: order.Id, PlanId: order.PlanId, PlanVersion: order.PlanVersion, PlanSnapshot: order.PlanSnapshot, Priority: order.Priority, BillingCycle: order.BillingCycle, DurationMonths: order.DurationMonths, TotalDurationMs: duration, RemainingDurationMs: duration, Status: "paused", PurchasedAt: *order.PaidAt, CreatedAt: s.now, UpdatedAt: s.now}
-		if err := s.tx.Create(&result).Error; err != nil {
-			return err
-		}
-		s.subscriptions = append(s.subscriptions, result)
-		if err := s.selectCurrent(); err != nil {
-			return err
-		}
-		if err := s.tx.Model(&CustomSubscriptionOrder{}).Where("id = ?", orderID).Updates(map[string]any{"fulfillment_status": CustomSubscriptionFulfillmentComplete, "fulfilled_at": s.now, "updated_at": s.now}).Error; err != nil {
-			return err
-		}
-		return s.tx.First(&result, result.Id).Error
+		var err error
+		result, err = s.fulfillOrder(orderID)
+		return err
 	})
-	return &result, err
+	return result, err
+}
+
+// fulfillOrder shares the schedule transaction with payment and point credits.
+func (s *customSubscriptionSchedule) fulfillOrder(orderID int64) (*CustomUserSubscription, error) {
+	var result CustomUserSubscription
+	var order CustomSubscriptionOrder
+	if err := lockForUpdate(s.tx).First(&order, orderID).Error; err != nil {
+		return nil, err
+	}
+	if order.UserId != s.state.UserId {
+		return nil, ErrCustomSubscriptionOrderInvalid
+	}
+	existing := s.tx.Where("order_id = ?", orderID).Limit(1).Find(&result)
+	if existing.Error != nil {
+		return nil, existing.Error
+	}
+	if existing.RowsAffected > 0 {
+		if order.FulfillmentStatus != CustomSubscriptionFulfillmentComplete || order.FulfilledAt == nil || result.UserId != s.state.UserId {
+			return nil, ErrCustomSubscriptionStateInvalid
+		}
+		return &result, nil
+	}
+	duration, err := customSubscriptionDurationMs(order.BillingCycle, order.DurationMonths)
+	if err != nil {
+		return nil, err
+	}
+	if order.Status != common.TopUpStatusSuccess || order.PaidAt == nil || *order.PaidAt <= 0 || *order.PaidAt > s.now || order.PlanId <= 0 || order.PlanVersion <= 0 || order.Priority < 0 || order.Priority > math.MaxInt32 || order.AmountDueMinor <= 0 || order.AmountPaidMinor < order.AmountDueMinor || order.RefundedAmountMinor != 0 || order.FulfilledAt != nil || order.FulfillmentStatus == CustomSubscriptionFulfillmentComplete {
+		return nil, ErrCustomSubscriptionOrderInvalid
+	}
+	var snapshot map[string]common.RawMessage
+	if common.UnmarshalJsonStr(order.PlanSnapshot, &snapshot) != nil || snapshot == nil {
+		return nil, ErrCustomSubscriptionOrderInvalid
+	}
+	result = CustomUserSubscription{UserId: order.UserId, OrderId: order.Id, PlanId: order.PlanId, PlanVersion: order.PlanVersion, PlanSnapshot: order.PlanSnapshot, Priority: order.Priority, BillingCycle: order.BillingCycle, DurationMonths: order.DurationMonths, TotalDurationMs: duration, RemainingDurationMs: duration, Status: "paused", PurchasedAt: *order.PaidAt, CreatedAt: s.now, UpdatedAt: s.now}
+	if err := s.tx.Create(&result).Error; err != nil {
+		return nil, err
+	}
+	s.subscriptions = append(s.subscriptions, result)
+	if err := s.selectCurrent(); err != nil {
+		return nil, err
+	}
+	if err := s.tx.Model(&CustomSubscriptionOrder{}).Where("id = ?", orderID).Updates(map[string]any{"fulfillment_status": CustomSubscriptionFulfillmentComplete, "fulfilled_at": s.now, "updated_at": s.now}).Error; err != nil {
+		return nil, err
+	}
+	return &result, s.tx.First(&result, result.Id).Error
 }
 
 func ReconcileCustomUserSubscriptions(userID int64) error {

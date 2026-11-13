@@ -388,6 +388,13 @@ func SetApiRouter(router *gin.Engine) {
 		tutorialAdmin.PUT("/chapters/:id", controller.UpdateConfigTutorialChapter)
 		tutorialAdmin.DELETE("/chapters/:id", controller.DeleteConfigTutorialChapter)
 
+		apiRouter.GET("/custom_subscription/payment_methods", middleware.DisableCache(), controller.GetCustomSubscriptionPaymentMethods)
+		apiRouter.POST("/custom_subscription/orders", middleware.UserAuth(), middleware.SessionCookieOriginGuard(), middleware.CriticalRateLimit(), middleware.DisableCache(), controller.CreateCustomSubscriptionOrder)
+		apiRouter.GET("/custom_subscription/orders/:trade_no", middleware.UserAuth(), middleware.DisableCache(), controller.GetCustomSubscriptionOrder)
+		apiRouter.POST("/custom_subscription/epay/notify", anonymousRequestBodyLimit, controller.CustomSubscriptionEpayNotify)
+		apiRouter.GET("/custom_subscription/epay/notify", controller.CustomSubscriptionEpayNotify)
+		apiRouter.POST("/custom_subscription/epay/return", anonymousRequestBodyLimit, controller.CustomSubscriptionEpayReturn)
+		apiRouter.GET("/custom_subscription/epay/return", controller.CustomSubscriptionEpayReturn)
 		apiRouter.GET("/custom_subscription/self", middleware.UserAuth(), controller.GetCustomSubscriptionSelf)
 		apiRouter.GET("/custom_subscription/plans", controller.ReadPublicCustomSubscriptionPlans)
 		apiRouter.GET("/custom_subscription/rules", controller.ReadCustomSubscriptionRules)

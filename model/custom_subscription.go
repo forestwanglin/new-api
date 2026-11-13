@@ -35,9 +35,12 @@ type CustomSubscriptionPlan struct {
 	UpdatedAt            int64  `gorm:"type:bigint;autoUpdateTime:milli"`
 }
 type CustomSubscriptionOrder struct {
+	TopUpId              *int    `gorm:"uniqueIndex:idx_cso_topup"`
+	CheckoutRequestId    *string `gorm:"type:varchar(64);uniqueIndex:idx_cso_checkout,priority:2"`
+	QuotaToCredit        int64   `gorm:"type:bigint;not null;default:0"`
 	Id                   int64   `gorm:"primaryKey"`
 	TradeNo              string  `gorm:"type:varchar(64);not null;uniqueIndex:idx_cso_trade"`
-	UserId               int64   `gorm:"type:bigint;not null;index:idx_cso_user_time,priority:1"`
+	UserId               int64   `gorm:"type:bigint;not null;index:idx_cso_user_time,priority:1;uniqueIndex:idx_cso_checkout,priority:1"`
 	PlanId               int64   `gorm:"type:bigint;not null;index:idx_cso_plan"`
 	PlanVersion          int64   `gorm:"type:bigint;not null"`
 	PlanSnapshot         string  `gorm:"type:text;not null"`

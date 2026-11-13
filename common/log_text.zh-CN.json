@@ -854,5 +854,7 @@
   "zhipu_image_missing_url": "智谱图片接口没有返回 URL",
   "¥%.6f quota": "¥%.6f 额度",
   "＄%.6f quota": "＄%.6f 额度",
-  "custom subscription expiry task failed: %v": "自定义订阅到期任务失败: %v"
+  "custom subscription expiry task failed: %v": "自定义订阅到期任务失败: %v",
+  "custom subscription payment callback rejected trade_no=%q reason=%s": "自定义订阅支付回调被拒绝 订单号=%q 原因=%s",
+  "custom subscription pending order expiry failed": "自定义订阅待支付订单过期处理失败"
 }

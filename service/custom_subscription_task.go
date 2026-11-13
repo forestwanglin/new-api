@@ -40,6 +40,9 @@ func runCustomSubscriptionExpiryOnce() {
 		return
 	}
 	defer customSubscriptionExpiryRunning.Store(false)
+	if _, err := model.ExpirePendingCustomSubscriptionOrders(customSubscriptionExpiryBatchSize); err != nil {
+		logger.LogWarn(context.Background(), common.LogText("custom subscription pending order expiry failed"))
+	}
 	for {
 		n, err := model.ExpireDueCustomSubscriptions(customSubscriptionExpiryBatchSize)
 		if err != nil {

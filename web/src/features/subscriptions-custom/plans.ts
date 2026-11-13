@@ -29,6 +29,7 @@ const pointType = z.object({ id: quantity, code: z.string(), name: z.string() })
 export const publicPlanSchema = z
   .object({
     id: quantity,
+    version: quantity,
     title: z.string(),
     subtitle: z.string(),
     billing_cycle: z.enum(['month', 'year']),

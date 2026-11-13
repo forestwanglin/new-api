@@ -73,9 +73,9 @@ export function PlanCard(props: Props) {
   )
   if (!offer.plan.auto_renew_enabled) {
     renewalInstruction = t('Auto renewal is unavailable for this plan.')
-  } else if (props.enabled) {
+  } else {
     renewalInstruction = t(
-      'Demo setting only; no scheduled charge. Turn off the switch to cancel.'
+      'Automatic renewal is not available yet. One-time purchases do not authorize future charges.'
     )
   }
   const period = offer.yearly ? t('year') : t('month')
@@ -117,11 +117,7 @@ export function PlanCard(props: Props) {
           <div>
             <h4>
               {t('Auto renewal')}{' '}
-              <span className='sub-recommend'>
-                {offer.plan.auto_renew_enabled
-                  ? t('Recommended')
-                  : t('Unavailable')}
-              </span>
+              <span className='sub-recommend'>{t('Unavailable')}</span>
             </h4>
             <p>
               {t('Future auto renewals add {{rate}} extra points', {
@@ -131,7 +127,7 @@ export function PlanCard(props: Props) {
           </div>
           <Switch
             checked={props.enabled}
-            disabled={!offer.plan.auto_renew_enabled}
+            disabled
             aria-label={`${offer.plan.title} ${period} ${t('Auto renewal')}`}
             onCheckedChange={() =>
               props.enabled
@@ -161,7 +157,7 @@ export function PlanCard(props: Props) {
         </p>
         <p>{renewalInstruction}</p>
         <Button
-          disabled={!offer.plan.auto_renew_enabled}
+          disabled
           onClick={() => props.onSelect({ ...offer, auto: true })}
         >
           {price} · {t('Subscribe and enable auto renewal')}

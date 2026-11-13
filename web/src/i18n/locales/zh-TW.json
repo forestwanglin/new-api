@@ -7708,6 +7708,11 @@
     "Failed to manage configuration tutorials": "設定教學管理失敗",
     "Find setup instructions, code examples and common questions in the contents. Use your browser search to find keywords.": "從建立密鑰到接入工具，按目錄找到所需說明。可使用瀏覽器搜尋定位關鍵字。",
     "Title": "標題",
-    "Failed to load custom subscriptions": "取得自訂訂閱失敗"
+    "Failed to load custom subscriptions": "取得自訂訂閱失敗",
+    "Invalid custom subscription checkout": "Invalid custom subscription checkout",
+    "Custom subscription checkout request conflict": "Custom subscription checkout request conflict",
+    "Failed to process custom subscription payment": "Failed to process custom subscription payment",
+    "Purchase purpose": "Purchase purpose",
+    "Custom subscription": "Custom subscription"
   }
 }

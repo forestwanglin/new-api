@@ -7708,6 +7708,11 @@
     "Failed to manage configuration tutorials": "設定ガイドの管理に失敗しました",
     "Find setup instructions, code examples and common questions in the contents. Use your browser search to find keywords.": "目次から設定手順とコード例を探せます。ブラウザーの検索機能も利用できます。",
     "Title": "タイトル",
-    "Failed to load custom subscriptions": "カスタムサブスクリプションの読み込みに失敗しました"
+    "Failed to load custom subscriptions": "カスタムサブスクリプションの読み込みに失敗しました",
+    "Invalid custom subscription checkout": "Invalid custom subscription checkout",
+    "Custom subscription checkout request conflict": "Custom subscription checkout request conflict",
+    "Failed to process custom subscription payment": "Failed to process custom subscription payment",
+    "Purchase purpose": "Purchase purpose",
+    "Custom subscription": "Custom subscription"
   }
 }

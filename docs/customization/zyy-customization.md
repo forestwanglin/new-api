@@ -836,6 +836,16 @@
 - 验证：Go 使用声明的 1.26.10；隔离 SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 16.16 上设置 `TEST_MYSQL_DSN` / `TEST_POSTGRES_DSN` 后执行 `go test ./model -run 'CustomSubscription|SubscriptionRule' -count=2 -v` 通过，覆盖新建、变更前自定义表升级、无DDL重复迁移、并发履约/读取、真实到期边界接续及取消到期历史保留。`go test ./model ./middleware ./service -count=1`、`go test ./router -run TestCustomSubscription -count=1`、相关包 vet 与 `go build ./...` 通过。前端相关 Vitest 15文件/101用例、typecheck（1,560文件/2项目）、改动文件 lint/format 和 `bun run build` 通过。全局路由登记检查仍有6个既有缺项；使用 HEAD 路由/登记文件的 Go overlay 复现完全相同失败，本次 self 路由已登记并通过匿名/PAT/归属测试。未验证浏览器交互、最低数据库版本或完整发行库升级。
 - 风险与未覆盖：订阅履约标记仅代表权益实例生成，不代表积分发放；首次服务从实际履约开始，支付时间仅用于排队。真实支付/积分/relay 权益接入须后续明确，不能把模型调用当作支付验证。未使用完整最新发行数据库升级样本或最低数据库版本；本次采用隔离真实引擎和精确变更前自定义表的代表性升级验证。
 
+### Z045 自定义订阅单次支付、积分与权益原子结算
+
+- 需求与原因：公开订阅页从演示购买改为真实单次购买；支付成功保留原 quota 入账，同时将套餐付费／常规赠送积分发入指定类型账户，并生成优先级服务排期。
+- 变更内容：复用登录弹窗及钱包易支付表单，支持支付宝／微信、方案版本确认、用户内幂等请求、本人订单查询与有限轮询。支付及订阅两单关联创建；验签和校验商户／金额／渠道后，一个主库事务完成 quota、point_accounts／point_transactions／point_ledger、订单状态、用户订阅及事件，重复回调只结算一次。普通充值回调及人工补单不能绕过订阅结算；30分钟本地过期仍可接受验证通过的延迟成功。公开页加载真实服务排期，自动续费、完整历史及发票明确暂未开放；钱包历史按用途显示订阅购买，避免显示旧 amount=0。
+- 影响面：新增 `model/custom_subscription_payment.go` 与模型测试、`controller/custom_subscription_payment.go` 与路由测试；修改自定义订单／履约模型、公开方案 DTO、到期 service、`web/src/features/subscriptions-custom/` 页面/API/测试及单次支付状态路由；更新 [custom-subscriptions.md](custom-subscriptions.md)。**上游自有文件**：`model/topup.go`、`router/api-router.go`、`middleware/access_token_routes.go`、`common/log_text.zh-CN.json`、`web/src/features/wallet/{types.ts,components/dialogs/billing-history-dialog.tsx,__tests__/copy.test.tsx}`、七种 `web/src/i18n/locales/*.json`。
+- 与上游差异：上游钱包充值只增加 quota；本条扩展 fork 的自定义订阅为三项原子履约。旧钱包与旧订阅保持原处理路径。Z044 的独立权益履约公开函数仍不发积分，本条统一结算在事务内复用权益逻辑。
+- 开关与默认值：复用既有支付配置、合规确认、会话与主节点任务，无新运行时依赖或环境变量。实付为套餐固定人民币分，不应用钱包预设充值折扣或充值最低额；quota 快照按 `(price_minor/100)/Price/topup_group_ratio*QuotaPerUnit` 的严格 half-away 整数换算，零组倍率沿用1，积分单独取套餐快照。新增唯一可空 top_up_id、用户内唯一可空 checkout_request_id、quota_to_credit；TopUp.business_type 默认空，订阅为 custom_subscription。旧数据不自动回填账务。回退代码保留全部新增列及账务。
+- 验证：声明工具链 Go1.26.10；隔离 SQLite3.50.4／MySQL8.4.13／PostgreSQL16.16，设置专用 `TEST_MYSQL_DSN`、`TEST_POSTGRES_DSN` 后执行 `go test ./model -run 'CustomSubscription|SubscriptionRule|PointsDatabaseMatrix' -count=2 -v` 通过（17.336s），覆盖新建及代表性变更前表升级两次、数据／唯一索引保留、并发同请求和不同订单、通知重放、积分类型拆分与合并、钱包／积分／服务失败回滚、渠道交易冲突、延迟通知、截止时间溢出、历史未关联订单不阻塞过期扫描及关联异常回滚。`go test ./model ./middleware ./service -count=1`、`go test ./router -run TestCustomSubscription -count=1` 通过。`go build ./...`、相关五包 vet 通过；相关前端20文件／121用例、typecheck（1,564文件／2项目）、改动文件 lint／format、生产构建通过。Chrome 使用隔离模拟传输验证访客登录拦截、真实确认文案、微信方式、390×844布局与本地表单跳转，未实际支付。安全审查参考 OWASP ASVS5.0.0、Authentication／Session Management／CSRF Cheat Sheets，复用会话、Origin防护、后端归属／PAT限制；未改变登录签发与会话轮换，不声称全站认证。
+- 风险与未覆盖：易支付SDK缺少权威主动查单接口，本次依靠通知重试与签名返回补偿，不具备主动平台对账。未做真实商户扣款、完整发行库恢复升级或最低数据库版本验证；实际回调入口与支付配置仍需部署环境联调。全局 `TestAccessTokenRouteRulesCoverEveryDashboardRoute` 仍有6个已有路由登记缺项，使用任务开始 HEAD 路由／登记文件的 Go overlay 复现完全相同集合，本次新增路由已全部登记。新旧 quota 与积分同时发放是明确业务要求；本次不修改 relay 积分消费、自动续费、退款、邀请奖励或发票。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
@@ -844,6 +854,7 @@
 
 | 区域 | 文件 | 关联条目 |
 |---|---|---|
+| 自定义订阅支付 | `model/topup.go`、`router/api-router.go`、`middleware/access_token_routes.go`、`common/log_text.zh-CN.json`、钱包类型/历史组件/测试、七种 locale | Z045 |
 | 登录认证弹窗与手机绑定 | `model/auth_flow.go`、`controller/{wechat,misc,option}.go`、`router/api-router.go`、前端 Dialog/auth/settings、布局/路由/导航/HTTP 入口、七种 locale | Z042 |
 | 配置教程 | model/{main,option}.go、router/api-router.go、middleware/access_token_routes.go、前端顶部/侧栏 hooks、维护侧栏配置、七种 locale、生成路由 | Z043 |
 | 公开订阅计划 | `router/api-router.go` | Z041 |
