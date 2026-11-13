@@ -49,6 +49,7 @@
   <a href="#quick-start">Quick start</a> •
   <a href="#deployment">Deployment</a> •
   <a href="#development">Development</a> •
+  <a href="#fork-customizations">Fork customizations</a> •
   <a href="#documentation">Documentation</a>
 </p>
 
@@ -275,14 +276,33 @@ Open [http://localhost:5173](http://localhost:5173); the development server prox
 | Location | Responsibility |
 | --- | --- |
 | `router/`, `middleware/`, `controller/` | HTTP routes, access checks, and API handlers |
-| `relay/` | Upstream adapters and request routing |
+| `relay/` | Upstream adapters and request routing; `relay/channel/` holds the per-provider channel adapters |
 | `service/`, `model/` | Business logic and persistence |
+| `setting/`, `common/` | Runtime configuration and shared utilities (JSON, quota math, crypto, email) |
+| `pkg/` | Internal packages: billing expression engine, JS plugin runtime, hybrid cache, metrics, WebSocket manager |
+| `oauth/`, `i18n/`, `logger/`, `constant/`, `dto/`, `types/` | OAuth/OIDC providers, backend i18n, logging, and shared types and constants |
 | [relaykit/](./relaykit/README.md) | Independently buildable Go module for protocol DTOs and conversions |
+| [tokenkit/](./tokenkit/README.md) | Independently buildable Go module for token counting and estimation |
 | [plugins/tasks/](./plugins/tasks/) | JavaScript task plugins; see [Task Plugin API v1](./docs/plugin-api/v1.md) for authoring and host boundaries |
-| `web/` | Web console; see [frontend conventions](./web/AGENTS.md) |
+| `web/` | Web console (React 19); `web/src/features/` holds the console feature modules; see [frontend conventions](./web/AGENTS.md) |
 | [electron/](./electron/README.md) | Desktop wrapper and packaging |
+| `docs/` | Guides, OpenAPI specs, the plugin API, and the fork customization registry |
 
 Read [AGENTS.md](./AGENTS.md) before contributing. Run checks appropriate to your change, including `make test` for the Go modules and `bun check -b`, `bun run lint`, `bun run test`, and `bun run build` in `web/` for frontend changes. Changes to RelayKit must also pass `GOWORK=off go build ./...` from `relaykit/`.
+
+<a id="fork-customizations"></a>
+
+## Fork customizations (zyy)
+
+This working copy is the `zyy` fork of upstream [QuantumNous/new-api](https://github.com/QuantumNous/new-api). On top of the upstream feature set it adds:
+
+- **Points (积分)** — independent business point accounts alongside quota, with admin management, a read-only ledger, and per-user balances.
+- **Custom subscriptions** — a public subscription page and admin plan management, isolated from the native subscription and quota flows.
+- **Seedance channel testing** — read-only quick health checks and real (billed) video generation tests, billed by the channel's own group.
+- **Model square pricing** — per-second CNY pricing for video models and group-ratio discount / original-price display.
+- **Console redesign** — a unified user-facing page layout and top navigation.
+
+The authoritative, itemized registry of every fork change lives in [docs/customization/zyy-customization.md](./docs/customization/zyy-customization.md); deployment and upgrade procedures are in [docs/deploy/](./docs/deploy/).
 
 <a id="documentation"></a>
 

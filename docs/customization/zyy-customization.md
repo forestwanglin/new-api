@@ -755,6 +755,35 @@
 - 影响面：新增模型、controller、router/model 测试、前端 `features/custom-subscriptions/` 及路由/测试；**上游自有文件**：`model/main.go`、`router/api-router.go`、`middleware/access_token_routes.go`、侧栏数据/默认配置、maintenance 配置与开关、七种 locale、`i18n/static-keys.ts` 和 `routeTree.gen.ts`。
 - 验证与边界：前端相关9文件/74用例、typecheck、改动文件lint/format、生产构建通过；分页使用与用户/渠道相同的默认完整组件，覆盖每页条数、数字页码、首末页及服务端参数。Chrome隔离实例验证空态、新增、详情、精确9,007,199,254,740,993积分、两类积分类型、编辑清零/禁用、搜索空态/恢复、删除取消、键盘关闭以及每页20→50；390px页面与详情均宽390px，表格在容器内滚动，未观察到console error。主题/语言切换和真实多页数据的浏览器交互未逐项实测，语言/多页行为由回归测试覆盖。隔离真实 SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 17.11 的新建/代表性旧库、重复迁移、索引/NULL 唯一键、精确整数和 CRUD 测试通过；实际 router 权限与无账务写入检查通过。后端 vet/build 与 model/router/middleware 包测试通过。项目声明 Go 1.26.10 下载失败，本机使用 Go 1.27.3 验证，未改 go.mod。controller 整包存在既有 `TestOpenAIChatSamplingCompatibility` 四个子例失败，恢复本次集成文件至 HEAD 的 overlay 仍复现，未改无关路径。未验证最低数据库版本或完整发行版数据库升级；回滚代码保留新增表和数据。
 
+---
+
+### Z039 根 README 结构总览与 fork 定制摘要
+
+- 需求与原因：根 `README.md` 此前与上游完全一致，其“Development and extensions”结构表只覆盖
+  `router/`、`relay/`、`service/`、`model/`、`relaykit/`、`plugins/tasks/`、`web/`、`electron/`，
+  未体现 `setting/`、`common/`、`pkg/`、`tokenkit/`、`oauth/`、`i18n/` 等目录，也未说明本 fork
+  相对上游新增的能力。用户要求“分析总体结构并更新根 README”，让 README 准确描述当前代码布局与
+  fork 定制。
+- 变更内容（纯文档，`README.md`，英文，与文件既有语言一致）：
+  - 补全结构表：新增 `setting/`、`common/`、`pkg/`、`tokenkit/`、`oauth/`、`i18n/`、`logger/`、
+    `constant/`、`dto/`、`types/`、`docs/` 行；为 `relay/` 补 `relay/channel/` 渠道适配器说明、
+    为 `web/` 补 `web/src/features/` 功能模块说明。
+  - 新增 `## Fork customizations (zyy)` 小节（含 TOC 锚点 `#fork-customizations`）：一句话说明本
+    fork 身份，5 条高层定制摘要（积分、自定义订阅、Seedance 渠道测试、模型广场定价、控制台改版），
+    并指向 `docs/customization/zyy-customization.md`（权威登记）与 `docs/deploy/`（部署/升级）。
+  - 顶部 TOC 增加 `Fork customizations` 链接。
+- 影响面：**上游自有文件** `README.md`（结构表 + 新增小节 + TOC）。无后端、前端、部署、配置或
+  运行行为改动；不改动受保护的 new-api / QuantumNous 品牌与归属信息。
+- 与上游差异：上游 README 结构表无上述目录行、无 fork 定制小节；本 fork 增补以准确描述当前代码
+  布局与定制。属“面向用户的文档”差异。
+- 开关与默认值：无（纯文档）。
+- 验证：`git diff README.md` 复核三处改动（TOC、结构表、fork 小节）；链接目标
+  `docs/customization/zyy-customization.md`、`docs/deploy/`、`tokenkit/README.md`、`web/AGENTS.md`
+  均存在。纯文档，未运行构建或测试。
+- 风险与未覆盖：`README.md` 属上游文件，下次 `git merge upstream/main` 可能冲突，升级时按 §5
+  复核；fork 定制摘要为高层概述，逐项细节以 `docs/customization/zyy-customization.md` 为准，
+  后续新增定制需同步更新该登记（本条不重复登记各定制细节）。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
@@ -783,6 +812,7 @@
 | 前端用户端基础 | `web/src/components/layout/components/section-page-layout.tsx`、`web/src/features/keys/index.tsx`、`web/src/features/usage-logs/index.tsx`、`web/src/styles/index.css` | Z020 |
 | 前端系统信息 | `web/src/features/system-info/constants.ts` | Z007 |
 | i18n | `web/src/i18n/locales/{en,zh,zh-TW,fr,ru,ja,vi}.json` | Z002 / Z004 / Z007 / Z012 / Z013 |
+| 根 README | `README.md` | Z039 |
 
 ## 6. 验证快照
 
