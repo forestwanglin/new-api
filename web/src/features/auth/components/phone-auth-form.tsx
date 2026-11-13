@@ -54,6 +54,10 @@ export function PhoneAuthForm(props: PhoneAuthFormProps) {
   const [error, setError] = useState('')
   const active = useRef(true)
   const operation = useRef<AbortController | null>(null)
+  const imageOperation = useRef<AbortController | null>(null)
+  const attemptedChallenges = useRef(new Set<string>())
+  const replacingChallenge = useRef<string | undefined>(undefined)
+  const [imageVerifying, setImageVerifying] = useState(false)
   const form = useForm<PhoneFields>({
     resolver: zodResolver(phoneSchema),
     defaultValues: { phone: '', answer: '', code: '' },
@@ -70,11 +74,14 @@ export function PhoneAuthForm(props: PhoneAuthFormProps) {
     meta: { errorToast: false },
   })
 
+  const { refetch: refetchCaptcha } = captcha
+
   useEffect(() => {
     active.current = true
     return () => {
       active.current = false
       operation.current?.abort()
+      imageOperation.current?.abort()
     }
   }, [])
   useEffect(() => {
@@ -83,8 +90,78 @@ export function PhoneAuthForm(props: PhoneAuthFormProps) {
     return () => window.clearInterval(timer)
   }, [retryAt])
 
+  useEffect(() => {
+    const challenge = captcha.data
+    setSendToken('')
+    setImageVerifying(false)
+    if (
+      !props.enabled ||
+      !challenge ||
+      !/^1[3-9]\d{9}$/.test(phone) ||
+      !/^\d{5}$/.test(answer)
+    ) {
+      return
+    }
+    if (attemptedChallenges.current.has(challenge.challenge_token)) {
+      if (replacingChallenge.current !== challenge.challenge_token) {
+        replacingChallenge.current = challenge.challenge_token
+        form.setValue('answer', '')
+        void refetchCaptcha()
+      }
+      return
+    }
+    const controller = new AbortController()
+    imageOperation.current = controller
+    const timer = window.setTimeout(async () => {
+      if (controller.signal.aborted || !active.current) return
+      // A challenge allows one server attempt, including aborted/ambiguous requests.
+      attemptedChallenges.current.add(challenge.challenge_token)
+      setImageVerifying(true)
+      setError('')
+      try {
+        const result = await phoneAuthRequest<{ send_token: string }>(
+          '/api/phone/captcha/verify',
+          {
+            phone,
+            answer,
+            challenge_token: challenge.challenge_token,
+            bind_token: props.bindToken,
+          },
+          challenge.browser_token,
+          controller.signal
+        )
+        if (!controller.signal.aborted && active.current) {
+          setSendToken(result.send_token)
+        }
+      } catch (failure) {
+        markServerErrorHandled(failure)
+        if (!controller.signal.aborted && active.current) {
+          setError(getServerErrorMessage(failure))
+          form.setValue('answer', '')
+          void refetchCaptcha()
+        }
+      } finally {
+        if (active.current && imageOperation.current === controller) {
+          setImageVerifying(false)
+        }
+      }
+    }, 350)
+    return () => {
+      window.clearTimeout(timer)
+      controller.abort()
+    }
+  }, [
+    phone,
+    answer,
+    props.enabled,
+    props.bindToken,
+    captcha.data,
+    form,
+    refetchCaptcha,
+  ])
+
   const action = useMutation({
-    mutationFn: async (kind: 'image' | 'send' | 'login') => {
+    mutationFn: async (kind: 'send' | 'login') => {
       if (!captcha.data) return
       operation.current?.abort()
       const controller = new AbortController()
@@ -97,20 +174,7 @@ export function PhoneAuthForm(props: PhoneAuthFormProps) {
           controller.signal
         )
       setError('')
-      if (kind === 'image') {
-        const result = await request<{ send_token: string }>(
-          '/api/phone/captcha/verify',
-          {
-            phone,
-            answer,
-            challenge_token: captcha.data.challenge_token,
-            bind_token: props.bindToken,
-          }
-        )
-        if (!controller.signal.aborted && active.current) {
-          setSendToken(result.send_token)
-        }
-      } else if (kind === 'send') {
+      if (kind === 'send') {
         // Sending is single-use, including provider failures and timeouts.
         const permit = sendToken
         setSendToken('')
@@ -123,7 +187,7 @@ export function PhoneAuthForm(props: PhoneAuthFormProps) {
           setRetryAt(Date.now() + result.retry_after * 1000)
           setNow(Date.now())
           form.setValue('answer', '')
-          void captcha.refetch()
+          void refetchCaptcha()
         }
       } else {
         const result = await request<unknown>('/api/phone/login', {
@@ -141,14 +205,32 @@ export function PhoneAuthForm(props: PhoneAuthFormProps) {
         setError(getServerErrorMessage(failure))
         form.setValue('answer', '')
         setSendToken('')
-        void captcha.refetch()
+        void refetchCaptcha()
       }
     },
     meta: { errorToast: false },
   })
 
   const remaining = Math.max(0, Math.ceil((retryAt - now) / 1000))
+  const invalidateImage = () => {
+    imageOperation.current?.abort()
+    setImageVerifying(false)
+    setSendToken('')
+  }
+  const replaceUsedImage = () => {
+    const token = captcha.data?.challenge_token
+    if (
+      token &&
+      attemptedChallenges.current.has(token) &&
+      replacingChallenge.current !== token
+    ) {
+      replacingChallenge.current = token
+      form.setValue('answer', '')
+      void refetchCaptcha()
+    }
+  }
   const resetProof = () => {
+    invalidateImage()
     operation.current?.abort()
     setSendToken('')
     setSMSToken('')
@@ -158,7 +240,7 @@ export function PhoneAuthForm(props: PhoneAuthFormProps) {
   const refreshImage = () => {
     resetProof()
     form.setValue('answer', '')
-    void captcha.refetch()
+    void refetchCaptcha()
   }
 
   return (
@@ -182,7 +264,12 @@ export function PhoneAuthForm(props: PhoneAuthFormProps) {
         autoComplete='tel-national'
         maxLength={11}
         placeholder={t('Enter your 11-digit phone number')}
-        {...form.register('phone', { onChange: resetProof })}
+        {...form.register('phone', {
+          onChange: () => {
+            resetProof()
+            replaceUsedImage()
+          },
+        })}
         aria-invalid={Boolean(form.formState.errors.phone)}
       />
       <Label htmlFor={`${id}-image`}>{t('Image verification code')}</Label>
@@ -195,8 +282,8 @@ export function PhoneAuthForm(props: PhoneAuthFormProps) {
           placeholder={t('Enter image code')}
           {...form.register('answer', {
             onChange: () => {
-              operation.current?.abort()
-              setSendToken('')
+              invalidateImage()
+              replaceUsedImage()
             },
           })}
         />
@@ -219,22 +306,6 @@ export function PhoneAuthForm(props: PhoneAuthFormProps) {
           {!captcha.data && t('Refresh')}
         </Button>
       </div>
-      <Button
-        type='button'
-        variant='outline'
-        className='auth-verify'
-        onClick={() => action.mutate('image')}
-        disabled={
-          !props.enabled ||
-          action.isPending ||
-          !captcha.data ||
-          !/^1[3-9]\d{9}$/.test(phone) ||
-          !/^\d{5}$/.test(answer) ||
-          Boolean(sendToken)
-        }
-      >
-        {sendToken ? t('Image verified') : t('Verify image code')}
-      </Button>
       <Label htmlFor={`${id}-sms`}>{t('SMS verification code')}</Label>
       <div className='auth-code-row'>
         <Input
@@ -251,7 +322,11 @@ export function PhoneAuthForm(props: PhoneAuthFormProps) {
           variant='outline'
           onClick={() => action.mutate('send')}
           disabled={
-            !props.enabled || !sendToken || action.isPending || remaining > 0
+            !props.enabled ||
+            !sendToken ||
+            imageVerifying ||
+            action.isPending ||
+            remaining > 0
           }
         >
           {remaining
@@ -260,7 +335,9 @@ export function PhoneAuthForm(props: PhoneAuthFormProps) {
         </Button>
       </div>
       <p className='auth-helper' role='status'>
-        {t('Verify the image code before requesting an SMS code')}
+        {sendToken
+          ? t('Image verified')
+          : t('Verify the image code before requesting an SMS code')}
       </p>
       {!props.enabled && (
         <p className='auth-helper'>

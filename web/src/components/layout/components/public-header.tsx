@@ -107,7 +107,7 @@ export function PublicHeader(props: PublicHeaderProps) {
   let authContent = (
     <Button
       size='sm'
-      className='h-auto rounded-[9px] border-0 bg-[#2563eb] px-[18px] py-2.5 text-[15px] leading-[1.62] font-semibold text-white shadow-[0_2px_6px_-2px_#2563eb4d] hover:bg-[#1d4ed8]'
+      className='h-auto min-w-max rounded-[9px] border-0 bg-[#2563eb] px-[18px] py-2.5 text-[15px] leading-[1.62] font-semibold text-white shadow-[0_2px_6px_-2px_#2563eb4d] hover:bg-[#1d4ed8]'
       onClick={() => useLoginModalStore.getState().open()}
     >
       {t('Register / Sign in')}
@@ -246,7 +246,9 @@ export function PublicHeader(props: PublicHeaderProps) {
                 {showAuthButtons && (
                   <>
                     <div className='bg-border/40 mx-1 hidden h-4 w-px sm:block' />
-                    {authContent}
+                    <div className='flex shrink-0 items-center'>
+                      {authContent}
+                    </div>
                   </>
                 )}
               </div>

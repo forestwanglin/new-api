@@ -160,6 +160,8 @@ it('uses the combined registration and sign-in label and demo primary button', a
   await userEvent.setup().click(entry)
   expect(useLoginModalStore.getState().isOpen).toBe(true)
   expect(entry).toHaveClass(
+    'min-w-max',
+    'shrink-0',
     'text-[15px]',
     'rounded-[9px]',
     'px-[18px]',

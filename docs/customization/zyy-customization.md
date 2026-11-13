@@ -808,12 +808,13 @@
 ### Z042 Demo 登录弹窗、阿里云短信与微信强制绑定手机号
 
 - 需求与行为：全局复用 Demo 注册/登录弹窗，保留微信扫码和手机号验证码；移除邮箱与邀请码。公共入口、受保护路由和认证过期均走弹窗；管理员恢复入口保留 `/sign-in?admin=true`。成功继续安全的本地目标，不自动重放付款或业务变更请求。
-- 认证契约：服务端图形验证后签发一次性短信发送授权，关联浏览器/号码/微信待绑定流程；六位短信最多五次尝试、五分钟有效，重发成功使旧码失效，数据库持久化限流，阿里云超时不重试。验证码使用 salted slow hash，正式会话仍经现有 `setupLogin` 与 TOTP/passkey 策略。
+- 认证契约：有效手机号与完整图形码输入后，页面经 350 毫秒防抖自动验证，取消独立验证按钮；输入变化/刷新/关闭取消旧请求，忽略过期响应，同一图形码不重复提交。服务端图形验证后签发一次性短信发送授权，关联浏览器/号码/微信待绑定流程；六位短信最多五次尝试、五分钟有效，重发成功使旧码失效，数据库持久化限流，阿里云超时不重试。验证码使用 salted slow hash，正式会话仍经现有 `setupLogin` 与 TOTP/passkey 策略。
 - 微信与持久化：已绑定手机号继续共享登录，未绑定只签发十分钟受限流程；绑定完成才允许正式会话。已被其他账号占用的号码拒绝绑定并提示换号，不合并资产。复用 `external_identity_claims` 唯一归属，`auth_flows.attempts` 为默认零的增量列；回滚保留身份与列。
 - 配置：新增认证设置 `phone-sms`，默认关闭；非秘密 options 为 `phone.enabled/region/sign_name/template_code`。凭据仅由后端环境 `ALIYUN_SMS_ACCESS_KEY_ID`、`ALIYUN_SMS_ACCESS_KEY_SECRET`、可选 `ALIYUN_SMS_SECURITY_TOKEN` 读取；操作步骤见 [phone-authentication.md](phone-authentication.md)。未新增运行依赖或修改部署脚本。
 - 影响面：新增 phone model/service/controller/settings、阿里云发送边界、弹窗 store/forms/CSS/API 与定向回归。上游自有改动包括 `model/auth_flow.go`、`controller/{wechat,misc,option}.go`、`router/api-router.go`，前端 Dialog primitives、auth API/types、认证设置注册与 use-update-option 状态失效、七种 locale，以及全局布局/路由/导航/HTTP 认证入口。
 - 已验证：`go test ./service ./model -run '^TestPhone' -count=1` 通过（含过期、猜测/重放、跨浏览器/跨 purpose、号主冲突、撤销版本、注册关闭、重发失效、供应商失败与固定签名向量）；新增前端组件/API 3 文件 6 用例通过，后台真实配置表单与缓存失效另新增 5 个回归（短信/OAuth/passkey 三套件共 35 用例通过）。真实 SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 16.16 三库矩阵通过，覆盖旧表升级两次、已有数据、唯一索引、并发手机号归属和尝试预算。命令：设置专用 TEST_MYSQL_DSN/TEST_POSTGRES_DSN 后执行 `go test ./model -run TestPhoneIdentityDatabaseMatrix -count=1`。前端认证相关 21 文件 / 152 用例、typecheck、所属文件 lint/format、生产构建及 `go build ./...`、`go vet ./model ./service ./controller ./router ./middleware ./setting/system_setting` 通过。六个后端相关包在排除两组已于 bf5183f5b 副本复现的原有失败（TestOpenAIChatSamplingCompatibility、TestAccessTokenRouteRulesCoverEveryDashboardRoute）后通过；完整原样测试仍有这两组失败。本次暂存内容的独立副本亦通过六包测试、1535 文件类型检查和相同 152 个前端用例，确认没有依赖并行教程代码。Chrome 检查桌面及 390×844 移动布局、真实图形码加载、两个 TAB、验证前发送禁用及中文文案。Demo 浏览器文件访问受限，依据源码 CSS 核对，未做像素级截图差异验证。
 - 安全依据：OWASP ASVS stable 5.0.0 的认证节流（6.3.1）、一致认证路径（6.3.4）、一次使用/随机/有效期（6.5.1、6.5.3–6.5.5）与 OOB 猜测限制（6.6.3），以及 Authentication、Session Management、CSRF Cheat Sheets；服务器校验与集成测试落实本次相关控制，不作整体合规声明。
+- 自动图形验证回归：真实输入交互与可控网络响应覆盖成功、失败、换号、修改答案、刷新图片、请求中关闭、请求前关闭及旧失败响应晚到；协议重新勾选时刷新已使用挑战，允许重新输入验证。表单 9 用例，连同弹窗/API 与公共导航共 4 文件 21 用例通过，相关 lint/format 与类型检查通过。公共导航登录按钮解除图标固定宽度限制，Chrome 实测宽约 109px、文字无溢出。
 - 限制：未配置真实阿里云凭据，真实送达待运营配置后验证；不声称完整 ASVS 合规或最低数据库版本兼容。前端其余语言暂以英文回退，简体中文已提供。
 
 ### Z043 配置教程与管理员 Markdown 管理

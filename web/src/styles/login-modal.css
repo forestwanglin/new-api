@@ -198,14 +198,6 @@
   height: 36px;
   object-fit: contain;
 }
-.login-modal .auth-verify {
-  margin-top: 10px;
-  width: 100%;
-  font-size: 14px;
-  border: 1px solid #dce2ea;
-  background: #fff;
-  color: var(--tx);
-}
 .login-modal .auth-submit {
   width: 100%;
   margin-top: 18px;
@@ -279,16 +271,13 @@
     transform 0.08s;
 }
 .login-modal .auth-submit,
-.login-modal .auth-code-row button,
-.login-modal .auth-verify {
+.login-modal .auth-code-row button {
   border-radius: 10px;
 }
-.login-modal .auth-code-row button,
-.login-modal .auth-verify {
+.login-modal .auth-code-row button {
   border-color: #d7e0eb;
 }
-.login-modal .auth-code-row button:not(:disabled):hover,
-.login-modal .auth-verify:not(:disabled):hover {
+.login-modal .auth-code-row button:not(:disabled):hover {
   background: #f3f7ff;
   border-color: #b8cced;
   color: #1d4ed8;
@@ -302,8 +291,7 @@
   transform: none;
 }
 .login-modal .auth-submit:disabled,
-.login-modal .auth-code-row button:disabled,
-.login-modal .auth-verify:disabled {
+.login-modal .auth-code-row button:disabled {
   opacity: 0.48;
 }
 .login-modal .auth-submit:disabled:hover {
