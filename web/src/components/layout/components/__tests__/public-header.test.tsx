@@ -28,12 +28,15 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, expect, it, vi } from 'vitest'
 
 import { api } from '@/lib/api'
+import { useSystemConfigStore } from '@/stores/system-config-store'
 
 import { PublicHeader, type PublicHeaderProps } from '../public-header'
 
+const initialSystemConfig = useSystemConfigStore.getState()
 const clients: QueryClient[] = []
 afterEach(() => {
   cleanup()
+  useSystemConfigStore.setState(initialSystemConfig)
   clients.splice(0).forEach((client) => client.clear())
 })
 
@@ -120,4 +123,39 @@ it('does not expose closed mobile navigation and restores focus after Escape', a
   )
   await user.keyboard('{Escape}')
   expect(trigger).toHaveFocus()
+})
+
+it('matches demo branding and keeps navigation beside the brand with tools at the right', async () => {
+  useSystemConfigStore.getState().setLoading(false)
+  await renderHeader({ navLinks: [{ title: 'Example', href: '/example' }] })
+  const brand = await screen.findByRole('link', { name: 'logo New API' })
+  expect(within(brand).getByRole('img').parentElement).toHaveClass(
+    'size-[30px]'
+  )
+  expect(within(brand).getByText('New API')).toHaveClass(
+    'text-[17px]',
+    'font-bold'
+  )
+  expect(brand.parentElement).toHaveClass('lg:flex-none')
+  expect(brand.parentElement).not.toHaveClass('@container/system-brand')
+  expect(brand.closest('nav')).not.toHaveClass('justify-between')
+  const language = screen.getByRole('button', { name: 'Change language' })
+  const trigger = screen.getByRole('button', { name: 'Toggle navigation menu' })
+  const actions = language.closest('.ms-auto')
+  expect(actions).not.toBeNull()
+  expect(actions).toContainElement(trigger)
+})
+
+it('uses the combined registration and sign-in label and demo primary button', async () => {
+  useSystemConfigStore.getState().setLoading(false)
+  await renderHeader()
+  const entry = await screen.findByRole('link', { name: 'Register / Sign in' })
+  expect(entry).toHaveAttribute('href', '/sign-in')
+  expect(entry).toHaveClass(
+    'text-[15px]',
+    'rounded-[9px]',
+    'px-[18px]',
+    'py-2.5',
+    'bg-[#2563eb]'
+  )
 })

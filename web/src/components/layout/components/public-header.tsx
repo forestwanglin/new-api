@@ -119,14 +119,15 @@ export function PublicHeader(props: PublicHeaderProps) {
   let authContent = (
     <Button
       size='sm'
-      className='h-8 rounded-lg px-3.5 text-xs font-medium'
+      role='link'
+      className='h-auto rounded-[9px] border-0 bg-[#2563eb] px-[18px] py-2.5 text-[15px] leading-[1.62] font-semibold text-white shadow-[0_2px_6px_-2px_#2563eb4d] [a]:hover:bg-[#1d4ed8]'
       render={<Link to='/sign-in' />}
     >
-      {t('Sign in')}
+      {t('Register / Sign in')}
     </Button>
   )
   if (isAuthenticated) authContent = <ProfileDropdown />
-  if (loading) authContent = <Skeleton className='h-8 w-20 rounded-lg' />
+  if (loading) authContent = <Skeleton className='h-11 w-32 rounded-[9px]' />
 
   useEffect(() => {
     if (!authPromptTarget) return
@@ -198,18 +199,18 @@ export function PublicHeader(props: PublicHeaderProps) {
         )}
       >
         <div className='mx-auto h-full max-w-[1200px] px-3 sm:px-7'>
-          <nav className='flex h-full min-w-0 items-center justify-between gap-2 lg:gap-6'>
+          <nav className='flex h-full min-w-0 items-center gap-2 lg:gap-9'>
             {/* Logo */}
-            <div className='@container/system-brand flex min-w-0 flex-1 items-center gap-1 lg:min-w-36'>
+            <div className='flex min-w-0 flex-1 items-center gap-1 lg:flex-none'>
               <Link
                 to={homeUrl}
                 className='group flex min-w-0 items-center gap-2.5'
               >
-                <div className='flex size-7 shrink-0 items-center justify-center transition-all duration-300 group-hover:scale-105'>
+                <div className='flex size-[30px] shrink-0 items-center justify-center transition-all duration-300 group-hover:scale-105'>
                   {logoContent}
                 </div>
                 <span
-                  className='max-w-48 truncate text-sm font-semibold tracking-tight'
+                  className='max-w-48 truncate text-[17px] font-bold tracking-[-0.2px]'
                   title={displaySiteName}
                 >
                   {loading ? (
@@ -241,7 +242,7 @@ export function PublicHeader(props: PublicHeaderProps) {
                           tabIndex={link.disabled ? -1 : undefined}
                           onClick={(event) => handleNavLinkClick(event, link)}
                           className={cn(
-                            'text-muted-foreground hover:text-foreground min-w-0 truncate rounded-lg px-3 py-1.5 text-sm font-medium transition-colors duration-200',
+                            'text-muted-foreground hover:text-foreground min-w-0 truncate rounded-lg px-[15px] py-2 text-[15px] leading-[1.62] transition-colors duration-150',
                             link.disabled && 'pointer-events-none opacity-50'
                           )}
                         >
@@ -257,9 +258,9 @@ export function PublicHeader(props: PublicHeaderProps) {
                         disabled={link.disabled}
                         onClick={(event) => handleNavLinkClick(event, link)}
                         className={cn(
-                          'min-w-0 truncate rounded-lg px-3 py-1.5 text-sm font-medium transition-colors duration-200',
+                          'min-w-0 truncate rounded-lg px-[15px] py-2 text-[15px] leading-[1.62] transition-colors duration-150',
                           isActive
-                            ? 'bg-accent text-foreground'
+                            ? 'bg-accent text-foreground font-semibold'
                             : 'text-muted-foreground hover:text-foreground',
                           link.disabled && 'pointer-events-none opacity-50'
                         )}
@@ -270,100 +271,104 @@ export function PublicHeader(props: PublicHeaderProps) {
                   }))}
             </div>
 
-            {props.rightContent ?? (
-              <div className='flex shrink-0 items-center gap-0.5 sm:gap-1'>
-                {(showLanguageSwitcher ||
-                  showThemeSwitch ||
-                  showNotifications) && (
-                  <div className='bg-border/40 mx-2 hidden h-4 w-px lg:block' />
-                )}
-
-                {showLanguageSwitcher && <LanguageSwitcher />}
-                {showThemeSwitch && <ThemeSwitch />}
-                {showNotifications && (
-                  <NotificationPopover
-                    open={notifications.popoverOpen}
-                    onOpenChange={notifications.setPopoverOpen}
-                    unreadCount={notifications.unreadCount}
-                    activeTab={notifications.activeTab}
-                    onTabChange={notifications.setActiveTab}
-                    notice={notifications.notice}
-                    announcements={notifications.announcements}
-                    loading={notifications.loading}
-                  />
-                )}
-
-                {showAuthButtons && (
-                  <>
-                    <div className='bg-border/40 mx-1 h-4 w-px' />
-                    {authContent}
-                  </>
-                )}
-              </div>
-            )}
-            {/* Mobile: compact actions + hamburger */}
-            {props.showNavigation !== false && (
-              <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-                <SheetTrigger
-                  render={
-                    <Button
-                      type='button'
-                      variant='ghost'
-                      size='icon'
-                      className='size-9 shrink-0 lg:hidden'
-                    />
-                  }
-                  aria-label={t('Toggle navigation menu')}
-                >
-                  <Menu className='size-5' />
-                </SheetTrigger>
-                <SheetContent className='overflow-y-auto p-6' side='right'>
-                  <SheetTitle>{t('Toggle navigation menu')}</SheetTitle>
-                  <nav className='flex flex-col gap-1'>
-                    {(props.mobileLinks ?? links).map((link) => (
-                      <Button
-                        nativeButton={false}
-                        role='link'
-                        key={`${link.title}:${link.href}`}
-                        variant='ghost'
-                        className='justify-start'
-                        disabled={link.disabled}
-                        render={
-                          link.external ? (
-                            <a
-                              href={link.href}
-                              target='_blank'
-                              rel='noopener noreferrer'
-                              onClick={(event) =>
-                                handleNavLinkClick(event, link, true)
-                              }
-                            />
-                          ) : (
-                            <Link
-                              to={link.href}
-                              onClick={(event) =>
-                                handleNavLinkClick(event, link, true)
-                              }
-                            />
-                          )
-                        }
-                      >
-                        {t(link.title)}
-                      </Button>
-                    ))}
-                  </nav>
-                  {showAuthButtons && (
-                    <Link
-                      to={isAuthenticated ? '/dashboard' : '/sign-in'}
-                      onClick={() => setMobileOpen(false)}
-                      className='bg-primary text-primary-foreground mt-auto rounded-lg px-4 py-3 text-center text-sm font-medium'
-                    >
-                      {isAuthenticated ? t('Go to Dashboard') : t('Sign in')}
-                    </Link>
+            <div className='ms-auto flex shrink-0 items-center gap-1 sm:gap-2.5'>
+              {props.rightContent ?? (
+                <div className='flex shrink-0 items-center sm:gap-1 [&>button]:size-8 sm:[&>button]:size-9'>
+                  {(showLanguageSwitcher ||
+                    showThemeSwitch ||
+                    showNotifications) && (
+                    <div className='bg-border/40 mx-2 hidden h-4 w-px lg:block' />
                   )}
-                </SheetContent>
-              </Sheet>
-            )}
+
+                  {showLanguageSwitcher && <LanguageSwitcher />}
+                  {showThemeSwitch && <ThemeSwitch />}
+                  {showNotifications && (
+                    <NotificationPopover
+                      open={notifications.popoverOpen}
+                      onOpenChange={notifications.setPopoverOpen}
+                      unreadCount={notifications.unreadCount}
+                      activeTab={notifications.activeTab}
+                      onTabChange={notifications.setActiveTab}
+                      notice={notifications.notice}
+                      announcements={notifications.announcements}
+                      loading={notifications.loading}
+                    />
+                  )}
+
+                  {showAuthButtons && (
+                    <>
+                      <div className='bg-border/40 mx-1 hidden h-4 w-px sm:block' />
+                      {authContent}
+                    </>
+                  )}
+                </div>
+              )}
+              {/* Mobile: compact actions + hamburger */}
+              {props.showNavigation !== false && (
+                <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+                  <SheetTrigger
+                    render={
+                      <Button
+                        type='button'
+                        variant='ghost'
+                        size='icon'
+                        className='size-9 shrink-0 lg:hidden'
+                      />
+                    }
+                    aria-label={t('Toggle navigation menu')}
+                  >
+                    <Menu className='size-5' />
+                  </SheetTrigger>
+                  <SheetContent className='overflow-y-auto p-6' side='right'>
+                    <SheetTitle>{t('Toggle navigation menu')}</SheetTitle>
+                    <nav className='flex flex-col gap-1'>
+                      {(props.mobileLinks ?? links).map((link) => (
+                        <Button
+                          nativeButton={false}
+                          role='link'
+                          key={`${link.title}:${link.href}`}
+                          variant='ghost'
+                          className='justify-start'
+                          disabled={link.disabled}
+                          render={
+                            link.external ? (
+                              <a
+                                href={link.href}
+                                target='_blank'
+                                rel='noopener noreferrer'
+                                onClick={(event) =>
+                                  handleNavLinkClick(event, link, true)
+                                }
+                              />
+                            ) : (
+                              <Link
+                                to={link.href}
+                                onClick={(event) =>
+                                  handleNavLinkClick(event, link, true)
+                                }
+                              />
+                            )
+                          }
+                        >
+                          {t(link.title)}
+                        </Button>
+                      ))}
+                    </nav>
+                    {showAuthButtons && (
+                      <Link
+                        to={isAuthenticated ? '/dashboard' : '/sign-in'}
+                        onClick={() => setMobileOpen(false)}
+                        className='bg-primary text-primary-foreground mt-auto rounded-lg px-4 py-3 text-center text-sm font-medium'
+                      >
+                        {isAuthenticated
+                          ? t('Go to Dashboard')
+                          : t('Register / Sign in')}
+                      </Link>
+                    )}
+                  </SheetContent>
+                </Sheet>
+              )}
+            </div>
           </nav>
         </div>
       </header>
