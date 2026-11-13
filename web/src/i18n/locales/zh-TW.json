@@ -7707,6 +7707,7 @@
     "Tutorial was modified; reload before saving": "教學已被修改，請重新載入後再儲存",
     "Failed to manage configuration tutorials": "設定教學管理失敗",
     "Find setup instructions, code examples and common questions in the contents. Use your browser search to find keywords.": "從建立密鑰到接入工具，按目錄找到所需說明。可使用瀏覽器搜尋定位關鍵字。",
-    "Title": "標題"
+    "Title": "標題",
+    "Failed to load custom subscriptions": "取得自訂訂閱失敗"
   }
 }

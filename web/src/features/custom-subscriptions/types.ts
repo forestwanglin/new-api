@@ -23,6 +23,7 @@ export type PlanInput = {
   subtitle: string
   tier_code: string
   tier_rank: number
+  priority: number
   billing_cycle: 'month' | 'year'
   duration_months: number
   currency: 'CNY'

@@ -7707,6 +7707,7 @@
     "Tutorial was modified; reload before saving": "Le guide a été modifié ; rechargez avant de sauvegarder",
     "Failed to manage configuration tutorials": "Échec de gestion des guides",
     "Find setup instructions, code examples and common questions in the contents. Use your browser search to find keywords.": "Retrouvez les instructions et exemples de code dans le sommaire. Utilisez la recherche du navigateur pour trouver un mot-clé.",
-    "Title": "Titre"
+    "Title": "Titre",
+    "Failed to load custom subscriptions": "Impossible de charger les abonnements personnalisés"
   }
 }

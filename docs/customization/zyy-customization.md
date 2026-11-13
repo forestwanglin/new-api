@@ -826,6 +826,16 @@
 - 上游改动：model/{main,option}.go、router/api-router.go、middleware/access_token_routes.go、顶部/侧栏 hooks、维护侧栏配置、七种 locale 和生成路由。admin.config_tutorial 缺省开启，保留显式关闭；菜单可见性不替代服务端权限。
 - 验证：真实 SQLite 3.50.4 / MySQL 8.4.13 / PostgreSQL 16.16 定向模型与路由测试通过；Go vet、前端定向测试、类型检查、限定 lint/格式和生产构建通过。Chrome 验证匿名桌面与 390px 阅读、锚点定位、复制反馈和无整页横向溢出。Chrome 管理端已验证登录、菜单进入、章节创建/编辑、Markdown 预览与保存后公开展示；删除/版本冲突/启停与失败交互由组件及真实路由测试覆盖。未验证生产数据库升级快照，未部署。
 
+### Z044 自定义订阅优先级排期与到期切换
+
+- 需求与原因：用户可重复购买不同套餐，任一时刻只使用最高优先级的一份，其余冻结时长；同优先级先买先用，到期自动接续，避免叠加消耗或调度延迟多送时长。
+- 变更内容：套餐与订单新增 priority；主库新增用户订阅实例、用户当前状态、生命周期事件三表。模型为既有支付成功订单提供幂等权益履约，支持抢占暂停、恢复、取消、原到期边界连续推进；后台每10秒扫描，用户 GET `/api/custom_subscription/self` 查询时校正。月付固定30天、年付固定365天。后台表单可配置优先级，旧请求省略时兼容保留现值，显式0可保存；历史档位字段保留但不参与排序。
+- 影响面：`model/custom_subscription.go`、新增 runtime 模型/测试、已有自定义模型迁移测试、`controller/custom_subscription.go` 与新增 self controller、`router/custom_subscription_test.go`、新增到期 service、`web/src/features/custom-subscriptions/` 类型/表单/列表/详情/测试、[custom-subscriptions.md](custom-subscriptions.md)。**上游自有文件**：`main.go`、`router/api-router.go`、`middleware/access_token_routes.go`、`common/log_text.zh-CN.json`、七种 `web/src/i18n/locales/*.json`。
+- 与上游差异：扩展 fork 自定义订阅的实际服务排期；不改变上游旧订阅、relay 计费或积分余额。自定义购买页面仍为演示，不新增支付渠道、签约、积分发放、退款或自动扣款。
+- 开关与默认值：无新生产依赖或环境变量；priority 默认0，数值越大越优先；调度按 priority DESC、paid_at ASC、实例ID ASC。后台任务遵循主节点约定；数据库用户状态事务保证重复 worker/请求一致性。迁移保留现有数据，不自动履约历史订单，回滚保留新表/列。
+- 验证：Go 使用声明的 1.26.10；隔离 SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 16.16 上设置 `TEST_MYSQL_DSN` / `TEST_POSTGRES_DSN` 后执行 `go test ./model -run 'CustomSubscription|SubscriptionRule' -count=2 -v` 通过，覆盖新建、变更前自定义表升级、无DDL重复迁移、并发履约/读取、真实到期边界接续及取消到期历史保留。`go test ./model ./middleware ./service -count=1`、`go test ./router -run TestCustomSubscription -count=1`、相关包 vet 与 `go build ./...` 通过。前端相关 Vitest 15文件/101用例、typecheck（1,560文件/2项目）、改动文件 lint/format 和 `bun run build` 通过。全局路由登记检查仍有6个既有缺项；使用 HEAD 路由/登记文件的 Go overlay 复现完全相同失败，本次 self 路由已登记并通过匿名/PAT/归属测试。未验证浏览器交互、最低数据库版本或完整发行库升级。
+- 风险与未覆盖：订阅履约标记仅代表权益实例生成，不代表积分发放；首次服务从实际履约开始，支付时间仅用于排队。真实支付/积分/relay 权益接入须后续明确，不能把模型调用当作支付验证。未使用完整最新发行数据库升级样本或最低数据库版本；本次采用隔离真实引擎和精确变更前自定义表的代表性升级验证。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，

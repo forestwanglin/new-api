@@ -388,6 +388,7 @@ func SetApiRouter(router *gin.Engine) {
 		tutorialAdmin.PUT("/chapters/:id", controller.UpdateConfigTutorialChapter)
 		tutorialAdmin.DELETE("/chapters/:id", controller.DeleteConfigTutorialChapter)
 
+		apiRouter.GET("/custom_subscription/self", middleware.UserAuth(), controller.GetCustomSubscriptionSelf)
 		apiRouter.GET("/custom_subscription/plans", controller.ReadPublicCustomSubscriptionPlans)
 		apiRouter.GET("/custom_subscription/rules", controller.ReadCustomSubscriptionRules)
 		customRules := apiRouter.Group("/custom_subscription/admin/rules", middleware.AdminAuth())

@@ -7707,6 +7707,7 @@
     "Tutorial was modified; reload before saving": "Tutorial was modified; reload before saving",
     "Failed to manage configuration tutorials": "Failed to manage configuration tutorials",
     "Find setup instructions, code examples and common questions in the contents. Use your browser search to find keywords.": "Find setup instructions, code examples and common questions in the contents. Use your browser search to find keywords.",
-    "Title": "Title"
+    "Title": "Title",
+    "Failed to load custom subscriptions": "Failed to load custom subscriptions"
   }
 }

@@ -7707,6 +7707,7 @@
     "Tutorial was modified; reload before saving": "教程已被修改，请重新加载后再保存",
     "Failed to manage configuration tutorials": "配置教程管理失败",
     "Find setup instructions, code examples and common questions in the contents. Use your browser search to find keywords.": "从创建密钥到接入工具，按目录找到所需说明。所有步骤、代码示例和常见报错均在本页展开，可使用浏览器查找（Ctrl / ⌘ + F）定位关键词。",
-    "Title": "标题"
+    "Title": "标题",
+    "Failed to load custom subscriptions": "获取自定义订阅失败"
   }
 }

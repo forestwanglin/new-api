@@ -76,6 +76,12 @@ export function usePlanColumns(props: {
       ),
     },
     {
+      accessorKey: 'priority',
+      header: t('Priority'),
+      size: 100,
+      cell: ({ row }) => formatNumber(row.original.priority, locale),
+    },
+    {
       accessorKey: 'billing_cycle',
       header: t('Billing cycle'),
       size: 100,

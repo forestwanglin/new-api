@@ -15,6 +15,7 @@ type CustomSubscriptionPlan struct {
 	Subtitle             string `gorm:"type:varchar(255);not null"`
 	TierCode             string `gorm:"type:varchar(32);not null;index:idx_csp_tier"`
 	TierRank             int    `gorm:"not null"`
+	Priority             int    `gorm:"not null;default:0"`
 	BillingCycle         string `gorm:"type:varchar(16);not null"`
 	DurationMonths       int    `gorm:"not null"`
 	Currency             string `gorm:"type:varchar(8);not null"`
@@ -42,6 +43,7 @@ type CustomSubscriptionOrder struct {
 	PlanSnapshot         string  `gorm:"type:text;not null"`
 	TierCode             string  `gorm:"type:varchar(32);not null"`
 	TierRank             int     `gorm:"not null"`
+	Priority             int     `gorm:"not null;default:0"`
 	BillingCycle         string  `gorm:"type:varchar(16);not null"`
 	DurationMonths       int     `gorm:"not null"`
 	Currency             string  `gorm:"type:varchar(8);not null"`
@@ -81,7 +83,7 @@ var (
 )
 
 func migrateCustomSubscriptions(db *gorm.DB) error {
-	return db.AutoMigrate(&CustomSubscriptionPlan{}, &CustomSubscriptionOrder{}, &CustomSubscriptionRule{})
+	return db.AutoMigrate(&CustomSubscriptionPlan{}, &CustomSubscriptionOrder{}, &CustomSubscriptionRule{}, &CustomUserSubscription{}, &CustomUserSubscriptionState{}, &CustomSubscriptionEvent{})
 }
 
 // This input contains only editable configuration, never identity or metadata.
@@ -91,6 +93,8 @@ type CustomSubscriptionPlanInput struct {
 	Subtitle             string
 	TierCode             string
 	TierRank             int
+	Priority             int
+	PreservePriority     bool
 	BillingCycle         string
 	DurationMonths       int
 	Currency             string
@@ -192,6 +196,9 @@ func UpdateCustomSubscriptionPlan(id, version int64, input CustomSubscriptionPla
 			return err
 		}
 		values := customSubscriptionPlanUpdates(input)
+		if input.PreservePriority {
+			delete(values, "priority")
+		}
 		values["version"] = version + 1
 		result := tx.Model(&CustomSubscriptionPlan{}).Where("id = ? AND version = ?", id, version).Updates(values)
 		if result.Error != nil {
@@ -230,8 +237,8 @@ func DeleteCustomSubscriptionPlan(id int64) error {
 	})
 }
 func customSubscriptionPlanFromInput(input CustomSubscriptionPlanInput) CustomSubscriptionPlan {
-	return CustomSubscriptionPlan{Code: input.Code, Title: input.Title, Subtitle: input.Subtitle, TierCode: input.TierCode, TierRank: input.TierRank, BillingCycle: input.BillingCycle, DurationMonths: input.DurationMonths, Currency: input.Currency, PriceAmountMinor: input.PriceAmountMinor, PaidPoints: input.PaidPoints, PaidPointTypeId: input.PaidPointTypeId, BonusPoints: input.BonusPoints, BonusPointTypeId: input.BonusPointTypeId, AutoRenewEnabled: input.AutoRenewEnabled, AutoRenewBonusBps: input.AutoRenewBonusBps, AutoBonusPointTypeId: input.AutoBonusPointTypeId, BenefitsJson: input.BenefitsJson, Enabled: input.Enabled, SortOrder: input.SortOrder}
+	return CustomSubscriptionPlan{Code: input.Code, Title: input.Title, Subtitle: input.Subtitle, TierCode: input.TierCode, TierRank: input.TierRank, Priority: input.Priority, BillingCycle: input.BillingCycle, DurationMonths: input.DurationMonths, Currency: input.Currency, PriceAmountMinor: input.PriceAmountMinor, PaidPoints: input.PaidPoints, PaidPointTypeId: input.PaidPointTypeId, BonusPoints: input.BonusPoints, BonusPointTypeId: input.BonusPointTypeId, AutoRenewEnabled: input.AutoRenewEnabled, AutoRenewBonusBps: input.AutoRenewBonusBps, AutoBonusPointTypeId: input.AutoBonusPointTypeId, BenefitsJson: input.BenefitsJson, Enabled: input.Enabled, SortOrder: input.SortOrder}
 }
 func customSubscriptionPlanUpdates(input CustomSubscriptionPlanInput) map[string]any {
-	return map[string]any{"code": input.Code, "title": input.Title, "subtitle": input.Subtitle, "tier_code": input.TierCode, "tier_rank": input.TierRank, "billing_cycle": input.BillingCycle, "duration_months": input.DurationMonths, "currency": input.Currency, "price_amount_minor": input.PriceAmountMinor, "paid_points": input.PaidPoints, "paid_point_type_id": input.PaidPointTypeId, "bonus_points": input.BonusPoints, "bonus_point_type_id": input.BonusPointTypeId, "auto_renew_enabled": input.AutoRenewEnabled, "auto_renew_bonus_bps": input.AutoRenewBonusBps, "auto_bonus_point_type_id": input.AutoBonusPointTypeId, "benefits_json": input.BenefitsJson, "enabled": input.Enabled, "sort_order": input.SortOrder}
+	return map[string]any{"code": input.Code, "title": input.Title, "subtitle": input.Subtitle, "tier_code": input.TierCode, "tier_rank": input.TierRank, "priority": input.Priority, "billing_cycle": input.BillingCycle, "duration_months": input.DurationMonths, "currency": input.Currency, "price_amount_minor": input.PriceAmountMinor, "paid_points": input.PaidPoints, "paid_point_type_id": input.PaidPointTypeId, "bonus_points": input.BonusPoints, "bonus_point_type_id": input.BonusPointTypeId, "auto_renew_enabled": input.AutoRenewEnabled, "auto_renew_bonus_bps": input.AutoRenewBonusBps, "auto_bonus_point_type_id": input.AutoBonusPointTypeId, "benefits_json": input.BenefitsJson, "enabled": input.Enabled, "sort_order": input.SortOrder}
 }

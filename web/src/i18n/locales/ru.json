@@ -7709,6 +7709,7 @@
     "Tutorial was modified; reload before saving": "Руководство изменено; перезагрузите перед сохранением",
     "Failed to manage configuration tutorials": "Не удалось управлять руководствами",
     "Find setup instructions, code examples and common questions in the contents. Use your browser search to find keywords.": "Инструкции и примеры кода доступны в содержании. Для поиска используйте поиск браузера.",
-    "Title": "Заголовок"
+    "Title": "Заголовок",
+    "Failed to load custom subscriptions": "Не удалось загрузить пользовательские подписки"
   }
 }

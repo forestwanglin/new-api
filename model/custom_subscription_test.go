@@ -52,7 +52,7 @@ func TestCustomSubscriptionDatabaseMatrix(t *testing.T) {
 					require.False(t, db.Migrator().HasTable(&CustomSubscriptionPlan{}))
 					require.False(t, db.Migrator().HasTable(&CustomSubscriptionOrder{}))
 					t.Cleanup(func() {
-						require.NoError(t, db.Migrator().DropTable(&CustomSubscriptionRule{}, &CustomSubscriptionOrder{}, &CustomSubscriptionPlan{}))
+						require.NoError(t, db.Migrator().DropTable(&CustomSubscriptionEvent{}, &CustomUserSubscriptionState{}, &CustomUserSubscription{}, &CustomSubscriptionRule{}, &CustomSubscriptionOrder{}, &CustomSubscriptionPlan{}))
 					})
 					type legacy struct {
 						Id    int64 `gorm:"primaryKey"`
@@ -62,8 +62,35 @@ func TestCustomSubscriptionDatabaseMatrix(t *testing.T) {
 						require.NoError(t, db.Table("custom_sub_test_legacy").AutoMigrate(&legacy{}))
 						require.NoError(t, db.Table("custom_sub_test_legacy").Create(&legacy{Id: 1, Quota: 9876543210}).Error)
 						t.Cleanup(func() { require.NoError(t, db.Migrator().DropTable("custom_sub_test_legacy")) })
+						// Reconstruct the exact additive pre-scheduling custom schema:
+						// plans/orders existed, but neither had priority or runtime tables.
+						require.NoError(t, db.AutoMigrate(&CustomSubscriptionPlan{}, &CustomSubscriptionOrder{}, &CustomSubscriptionRule{}))
+						require.NoError(t, db.Migrator().DropColumn(&CustomSubscriptionPlan{}, "priority"))
+						require.NoError(t, db.Migrator().DropColumn(&CustomSubscriptionOrder{}, "priority"))
+						require.False(t, db.Migrator().HasColumn(&CustomSubscriptionPlan{}, "priority"))
+						require.False(t, db.Migrator().HasColumn(&CustomSubscriptionOrder{}, "priority"))
+						require.False(t, db.Migrator().HasTable(&CustomUserSubscription{}))
+						oldPlan := CustomSubscriptionPlan{Id: 7001, Code: "historical", Title: "Historical", BillingCycle: "month", DurationMonths: 1, PriceAmountMinor: 9007199254740993, PaidPoints: 9007199254740993, PaidPointTypeId: pt.Id, BenefitsJson: "[]", Version: 3}
+						require.NoError(t, db.Omit("Priority").Create(&oldPlan).Error)
+						oldOrder := CustomSubscriptionOrder{Id: 7001, TradeNo: "historical-order", UserId: 9007199254740993, PlanId: oldPlan.Id, PlanVersion: 3, PlanSnapshot: `{"title":"Historical"}`, BillingCycle: "month", DurationMonths: 1}
+						require.NoError(t, db.Omit("Priority").Create(&oldOrder).Error)
 					}
 					require.NoError(t, migrateCustomSubscriptions(db))
+					if scenario == "existing_schema" {
+						var historicalPlan CustomSubscriptionPlan
+						var historicalOrder CustomSubscriptionOrder
+						require.NoError(t, db.First(&historicalPlan, 7001).Error)
+						require.NoError(t, db.First(&historicalOrder, 7001).Error)
+						assert.Zero(t, historicalPlan.Priority)
+						assert.Zero(t, historicalOrder.Priority)
+						assert.EqualValues(t, 9007199254740993, historicalPlan.PriceAmountMinor)
+						assert.EqualValues(t, 9007199254740993, historicalPlan.PaidPoints)
+						assert.EqualValues(t, 3, historicalPlan.Version)
+						assert.EqualValues(t, 9007199254740993, historicalOrder.UserId)
+						assert.Equal(t, `{"title":"Historical"}`, historicalOrder.PlanSnapshot)
+						assert.Nil(t, historicalOrder.ProviderTradeNo)
+						assert.Nil(t, historicalOrder.PaidAt)
+					}
 					recorder := &migrationSQLRecorder{}
 					require.NoError(t, migrateCustomSubscriptions(db.Session(&gorm.Session{Logger: recorder})))
 					assert.Empty(t, recorder.schemaMutations())
@@ -86,7 +113,11 @@ func TestCustomSubscriptionDatabaseMatrix(t *testing.T) {
 					require.Len(t, filtered, 1)
 					var orderCount int64
 					require.NoError(t, db.Model(&CustomSubscriptionOrder{}).Count(&orderCount).Error)
-					assert.Zero(t, orderCount)
+					if scenario == "existing_schema" {
+						assert.EqualValues(t, 1, orderCount)
+					} else {
+						assert.Zero(t, orderCount)
+					}
 					assert.Greater(t, managed.CreatedAt, time.Now().Add(-time.Minute).UnixMilli())
 					require.NoError(t, DeleteCustomSubscriptionPlan(managed.Id))
 					input.PaidPointTypeId = 999999
@@ -220,7 +251,7 @@ func TestSubscriptionRuleDatabaseMatrix(t *testing.T) {
 				t.Run(scenario, func(t *testing.T) {
 					require.False(t, db.Migrator().HasTable(&CustomSubscriptionRule{}))
 					t.Cleanup(func() {
-						require.NoError(t, db.Migrator().DropTable(&CustomSubscriptionRule{}, &CustomSubscriptionOrder{}, &CustomSubscriptionPlan{}, &Option{}))
+						require.NoError(t, db.Migrator().DropTable(&CustomSubscriptionEvent{}, &CustomUserSubscriptionState{}, &CustomUserSubscription{}, &CustomSubscriptionRule{}, &CustomSubscriptionOrder{}, &CustomSubscriptionPlan{}, &Option{}))
 					})
 					require.NoError(t, db.AutoMigrate(&Option{}))
 					if scenario == "existing_plan_schema" {

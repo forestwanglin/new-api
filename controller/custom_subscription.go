@@ -39,7 +39,7 @@ func customSubscriptionInput(c *gin.Context, update bool) (model.CustomSubscript
 		return fail()
 	}
 	allowed := map[string]bool{}
-	for _, key := range strings.Fields("code title subtitle tier_code tier_rank billing_cycle duration_months currency price_amount_minor paid_points paid_point_type_id bonus_points bonus_point_type_id auto_renew_enabled auto_renew_bonus_bps auto_bonus_point_type_id benefits enabled sort_order") {
+	for _, key := range strings.Fields("code title subtitle tier_code tier_rank priority billing_cycle duration_months currency price_amount_minor paid_points paid_point_type_id bonus_points bonus_point_type_id auto_renew_enabled auto_renew_bonus_bps auto_bonus_point_type_id benefits enabled sort_order") {
 		allowed[key] = true
 	}
 	if update {
@@ -53,12 +53,15 @@ func customSubscriptionInput(c *gin.Context, update bool) (model.CustomSubscript
 	// All configuration fields are explicit, including false and zero; optional
 	// type references may be omitted and normalize to SQL NULL when unused.
 	for key := range allowed {
-		if key == "bonus_point_type_id" || key == "auto_bonus_point_type_id" {
+		if key == "bonus_point_type_id" || key == "auto_bonus_point_type_id" || key == "priority" {
 			continue
 		}
 		if value, ok := fields[key]; !ok || string(value) == "null" {
 			return fail()
 		}
+	}
+	if value, ok := fields["priority"]; ok && string(value) == "null" {
+		return fail()
 	}
 	var in struct {
 		Code           string   `json:"code"`
@@ -66,6 +69,7 @@ func customSubscriptionInput(c *gin.Context, update bool) (model.CustomSubscript
 		Subtitle       string   `json:"subtitle"`
 		TierCode       string   `json:"tier_code"`
 		TierRank       int      `json:"tier_rank"`
+		Priority       int      `json:"priority"`
 		BillingCycle   string   `json:"billing_cycle"`
 		DurationMonths int      `json:"duration_months"`
 		Currency       string   `json:"currency"`
@@ -85,7 +89,7 @@ func customSubscriptionInput(c *gin.Context, update bool) (model.CustomSubscript
 	if common.Unmarshal(body, &in) != nil {
 		return fail()
 	}
-	if !customSubscriptionCode.MatchString(in.Code) || len(in.Code) > 64 || !customSubscriptionCode.MatchString(in.TierCode) || len(in.TierCode) > 32 || !customSubscriptionText(in.Title, 128, true) || !customSubscriptionText(in.Subtitle, 255, false) || in.TierRank < 1 || in.TierRank > math.MaxInt32 || in.Sort < 0 || in.Sort > math.MaxInt32 || in.Currency != "CNY" || !(in.BillingCycle == "month" && in.DurationMonths == 1 || in.BillingCycle == "year" && in.DurationMonths == 12) || in.Bps < 0 || in.Bps > 10000 || len(in.Benefits) > 20 {
+	if !customSubscriptionCode.MatchString(in.Code) || len(in.Code) > 64 || !customSubscriptionCode.MatchString(in.TierCode) || len(in.TierCode) > 32 || !customSubscriptionText(in.Title, 128, true) || !customSubscriptionText(in.Subtitle, 255, false) || in.TierRank < 1 || in.TierRank > math.MaxInt32 || in.Sort < 0 || in.Sort > math.MaxInt32 || in.Priority < 0 || in.Priority > math.MaxInt32 || in.Currency != "CNY" || !(in.BillingCycle == "month" && in.DurationMonths == 1 || in.BillingCycle == "year" && in.DurationMonths == 12) || in.Bps < 0 || in.Bps > 10000 || len(in.Benefits) > 20 {
 		return fail()
 	}
 	for _, benefit := range in.Benefits {
@@ -144,7 +148,9 @@ func customSubscriptionInput(c *gin.Context, update bool) (model.CustomSubscript
 	if err != nil {
 		return fail()
 	}
-	result = model.CustomSubscriptionPlanInput{Code: in.Code, Title: in.Title, Subtitle: in.Subtitle, TierCode: in.TierCode, TierRank: in.TierRank, BillingCycle: in.BillingCycle, DurationMonths: in.DurationMonths, Currency: in.Currency, PriceAmountMinor: price, PaidPoints: paid, PaidPointTypeId: paidType, BonusPoints: bonus, BonusPointTypeId: bonusType, AutoRenewEnabled: in.Auto, AutoRenewBonusBps: in.Bps, AutoBonusPointTypeId: autoType, BenefitsJson: string(benefits), Enabled: in.Enabled, SortOrder: in.Sort}
+	result = model.CustomSubscriptionPlanInput{Code: in.Code, Title: in.Title, Subtitle: in.Subtitle, TierCode: in.TierCode, TierRank: in.TierRank, Priority: in.Priority, BillingCycle: in.BillingCycle, DurationMonths: in.DurationMonths, Currency: in.Currency, PriceAmountMinor: price, PaidPoints: paid, PaidPointTypeId: paidType, BonusPoints: bonus, BonusPointTypeId: bonusType, AutoRenewEnabled: in.Auto, AutoRenewBonusBps: in.Bps, AutoBonusPointTypeId: autoType, BenefitsJson: string(benefits), Enabled: in.Enabled, SortOrder: in.Sort}
+	_, hasPriority := fields["priority"]
+	result.PreservePriority = update && !hasPriority
 	return result, version, true
 }
 
@@ -188,7 +194,7 @@ func customSubscriptionDTO(p model.CustomSubscriptionPlan, types map[int64]map[s
 		}
 		return types[*id]
 	}
-	return map[string]any{"id": strconv.FormatInt(p.Id, 10), "code": p.Code, "title": p.Title, "subtitle": p.Subtitle, "tier_code": p.TierCode, "tier_rank": p.TierRank, "billing_cycle": p.BillingCycle, "duration_months": p.DurationMonths, "currency": p.Currency, "price_amount_minor": strconv.FormatInt(p.PriceAmountMinor, 10), "paid_points": strconv.FormatInt(p.PaidPoints, 10), "paid_point_type_id": strconv.FormatInt(p.PaidPointTypeId, 10), "bonus_points": strconv.FormatInt(p.BonusPoints, 10), "bonus_point_type_id": optional(p.BonusPointTypeId), "auto_renew_enabled": p.AutoRenewEnabled, "auto_renew_bonus_bps": p.AutoRenewBonusBps, "auto_bonus_point_type_id": optional(p.AutoBonusPointTypeId), "benefits": benefits, "enabled": p.Enabled, "sort_order": p.SortOrder, "version": strconv.FormatInt(p.Version, 10), "created_at": p.CreatedAt, "updated_at": p.UpdatedAt, "paid_point_type": types[p.PaidPointTypeId], "bonus_point_type": optionalType(p.BonusPointTypeId), "auto_bonus_point_type": optionalType(p.AutoBonusPointTypeId)}, nil
+	return map[string]any{"id": strconv.FormatInt(p.Id, 10), "code": p.Code, "title": p.Title, "subtitle": p.Subtitle, "tier_code": p.TierCode, "tier_rank": p.TierRank, "priority": p.Priority, "billing_cycle": p.BillingCycle, "duration_months": p.DurationMonths, "currency": p.Currency, "price_amount_minor": strconv.FormatInt(p.PriceAmountMinor, 10), "paid_points": strconv.FormatInt(p.PaidPoints, 10), "paid_point_type_id": strconv.FormatInt(p.PaidPointTypeId, 10), "bonus_points": strconv.FormatInt(p.BonusPoints, 10), "bonus_point_type_id": optional(p.BonusPointTypeId), "auto_renew_enabled": p.AutoRenewEnabled, "auto_renew_bonus_bps": p.AutoRenewBonusBps, "auto_bonus_point_type_id": optional(p.AutoBonusPointTypeId), "benefits": benefits, "enabled": p.Enabled, "sort_order": p.SortOrder, "version": strconv.FormatInt(p.Version, 10), "created_at": p.CreatedAt, "updated_at": p.UpdatedAt, "paid_point_type": types[p.PaidPointTypeId], "bonus_point_type": optionalType(p.BonusPointTypeId), "auto_bonus_point_type": optionalType(p.AutoBonusPointTypeId)}, nil
 }
 func writeCustomSubscription(c *gin.Context, p *model.CustomSubscriptionPlan) {
 	_, types, err := customSubscriptionTypes()

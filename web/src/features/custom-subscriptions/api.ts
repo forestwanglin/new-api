@@ -56,6 +56,7 @@ export async function savePlan(
     subtitle: input.subtitle,
     tier_code: input.tier_code,
     tier_rank: input.tier_rank,
+    priority: input.priority,
     billing_cycle: input.billing_cycle,
     duration_months: input.duration_months,
     currency: input.currency,

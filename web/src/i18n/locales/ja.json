@@ -7707,6 +7707,7 @@
     "Tutorial was modified; reload before saving": "ガイドが変更されました。再読み込みしてから保存してください",
     "Failed to manage configuration tutorials": "設定ガイドの管理に失敗しました",
     "Find setup instructions, code examples and common questions in the contents. Use your browser search to find keywords.": "目次から設定手順とコード例を探せます。ブラウザーの検索機能も利用できます。",
-    "Title": "タイトル"
+    "Title": "タイトル",
+    "Failed to load custom subscriptions": "カスタムサブスクリプションの読み込みに失敗しました"
   }
 }

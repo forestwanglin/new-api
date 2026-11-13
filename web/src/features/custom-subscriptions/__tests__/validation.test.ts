@@ -164,3 +164,23 @@ describe('automatic renewal reward configuration independent of switch', () => {
     }
   })
 })
+
+describe('subscription scheduling priority', () => {
+  it('round-trips independent priority and preserves explicit zero', () => {
+    const schema = createPlanSchema(types)
+    expect(
+      toPlanInput(schema.parse({ ...valid, priority: '12' }))
+    ).toMatchObject({ priority: 12 })
+    expect(
+      toPlanInput(schema.parse({ ...valid, priority: '0' }))
+    ).toMatchObject({ priority: 0 })
+  })
+  it.each(['-1', '1.5', '2147483648', ''])(
+    'rejects invalid priority %s',
+    (priority) => {
+      expect(
+        createPlanSchema(types).safeParse({ ...valid, priority }).success
+      ).toBe(false)
+    }
+  )
+})

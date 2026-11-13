@@ -63,6 +63,7 @@ const baseSchema = z.object({
   subtitle: z.string(),
   tier_code: z.string(),
   tier_rank: z.string(),
+  priority: z.string(),
   billing_cycle: z.enum(['month', 'year']),
   price_yuan: z.string(),
   paid_points: z.string(),
@@ -84,6 +85,7 @@ export const defaultPlanValues: PlanFormValues = {
   subtitle: '',
   tier_code: '',
   tier_rank: '1',
+  priority: '0',
   billing_cycle: 'month',
   price_yuan: '',
   paid_points: '',
@@ -117,6 +119,7 @@ export function createPlanSchema(types: PointTypeOption[]) {
     if (!validText(values.title, 128, true)) issue('title')
     if (!validText(values.subtitle, 255)) issue('subtitle')
     if (!isInteger(values.tier_rank, true, 2147483647n)) issue('tier_rank')
+    if (!isInteger(values.priority, false, 2147483647n)) issue('priority')
     if (!isInteger(values.sort_order, false, 2147483647n)) issue('sort_order')
     try {
       if (yuanToMinor(values.price_yuan) === '0') issue('price_yuan')
@@ -172,6 +175,7 @@ export function toPlanInput(values: PlanFormValues): PlanInput {
     subtitle: values.subtitle,
     tier_code: values.tier_code,
     tier_rank: Number(values.tier_rank),
+    priority: Number(values.priority),
     billing_cycle: values.billing_cycle,
     duration_months: values.billing_cycle === 'month' ? 1 : 12,
     currency: 'CNY',
@@ -199,6 +203,7 @@ export function planFormValues(plan: CustomSubscriptionPlan): PlanFormValues {
     subtitle: plan.subtitle,
     tier_code: plan.tier_code,
     tier_rank: String(plan.tier_rank),
+    priority: String(plan.priority),
     billing_cycle: plan.billing_cycle,
     price_yuan: minorToYuan(plan.price_amount_minor),
     paid_points: plan.paid_points,

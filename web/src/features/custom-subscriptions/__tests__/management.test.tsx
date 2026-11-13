@@ -36,6 +36,7 @@ const plan: CustomSubscriptionPlan = {
   subtitle: '',
   tier_code: 'basic',
   tier_rank: 1,
+  priority: 12,
   billing_cycle: 'month',
   duration_months: 1,
   currency: 'CNY',
@@ -120,6 +121,10 @@ describe('custom subscription management', () => {
     renderPage()
     await user.click(await screen.findByRole('button', { name: 'Edit' }))
     const title = await screen.findByRole('textbox', { name: 'Plan name' })
+    const priority = screen.getByRole('textbox', { name: 'Priority' })
+    expect(priority).toHaveValue('12')
+    await user.clear(priority)
+    await user.type(priority, '0')
     await user.clear(title)
     await user.type(title, 'Changed title')
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
@@ -135,6 +140,7 @@ describe('custom subscription management', () => {
       expect.stringContaining('/1'),
       expect.objectContaining({
         title: 'Changed title',
+        priority: 0,
         version: '3',
         auto_renew_enabled: false,
         bonus_points: '0',

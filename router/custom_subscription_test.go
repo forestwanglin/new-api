@@ -109,6 +109,30 @@ func TestCustomSubscriptionAdminAPI(t *testing.T) {
 	assert.Equal(t, false, saved["enabled"])
 	assert.Equal(t, "2", saved["version"])
 	assert.False(t, request(t, "PUT", path, update, admin, 200).Success)
+	t.Run("priority round trip and older-client updates", func(t *testing.T) {
+		withPriority := strings.TrimSuffix(payload("priority-plan"), "}") + `,"priority":12}`
+		res := request(t, "POST", base, withPriority, admin, 200)
+		require.True(t, res.Success, res.Message)
+		var row map[string]any
+		require.NoError(t, common.Unmarshal(res.Data, &row))
+		assert.EqualValues(t, 12, row["priority"])
+		priorityPath := base + "/" + row["id"].(string)
+		// Existing clients omit the new field: preserve the stored priority.
+		older := strings.TrimSuffix(payload("priority-plan"), "}") + `,"version":"1"}`
+		res = request(t, "PUT", priorityPath, older, admin, 200)
+		require.True(t, res.Success, res.Message)
+		require.NoError(t, common.Unmarshal(res.Data, &row))
+		assert.EqualValues(t, 12, row["priority"])
+		zero := strings.TrimSuffix(payload("priority-plan"), "}") + `,"version":"2","priority":0}`
+		res = request(t, "PUT", priorityPath, zero, admin, 200)
+		require.True(t, res.Success, res.Message)
+		require.NoError(t, common.Unmarshal(res.Data, &row))
+		assert.EqualValues(t, 0, row["priority"])
+		for _, value := range []string{"-1", "1.5", "2147483648", "null", `"1"`} {
+			body := strings.TrimSuffix(payload("invalid-priority"), "}") + `,"priority":` + value + `}`
+			assert.False(t, request(t, "POST", base, body, admin, 200).Success, value)
+		}
+	})
 	t.Run("compliance locks writes but preserves reads", func(t *testing.T) {
 		defer func() {
 			payment.ComplianceConfirmed, payment.ComplianceTermsVersion = true, operation_setting.CurrentComplianceTermsVersion
