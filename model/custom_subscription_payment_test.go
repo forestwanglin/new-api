@@ -130,6 +130,55 @@ func TestCustomSubscriptionPaymentDatabaseMatrix(t *testing.T) {
 				require.NoError(t, db.Model(&CustomUserSubscription{}).Where("order_id = ?", order.Id).Count(&count).Error)
 				assert.EqualValues(t, 1, count)
 			})
+			t.Run("payment_order_resolves_linked_subscription", func(t *testing.T) {
+				order := newCheckout(122, "request-122")
+				input := inputFor(order)
+				paymentID := *order.TopUpId
+				missing := input
+				missing.TradeNo = "missing-payment-order"
+				_, err := SettleCustomSubscriptionPayment(missing)
+				require.ErrorIs(t, err, ErrCustomSubscriptionOrderNotFound)
+				for _, invalid := range []struct {
+					column  string
+					value   any
+					restore any
+				}{
+					{"business_type", "wallet", "custom_subscription"},
+					{"payment_provider", "other-provider", PaymentProviderEpay},
+					{"user_id", 999, 122},
+				} {
+					require.NoError(t, db.Model(&TopUp{}).Where("id = ?", paymentID).Update(invalid.column, invalid.value).Error)
+					_, err = SettleCustomSubscriptionPayment(input)
+					require.ErrorIs(t, err, ErrCustomSubscriptionPaymentMismatch)
+					require.NoError(t, db.Model(&TopUp{}).Where("id = ?", paymentID).Update(invalid.column, invalid.restore).Error)
+				}
+				require.NoError(t, db.Model(&CustomSubscriptionOrder{}).Where("id = ?", order.Id).Update("top_up_id", nil).Error)
+				_, err = SettleCustomSubscriptionPayment(input)
+				require.ErrorIs(t, err, ErrCustomSubscriptionOrderNotFound)
+				require.NoError(t, db.Model(&CustomSubscriptionOrder{}).Where("id = ?", order.Id).Update("top_up_id", paymentID).Error)
+				// The payment ID owns the association; mismatched custom trade numbers must fail safely.
+				require.NoError(t, db.Model(order).Update("trade_no", "mismatched-custom-trade").Error)
+				_, err = SettleCustomSubscriptionPayment(input)
+				require.ErrorIs(t, err, ErrCustomSubscriptionPaymentMismatch)
+				var user User
+				require.NoError(t, db.First(&user, 122).Error)
+				assert.EqualValues(t, 7, user.Quota)
+				var saved CustomSubscriptionOrder
+				require.NoError(t, db.First(&saved, order.Id).Error)
+				assert.Equal(t, common.TopUpStatusPending, saved.Status)
+				assert.Nil(t, saved.PointTransactionId)
+				var topup TopUp
+				require.NoError(t, db.First(&topup, *order.TopUpId).Error)
+				assert.Equal(t, common.TopUpStatusPending, topup.Status)
+				var count int64
+				require.NoError(t, db.Model(&PointTransaction{}).Where("user_id = ?", 122).Count(&count).Error)
+				assert.Zero(t, count)
+				require.NoError(t, db.Model(&CustomUserSubscription{}).Where("order_id = ?", order.Id).Count(&count).Error)
+				assert.Zero(t, count)
+				require.NoError(t, db.Model(order).Update("trade_no", input.TradeNo).Error)
+				_, err = SettleCustomSubscriptionPayment(input)
+				require.NoError(t, err)
+			})
 			t.Run("point_overflow_rolls_back_quota_and_orders", func(t *testing.T) {
 				order := newCheckout(101, "request-101")
 				account := PointAccount{UserId: 101, PointTypeId: types[1].Id, AvailablePoints: math.MaxInt64}

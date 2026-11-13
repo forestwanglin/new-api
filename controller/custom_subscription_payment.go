@@ -190,7 +190,12 @@ func settleCustomSubscriptionEpay(c *gin.Context) (string, error) {
 	if err != nil || !verified.VerifyStatus {
 		return "", errCustomSubscriptionCallbackSignature
 	}
-	if params["pid"] != client.Config.PartnerID || verified.TradeStatus != epay.StatusTradeSuccess || len(verified.ServiceTradeNo) > 64 || len(verified.TradeNo) > 128 || (verified.Type != "alipay" && verified.Type != "wxpay") || len(verified.Money) > 22 || !customSubscriptionMoney.MatchString(verified.Money) {
+	// Normalize only after verifying the original signature-covered parameters.
+	// Some compatible gateways name their provider reference third_party_trade_no.
+	if verified.TradeNo == "" {
+		verified.TradeNo = params["third_party_trade_no"]
+	}
+	if params["pid"] != client.Config.PartnerID || verified.TradeStatus != epay.StatusTradeSuccess || len(verified.ServiceTradeNo) > 64 || verified.TradeNo == "" || len(verified.TradeNo) > 128 || (verified.Type != "alipay" && verified.Type != "wxpay") || len(verified.Money) > 22 || !customSubscriptionMoney.MatchString(verified.Money) {
 		return "", errCustomSubscriptionCallbackPayment
 	}
 	money, err := decimal.NewFromString(verified.Money)

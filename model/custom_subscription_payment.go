@@ -138,11 +138,26 @@ func SettleCustomSubscriptionPayment(input CustomSubscriptionPaymentInput) (bool
 	if input.TradeNo == "" || input.ProviderTradeNo == "" || len(input.ProviderTradeNo) > 128 || input.AmountMinor <= 0 {
 		return false, ErrCustomSubscriptionPaymentMismatch
 	}
-	if err := DB.Select("id", "user_id").Where("trade_no = ?", input.TradeNo).First(&owner).Error; err != nil {
+	// Locate the payment first; its unique association owns the subscription order.
+	// These reads take no locks: the transaction retains schedule -> order -> payment locking.
+	var payment TopUp
+	if err := DB.Select("id", "user_id", "business_type", "payment_provider").Where("trade_no = ?", input.TradeNo).First(&payment).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return false, ErrCustomSubscriptionOrderNotFound
 		}
 		return false, err
+	}
+	if payment.BusinessType != "custom_subscription" || payment.PaymentProvider != PaymentProviderEpay {
+		return false, ErrCustomSubscriptionPaymentMismatch
+	}
+	if err := DB.Select("id", "user_id").Where("top_up_id = ?", payment.Id).First(&owner).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, ErrCustomSubscriptionOrderNotFound
+		}
+		return false, err
+	}
+	if owner.UserId != int64(payment.UserId) {
+		return false, ErrCustomSubscriptionPaymentMismatch
 	}
 	already := false
 	var order CustomSubscriptionOrder
@@ -150,7 +165,7 @@ func SettleCustomSubscriptionPayment(input CustomSubscriptionPaymentInput) (bool
 		if err := lockForUpdate(s.tx).First(&order, owner.Id).Error; err != nil {
 			return err
 		}
-		if order.UserId != owner.UserId || order.PaymentProvider != PaymentProviderEpay || order.PaymentMethod != input.PaymentMethod || order.Currency != "CNY" || order.AmountDueMinor != input.AmountMinor || order.TopUpId == nil || order.QuotaToCredit <= 0 || order.QuotaToCredit > common.MaxWalletQuota {
+		if order.UserId != owner.UserId || order.TradeNo != input.TradeNo || order.PaymentProvider != PaymentProviderEpay || order.PaymentMethod != input.PaymentMethod || order.Currency != "CNY" || order.AmountDueMinor != input.AmountMinor || order.TopUpId == nil || *order.TopUpId != payment.Id || order.QuotaToCredit <= 0 || order.QuotaToCredit > common.MaxWalletQuota {
 			return ErrCustomSubscriptionPaymentMismatch
 		}
 		var topup TopUp

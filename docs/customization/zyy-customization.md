@@ -846,6 +846,16 @@
 - 验证：声明工具链 Go1.26.10；隔离 SQLite3.50.4／MySQL8.4.13／PostgreSQL16.16，设置专用 `TEST_MYSQL_DSN`、`TEST_POSTGRES_DSN` 后执行 `go test ./model -run 'CustomSubscription|SubscriptionRule|PointsDatabaseMatrix' -count=2 -v` 通过（17.336s），覆盖新建及代表性变更前表升级两次、数据／唯一索引保留、并发同请求和不同订单、通知重放、积分类型拆分与合并、钱包／积分／服务失败回滚、渠道交易冲突、延迟通知、截止时间溢出、历史未关联订单不阻塞过期扫描及关联异常回滚。`go test ./model ./middleware ./service -count=1`、`go test ./router -run TestCustomSubscription -count=1` 通过。`go build ./...`、相关五包 vet 通过；相关前端20文件／121用例、typecheck（1,564文件／2项目）、改动文件 lint／format、生产构建通过。Chrome 使用隔离模拟传输验证访客登录拦截、真实确认文案、微信方式、390×844布局与本地表单跳转，未实际支付。安全审查参考 OWASP ASVS5.0.0、Authentication／Session Management／CSRF Cheat Sheets，复用会话、Origin防护、后端归属／PAT限制；未改变登录签发与会话轮换，不声称全站认证。
 - 风险与未覆盖：易支付SDK缺少权威主动查单接口，本次依靠通知重试与签名返回补偿，不具备主动平台对账。未做真实商户扣款、完整发行库恢复升级或最低数据库版本验证；实际回调入口与支付配置仍需部署环境联调。全局 `TestAccessTokenRouteRulesCoverEveryDashboardRoute` 仍有6个已有路由登记缺项，使用任务开始 HEAD 路由／登记文件的 Go overlay 复现完全相同集合，本次新增路由已全部登记。新旧 quota 与积分同时发放是明确业务要求；本次不修改 relay 积分消费、自动续费、退款、邀请奖励或发票。
 
+### Z046 自定义订阅已签名渠道交易号兼容与支付关联校验
+
+- 需求与原因：部分兼容易支付网关只签名传入 `third_party_trade_no`，SDK只映射 `trade_no`，导致真实支付成功通知被订阅结算拒绝；订阅结算应以支付记录及其唯一关联为入口。
+- 变更内容：保持原始参数验签顺序，验签后优先使用标准 `trade_no`，缺失时回退到已签名别名；继续拒绝空值、超过128字节、签名篡改及原有金额／商户／渠道异常。先定位自定义订阅用途的易支付 TopUp，再通过 `top_up_id` 找订阅订单；锁内重验关联和订单号。quota、配置积分和权益仍在同一事务结算，不调用会独立提交的钱包充值函数。
+- 影响面：`controller/custom_subscription_payment.go`、`model/custom_subscription_payment.go`、`model/custom_subscription_payment_test.go`、`router/custom_subscription_payment_test.go`、[custom-subscriptions.md](custom-subscriptions.md) 及本登记表。本次代码与测试均为 fork 新增文件，没有新增上游自有文件修改。
+- 与上游差异：只扩展 fork 自定义订阅的兼容证据及关联查询；普通钱包回调、现有HTTP端点、校验规则和用户状态→订阅订单→充值记录→积分账户锁顺序保持原约定。
+- 开关与默认值：无新配置、依赖或数据库结构；标准字段优先，别名只在标准字段为空且原始签名有效时使用。不会自动补发旧订单、修改线上回调记录或重放通知。
+- 验证：Go1.26.10；修复前签名别名通知和支付关联回归测试均按预期失败；修复后 SQLite 定向模型及真实router测试通过，包含0.01元微信支付、GET／POST通知、签名返回、重复回调、标准字段优先、篡改／空值／超长拒绝、用途／渠道／归属／缺失关联及订单号冲突拒绝，校验quota和积分仅入账一次。`go test ./router -run TestCustomSubscription -count=1`、`go test ./model -run 'CustomSubscription|SubscriptionRule|PointsDatabaseMatrix|PaymentMethod|RechargeEpay' -count=1`、`go vet ./controller ./model ./router`、`go build ./...`、`git diff --check`通过。主任务设置专用测试DSN，隔离SQLite3.50.4／MySQL8.4.13／PostgreSQL16.16执行 `go test ./model -run 'CustomSubscription|SubscriptionRule|PointsDatabaseMatrix' -count=2 -v` 通过（16.622s）；`go test ./model ./middleware ./service -count=1` 通过。
+- 风险与未覆盖：未操作生产服务器、真实扣款或部署；已被网关误记为投递成功的旧记录不会自动重试，需部署后另行受控恢复。本条不合并钱包与订阅HTTP入口，也不引入主动支付对账。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，

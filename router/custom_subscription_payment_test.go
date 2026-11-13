@@ -227,4 +227,99 @@ func TestCustomSubscriptionPayment(t *testing.T) {
 	assert.Equal(t, "https://merchant.example.com/subscription?trade_no="+payment.TradeNo, returned.Header().Get("Location"))
 	invalidReturn := request("GET", "/api/custom_subscription/epay/return?out_trade_no=forged&trade_status=TRADE_SUCCESS", "", "", "")
 	assert.Equal(t, "https://merchant.example.com/subscription", invalidReturn.Header().Get("Location"))
+	// Gateway callbacks may sign only the downstream provider-reference alias.
+	require.NoError(t, db.Model(&plan).Updates(map[string]any{"price_amount_minor": 1, "version": 2}).Error)
+	for _, tc := range []struct {
+		name, canonical, alias string
+		returnFirst            bool
+	}{
+		{name: "alias_notify", alias: "downstream-alias-notify"},
+		{name: "alias_return", alias: "downstream-alias-return", returnFirst: true},
+		{name: "canonical_precedence", canonical: "canonical-provider", alias: "different-downstream-provider"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var before model.User
+			require.NoError(t, db.First(&before, 1).Error)
+			var beforeAccount model.PointAccount
+			require.NoError(t, db.First(&beforeAccount, account.Id).Error)
+			order, err := model.CreateCustomSubscriptionCheckout(model.CustomSubscriptionCheckoutInput{UserID: 1, PlanID: plan.Id, PlanVersion: 2, RequestID: "request-" + tc.name, PaymentMethod: "wxpay"})
+			require.NoError(t, err)
+			params := map[string]string{"pid": "merchant-test", "out_trade_no": order.TradeNo, "money": "0.01", "type": "wxpay", "trade_status": epay.StatusTradeSuccess, "third_party_trade_no": tc.alias}
+			if tc.canonical != "" {
+				params["trade_no"] = tc.canonical
+			}
+			if tc.name == "alias_notify" {
+				for _, invalid := range []string{"", strings.Repeat("x", 129)} {
+					params["third_party_trade_no"] = invalid
+					assert.Equal(t, "fail", notify(params, false).Body.String())
+				}
+				params["third_party_trade_no"] = tc.alias
+				tampered, err := epay.GenerateParamsWithError(params, "test-key")
+				require.NoError(t, err)
+				values := url.Values{}
+				for key, value := range tampered {
+					values.Set(key, value)
+				}
+				values.Set("third_party_trade_no", "tampered-provider")
+				assert.Equal(t, "fail", request("GET", "/api/custom_subscription/epay/notify?"+values.Encode(), "", "", "").Body.String())
+				var unchangedOrder model.CustomSubscriptionOrder
+				require.NoError(t, db.First(&unchangedOrder, order.Id).Error)
+				assert.Equal(t, common.TopUpStatusPending, unchangedOrder.Status)
+				var stillUnchanged model.User
+				require.NoError(t, db.First(&stillUnchanged, 1).Error)
+				assert.Equal(t, before.Quota, stillUnchanged.Quota)
+			}
+			signed, err := epay.GenerateParamsWithError(params, "test-key")
+			require.NoError(t, err)
+			values := url.Values{}
+			for key, value := range signed {
+				values.Set(key, value)
+			}
+			if tc.returnFirst {
+				returned := request("GET", "/api/custom_subscription/epay/return?"+values.Encode(), "", "", "")
+				assert.Equal(t, http.StatusFound, returned.Code)
+				assert.Equal(t, "https://merchant.example.com/subscription?trade_no="+order.TradeNo, returned.Header().Get("Location"))
+			} else {
+				req := httptest.NewRequest("POST", "/api/custom_subscription/epay/notify", strings.NewReader(values.Encode()))
+				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+				w := httptest.NewRecorder()
+				engine.ServeHTTP(w, req)
+				assert.Equal(t, "success", w.Body.String())
+			}
+			assert.Equal(t, "success", notify(params, false).Body.String())
+			assert.Equal(t, "success", notify(params, false).Body.String())
+			var settled model.CustomSubscriptionOrder
+			require.NoError(t, db.First(&settled, order.Id).Error)
+			assert.Equal(t, common.TopUpStatusSuccess, settled.Status)
+			assert.Equal(t, model.CustomSubscriptionFulfillmentComplete, settled.FulfillmentStatus)
+			provider := tc.canonical
+			if provider == "" {
+				provider = tc.alias
+			}
+			require.NotNil(t, settled.ProviderTradeNo)
+			assert.Equal(t, provider, *settled.ProviderTradeNo)
+			var safe epay.VerifyRes
+			require.NoError(t, common.UnmarshalJsonStr(settled.ProviderPayload, &safe))
+			assert.Equal(t, provider, safe.TradeNo)
+			assert.NotContains(t, settled.ProviderPayload, "sign")
+			var credited model.User
+			require.NoError(t, db.First(&credited, 1).Error)
+			assert.EqualValues(t, before.Quota+int(order.QuotaToCredit), credited.Quota)
+			var creditedAccount model.PointAccount
+			require.NoError(t, db.First(&creditedAccount, account.Id).Error)
+			assert.EqualValues(t, beforeAccount.AvailablePoints+30000, creditedAccount.AvailablePoints)
+			var transaction model.PointTransaction
+			require.NoError(t, db.Where("event_key = ?", fmt.Sprintf("custom-subscription:%d:credit", order.Id)).First(&transaction).Error)
+			assert.EqualValues(t, 30000, transaction.Points)
+			var rows int64
+			require.NoError(t, db.Model(&model.PointLedger{}).Where("transaction_id = ?", transaction.Id).Count(&rows).Error)
+			assert.EqualValues(t, 1, rows)
+			require.NoError(t, db.Model(&model.CustomUserSubscription{}).Where("order_id = ?", order.Id).Count(&rows).Error)
+			assert.EqualValues(t, 1, rows)
+			var payment model.TopUp
+			require.NoError(t, db.First(&payment, *order.TopUpId).Error)
+			assert.Equal(t, common.TopUpStatusSuccess, payment.Status)
+		})
+	}
+
 }
