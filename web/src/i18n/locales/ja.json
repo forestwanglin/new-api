@@ -1,5 +1,14 @@
 {
   "translation": {
+    "Adjust Points": "ポイントを調整",
+    "Failed to adjust points": "ポイントの調整に失敗しました",
+    "Points adjusted successfully": "ポイントを調整しました",
+    "Failed to load points": "ポイントの読み込みに失敗しました",
+    "Enter a positive whole number of points within the supported range": "対応範囲内の正の整数でポイントを入力してください",
+    "Invalid point adjustment parameters": "ポイント調整のパラメーターが無効です",
+    "Point adjustment request conflicts with an existing request": "ポイント調整リクエストが既存のリクエストと競合しています",
+    "Point balance exceeds the supported integer range": "ポイント残高が対応する整数の範囲を超えています",
+    "Failed to adjust user points": "ユーザーのポイント調整に失敗しました",
     "Discount ratio": "割引率",
     "Model discount": "モデルの割引",
     "Models from": "モデル料金は参考価格の",

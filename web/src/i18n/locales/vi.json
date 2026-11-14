@@ -1,5 +1,14 @@
 {
   "translation": {
+    "Adjust Points": "Điều chỉnh điểm",
+    "Failed to adjust points": "Không thể điều chỉnh điểm",
+    "Points adjusted successfully": "Điều chỉnh điểm thành công",
+    "Failed to load points": "Không thể tải điểm",
+    "Enter a positive whole number of points within the supported range": "Nhập số điểm nguyên dương trong phạm vi được hỗ trợ",
+    "Invalid point adjustment parameters": "Tham số điều chỉnh điểm không hợp lệ",
+    "Point adjustment request conflicts with an existing request": "Yêu cầu điều chỉnh điểm xung đột với yêu cầu hiện có",
+    "Point balance exceeds the supported integer range": "Số dư điểm vượt quá phạm vi số nguyên được hỗ trợ",
+    "Failed to adjust user points": "Không thể điều chỉnh điểm của người dùng",
     "Discount ratio": "Tỷ lệ giảm giá",
     "Model discount": "Giảm giá mô hình",
     "Models from": "Mô hình chỉ từ",

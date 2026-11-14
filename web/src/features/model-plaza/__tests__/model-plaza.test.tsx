@@ -508,3 +508,28 @@ it('reacts to the configured reference exchange rate in overseas prices, discoun
     )
   ).toBeVisible()
 })
+
+it('shows codex-auto-review in the overseas filter without vendor metadata', async () => {
+  vi.mocked(api.get).mockResolvedValue({
+    data: {
+      ...pricing,
+      data: [
+        { ...pricing.data[0], model_name: 'codex-auto-review', vendor_id: 0 },
+        { ...pricing.data[0], model_name: 'custom-service', vendor_id: 99 },
+      ],
+      vendors: [{ id: 99, name: 'Private Service' }],
+    },
+  })
+  const user = userEvent.setup()
+  renderPlaza()
+  const overseas = await screen.findByRole('button', {
+    name: /^Overseas Models/,
+  })
+  expect(within(overseas).getByText('1')).toBeVisible()
+  await user.click(overseas)
+  expect(screen.getByText('codex-auto-review')).toBeVisible()
+  expect(screen.queryByText('custom-service')).not.toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: /^Other Models/ }))
+  expect(screen.queryByText('codex-auto-review')).not.toBeInTheDocument()
+  expect(screen.getByText('custom-service')).toBeVisible()
+})

@@ -96,6 +96,7 @@ import {
   transformUserToFormDefaults,
 } from '../lib'
 import type { User } from '../types'
+import { UserPointsEditor } from './user-points-editor'
 import { UserQuotaDialog } from './user-quota-dialog'
 import { useUsers } from './users-provider'
 
@@ -476,6 +477,15 @@ export function UsersMutateDrawer({
                       </FormItem>
                     )}
                   />
+
+                  {currentRow && (
+                    <UserPointsEditor
+                      key={currentRow.id}
+                      open={open}
+                      userId={currentRow.id}
+                      onSuccess={triggerRefresh}
+                    />
+                  )}
 
                   <FormField
                     control={form.control}

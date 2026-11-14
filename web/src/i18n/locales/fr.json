@@ -1,5 +1,14 @@
 {
   "translation": {
+    "Adjust Points": "Ajuster les points",
+    "Failed to adjust points": "Échec de l’ajustement des points",
+    "Points adjusted successfully": "Points ajustés avec succès",
+    "Failed to load points": "Échec du chargement des points",
+    "Enter a positive whole number of points within the supported range": "Saisissez un nombre entier positif de points dans la plage prise en charge",
+    "Invalid point adjustment parameters": "Paramètres d’ajustement des points invalides",
+    "Point adjustment request conflicts with an existing request": "La demande d’ajustement des points est en conflit avec une demande existante",
+    "Point balance exceeds the supported integer range": "Le solde de points dépasse la plage des entiers prise en charge",
+    "Failed to adjust user points": "Échec de l’ajustement des points de l’utilisateur",
     "Discount ratio": "Taux de réduction",
     "Model discount": "Réduction des modèles",
     "Models from": "Modèles à partir de",

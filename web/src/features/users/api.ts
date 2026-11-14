@@ -26,6 +26,9 @@ import { requireServerSuccess } from '@/lib/server-error-message'
 
 import {
   userPointBalanceSchema,
+  userPointAccountSchema,
+  type AdjustUserPointsPayload,
+  type UserPointAccount,
   type User,
   type GetUsersParams,
   type GetUsersResponse,
@@ -284,4 +287,23 @@ export async function adminUnbindCustomOAuth(
     securityProofConfig(proofToken)
   )
   return res.data
+}
+
+/** Administrator reads all configured types, including types with no account. */
+export async function getUserPoints(
+  userId: number
+): Promise<UserPointAccount[]> {
+  const response = await api.get(`/api/user/${userId}/points`)
+  const data = requireServerSuccess(response.data).data
+  const parsed = userPointAccountSchema.array().safeParse(data?.balances)
+  if (!parsed.success) throw new Error(t('Invalid response'))
+  return parsed.data
+}
+
+export async function adjustUserPoints(
+  userId: number,
+  payload: AdjustUserPointsPayload
+): Promise<void> {
+  const response = await api.post(`/api/user/${userId}/points`, payload)
+  requireServerSuccess(response.data)
 }

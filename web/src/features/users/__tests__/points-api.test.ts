@@ -20,7 +20,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 
 import { api } from '@/lib/api'
 
-import { getUsers, searchUsers } from '../api'
+import { getUsers, searchUsers, getUserPoints, adjustUserPoints } from '../api'
 import { userPointBalanceSchema, userSchema } from '../types'
 
 const balance = {
@@ -87,4 +87,52 @@ it('accepts users without list-only points and does not rewrite server business 
   vi.spyOn(api, 'get').mockResolvedValue({ data: response })
   expect(await getUsers()).toEqual(response)
   expect(await searchUsers({})).toEqual(response)
+})
+
+it('reads target balances with exact integer strings and no legacy quota conversion', async () => {
+  const data = {
+    balances: [{ ...balance, point_type_id: '99', frozen_points: '5' }],
+  }
+  const get = vi
+    .spyOn(api, 'get')
+    .mockResolvedValue({ data: { success: true, data } })
+  expect(await getUserPoints(2)).toEqual(data.balances)
+  expect(get).toHaveBeenCalledWith('/api/user/2/points')
+})
+
+it('rejects malformed administrator balances instead of using zero', async () => {
+  vi.spyOn(api, 'get').mockResolvedValue({
+    data: {
+      success: true,
+      data: {
+        balances: [
+          {
+            ...balance,
+            point_type_id: '99',
+            available_points: 9007199254740992,
+          },
+        ],
+      },
+    },
+  })
+  await expect(getUserPoints(2)).rejects.toThrow('Invalid response')
+})
+
+it('posts exact point amounts and preserves server business failures', async () => {
+  const payload = {
+    point_type_id: '99',
+    mode: 'add' as const,
+    amount: '9007199254740993',
+    request_id: 'request-1',
+  }
+  const post = vi.spyOn(api, 'post').mockResolvedValue({
+    data: {
+      success: false,
+      message: 'Point adjustment request conflicts with an existing request',
+    },
+  })
+  await expect(adjustUserPoints(2, payload)).rejects.toThrow(
+    'Point adjustment request conflicts with an existing request'
+  )
+  expect(post).toHaveBeenCalledWith('/api/user/2/points', payload)
 })

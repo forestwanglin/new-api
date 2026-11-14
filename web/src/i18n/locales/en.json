@@ -1,5 +1,14 @@
 {
   "translation": {
+    "Adjust Points": "Adjust Points",
+    "Failed to adjust points": "Failed to adjust points",
+    "Points adjusted successfully": "Points adjusted successfully",
+    "Failed to load points": "Failed to load points",
+    "Enter a positive whole number of points within the supported range": "Enter a positive whole number of points within the supported range",
+    "Invalid point adjustment parameters": "Invalid point adjustment parameters",
+    "Point adjustment request conflicts with an existing request": "Point adjustment request conflicts with an existing request",
+    "Point balance exceeds the supported integer range": "Point balance exceeds the supported integer range",
+    "Failed to adjust user points": "Failed to adjust user points",
     "Discount ratio": "Discount ratio",
     "Model discount": "Model discount",
     "Models from": "Models from",

@@ -50,6 +50,17 @@ export const userPointBalanceSchema = z.object({
 })
 export type UserPointBalance = z.infer<typeof userPointBalanceSchema>
 
+export const userPointAccountSchema = userPointBalanceSchema.extend({
+  point_type_id: z.string().regex(/^[1-9]\d*$/),
+})
+export type UserPointAccount = z.infer<typeof userPointAccountSchema>
+export type AdjustUserPointsPayload = {
+  point_type_id: string
+  mode: 'add' | 'subtract'
+  amount: string
+  request_id: string
+}
+
 export const userSchema = z.object({
   id: z.number(),
   username: z.string(),

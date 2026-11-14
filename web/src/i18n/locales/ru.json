@@ -1,5 +1,14 @@
 {
   "translation": {
+    "Adjust Points": "Изменить баллы",
+    "Failed to adjust points": "Не удалось изменить баллы",
+    "Points adjusted successfully": "Баллы успешно изменены",
+    "Failed to load points": "Не удалось загрузить баллы",
+    "Enter a positive whole number of points within the supported range": "Введите положительное целое число баллов в допустимом диапазоне",
+    "Invalid point adjustment parameters": "Недопустимые параметры изменения баллов",
+    "Point adjustment request conflicts with an existing request": "Запрос изменения баллов конфликтует с существующим запросом",
+    "Point balance exceeds the supported integer range": "Баланс баллов выходит за допустимый диапазон целых чисел",
+    "Failed to adjust user points": "Не удалось изменить баллы пользователя",
     "Discount ratio": "Размер скидки",
     "Model discount": "Скидка на модели",
     "Models from": "Модели от",

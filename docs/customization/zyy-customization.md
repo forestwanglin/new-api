@@ -962,6 +962,26 @@
 - 验证：`go test ./model -run TestPointCall -count=1` 在真实 SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 17.11 全通过，覆盖账户/冻结一致性、并发预留、负账/同类型补足、累计取整、重复/冲突事件、故障回滚/恢复、日志插入后未确认去重和 limit1 队首失败不阻塞后项。`go test ./service -run TestPointsUncertainOutcomeRetainsHoldAndStopsRetry -count=1` 通过，验证模糊传输/响应错误保留冻结并停止重发。固定价格（独立日志库）、即时任务及预占策略矩阵三数据库通过，Key 主库权威/缓存矩阵三数据库通过，Task/MJ 迁移、防旧结果覆盖及公平恢复三数据库通过。真实 ClickHouse 26.8.37.168 日志读取去重红绿通过，覆盖列表/count/分页、Key 查询、导出和费用/token 聚合；物理重放不承诺唯一，公共投影按用户及已提交事件去重（大日志库需关注新增 JSON/排序查询成本，未做生产规模压测）。后端 model/service/controller/relay/.../middleware/router 集成排除下述已在独立 HEAD 复现的4项既有测试后通过，go vet 受影响包、go build ./... 通过。4项基线为 TestOpenAIChatSamplingCompatibility、TestAPITokenAuditDatabaseMatrix、TestAdaptorMasksDialedHostsInDialFailure、TestAccessTokenRouteRulesCoverEveryDashboardRoute，未修无关功能或弱化断言。前端91个专项测试、typecheck（1586文件/2项目）、生产构建、修改文件lint/format通过；全量排除既有 detail-preview localized 测试超时后273文件/2948用例通过，该超时独立 HEAD 同样复现。全库格式检查另有33个未修改文件的既有问题。隔离Chrome桌面与390×844移动端核实积分列、多类型展示、旧钱包菜单隐藏及优先级文案；HTTP/WebSocket 使用本地上游桩完成真实准入/结算测试，未发起商业模型付费请求。
 - 风险与未覆盖：**禁止混跑旧/新准入节点；必须停止全部旧 writer，取得旧 user/token 批量账务的持久排空/对账证据后统一切换**。旧批量实现先丢缓冲后 SQL、失败仅日志，空缓冲/等待/finished 都不构成证据；无法证明时阻止启用，先运维对账或另行发布可靠排空准备版本。回滚也需排空新冻结/任务/副作用并保留表。未知上游结果仍需凭证据对账，不能按超时擅退。详见 [points-schema.md](points-schema.md)。仅隔离测试库验证，未执行生产升级、部署或正式发行版完整数据库演练；ClickHouse 日志故障恢复单独验证，主库三引擎矩阵不代表 ClickHouse。
 
+### Z058 管理员用户编辑逐类型调整积分
+
+- 需求与原因：管理员需要在用户编辑抽屉中直接增减任意已登记类型的积分，沿用额度调整交互，不提供积分覆盖。
+- 变更内容：额度行下面逐类型展示只读可用积分输入框和对应调整按钮，含未开户类型的零值；点击打开固定该类型的增加/扣减弹窗。新增会话限定的 `GET/POST /api/user/:id/points`，读取全部类型且不建账，调账支持精确整数、负余额、稳定请求幂等、并发账户更新、交易/流水原子提交和管理员身份记录；冻结积分及 quota 不变。成功刷新、失败提示/重试及七种语言沿用项目封装。
+- 影响面：新增 `model/user_points_adjustment{,_test}.go`、`controller/user_points.go`、`router/user_points_adjustment_test.go` 及用户积分调整组件/测试。**上游自有文件**：`router/api-router.go`、`middleware/access_token_routes.go`、`web/src/features/users/{api,types}.ts`、`web/src/features/users/components/users-mutate-drawer.tsx`、相关既有用户测试、七种 locale。详见 [points-schema.md](points-schema.md) 及仓库积分持久化契约。
+- 与上游差异：扩展用户编辑的 quota 调整为独立积分账户调账，不替换原额度功能；沿用 AdminAuth 与目标角色限制，PAT 不可调用新接口。交易类型 ADMIN_ADJUST，增加 CREDIT、扣减 REVOKE，无新增表或依赖。
+- 开关与默认值：无新增开关；类型来自数据库，按消费优先级大值在前；仅增加/扣减，扣减允许负可用积分。余额和金额十进制字符串，前端 BigInt，超 int64 整体拒绝；同键异载荷或 MySQL 大小写键碰撞安全冲突。
+- 验证：后端 SQLite 3.50.4 / MySQL 8.4.13 / PostgreSQL 17.11 专项矩阵通过，覆盖 >2^53、负余额、冻结/quota 不变、权限、重放/冲突、大小写请求碰撞、溢出、流水失败回滚、并发首次开户及真实模型预扣/最终结算并发；`go vet ./model ./controller ./router ./middleware` 通过。后端 model/controller/router/middleware 集成排除已有三项基线（TestOpenAIChatSamplingCompatibility、TestAPITokenAuditDatabaseMatrix、TestAccessTokenRouteRulesCoverEveryDashboardRoute）后通过，`go build ./...` 通过。前端相关 15 文件/122 用例及独立审查 6 文件/77 用例通过，typecheck（1589 文件/2 项目）、修改文件 lint/format 和生产构建通过。全量前端 273 文件/2974 用例通过，仅未修改的 detail-preview 本地化价格测试 20 秒超时失败，已由此前独立 HEAD 基线复现。
+- 风险与未覆盖：仅在隔离数据库执行调账，未调整生产积分；Chrome 以仅拦截当前测试标签页 GET 的模拟余额验证最终逐类型布局、固定类型弹窗、>2^53/零值/负值及 390×844 扣减预览，并清除拦截/视口覆盖及关闭标签页；未点击调账确认。真实成功写入由三引擎和组件/API 回归覆盖，浏览器未连接更新后端验证写入；未为验证重启现有开发服务。未推送或部署。
+
+### Z059 codex-auto-review 归入海外模型
+
+- 需求与原因：用户要求模型页面将 `codex-auto-review` 归到海外模型，即使厂商元数据缺失也应正确显示。
+- 变更内容：模型页对精确名称 `codex-auto-review` 优先返回 overseas；其余名称继续按现有厂商别名归类，未知保持其他模型。海外筛选、计数及现有海外参考汇率/折扣展示同步生效，实际售价和后端计费不变。
+- 影响面：`web/src/features/model-plaza/categories.ts` 与分类/模型页回归测试；**上游自有文件**：无（该功能模块为 fork 新增）。
+- 与上游差异：在 Z052 的厂商归类上增加一条用户明确指定的模型名称规则，不扩展为 codex 前缀匹配，不修改元数据或模型调用。
+- 开关与默认值：无新增开关、依赖或接口；精确名称规则常开。
+- 验证：新增分类及真实组件筛选回归修改前失败、修改后通过；`bun run test` 指定 model-plaza 分类/页面/折扣 3 文件共 41 用例通过，修改文件 oxlint/oxfmt 和 typecheck 通过。
+- 风险与未覆盖：海外参考价格展示会沿用已有参考汇率，实际售价不受影响；未调用商业模型、修改服务器配置或部署。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
@@ -970,6 +990,7 @@
 
 | 区域 | 文件 | 关联条目 |
 |---|---|---|
+| 管理员积分调账 | `router/api-router.go`、`middleware/access_token_routes.go`、用户API/类型/编辑抽屉/既有测试、七种locale | Z058 |
 | 模型积分准入与结算 | `model/{token,quota_reserve,log,task,midjourney}.go`、`controller/{token,relay,midjourney,plugin_protocol}.go`、`relay/{request_billing,relay_task,mjproxy_handler,common/relay_info}.go`、`service/{billing_session,quota,midjourney,task_billing,task_polling,task_billing_reconcile,violation_fee,relay_error}.go` 及测试；使用日志/任务/绘图 schema 和列、账号/移动菜单、侧栏/维护设置、七种 locale 及相关测试 | Z057 |
 | 首页接入引导取价 | `web/src/features/dashboard/components/overview/access-guide/index.tsx` 及接入引导、首页测试 | Z056 |
 | 新模型页公开定价入口 | `router/api-router.go`、`middleware/access_token_routes.go`、`web/src/features/pricing/api.ts`、`web/src/features/pricing/hooks/use-pricing-data.ts`、七种locale | Z051、Z052、Z053、Z054、Z055 |

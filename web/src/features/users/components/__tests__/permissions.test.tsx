@@ -17,7 +17,14 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, expect, it, vi } from 'vitest'
 
@@ -43,7 +50,11 @@ const label = "View other accounts' audit logs"
 const description =
   'View audit records from user and admin roles. Root records are always excluded.'
 
-function renderPermissions(viewerRole: number, allowed?: boolean) {
+function renderPermissions(
+  viewerRole: number,
+  allowed?: boolean,
+  editing = true
+) {
   useAuthStore
     .getState()
     .auth.setUser({ id: 1, username: 'operator', role: viewerRole })
@@ -67,6 +78,31 @@ function renderPermissions(viewerRole: number, allowed?: boolean) {
               },
             ],
             roles: [{ key: 'admin', grants: { audit: { read: false } } }],
+          },
+        },
+      }
+    }
+    if (url === '/api/user/2/points') {
+      return {
+        data: {
+          success: true,
+          data: {
+            balances: [
+              {
+                point_type_id: '1',
+                code: 'GENERAL',
+                name: 'General',
+                available_points: '9007199254740993',
+                frozen_points: '5',
+              },
+              {
+                point_type_id: '99',
+                code: 'FUTURE',
+                name: 'Future points',
+                available_points: '0',
+                frozen_points: '0',
+              },
+            ],
           },
         },
       }
@@ -107,7 +143,7 @@ function renderPermissions(viewerRole: number, allowed?: boolean) {
         <UsersMutateDrawer
           open
           onOpenChange={() => undefined}
-          currentRow={target}
+          currentRow={editing ? target : undefined}
         />
       </UsersProvider>
     </QueryClientProvider>
@@ -194,4 +230,106 @@ it('admin cannot edit the audit permission even when the catalog is available', 
   renderPermissions(10)
   await screen.findByDisplayValue('Managed admin')
   expect(screen.queryByRole('button', { name: label })).not.toBeInTheDocument()
+})
+
+it('renders every type as a readonly amount and matching adjustment button below quota', async () => {
+  renderPermissions(100)
+  await screen.findByDisplayValue('Managed admin')
+  const quota = screen.getByRole('button', { name: 'Adjust Quota' })
+  const general = await screen.findByRole('group', {
+    name: 'General (GENERAL)',
+  })
+  const future = screen.getByRole('group', { name: 'Future points (FUTURE)' })
+  expect(within(general).getByRole('textbox')).toHaveValue(
+    '9,007,199,254,740,993'
+  )
+  expect(within(general).getByRole('textbox')).toHaveAttribute('readonly')
+  expect(within(future).getByRole('textbox')).toHaveValue('0')
+  expect(
+    quota.compareDocumentPosition(general) & Node.DOCUMENT_POSITION_FOLLOWING
+  ).toBeTruthy()
+  expect(screen.getAllByRole('button', { name: 'Adjust Points' })).toHaveLength(
+    2
+  )
+  await userEvent.click(
+    within(future).getByRole('button', { name: 'Adjust Points' })
+  )
+  const modal = await screen.findByRole('dialog', { name: 'Adjust Points' })
+  await waitFor(() =>
+    expect(within(modal).getByText('Future points (FUTURE)')).toBeVisible()
+  )
+  expect(within(modal).queryByRole('combobox')).not.toBeInTheDocument()
+  expect(within(modal).queryByText('General (GENERAL)')).not.toBeInTheDocument()
+})
+
+it('does not offer quota or point adjustment when creating a user', async () => {
+  renderPermissions(100, undefined, false)
+  expect(
+    screen.queryByRole('button', { name: 'Adjust Quota' })
+  ).not.toBeInTheDocument()
+  expect(
+    screen.queryByRole('button', { name: 'Adjust Points' })
+  ).not.toBeInTheDocument()
+})
+
+it('refreshes a changed point row without resetting unsaved user edits', async () => {
+  const get = renderPermissions(100)
+  const displayName = await screen.findByDisplayValue('Managed admin')
+  await userEvent.clear(displayName)
+  await userEvent.type(displayName, 'Unsaved user edit')
+  const future = await screen.findByRole('group', {
+    name: 'Future points (FUTURE)',
+  })
+  await userEvent.click(
+    within(future).getByRole('button', { name: 'Adjust Points' })
+  )
+  const modal = await screen.findByRole('dialog', { name: 'Adjust Points' })
+  await within(modal).findByText('Future points (FUTURE)')
+  fireEvent.change(within(modal).getByLabelText('Amount (Points)'), {
+    target: { value: '2' },
+  })
+  const previousGet = get.getMockImplementation()
+  if (!previousGet) throw new Error('Missing API fixture')
+  get.mockImplementation(async (...args) => {
+    if (args[0] === '/api/user/2/points') {
+      return {
+        data: {
+          success: true,
+          data: {
+            balances: [
+              {
+                point_type_id: '99',
+                code: 'FUTURE',
+                name: 'Future points',
+                available_points: '2',
+                frozen_points: '0',
+              },
+            ],
+          },
+        },
+      }
+    }
+    return previousGet(...args)
+  })
+  const post = vi
+    .spyOn(api, 'post')
+    .mockResolvedValue({ data: { success: true } })
+  await userEvent.click(within(modal).getByRole('button', { name: 'Confirm' }))
+  await waitFor(() =>
+    expect(post).toHaveBeenCalledWith(
+      '/api/user/2/points',
+      expect.objectContaining({ point_type_id: '99', mode: 'add', amount: '2' })
+    )
+  )
+  await waitFor(() =>
+    expect(
+      screen.queryByRole('dialog', { name: 'Adjust Points' })
+    ).not.toBeInTheDocument()
+  )
+  expect(
+    within(
+      screen.getByRole('group', { name: 'Future points (FUTURE)' })
+    ).getByRole('textbox')
+  ).toHaveValue('2')
+  expect(screen.getByDisplayValue('Unsaved user edit')).toBeVisible()
 })

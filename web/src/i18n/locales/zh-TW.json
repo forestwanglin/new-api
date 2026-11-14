@@ -1,5 +1,14 @@
 {
   "translation": {
+    "Adjust Points": "調整積分",
+    "Failed to adjust points": "調整積分失敗",
+    "Points adjusted successfully": "積分調整成功",
+    "Failed to load points": "載入積分失敗",
+    "Enter a positive whole number of points within the supported range": "請輸入支援範圍內的正整數積分",
+    "Invalid point adjustment parameters": "積分調整參數無效",
+    "Point adjustment request conflicts with an existing request": "積分調整請求與既有請求衝突",
+    "Point balance exceeds the supported integer range": "積分餘額超出支援的整數範圍",
+    "Failed to adjust user points": "調整使用者積分失敗",
     "Discount ratio": "折扣比例",
     "Model discount": "模型折扣",
     "Models from": "模型低至",

@@ -59,3 +59,19 @@ it('preserves a negative API vendor ID as its filter identity', () => {
     getModelVendorKey({ ...model, vendor_id: -1012, vendor_name: 'OpenAI' })
   ).toBe('-1012')
 })
+
+it.each([undefined, 'Private Service', 'OpenAI', 'DeepSeek'])(
+  'classifies codex-auto-review as overseas with vendor %s',
+  (vendor_name) => {
+    expect(
+      getModelCategory({
+        ...model,
+        model_name: 'codex-auto-review',
+        vendor_name,
+      })
+    ).toBe('overseas')
+    expect(
+      getModelCategory({ ...model, model_name: 'codex-auto-review-custom' })
+    ).toBe('other')
+  }
+)

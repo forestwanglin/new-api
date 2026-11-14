@@ -21,7 +21,7 @@ import type { PricingModel } from '@/features/pricing/types'
 export type ModelCategory = 'domestic' | 'overseas' | 'other'
 
 // Display-only vendor ownership. Extend aliases when onboarding a new vendor;
-// unmatched names stay in Other Models rather than guessing from model names.
+// unmatched names stay in Other Models unless explicitly classified below.
 const DOMESTIC_VENDORS = new Set([
   'deepseek',
   '深度求索',
@@ -108,6 +108,9 @@ const OVERSEAS_VENDORS = new Set([
 ])
 
 export function getModelCategory(model: PricingModel): ModelCategory {
+  // Explicit display classification for the review model, including missing metadata.
+  if (model.model_name === 'codex-auto-review') return 'overseas'
+
   const vendor = model.vendor_name
     ?.trim()
     .toLowerCase()

@@ -1,5 +1,14 @@
 {
   "translation": {
+    "Adjust Points": "调整积分",
+    "Failed to adjust points": "调整积分失败",
+    "Points adjusted successfully": "积分调整成功",
+    "Failed to load points": "加载积分失败",
+    "Enter a positive whole number of points within the supported range": "请输入支持范围内的正整数积分",
+    "Invalid point adjustment parameters": "积分调整参数无效",
+    "Point adjustment request conflicts with an existing request": "积分调整请求与已有请求冲突",
+    "Point balance exceeds the supported integer range": "积分余额超出支持的整数范围",
+    "Failed to adjust user points": "调整用户积分失败",
     "Discount ratio": "折扣比例",
     "Model discount": "模型折扣",
     "Models from": "模型低至",
