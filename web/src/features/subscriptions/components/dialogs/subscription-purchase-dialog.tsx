@@ -26,7 +26,7 @@ import { GroupBadge } from '@/components/group-badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Combobox } from '@/components/ui/combobox'
-import { Separator } from '@/components/ui/separator'
+
 import { useSystemConfig } from '@/hooks/use-system-config'
 import { formatQuota } from '@/lib/format'
 import { handleServerError } from '@/lib/handle-server-error'
@@ -239,15 +239,12 @@ export function SubscriptionPurchaseDialog(props: Props) {
       contentHeight='auto'
       bodyClassName='space-y-4'
     >
-      <div className='space-y-3 sm:space-y-4'>
-        <div className='bg-muted/50 space-y-2.5 rounded-lg border p-3 sm:space-y-3 sm:p-4'>
-          <div className='flex justify-between'>
-            <span className='text-muted-foreground text-sm'>
-              {t('Plan Name')}
-            </span>
-            <span className='max-w-[200px] truncate text-sm font-medium'>
-              {plan.title}
-            </span>
+      <div className='space-y-4'>
+        {/* Plan info */}
+        <div className='space-y-2.5 rounded-lg border bg-white p-3 sm:p-4'>
+          <div className='flex items-center justify-between'>
+            <span className='text-sm font-medium'>{plan.title}</span>
+            <span className='text-lg font-bold text-primary'>${price}</span>
           </div>
           <div className='flex items-center justify-between'>
             <span className='text-muted-foreground text-sm'>
@@ -259,7 +256,7 @@ export function SubscriptionPurchaseDialog(props: Props) {
             </span>
           </div>
           {formatResetPeriod(plan, t) !== t('No Reset') && (
-            <div className='flex justify-between'>
+            <div className='flex items-center justify-between'>
               <span className='text-muted-foreground text-sm'>
                 {t('Reset Period')}
               </span>
@@ -283,11 +280,24 @@ export function SubscriptionPurchaseDialog(props: Props) {
               <GroupBadge group={plan.upgrade_group} />
             </div>
           )}
-          <Separator />
-          <div className='flex items-center justify-between'>
-            <span className='text-sm font-medium'>{t('Amount Due')}</span>
-            <span className='text-primary text-lg font-bold'>${price}</span>
-          </div>
+        </div>
+
+        {/* Payment summary info box */}
+        <div className='rounded-lg border border-blue-200 bg-blue-50/60 p-4 sm:p-5'>
+          <p className='text-sm text-muted-foreground'>
+            {t('This payment')}{" "}
+            <span className='text-lg font-bold text-blue-600'>${price}</span>
+          </p>
+          <p className='mt-2 text-sm text-muted-foreground'>
+            {t('This credit')}{" "}
+            <span className='text-lg font-bold text-blue-600'>
+              {totalAmount > 0 ? formatQuota(totalAmount) : t('Unlimited')}
+            </span>{" "}
+            {t('points, valid forever')}
+          </p>
+          <p className='mt-2 text-sm text-muted-foreground'>
+            {t('Activated upon payment')}；{t('Service period for this purchase')}1{t('month(s)')}。
+          </p>
         </div>
 
         {limitReached && (
@@ -334,9 +344,9 @@ export function SubscriptionPurchaseDialog(props: Props) {
 
         {hasAnyPayment && (
           <div className='space-y-3'>
-            <p className='text-muted-foreground text-xs'>
+            <label className='text-sm font-medium'>
               {t('Select payment method')}
-            </p>
+            </label>
             {(hasStripe || hasCreem || hasWaffoPancake) && (
               <div className='grid grid-cols-2 gap-2 sm:flex'>
                 {hasStripe && (
@@ -372,7 +382,7 @@ export function SubscriptionPurchaseDialog(props: Props) {
               </div>
             )}
             {hasEpay && (
-              <div className='grid grid-cols-[minmax(0,1fr)_auto] gap-2'>
+              <div className='flex gap-2'>
                 <Combobox
                   options={(props.epayMethods || []).map((m) => ({
                     value: m.type,

@@ -7642,7 +7642,7 @@
     "Bind a phone number to finish WeChat sign in": "请绑定手机号后完成微信登录。",
     "Bind phone and sign in": "绑定手机号并登录",
     "WeChat login QR code is not configured": "尚未配置公众号二维码，请联系管理员。",
-    "Scan with WeChat and enter the official account verification code": "请使用微信扫一扫，输入公众号提供的验证码。",
+    "Scan with WeChat and enter the official account verification code": "扫描二维码关注官方账号，回复“验证码”以接收您的验证码。",
     "WeChat verification code": "微信验证码",
     "WeChat sign in is not enabled": "尚未开启微信登录，请联系管理员。",
     "Phone login is not configured. Please contact your administrator.": "手机号登录尚未配置，请联系管理员。",
