@@ -49,6 +49,8 @@ export type ModelPriceCellOptions = {
   usdExchangeRate?: number
   showRechargePrice?: boolean
   selectedGroup?: string
+  /** Display-only multiplier for the struck-through reference price. */
+  originalPriceMultiplier?: number
 }
 
 export function ModelPriceCell(props: {
@@ -98,11 +100,19 @@ export function ModelPriceCell(props: {
     [props.model, dynamicOptions, currency]
   )
   const discount = getVisibleDiscount(props.model, options.selectedGroup)
-  const showOriginalPrice = discount.kind === 'discount'
-  const baseModel = useMemo(
-    () => withBaseGroupRatio(props.model),
-    [props.model]
-  )
+  const originalPriceMultiplier = options.originalPriceMultiplier ?? 1
+  const showOriginalPrice =
+    discount.kind === 'discount' || originalPriceMultiplier > 1
+  const baseModel = useMemo(() => {
+    const base = withBaseGroupRatio(props.model)
+    return {
+      ...base,
+      group_ratio: {
+        ...base.group_ratio,
+        [BASE_GROUP_KEY]: originalPriceMultiplier,
+      },
+    }
+  }, [props.model, originalPriceMultiplier])
   const baseEntryByKey = useMemo(() => {
     const map = new Map<
       string,
@@ -111,10 +121,10 @@ export function ModelPriceCell(props: {
     if (!showOriginalPrice) {
       return map
     }
-    const summary = getDynamicPricingSummary(
-      props.model,
-      getBasePriceOptions(dynamicOptions)
-    )
+    const summary = getDynamicPricingSummary(props.model, {
+      ...getBasePriceOptions(dynamicOptions),
+      groupRatioMultiplier: originalPriceMultiplier,
+    })
     for (const entry of [
       ...(summary?.primaryEntries ?? []),
       ...(summary?.secondaryEntries ?? []),
@@ -127,7 +137,13 @@ export function ModelPriceCell(props: {
     return map
     // Currency is read indirectly by the price formatter.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.model, dynamicOptions, showOriginalPrice, currency])
+  }, [
+    props.model,
+    dynamicOptions,
+    showOriginalPrice,
+    originalPriceMultiplier,
+    currency,
+  ])
   let metrics: Array<{ label: string; value: string; original?: string }>
   const providerCaption = dynamic?.providerCount
     ? t('{{count}} providers', { count: dynamic.providerCount })

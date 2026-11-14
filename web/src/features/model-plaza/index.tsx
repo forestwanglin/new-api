@@ -43,6 +43,11 @@ import {
   type ModelCategory,
 } from './categories'
 import {
+  formatModelDiscount,
+  getModelDiscountRatio,
+  getReferencePriceMultiplier,
+} from './display-discount'
+import {
   ModelSidebar,
   type ModelCategoryGroup,
   type ModelFilter,
@@ -129,6 +134,11 @@ export function ModelPlaza() {
     )
   }, [searchedModels, filter, locale])
 
+  const discounts = models
+    .map(getModelDiscountRatio)
+    .filter((ratio): ratio is number => ratio !== null && ratio < 1)
+  const bestDiscount = discounts.length ? Math.min(...discounts) : null
+
   return (
     <PublicLayout showMainContainer={false}>
       <main className='pt-16'>
@@ -137,6 +147,27 @@ export function ModelPlaza() {
             <h1>{t('Models')}</h1>
             <p>{t('Browse available models and pricing')}</p>
           </header>
+
+          {!isLoading && !error && bestDiscount !== null && (
+            <div
+              className='mp-deal'
+              role='status'
+              aria-label={t('Model discount')}
+            >
+              <span>{t('Models from')}</span>
+              <strong>
+                {t('{{discount}} tenths of reference price', {
+                  discount: formatModelDiscount(bestDiscount),
+                })}
+              </strong>
+              <span>{t('Compared with the reference price')}</span>
+              <b>
+                {t('Save up to {{percent}}%', {
+                  percent: Math.round((1 - bestDiscount) * 100),
+                })}
+              </b>
+            </div>
+          )}
 
           <SearchBar
             value={keyword}
@@ -197,6 +228,9 @@ export function ModelPlaza() {
                         <th scope='col'>{t('Description')}</th>
                         <th scope='col'>{t('Type')}</th>
                         <th scope='col'>{t('Price')}</th>
+                        <th scope='col' className='is-right'>
+                          {t('Discount ratio')}
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -237,8 +271,16 @@ export function ModelPlaza() {
                                 tokenUnit: 'M',
                                 priceRate,
                                 usdExchangeRate,
+                                originalPriceMultiplier:
+                                  getReferencePriceMultiplier(model),
                               }}
                             />
+                          </td>
+                          <td
+                            data-label={t('Discount ratio')}
+                            className='is-right'
+                          >
+                            <ModelDiscount model={model} />
                           </td>
                         </tr>
                       ))}
@@ -247,6 +289,11 @@ export function ModelPlaza() {
                   <p className='mp-note'>
                     {t(
                       'Prices use the lowest available group rate. Actual charges depend on usage.'
+                    )}
+                  </p>
+                  <p className='mp-note'>
+                    {t(
+                      'Overseas reference prices used for discount comparisons are converted at a fixed rate of USD 1 = CNY 7. This rate is for display only and does not change billing.'
                     )}
                   </p>
                 </>
@@ -258,5 +305,29 @@ export function ModelPlaza() {
       <SupportDialog open={supportOpen} onOpenChange={setSupportOpen} />
       <SubscriptionsCustomFooter onContact={() => setSupportOpen(true)} />
     </PublicLayout>
+  )
+}
+
+function ModelDiscount(props: {
+  model: Parameters<typeof getModelDiscountRatio>[0]
+}) {
+  const { t } = useTranslation()
+  const ratio = getModelDiscountRatio(props.model)
+  if (ratio === null) return <span className='mp-unavailable'>—</span>
+  return (
+    <>
+      <span className='mp-discount'>
+        {t('{{discount}} tenths of reference price', {
+          discount: formatModelDiscount(ratio),
+        })}
+      </span>
+      {ratio < 1 && (
+        <span className='mp-saving'>
+          {t('Save {{percent}}% compared with the reference price', {
+            percent: Math.round((1 - ratio) * 100),
+          })}
+        </span>
+      )}
+    </>
   )
 }

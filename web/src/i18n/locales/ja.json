@@ -1,5 +1,13 @@
 {
   "translation": {
+    "Discount ratio": "割引率",
+    "Model discount": "モデルの割引",
+    "Models from": "モデル料金は参考価格の",
+    "{{discount}} tenths of reference price": "参考価格の {{discount}}/10",
+    "Compared with the reference price": "参考価格との比較",
+    "Save up to {{percent}}%": "最大 {{percent}}% お得",
+    "Save {{percent}}% compared with the reference price": "参考価格より {{percent}}% お得",
+    "Overseas reference prices used for discount comparisons are converted at a fixed rate of USD 1 = CNY 7. This rate is for display only and does not change billing.": "海外モデルの割引比較は、1 米ドル = 7 人民元の固定参考レートで換算します。表示専用であり、実際の課金には適用されません。",
     "Domestic Models": "中国国内モデル",
     "Overseas Models": "海外モデル",
     "Other Models": "その他のモデル",

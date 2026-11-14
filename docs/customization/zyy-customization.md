@@ -916,6 +916,16 @@
 - 验证：模型页3文件28用例及日志详情页30用例（合计4文件58用例）通过；`bun check -b`（1580文件、2项目）、变更文件 oxlint/oxfmt、`git diff --check` 和 `bun run build` 通过。Chrome 本地真实接口验证国内2个、海外7个、其他1个，分组筛选、搜索零结果计数及清除筛选正常；独立只读审查无阻断问题。全量测试269文件中268通过、2906用例中2905通过，唯一失败为 `usage-logs/components/__tests__/detail-preview.test.tsx` 的 `task log prices use localized unit labels from pricing metadata` 20秒超时，定向复跑该文件30用例全部通过。
 - 风险与未覆盖：新增厂商或厂商更名需要更新前端别名映射并发布；国内/海外表示厂商归属，不代表接入渠道或部署位置；本次不关闭旧广场、不修改生产配置或部署。
 
+### Z053 模型参考价与折扣展示及公开页页脚布局
+
+- 需求与原因：公开页短内容时页脚需要贴底；新模型页需要展示统一口径的参考价、折扣比例和全量模型最低折扣，继续复用现有定价接口。
+- 变更内容：公开布局以纵向弹性布局填充视口，短内容的剩余空间由主内容承担，长内容正常下推页脚。模型列表末列增加 demo 样式的折扣标记与节省比例；实际价格保持不变，国内及其他模型参考价保持不变，海外模型划线参考价乘以 7，折扣按实际价与调整后参考价的比例计算。顶部最低折扣基于完整响应，不随搜索或分类改变；底部注明固定美元兑人民币 1:7 仅用于海外参考价及折扣展示。
+- 影响面：`web/src/features/model-plaza/` 页面、折扣计算及测试、`web/src/styles/model-plaza.css`。**上游自有文件**：`web/src/components/layout/components/public-layout.tsx`、`web/src/features/pricing/components/model-price-cell.tsx` 及相关测试、七种 `web/src/i18n/locales/{en,zh,zh-TW,fr,ru,ja,vi}.json`。
+- 与上游差异：扩展公共布局的短页面页脚行为；价格组件增加默认保持原行为的可选参考价倍率，仅新模型页对海外模型传入 7；不修改后端接口、查询、数据结构、实际计费或旧广场定价行为。
+- 开关与默认值：无新增配置、依赖或管理员入口。参考价倍率默认 1，海外展示倍率固定 7；模型地区继续按 Z052 的厂商映射判定。参考价为系统基础倍率价，不宣称为厂商官方报价。
+- 验证：新增价格与布局回归先红后绿；模型、原定价、布局、教程、订阅及首页相关27文件301用例通过；`bun check -b`（1583文件、2项目）、变更文件 oxlint/oxfmt、`git diff --check`、`bun run build` 通过。Chrome真实本地接口验证国内价格不变，海外示例实价3/18保持、参考价5/30变为35/210，展示0.9折及省91%；顶部全量最低折扣不受分类和搜索空态影响。1172px高视口下，短页及空态footer底边均为1172px，长列表footer随内容下推。独立审查未发现阻断问题。
+- 风险与未覆盖：固定汇率不是实时汇率或结算汇率；无法得到有效数值参考价的模型不展示伪造折扣，不参与顶部最低折扣比较。未运行全量前端测试或移动端浏览器实测，未部署。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
@@ -924,7 +934,8 @@
 
 | 区域 | 文件 | 关联条目 |
 |---|---|---|
-| 新模型页公开定价入口 | `router/api-router.go`、`middleware/access_token_routes.go`、`web/src/features/pricing/api.ts`、`web/src/features/pricing/hooks/use-pricing-data.ts`、七种locale | Z051、Z052 |
+| 新模型页公开定价入口 | `router/api-router.go`、`middleware/access_token_routes.go`、`web/src/features/pricing/api.ts`、`web/src/features/pricing/hooks/use-pricing-data.ts`、七种locale | Z051、Z052、Z053 |
+| 公开页页脚与模型折扣展示 | `web/src/components/layout/components/public-layout.tsx`、`web/src/features/pricing/components/model-price-cell.tsx` 及相关测试 | Z053 |
 | 控制台统一顶部导航 | `web/src/components/layout/components/{app-header,public-header}.tsx` 及对应测试 | Z050 |
 | 个人积分/订阅查询与导航 | `model/{main,option,user}.go`、`router/api-router.go`、`middleware/access_token_routes.go`、个人侧栏设置/维护设置、侧栏hooks及测试、七种locale、生成路由（详细文件见Z049） | Z049 |
 | 自定义订阅支付 | `model/topup.go`、`router/api-router.go`、`middleware/access_token_routes.go`、`common/log_text.zh-CN.json`、钱包类型/历史组件/测试、七种 locale | Z045 |

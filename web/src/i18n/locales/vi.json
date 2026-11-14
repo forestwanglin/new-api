@@ -1,5 +1,13 @@
 {
   "translation": {
+    "Discount ratio": "Tỷ lệ giảm giá",
+    "Model discount": "Giảm giá mô hình",
+    "Models from": "Mô hình chỉ từ",
+    "{{discount}} tenths of reference price": "{{discount}}/10 giá tham chiếu",
+    "Compared with the reference price": "So với giá tham chiếu",
+    "Save up to {{percent}}%": "Tiết kiệm đến {{percent}}%",
+    "Save {{percent}}% compared with the reference price": "Tiết kiệm {{percent}}% so với giá tham chiếu",
+    "Overseas reference prices used for discount comparisons are converted at a fixed rate of USD 1 = CNY 7. This rate is for display only and does not change billing.": "Giá tham chiếu của mô hình nước ngoài được quy đổi theo tỷ giá cố định 1 USD = 7 CNY để so sánh giảm giá. Tỷ giá này chỉ dùng để hiển thị và không thay đổi cách tính phí.",
     "Domestic Models": "Mô hình Trung Quốc",
     "Overseas Models": "Mô hình quốc tế",
     "Other Models": "Mô hình khác",

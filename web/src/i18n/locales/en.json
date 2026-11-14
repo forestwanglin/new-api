@@ -1,5 +1,13 @@
 {
   "translation": {
+    "Discount ratio": "Discount ratio",
+    "Model discount": "Model discount",
+    "Models from": "Models from",
+    "{{discount}} tenths of reference price": "{{discount}}/10 of reference price",
+    "Compared with the reference price": "Compared with the reference price",
+    "Save up to {{percent}}%": "Save up to {{percent}}%",
+    "Save {{percent}}% compared with the reference price": "Save {{percent}}% compared with the reference price",
+    "Overseas reference prices used for discount comparisons are converted at a fixed rate of USD 1 = CNY 7. This rate is for display only and does not change billing.": "Overseas reference prices used for discount comparisons are converted at a fixed rate of USD 1 = CNY 7. This rate is for display only and does not change billing.",
     "Domestic Models": "Domestic Models",
     "Overseas Models": "Overseas Models",
     "Other Models": "Other Models",

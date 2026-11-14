@@ -8,6 +8,8 @@
   --mp-red: #dc2626;
   --mp-deal-surface: #fff7f5;
   --mp-deal-line: #fecaca;
+  --mp-discount-surface: #fff1f2;
+  --mp-discount-line: #fecdd3;
 }
 .dark .model-plaza {
   --mp-brand: #8ab4ff;
@@ -16,6 +18,8 @@
   --mp-red: #f87171;
   --mp-deal-surface: #2a1c1c;
   --mp-deal-line: #5f2a2a;
+  --mp-discount-surface: #2a1c1c;
+  --mp-discount-line: #5f2a2a;
 }
 .model-plaza {
   max-width: 1200px;
@@ -241,9 +245,9 @@
 .model-plaza .mp-discount {
   display: inline-block;
   padding: 4px 9px;
-  border: 1px solid var(--mp-deal-line);
+  border: 1px solid var(--mp-discount-line);
   border-radius: 6px;
-  background: var(--mp-deal-surface);
+  background: var(--mp-discount-surface);
   color: var(--mp-red);
   font-size: 18px;
   font-weight: 700;
@@ -378,6 +382,9 @@
   }
   .model-plaza .mp-head h1 {
     font-size: 28px;
+  }
+  .model-plaza .mp-discount {
+    font-size: 14.5px;
   }
   .model-plaza .mp-deal strong {
     font-size: 30px;

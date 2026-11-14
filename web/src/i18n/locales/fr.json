@@ -1,5 +1,13 @@
 {
   "translation": {
+    "Discount ratio": "Taux de réduction",
+    "Model discount": "Réduction des modèles",
+    "Models from": "Modèles à partir de",
+    "{{discount}} tenths of reference price": "{{discount}}/10 du prix de référence",
+    "Compared with the reference price": "Par rapport au prix de référence",
+    "Save up to {{percent}}%": "Économisez jusqu’à {{percent}}%",
+    "Save {{percent}}% compared with the reference price": "Économisez {{percent}}% par rapport au prix de référence",
+    "Overseas reference prices used for discount comparisons are converted at a fixed rate of USD 1 = CNY 7. This rate is for display only and does not change billing.": "Les prix de référence des modèles étrangers sont convertis au taux fixe de 1 USD = 7 CNY pour comparer les réductions. Ce taux sert uniquement à l’affichage et ne modifie pas la facturation.",
     "Domestic Models": "Modèles chinois",
     "Overseas Models": "Modèles internationaux",
     "Other Models": "Autres modèles",

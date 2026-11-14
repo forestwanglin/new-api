@@ -410,3 +410,66 @@ it('allows keyboard selection of a category and keeps it selected when search ha
     'true'
   )
 })
+
+it('keeps sale prices and domestic references unchanged while multiplying overseas references by seven', async () => {
+  vi.mocked(api.get).mockResolvedValue({
+    data: { ...pricing, group_ratio: { default: 0.5 } },
+  })
+  renderPlaza()
+  const domestic = within(
+    await screen.findByRole('row', { name: /deepseek-chat/ })
+  )
+  expect(domestic.getByText('1')).toBeVisible()
+  expect(domestic.getByLabelText('Original price 2')).toBeVisible()
+  expect(domestic.getByLabelText('Original price 8')).toBeVisible()
+  const overseas = within(screen.getByRole('row', { name: /gpt-api-model/ }))
+  expect(overseas.getByText('2')).toBeVisible()
+  expect(overseas.getByText('6')).toBeVisible()
+  expect(overseas.getByLabelText('Original price 28')).toBeVisible()
+  expect(overseas.getByLabelText('Original price 84')).toBeVisible()
+  expect(
+    overseas.getByText('Save 93% compared with the reference price')
+  ).toBeVisible()
+  expect(
+    domestic.getByText('Save 50% compared with the reference price')
+  ).toBeVisible()
+  const columns = screen.getAllByRole('columnheader')
+  expect(columns.at(-1)).toHaveTextContent('Discount ratio')
+})
+
+it('keeps the headline lowest discount across all models when the list is filtered', async () => {
+  vi.mocked(api.get).mockResolvedValue({
+    data: { ...pricing, group_ratio: { default: 0.5 } },
+  })
+  renderPlaza()
+  const promotion = await screen.findByRole('status', {
+    name: 'Model discount',
+  })
+  expect(promotion).toHaveTextContent('Save up to 93%')
+  await userEvent
+    .setup()
+    .click(screen.getByRole('button', { name: /^Domestic Models/ }))
+  expect(screen.queryByText('gpt-api-model')).not.toBeInTheDocument()
+  expect(promotion).toHaveTextContent('Save up to 93%')
+  expect(
+    screen.getByText(
+      'Overseas reference prices used for discount comparisons are converted at a fixed rate of USD 1 = CNY 7. This rate is for display only and does not change billing.'
+    )
+  ).toBeVisible()
+})
+
+it('shows overseas references without changing full-rate token or expression sale prices', async () => {
+  renderPlaza()
+  const overseas = within(
+    await screen.findByRole('row', { name: /gpt-api-model/ })
+  )
+  expect(overseas.getByText('4')).toBeVisible()
+  expect(overseas.getByText('12')).toBeVisible()
+  expect(overseas.getByLabelText('Original price 28')).toBeVisible()
+  expect(overseas.getByLabelText('Original price 84')).toBeVisible()
+  const dynamic = within(screen.getByRole('row', { name: /tiered-api-model/ }))
+  expect(dynamic.getByText('5')).toBeVisible()
+  expect(dynamic.getByText('15')).toBeVisible()
+  expect(dynamic.getByLabelText('Original price 35')).toBeVisible()
+  expect(dynamic.getByLabelText('Original price 105')).toBeVisible()
+})

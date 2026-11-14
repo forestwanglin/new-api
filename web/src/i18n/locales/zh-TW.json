@@ -1,5 +1,13 @@
 {
   "translation": {
+    "Discount ratio": "折扣比例",
+    "Model discount": "模型折扣",
+    "Models from": "模型低至",
+    "{{discount}} tenths of reference price": "{{discount}} 折",
+    "Compared with the reference price": "相比參考價",
+    "Save up to {{percent}}%": "最高省 {{percent}}%",
+    "Save {{percent}}% compared with the reference price": "比參考價省 {{percent}}%",
+    "Overseas reference prices used for discount comparisons are converted at a fixed rate of USD 1 = CNY 7. This rate is for display only and does not change billing.": "海外模型的折扣比較採用固定參考匯率 1 美元 = 7 元人民幣換算，僅用於價格展示，不作為實際計費依據。",
     "Domestic Models": "國內模型",
     "Overseas Models": "海外模型",
     "Other Models": "其他模型",
