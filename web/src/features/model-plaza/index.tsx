@@ -182,7 +182,7 @@ export function ModelPlaza() {
             </div>
           )}
 
-          <p className='mp-note text-center'>
+          <p className='mp-note'>
             {t(
               'Compare model configurations using fixed token usage. Platform usage counts follow the same point deduction rules.'
             )}
