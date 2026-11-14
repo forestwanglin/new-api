@@ -63,6 +63,46 @@ func TestPointLedgerAPI(t *testing.T) {
 	require.NoError(t, common.Unmarshal(w.Body.Bytes(), &got))
 	assert.True(t, got.Success)
 	assert.Contains(t, string(got.Data), `"items":[]`)
+	for _, path := range []string{"/api/points/wallet/self", "/api/points/wallet/rules"} {
+		for _, tc := range []struct {
+			token  string
+			status int
+		}{{"", http.StatusUnauthorized}, {pat, http.StatusForbidden}} {
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			if tc.token != "" {
+				req.Header.Set("Authorization", "Bearer "+tc.token)
+			}
+			w := httptest.NewRecorder()
+			engine.ServeHTTP(w, req)
+			assert.Equal(t, tc.status, w.Code, w.Body.String())
+		}
+	}
+	for _, tc := range []struct {
+		path    string
+		success bool
+	}{
+		{"/api/points/wallet/self", true},
+		{"/api/points/wallet/self?user_id=2", false},
+		{"/api/points/wallet/self?unknown=1", false},
+		{"/api/points/wallet/self?user_id=%ZZ", false},
+		{"/api/points/wallet/self?bad=1;ignored=2", false},
+		{"/api/points/wallet/self?p=1&p=2", false},
+	} {
+		req := httptest.NewRequest(http.MethodGet, tc.path, nil)
+		req.Header.Set("Authorization", "Bearer "+bundle.AccessToken)
+		w := httptest.NewRecorder()
+		engine.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		var response pointAdminResponse
+		require.NoError(t, common.Unmarshal(w.Body.Bytes(), &response))
+		assert.Equal(t, tc.success, response.Success, w.Body.String())
+		if tc.success {
+			assert.Contains(t, string(response.Data), `"balances":[]`)
+			assert.Contains(t, string(response.Data), `"source_summaries":[]`)
+			assert.Contains(t, string(response.Data), `"pending_gpt_points":null`)
+			assert.Contains(t, w.Header().Get("Cache-Control"), "no-store")
+		}
+	}
 	for _, tc := range []struct {
 		path, token string
 		status      int

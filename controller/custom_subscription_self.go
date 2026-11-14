@@ -12,6 +12,7 @@ type customUserSubscriptionDTO struct {
 	ID                  string  `json:"id"`
 	OrderID             string  `json:"order_id"`
 	PlanID              string  `json:"plan_id"`
+	PlanTitle           string  `json:"plan_title"`
 	PlanVersion         string  `json:"plan_version"`
 	Priority            int     `json:"priority"`
 	BillingCycle        string  `json:"billing_cycle"`
@@ -51,7 +52,8 @@ func GetCustomSubscriptionSelf(c *gin.Context) {
 		items = append(items, customUserSubscriptionDTO{
 			ID: strconv.FormatInt(sub.Id, 10), OrderID: strconv.FormatInt(sub.OrderId, 10),
 			PlanID: strconv.FormatInt(sub.PlanId, 10), PlanVersion: strconv.FormatInt(sub.PlanVersion, 10),
-			Priority: sub.Priority, BillingCycle: sub.BillingCycle, DurationMonths: sub.DurationMonths,
+			PlanTitle: model.CustomSubscriptionSnapshotTitle(sub.PlanSnapshot),
+			Priority:  sub.Priority, BillingCycle: sub.BillingCycle, DurationMonths: sub.DurationMonths,
 			TotalDurationMS: strconv.FormatInt(sub.TotalDurationMs, 10), RemainingDurationMS: strconv.FormatInt(sub.RemainingDurationMs, 10),
 			Status: sub.Status, PurchasedAt: strconv.FormatInt(sub.PurchasedAt, 10),
 			FirstActivatedAt: customSubscriptionOptionalInt(sub.FirstActivatedAt),

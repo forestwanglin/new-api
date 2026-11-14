@@ -46,8 +46,10 @@ import { Route as AuthenticatedErrorsErrorRouteImport } from './routes/_authenti
 import { Route as AuthenticatedKeysIndexRouteImport } from './routes/_authenticated/keys/index'
 import { Route as AuthenticatedModelsIndexRouteImport } from './routes/_authenticated/models/index'
 import { Route as AuthenticatedModelsSectionRouteImport } from './routes/_authenticated/models/$section'
+import { Route as AuthenticatedMySubscriptionIndexRouteImport } from './routes/_authenticated/my-subscription/index'
 import { Route as AuthenticatedPlaygroundIndexRouteImport } from './routes/_authenticated/playground/index'
 import { Route as AuthenticatedPointLedgerIndexRouteImport } from './routes/_authenticated/point-ledger/index'
+import { Route as AuthenticatedPointsWalletIndexRouteImport } from './routes/_authenticated/points-wallet/index'
 import { Route as AuthenticatedPointsIndexRouteImport } from './routes/_authenticated/points/index'
 import { Route as AuthenticatedProfileIndexRouteImport } from './routes/_authenticated/profile/index'
 import { Route as AuthenticatedRedemptionCodesIndexRouteImport } from './routes/_authenticated/redemption-codes/index'
@@ -271,6 +273,12 @@ const AuthenticatedModelsSectionRoute =
     path: '/models/$section',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedMySubscriptionIndexRoute =
+  AuthenticatedMySubscriptionIndexRouteImport.update({
+    id: '/my-subscription/',
+    path: '/my-subscription/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedPlaygroundIndexRoute =
   AuthenticatedPlaygroundIndexRouteImport.update({
     id: '/playground/',
@@ -281,6 +289,12 @@ const AuthenticatedPointLedgerIndexRoute =
   AuthenticatedPointLedgerIndexRouteImport.update({
     id: '/point-ledger/',
     path: '/point-ledger/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedPointsWalletIndexRoute =
+  AuthenticatedPointsWalletIndexRouteImport.update({
+    id: '/points-wallet/',
+    path: '/points-wallet/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedPointsIndexRoute =
@@ -506,8 +520,10 @@ export interface FileRoutesByFullPath {
   '/dashboard/': typeof AuthenticatedDashboardIndexRoute
   '/keys/': typeof AuthenticatedKeysIndexRoute
   '/models/': typeof AuthenticatedModelsIndexRoute
+  '/my-subscription/': typeof AuthenticatedMySubscriptionIndexRoute
   '/playground/': typeof AuthenticatedPlaygroundIndexRoute
   '/point-ledger/': typeof AuthenticatedPointLedgerIndexRoute
+  '/points-wallet/': typeof AuthenticatedPointsWalletIndexRoute
   '/points/': typeof AuthenticatedPointsIndexRoute
   '/profile/': typeof AuthenticatedProfileIndexRoute
   '/redemption-codes/': typeof AuthenticatedRedemptionCodesIndexRoute
@@ -575,8 +591,10 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardIndexRoute
   '/keys': typeof AuthenticatedKeysIndexRoute
   '/models': typeof AuthenticatedModelsIndexRoute
+  '/my-subscription': typeof AuthenticatedMySubscriptionIndexRoute
   '/playground': typeof AuthenticatedPlaygroundIndexRoute
   '/point-ledger': typeof AuthenticatedPointLedgerIndexRoute
+  '/points-wallet': typeof AuthenticatedPointsWalletIndexRoute
   '/points': typeof AuthenticatedPointsIndexRoute
   '/profile': typeof AuthenticatedProfileIndexRoute
   '/redemption-codes': typeof AuthenticatedRedemptionCodesIndexRoute
@@ -648,8 +666,10 @@ export interface FileRoutesById {
   '/_authenticated/dashboard/': typeof AuthenticatedDashboardIndexRoute
   '/_authenticated/keys/': typeof AuthenticatedKeysIndexRoute
   '/_authenticated/models/': typeof AuthenticatedModelsIndexRoute
+  '/_authenticated/my-subscription/': typeof AuthenticatedMySubscriptionIndexRoute
   '/_authenticated/playground/': typeof AuthenticatedPlaygroundIndexRoute
   '/_authenticated/point-ledger/': typeof AuthenticatedPointLedgerIndexRoute
+  '/_authenticated/points-wallet/': typeof AuthenticatedPointsWalletIndexRoute
   '/_authenticated/points/': typeof AuthenticatedPointsIndexRoute
   '/_authenticated/profile/': typeof AuthenticatedProfileIndexRoute
   '/_authenticated/redemption-codes/': typeof AuthenticatedRedemptionCodesIndexRoute
@@ -720,8 +740,10 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/keys/'
     | '/models/'
+    | '/my-subscription/'
     | '/playground/'
     | '/point-ledger/'
+    | '/points-wallet/'
     | '/points/'
     | '/profile/'
     | '/redemption-codes/'
@@ -789,8 +811,10 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/keys'
     | '/models'
+    | '/my-subscription'
     | '/playground'
     | '/point-ledger'
+    | '/points-wallet'
     | '/points'
     | '/profile'
     | '/redemption-codes'
@@ -861,8 +885,10 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard/'
     | '/_authenticated/keys/'
     | '/_authenticated/models/'
+    | '/_authenticated/my-subscription/'
     | '/_authenticated/playground/'
     | '/_authenticated/point-ledger/'
+    | '/_authenticated/points-wallet/'
     | '/_authenticated/points/'
     | '/_authenticated/profile/'
     | '/_authenticated/redemption-codes/'
@@ -1177,6 +1203,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedModelsSectionRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/my-subscription/': {
+      id: '/_authenticated/my-subscription/'
+      path: '/my-subscription'
+      fullPath: '/my-subscription/'
+      preLoaderRoute: typeof AuthenticatedMySubscriptionIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/playground/': {
       id: '/_authenticated/playground/'
       path: '/playground'
@@ -1189,6 +1222,13 @@ declare module '@tanstack/react-router' {
       path: '/point-ledger'
       fullPath: '/point-ledger/'
       preLoaderRoute: typeof AuthenticatedPointLedgerIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/points-wallet/': {
+      id: '/_authenticated/points-wallet/'
+      path: '/points-wallet'
+      fullPath: '/points-wallet/'
+      preLoaderRoute: typeof AuthenticatedPointsWalletIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/points/': {
@@ -1514,8 +1554,10 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardIndexRoute: typeof AuthenticatedDashboardIndexRoute
   AuthenticatedKeysIndexRoute: typeof AuthenticatedKeysIndexRoute
   AuthenticatedModelsIndexRoute: typeof AuthenticatedModelsIndexRoute
+  AuthenticatedMySubscriptionIndexRoute: typeof AuthenticatedMySubscriptionIndexRoute
   AuthenticatedPlaygroundIndexRoute: typeof AuthenticatedPlaygroundIndexRoute
   AuthenticatedPointLedgerIndexRoute: typeof AuthenticatedPointLedgerIndexRoute
+  AuthenticatedPointsWalletIndexRoute: typeof AuthenticatedPointsWalletIndexRoute
   AuthenticatedPointsIndexRoute: typeof AuthenticatedPointsIndexRoute
   AuthenticatedProfileIndexRoute: typeof AuthenticatedProfileIndexRoute
   AuthenticatedRedemptionCodesIndexRoute: typeof AuthenticatedRedemptionCodesIndexRoute
@@ -1545,8 +1587,10 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardIndexRoute: AuthenticatedDashboardIndexRoute,
   AuthenticatedKeysIndexRoute: AuthenticatedKeysIndexRoute,
   AuthenticatedModelsIndexRoute: AuthenticatedModelsIndexRoute,
+  AuthenticatedMySubscriptionIndexRoute: AuthenticatedMySubscriptionIndexRoute,
   AuthenticatedPlaygroundIndexRoute: AuthenticatedPlaygroundIndexRoute,
   AuthenticatedPointLedgerIndexRoute: AuthenticatedPointLedgerIndexRoute,
+  AuthenticatedPointsWalletIndexRoute: AuthenticatedPointsWalletIndexRoute,
   AuthenticatedPointsIndexRoute: AuthenticatedPointsIndexRoute,
   AuthenticatedProfileIndexRoute: AuthenticatedProfileIndexRoute,
   AuthenticatedRedemptionCodesIndexRoute:

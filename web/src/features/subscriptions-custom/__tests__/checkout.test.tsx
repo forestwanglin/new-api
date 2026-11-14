@@ -258,38 +258,6 @@ it('keeps payment selection visible and allows retry after a payment-method requ
   )
 })
 
-it('renders actual active and paused subscriptions from the authenticated self query', async () => {
-  signIn()
-  vi.spyOn(api, 'get').mockImplementation(async (url) => {
-    const items: Record<string, unknown[]> = {
-      '/api/custom_subscription/plans': [configuredPlan],
-      '/api/custom_subscription/self': [
-        {
-          id: '1',
-          plan_id: configuredPlan.id,
-          status: 'active',
-          priority: 9,
-          remaining_duration_ms: '2592000000',
-        },
-        {
-          id: '2',
-          plan_id: '42',
-          status: 'paused',
-          priority: 2,
-          remaining_duration_ms: '86400000',
-        },
-      ],
-    }
-    return {
-      data: { success: true, data: { items: items[String(url)] ?? [] } },
-    }
-  })
-  renderPage()
-  expect(await screen.findByText('使用中')).toBeVisible()
-  expect(screen.getByText('已暂停')).toBeVisible()
-  expect(screen.getByText('优先级 9')).toBeVisible()
-  expect(screen.getByText('剩余服务时长 2,592,000 秒')).toBeVisible()
-})
 it('queries an already paid checkout replay without submitting a second payment form', async () => {
   signIn()
   const user = userEvent.setup()

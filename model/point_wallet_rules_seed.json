@@ -1,0 +1,238 @@
+[
+  {
+    "title": "积分使用：通用优先，专项用于GPT系列",
+    "body": [
+      {
+        "text": "订阅及其赠送为通用积分，适用于所有已开放模型；邀请奖励为",
+        "emphasis": false
+      },
+      {
+        "text": "GPT系列专项积分",
+        "emphasis": true
+      },
+      {
+        "text": "，用于GPT系列模型调用。调用时优先使用通用积分，再使用适配当前GPT模型的专项积分。历史已到账余额保留原使用范围。",
+        "emphasis": false
+      }
+    ],
+    "rule_key": "wallet-usage"
+  },
+  {
+    "title": "到账时间：订阅支付成功即到账",
+    "body": [
+      {
+        "text": "月付与年付积分均一次到账；自动续费额外10%只在实际自动扣款成功后到账。",
+        "emphasis": false
+      }
+    ],
+    "rule_key": "wallet-credit-time"
+  },
+  {
+    "title": "有效期：已到账积分永久有效",
+    "body": [
+      {
+        "text": "订阅到期或取消自动续费，不会自动清空已到账余额。",
+        "emphasis": false
+      }
+    ],
+    "rule_key": "wallet-expiry"
+  },
+  {
+    "title": "消费用途：按实际token用量扣减",
+    "body": [
+      {
+        "text": "按所选模型及实际输入、输出token用量计算积分。页面展示的调用次数为参考值，",
+        "emphasis": false
+      },
+      {
+        "text": "不代表保证次数",
+        "emphasis": true
+      },
+      {
+        "text": "。",
+        "emphasis": false
+      }
+    ],
+    "rule_key": "wallet-consumption"
+  },
+  {
+    "title": "计量规则：消费金额换算向上取整",
+    "body": [
+      {
+        "text": "消费金额按人民币1元=1,000积分换算，向上取整为整数积分；正数消费不足1积分按1积分计，零消费为0积分，恰好为整数时不额外加1。人民币参考费用仅用于对照，",
+        "emphasis": false
+      },
+      {
+        "text": "不是可提现余额",
+        "emphasis": true
+      },
+      {
+        "text": "。",
+        "emphasis": false
+      }
+    ],
+    "rule_key": "wallet-rounding"
+  },
+  {
+    "title": "积分不足：不透支、不扣部分积分",
+    "body": [
+      {
+        "text": "调用前按所选模型核对可用积分；GPT系列可使用通用与GPT专项，其他模型使用通用积分。余额不足时先补充积分再调用，本次不会扣减部分积分。",
+        "emphasis": false
+      }
+    ],
+    "rule_key": "wallet-insufficient"
+  },
+  {
+    "title": "密钥额度：不等于账号积分",
+    "body": [
+      {
+        "text": "账号有积分仍可能受密钥额度上限限制；提高密钥额度不增加积分，购买订阅也不自动提高密钥额度。",
+        "emphasis": false
+      }
+    ],
+    "rule_key": "wallet-key-quota"
+  },
+  {
+    "title": "活动奖励：支付时锁定一个比例",
+    "body": [
+      {
+        "text": "新订单按好友有效实付、支付时已确认的有效好友人数及活动比例折算为",
+        "emphasis": false
+      },
+      {
+        "text": "GPT系列专项积分",
+        "emphasis": true
+      },
+      {
+        "text": "，可用于GPT系列模型调用；满",
+        "emphasis": false
+      },
+      {
+        "text": "7×24小时",
+        "emphasis": true
+      },
+      {
+        "text": "后整笔释放，无需好友先消费。每笔订单采用一个比例，一次发放。",
+        "emphasis": false
+      }
+    ],
+    "rule_key": "wallet-referral-rate"
+  },
+  {
+    "title": "有效好友：同一位好友只计一次",
+    "body": [
+      {
+        "text": "独立直接好友的首笔有效订阅满7天且未全额退款后确认，复购不重复增加人数；累计人数跨月、跨活动保留。",
+        "emphasis": false
+      }
+    ],
+    "rule_key": "wallet-effective-friend"
+  },
+  {
+    "title": "当前档位：5% / 7% / 10%",
+    "body": [
+      {
+        "text": "当前活动最高10%：支付时累计0—2位有效好友为5%，3—8位为7%，9位及以上为10%。三个档位随活动最高比例按50% / 70% / 100%设置，具体以活动公布为准。",
+        "emphasis": false
+      }
+    ],
+    "rule_key": "wallet-current-tier"
+  },
+  {
+    "title": "人数升级：新订单享更高奖励",
+    "body": [
+      {
+        "text": "第3位、第9位好友确认有效后，提高之后支付的新订单比例；此前订单继续按支付时的金额与比例结算。例如第3位好友的首单支付时仅有2位有效好友，该单按5%计算；待其满7天计入人数，之后支付的新订单按7%计算，第9位同理。实付100元，三个档位分别奖励5,000 / 7,000 / 10,000 GPT系列专项积分。",
+        "emphasis": false
+      }
+    ],
+    "rule_key": "wallet-tier-upgrade"
+  },
+  {
+    "title": "好友复购：按新订单支付时档位计算",
+    "body": [
+      {
+        "text": "购买或续订均按该笔订单支付时的活动版本和有效人数锁定比例，每笔订单独立计算，确认后的比例保持不变。",
+        "emphasis": false
+      }
+    ],
+    "rule_key": "wallet-friend-renewal"
+  },
+  {
+    "title": "积分状态：已到账、待释放或未发放",
+    "body": [
+      {
+        "text": "新订单的奖励先显示为待释放，满7天按有效实付整笔到账后即可使用。钱包已到账积分总额为通用积分与GPT系列专项积分可用余额之和，待释放单独展示；历史通用奖励计入通用积分。邀请页累计已到账奖励含历史已使用部分。未发放仅为奖励资格，不计入积分总额、待释放或可用余额；历史订单沿用原条件。",
+        "emphasis": false
+      }
+    ],
+    "rule_key": "wallet-reward-state"
+  },
+  {
+    "title": "有效实付：不包含赠送与奖励",
+    "body": [
+      {
+        "text": "邀请奖励按有效现金实付核算，年付优惠积分、自动续费赠送和邀请奖励本身不重复产生邀请奖励。",
+        "emphasis": false
+      }
+    ],
+    "rule_key": "wallet-effective-payment"
+  },
+  {
+    "title": "退款影响：未释放奖励按比例取消",
+    "body": [
+      {
+        "text": "部分退款按有效实付比例取消对应未释放奖励；全额退款取消该订单未释放奖励。已有奖励到账的订单退款及冲回由客服核实。",
+        "emphasis": false
+      }
+    ],
+    "rule_key": "wallet-refund"
+  },
+  {
+    "title": "活动调整：既有订单不追改",
+    "body": [
+      {
+        "text": "活动比例调整只影响之后支付的新订单；已有",
+        "emphasis": false
+      },
+      {
+        "text": "待释放及已到账奖励均不追改",
+        "emphasis": true
+      },
+      {
+        "text": "，活动结束不清空已锁定奖励。历史规则订单继续按原规则处理。",
+        "emphasis": false
+      }
+    ],
+    "rule_key": "wallet-campaign-change"
+  },
+  {
+    "title": "奖励用途：GPT系列模型调用",
+    "body": [
+      {
+        "text": "邀请奖励可用于GPT系列模型调用，为模型调用积分，不支持提现、转出或兑换现金；依法申请退款的权益不受影响。本人订阅、自邀及异常交易不参与邀请奖励。",
+        "emphasis": false
+      }
+    ],
+    "rule_key": "wallet-reward-usage"
+  },
+  {
+    "title": "发票：按实际支付金额申请",
+    "body": [
+      {
+        "text": "可开票金额为实际支付金额扣除已申请部分，满",
+        "emphasis": false
+      },
+      {
+        "text": "¥50",
+        "emphasis": true
+      },
+      {
+        "text": "可申请；赠送积分与邀请奖励不计入开票金额。",
+        "emphasis": false
+      }
+    ],
+    "rule_key": "wallet-invoice"
+  }
+]

@@ -1,0 +1,198 @@
+.points-account {
+  min-width: 0;
+  color: var(--foreground);
+  font-size: 14px;
+  line-height: 1.7;
+}
+.points-account .account-card,
+.account-current {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  padding: 22px;
+  margin-bottom: 18px;
+  min-width: 0;
+}
+.points-account h2,
+.account-current h2 {
+  font-size: 18px;
+  line-height: 1.5;
+  font-weight: 600;
+  margin: 0 0 12px;
+}
+.points-account h3,
+.account-current h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 20px 0 10px;
+}
+.points-account p,
+.account-current p,
+.account-orders > p {
+  color: var(--muted-foreground);
+  margin: 6px 0 14px;
+}
+.points-account .wallet-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.points-account .wallet-stat {
+  margin: 0;
+  padding: 20px;
+}
+.points-account .wallet-stat h2 {
+  font-size: 14px;
+  min-height: 45px;
+  font-weight: 400;
+  color: var(--muted-foreground);
+  margin: 0;
+}
+.points-account .wallet-stat-number {
+  font-size: 30px;
+  line-height: 1.4;
+  margin-top: 8px;
+  letter-spacing: -0.5px;
+  overflow-wrap: anywhere;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.points-account .wallet-points .wallet-stat-number {
+  color: var(--primary);
+}
+.points-account .wallet-stat p {
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 8px 0 0;
+}
+.points-account .wallet-usage-guide {
+  padding: 14px 18px;
+  margin-bottom: 18px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--muted);
+}
+.points-account .wallet-usage-guide p {
+  margin: 0;
+}
+.points-account .wallet-usage-guide p + p {
+  margin-top: 4px;
+}
+.points-account .wallet-usage-guide strong {
+  color: var(--foreground);
+}
+.points-account .wallet-details-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+.points-account .wallet-details-title-row h2 {
+  margin: 0;
+}
+.points-account .wallet-rule-list {
+  padding-left: 24px;
+  margin: 16px 0 0;
+  list-style: decimal;
+}
+.points-account .wallet-rule-list li {
+  margin-top: 12px;
+  padding-left: 4px;
+}
+.points-account .wallet-rule-list li strong {
+  color: var(--foreground);
+}
+.points-account .wallet-rules summary {
+  color: var(--primary);
+  cursor: pointer;
+  width: fit-content;
+}
+.points-account summary:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 4px;
+  border-radius: 3px;
+}
+.points-account.account-subscriptions {
+  max-width: none;
+  padding: 0;
+  margin: 0;
+}
+.account-current-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.account-current-heading h3 {
+  font-size: 22px;
+  margin: 0;
+}
+.account-status {
+  color: var(--primary);
+  font-weight: 600;
+}
+.account-subscription-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin: 18px 0;
+}
+.account-subscription-fields dt {
+  color: var(--muted-foreground);
+  margin-bottom: 4px;
+}
+.account-subscription-fields dd {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.account-secondary {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+.points-account .account-renewal-fields {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  padding: 8px 0;
+}
+.points-account .account-renewal-fields > div {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+.points-account .account-renewal-fields span {
+  color: var(--muted-foreground);
+}
+.points-account .sub-management {
+  flex-wrap: wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 1050px) {
+  .points-account .wallet-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .points-account .wallet-stats {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .points-account .wallet-stat h2 {
+    min-height: 0;
+  }
+  .points-account .account-card,
+  .account-current {
+    padding: 18px;
+  }
+  .account-subscription-fields,
+  .points-account .account-renewal-fields {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+}

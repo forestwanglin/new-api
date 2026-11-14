@@ -227,7 +227,7 @@ func GetCustomSubscriptionRule(id int64) (*CustomSubscriptionRule, error) {
 	return &rule, err
 }
 func ReadCustomSubscriptionRules(planID *int64) ([]CustomSubscriptionRule, error) {
-	q := DB.Where("enabled = ?", true)
+	q := DB.Where("enabled = ?", true).Where("rule_key NOT LIKE ?", "wallet-%")
 	if planID != nil {
 		var count int64
 		if err := DB.Model(&CustomSubscriptionPlan{}).Where("id = ? AND enabled = ?", *planID, true).Count(&count).Error; err != nil {

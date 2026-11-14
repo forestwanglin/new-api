@@ -17,11 +17,26 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, render, screen, within } from '@testing-library/react'
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+  RouterProvider,
+} from '@tanstack/react-router'
+import {
+  act,
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 import { api } from '@/lib/api'
+import { Route as subscriptionRoute } from '@/routes/subscription'
 import { useAuthStore } from '@/stores/auth-store'
 
 import { SubscriptionsCustom } from '..'
@@ -93,29 +108,36 @@ beforeEach(() => {
   vi.spyOn(api, 'get').mockImplementation(async (url) => ({
     data: {
       success: true,
-      data: {
-        items:
-          url === '/api/custom_subscription/plans'
-            ? plans
-            : rules.map((rule, index) => ({
-                id: String(index + 1),
-                rule_key: String(index),
-                title: rule.title,
-                content: {
-                  blocks: [
-                    {
-                      type: 'paragraph',
-                      children: rule.body.map((part) => ({
-                        text: part.text,
-                        style: part.emphasis
-                          ? { color: '#0052d9', fontWeight: 700 }
-                          : {},
-                      })),
-                    },
-                  ],
-                },
-              })),
-      },
+      data:
+        url === '/api/custom_subscription/self'
+          ? {
+              active_subscription_id: null,
+              observed_at: '1794614400000',
+              items: [],
+            }
+          : {
+              items:
+                url === '/api/custom_subscription/plans'
+                  ? plans
+                  : rules.map((rule, index) => ({
+                      id: String(index + 1),
+                      rule_key: String(index),
+                      title: rule.title,
+                      content: {
+                        blocks: [
+                          {
+                            type: 'paragraph',
+                            children: rule.body.map((part) => ({
+                              text: part.text,
+                              style: part.emphasis
+                                ? { color: '#0052d9', fontWeight: 700 }
+                                : {},
+                            })),
+                          },
+                        ],
+                      },
+                    })),
+            },
     },
   }))
 })
@@ -193,16 +215,81 @@ it('hides account-only tabs and sections for signed-out visitors', async () => {
   ).toBeNull()
   expect(screen.getByRole('heading', { name: '订阅规则' })).toBeVisible()
 })
-it('labels unavailable order history rather than displaying fabricated account records', async () => {
-  const user = userEvent.setup()
+it('shows the current subscription and hides invoices and the top entitlement schedule when signed in', async () => {
   signIn()
   await renderDemo()
-  expect(screen.getByRole('heading', { name: '自动续费管理' })).toBeVisible()
+  expect(screen.getByRole('heading', { name: 'My subscription' })).toBeVisible()
+  expect(screen.queryByRole('tab', { name: '发票' })).not.toBeInTheDocument()
   expect(
-    screen.getByRole('heading', { name: '我的订阅与权益排期' })
-  ).toBeVisible()
+    screen.queryByRole('heading', { name: '我的订阅与权益排期' })
+  ).not.toBeInTheDocument()
+})
+
+it('restores the default plans tab through browser back and the orders tab through forward', async () => {
+  signIn()
+  vi.mocked(api.get).mockResolvedValue({
+    data: {
+      success: true,
+      data: {
+        items: [],
+        page: 1,
+        page_size: 20,
+        total: 0,
+        active_subscription_id: null,
+        observed_at: '1794614400000',
+      },
+    },
+  })
+  const root = createRootRoute()
+  const route = createRoute({
+    getParentRoute: () => root,
+    path: '/subscription/',
+    validateSearch: subscriptionRoute.options.validateSearch,
+    component: subscriptionRoute.options.component,
+  })
+  const router = createRouter({
+    routeTree: root.addChildren([route]),
+    history: createMemoryHistory({ initialEntries: ['/subscription'] }),
+  })
+  await router.load()
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  render(
+    <QueryClientProvider client={client}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>
+  )
+  const user = userEvent.setup()
+  expect(await screen.findByRole('tab', { name: '订阅服务' })).toHaveAttribute(
+    'aria-selected',
+    'true'
+  )
   await user.click(screen.getByRole('tab', { name: '订单' }))
-  expect(
-    screen.getByText('本次支付结果见页面上方，完整订单记录暂未开放。')
-  ).toBeVisible()
+  await waitFor(() =>
+    expect(router.state.location.search).toMatchObject({ tab: 'orders' })
+  )
+  expect(screen.getByRole('tab', { name: '订单' })).toHaveAttribute(
+    'aria-selected',
+    'true'
+  )
+  await act(async () => {
+    router.history.back()
+  })
+  await waitFor(() =>
+    expect(router.state.location.search).not.toHaveProperty('tab')
+  )
+  expect(screen.getByRole('tab', { name: '订阅服务' })).toHaveAttribute(
+    'aria-selected',
+    'true'
+  )
+  await act(async () => {
+    router.history.forward()
+  })
+  await waitFor(() =>
+    expect(screen.getByRole('tab', { name: '订单' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    )
+  )
 })

@@ -132,6 +132,14 @@ export function SidebarModulesSection({
         title: t('Wallet'),
         description: t('Top up balance and view billing history.'),
       },
+      points_wallet: {
+        title: t('Points wallet'),
+        description: t('View points balances, details and rules.'),
+      },
+      my_subscription: {
+        title: t('My subscription'),
+        description: t('View your current subscription and expiry.'),
+      },
       personal: {
         title: t('Profile'),
         description: t('Personal settings and profile management.'),

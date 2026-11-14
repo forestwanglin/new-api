@@ -23,6 +23,7 @@ import { SubscriptionsCustom } from '@/features/subscriptions-custom'
 
 export const Route = createFileRoute('/subscription/')({
   validateSearch: z.object({
+    tab: z.enum(['plans', 'orders']).optional().catch(undefined),
     trade_no: z
       .string()
       .regex(/^[A-Za-z0-9_-]{1,64}$/)
@@ -34,5 +35,14 @@ export const Route = createFileRoute('/subscription/')({
 
 function SubscriptionPage() {
   const search = Route.useSearch()
-  return <SubscriptionsCustom tradeNo={search.trade_no} />
+  const navigate = Route.useNavigate()
+  return (
+    <SubscriptionsCustom
+      tradeNo={search.trade_no}
+      tab={search.tab ?? 'plans'}
+      onTabChange={(tab) => {
+        void navigate({ search: (previous) => ({ ...previous, tab }) })
+      }}
+    />
+  )
 }

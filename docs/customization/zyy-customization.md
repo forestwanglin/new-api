@@ -876,6 +876,16 @@
 - 验证：先补充回归测试并确认空/加载/失败状态下选择器缺失导致失败；修复后验证支付方式切换、失败重试、禁用支付、优先级说明删除、整数及超大分金额显示。`bun run typecheck`、订阅模块6文件34用例、涉及文件的 oxlint / oxfmt 与 `bun run build` 通过。Chrome 实测支付宝与微信切换、560px弹窗、13px帮助文字及390px移动端无横向溢出；未进行真实支付。
 - 风险与未覆盖：没有修改服务端支付配置或进行真实扣款；后端返回空列表时只展示禁用选择器，不能代替实际配置支付渠道。保留业务积分类型和30/365天服务时长，不照搬 demo 尚未开放的自动续费文案。
 
+### Z049 积分钱包、个人订阅与本人订阅订单查询
+
+- 需求与原因：按 `c-dev/ZYY-AI-demo.html` 接入真实积分账户、流水汇总、规则配置及订阅信息，用户可从个人菜单查看积分和当前订阅，从顶部订阅页查看全部本人订单。
+- 变更内容：新增积分钱包和我的订阅认证页面；顶部订阅服务显示当前订阅，隐藏发票及旧权益排期，订单按创建时间和ID倒序分页。个人页保留权益排期和禁用自动续费开关，方案/订单快捷入口跳转顶部页签。使用购买快照名称和实际到期时间（含秒和时区）。新增三个仅会话接口：GET `/api/points/wallet/self`、`/api/points/wallet/rules`、`/api/custom_subscription/orders`；归属只取当前会话，拒绝PAT及不支持/非法参数。流水累计增减使用大整数，冻结转移抵消，不作为来源剩余余额。积分、金额与时间保留十进制字符串；订单三类积分分别显示。数据库一次性初始化18条 `wallet-*` 规则，独立事务标记保留后续编辑/禁用/删除，既有订阅规则读取排除该命名空间。
+- 影响面：新增 wallet query/rules、order query 模型及controller和测试；更新 self DTO、自定义规则查询、路由测试；新增 `web/src/features/{points-wallet,my-subscription}/`、订阅 current/orders 组件、认证路由和 `styles/points-account.css`，更新订阅API/页签/付款后刷新。**上游自有文件**：`model/{main,option,user}.go`、`router/api-router.go`、`middleware/access_token_routes.go`、`web/src/features/profile/components/sidebar-modules-card.tsx`、`web/src/features/system-settings/maintenance/{config.ts,sidebar-modules-section.tsx}`、`web/src/hooks/{use-sidebar-config.ts,use-sidebar-data.ts,__tests__/sidebar-config.test.tsx}`、七种 `web/src/i18n/locales/*.json`、`web/src/routeTree.gen.ts`。
+- 与上游差异：扩展 fork 自定义订阅和独立积分六表的个人只读视图；复用现有页面布局、表格/分页、错误/加载/空态、Switch和规则富文本展示，不替换旧钱包，不改变quota、计费、支付结算或邀请奖励业务。
+- 开关与默认值：无新运行时依赖、表或环境变量。个人菜单 `points_wallet`、`my_subscription` 默认true；兼容旧配置缺键，保留显式false。规则使用既有管理员订阅规则CRUD；内部标记 `internal.point_wallet_rules_seed_v1` 对设置读写隐藏并保护，旧订阅初始化先于钱包规则。降级旧版本前须禁用钱包规则或保留命名空间过滤，避免旧版把钱包说明展示在订阅规则中。
+- 验证：SQLite3.50.4、MySQL8.4.13、PostgreSQL17.11 隔离数据库矩阵通过，覆盖用户隔离、超大整数、所有订单状态/倒序/分页、无账务写入、初始化并发/回滚及编辑删除保留。`go test ./model ./controller -run 'TestPointWallet|TestSubscriptionRule' -count=1`（配置专用测试DSN）、self/ledger路由测试、middleware测试及相关包vet通过；前端受影响模块测试、`bun check -b`、本任务文件lint/格式检查、`bun run build`通过。Chrome使用隔离SQLite真实接口，核对91500总额、87000通用/4500GPT、来源汇总、三种状态订单倒序、历史方案名及精确到期时间、跳转、禁用开关；390px钱包无整页横向溢出，控制台无error/warn。
+- 风险与未覆盖：邀请待释放积分与按来源剩余积分无权威读模型，按已确认策略展示暂不可用。自动续费、退款及真实商户扣款未接入/验证。全量lint在未改动文件存在既有错误；全局路由登记覆盖测试仍报6条既有漏配，本次新增路由已登记并通过鉴权回归。未验证最低数据库版本、完整生产库升级或生产支付。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
@@ -884,6 +894,7 @@
 
 | 区域 | 文件 | 关联条目 |
 |---|---|---|
+| 个人积分/订阅查询与导航 | `model/{main,option,user}.go`、`router/api-router.go`、`middleware/access_token_routes.go`、个人侧栏设置/维护设置、侧栏hooks及测试、七种locale、生成路由（详细文件见Z049） | Z049 |
 | 自定义订阅支付 | `model/topup.go`、`router/api-router.go`、`middleware/access_token_routes.go`、`common/log_text.zh-CN.json`、钱包类型/历史组件/测试、七种 locale | Z045 |
 | 登录认证弹窗与手机绑定 | `model/auth_flow.go`、`controller/{wechat,misc,option}.go`、`router/api-router.go`、前端 Dialog/auth/settings、布局/路由/导航/HTTP 入口、七种 locale | Z042 |
 | 配置教程 | model/{main,option}.go、router/api-router.go、middleware/access_token_routes.go、前端顶部/侧栏 hooks、维护侧栏配置、七种 locale、生成路由 | Z043 |

@@ -192,6 +192,8 @@ export function useSubscriptionCheckout(props: SubscriptionCheckoutProps) {
       ['point-ledger'],
       ['users'],
       ['custom-subscription-self'],
+      ['custom-subscription-orders'],
+      ['points-wallet'],
     ]) {
       void client.invalidateQueries({ queryKey: key })
     }

@@ -125,6 +125,16 @@ export function SidebarModulesCard() {
           description: t('Balance and top-up management'),
         },
         {
+          key: 'points_wallet',
+          title: t('Points wallet'),
+          description: t('View points balances, details and rules.'),
+        },
+        {
+          key: 'my_subscription',
+          title: t('My subscription'),
+          description: t('View your current subscription and expiry.'),
+        },
+        {
           key: 'personal',
           title: t('Personal Settings'),
           description: t('Personal info settings'),

@@ -374,6 +374,8 @@ func SetApiRouter(router *gin.Engine) {
 
 		apiRouter.GET("/points/ledger/self", middleware.UserAuth(), controller.GetSelfPointLedger)
 		apiRouter.GET("/points/ledger", middleware.AdminAuth(), controller.GetAdminPointLedger)
+		apiRouter.GET("/points/wallet/self", middleware.UserAuth(), middleware.DisableCache(), controller.GetSelfPointWallet)
+		apiRouter.GET("/points/wallet/rules", middleware.UserAuth(), middleware.DisableCache(), controller.GetPointWalletRules)
 
 		apiRouter.GET("/config_tutorial", controller.ReadConfigTutorial)
 		tutorialAdmin := apiRouter.Group("/config_tutorial/admin", middleware.AdminAuth())
@@ -390,6 +392,7 @@ func SetApiRouter(router *gin.Engine) {
 
 		apiRouter.GET("/custom_subscription/payment_methods", middleware.DisableCache(), controller.GetCustomSubscriptionPaymentMethods)
 		apiRouter.POST("/custom_subscription/orders", middleware.UserAuth(), middleware.SessionCookieOriginGuard(), middleware.CriticalRateLimit(), middleware.DisableCache(), controller.CreateCustomSubscriptionOrder)
+		apiRouter.GET("/custom_subscription/orders", middleware.UserAuth(), middleware.DisableCache(), controller.GetCustomSubscriptionOrdersSelf)
 		apiRouter.GET("/custom_subscription/orders/:trade_no", middleware.UserAuth(), middleware.DisableCache(), controller.GetCustomSubscriptionOrder)
 		apiRouter.POST("/custom_subscription/epay/notify", anonymousRequestBodyLimit, controller.CustomSubscriptionEpayNotify)
 		apiRouter.GET("/custom_subscription/epay/notify", controller.CustomSubscriptionEpayNotify)

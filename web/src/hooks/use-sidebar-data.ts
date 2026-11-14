@@ -119,6 +119,16 @@ export function useSidebarData(badges: SidebarBadges = {}): SidebarData {
             icon: Wallet,
           },
           {
+            title: t('Points wallet'),
+            url: '/points-wallet',
+            icon: Coins,
+          },
+          {
+            title: t('My subscription'),
+            url: '/my-subscription',
+            icon: CreditCard,
+          },
+          {
             title: t('Profile'),
             url: '/profile',
             icon: User,

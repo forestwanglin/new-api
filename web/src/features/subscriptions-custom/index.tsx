@@ -32,18 +32,29 @@ import { useAuthStore } from '@/stores/auth-store'
 import { getPublicPlans, publicPlanKey } from './api'
 import { SubscriptionCheckout } from './checkout'
 import { subscriptionCopy as t } from './copy'
+import { CurrentSubscription } from './current-subscription'
 import { SubscriptionsCustomFooter } from './footer'
+import { SubscriptionOrders } from './orders'
 import { PlanCard } from './plan-card'
 import type { Offer } from './plans'
-import { SubscriptionSchedule } from './schedule'
 import { SupportDialog } from './support-dialog'
 
 import '@/styles/subscriptions-custom.css'
+import '@/styles/points-account.css'
 
-export function SubscriptionsCustom(props: { tradeNo?: string } = {}) {
-  const isAuthenticated = useAuthStore((state) => !!state.auth.user)
+export function SubscriptionsCustom(
+  props: {
+    tradeNo?: string
+    tab?: 'plans' | 'orders'
+    onTabChange?: (tab: 'plans' | 'orders') => void
+  } = {}
+) {
+  const userId = useAuthStore((state) => state.auth.user?.id)
+  const isAuthenticated = !!userId
   const query = useQuery({ queryKey: publicPlanKey, queryFn: getPublicPlans })
   const plans = query.isSuccess ? query.data : []
+  const [localTab, setLocalTab] = useState<'plans' | 'orders'>('plans')
+  const selectedTab = isAuthenticated ? (props.tab ?? localTab) : 'plans'
   const [supportOpen, setSupportOpen] = useState(false)
   const [selection, setPending] = useState<Offer | null>(null)
   const selectedPlan = plans.find((plan) => plan.id === selection?.plan.id)
@@ -78,16 +89,20 @@ export function SubscriptionsCustom(props: { tradeNo?: string } = {}) {
             plans={plans}
             onSelect={select}
           />
-          <Tabs defaultValue='plans'>
+          <Tabs
+            value={selectedTab}
+            onValueChange={(value) => {
+              const tab = value === 'orders' ? 'orders' : 'plans'
+              setLocalTab(tab)
+              props.onTabChange?.(tab)
+            }}
+          >
             <TabsList variant='line' aria-label={t('Subscription features')}>
               <TabsTrigger value='plans'>
                 {t('Subscription service')}
               </TabsTrigger>
               {isAuthenticated && (
-                <>
-                  <TabsTrigger value='orders'>{t('Orders')}</TabsTrigger>
-                  <TabsTrigger value='invoices'>{t('Invoices')}</TabsTrigger>
-                </>
+                <TabsTrigger value='orders'>{t('Orders')}</TabsTrigger>
               )}
             </TabsList>
             <TabsContent value='plans'>
@@ -110,6 +125,7 @@ export function SubscriptionsCustom(props: { tradeNo?: string } = {}) {
                   )}
                 </p>
               </section>
+              {isAuthenticated && <CurrentSubscription />}
               <p className='sub-muted'>
                 {t(
                   'Choose a monthly or yearly plan. Prices, points and renewal rewards follow the configured offer.'
@@ -167,17 +183,14 @@ export function SubscriptionsCustom(props: { tradeNo?: string } = {}) {
                   </section>
                 ))}
               {isAuthenticated && (
-                <>
-                  <section className='sub-card'>
-                    <h2>{t('Auto renewal management')}</h2>
-                    <p>
-                      {t(
-                        'Automatic renewal is not available yet. One-time purchases do not authorize future charges.'
-                      )}
-                    </p>
-                  </section>
-                  <SubscriptionSchedule plans={plans} />
-                </>
+                <section className='sub-card'>
+                  <h2>{t('Auto renewal management')}</h2>
+                  <p>
+                    {t(
+                      'Automatic renewal is not available yet. One-time purchases do not authorize future charges.'
+                    )}
+                  </p>
+                </section>
               )}
               <section className='sub-card'>
                 <h2>{t('Subscription rules')}</h2>
@@ -188,31 +201,9 @@ export function SubscriptionsCustom(props: { tradeNo?: string } = {}) {
               </section>
             </TabsContent>
             {isAuthenticated && (
-              <>
-                <TabsContent value='orders'>
-                  <section className='sub-card'>
-                    <h2>{t('Subscription orders')}</h2>
-                    <p className='sub-empty'>
-                      {t(
-                        'The current payment result appears above. Complete order history is not available yet.'
-                      )}
-                    </p>
-                    <p>
-                      {t(
-                        'Invoices use actual payments only; promotional points, renewal bonuses and referral rewards are not invoiced again.'
-                      )}
-                    </p>
-                  </section>
-                </TabsContent>
-                <TabsContent value='invoices'>
-                  <section className='sub-card'>
-                    <h2>{t('Invoices')}</h2>
-                    <p className='sub-empty'>
-                      {t('Invoice requests are not available yet.')}
-                    </p>
-                  </section>
-                </TabsContent>
-              </>
+              <TabsContent value='orders'>
+                <SubscriptionOrders key={userId} />
+              </TabsContent>
             )}
           </Tabs>
         </div>

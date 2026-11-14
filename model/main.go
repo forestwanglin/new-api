@@ -386,6 +386,9 @@ func migrateDB() error {
 	if err := InitializeCustomSubscriptionRules(DB); err != nil {
 		return err
 	}
+	if err := InitializePointWalletRules(DB); err != nil {
+		return err
+	}
 	if err := migrateConfigTutorials(DB); err != nil {
 		return err
 	}

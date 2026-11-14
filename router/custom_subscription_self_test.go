@@ -80,7 +80,7 @@ func TestCustomSubscriptionSelf(t *testing.T) {
 	now := time.Now().UnixMilli()
 	start, end := now-2000, now-1000
 	active := model.CustomUserSubscription{Id: 9007199254740993, UserId: 1, OrderId: 1, PlanId: 9007199254740995, PlanVersion: 1, Priority: 2, BillingCycle: "month", DurationMonths: 1, TotalDurationMs: 1000, RemainingDurationMs: 1000, Status: "active", PurchasedAt: start, FirstActivatedAt: &start, ActiveSinceAt: &start, ActiveUntilAt: &end, PlanSnapshot: `{"provider_secret":"never-return"}`}
-	queued := model.CustomUserSubscription{Id: 9007199254740994, UserId: 1, OrderId: 2, PlanId: 9007199254740996, PlanVersion: 1, Priority: 1, BillingCycle: "month", DurationMonths: 1, TotalDurationMs: 2592000000, RemainingDurationMs: 2592000000, Status: "paused", PurchasedAt: start + 1}
+	queued := model.CustomUserSubscription{Id: 9007199254740994, UserId: 1, OrderId: 2, PlanId: 9007199254740996, PlanVersion: 1, Priority: 1, BillingCycle: "month", DurationMonths: 1, TotalDurationMs: 2592000000, RemainingDurationMs: 2592000000, Status: "paused", PurchasedAt: start + 1, PlanSnapshot: `{"Title":"Purchased plan","provider_secret":"never-return"}`}
 	other := model.CustomUserSubscription{Id: 9007199254740997, UserId: 2, OrderId: 3, PlanId: 3, PlanVersion: 1, Priority: 99, TotalDurationMs: 1000, RemainingDurationMs: 1000, Status: "paused", PurchasedAt: start}
 	require.NoError(t, db.Create(&[]model.CustomUserSubscription{active, queued, other}).Error)
 	require.NoError(t, db.Model(&model.CustomUserSubscriptionState{}).Where("user_id = ?", 1).Updates(map[string]any{"active_subscription_id": active.Id, "reconciled_at": start}).Error)
@@ -97,12 +97,46 @@ func TestCustomSubscriptionSelf(t *testing.T) {
 		assert.IsType(t, "", item["id"])
 		assert.IsType(t, "", item["plan_id"])
 		assert.IsType(t, "", item["remaining_duration_ms"])
+		if item["id"] == "9007199254740994" {
+			assert.Equal(t, "Purchased plan", item["plan_title"])
+		}
 	}
 	var restored model.CustomUserSubscription
 	require.NoError(t, db.First(&restored, queued.Id).Error)
 	require.NotNil(t, restored.ActiveSinceAt)
 	assert.Equal(t, end, *restored.ActiveSinceAt)
 	assert.Equal(t, "active", restored.Status)
+
+	t.Run("subscription orders require a browser session and reject owner filters", func(t *testing.T) {
+		const ordersPath = "/api/custom_subscription/orders"
+		read(ordersPath, "", http.StatusUnauthorized)
+		read(ordersPath, pat, http.StatusForbidden)
+		require.NoError(t, db.AutoMigrate(&model.CustomSubscriptionOrder{}))
+		orders := []model.CustomSubscriptionOrder{
+			{Id: 1, UserId: 1, TradeNo: "first", PlanId: 1, PlanVersion: 1, PlanSnapshot: `{"Title":"Original title","private":"never-return"}`, Status: "success", CreatedAt: 1000, PaidPoints: 9007199254740993, AmountPaidMinor: 2900},
+			{Id: 2, UserId: 1, TradeNo: "second", PlanId: 2, Status: "pending", CreatedAt: 2000},
+			{Id: 3, UserId: 2, TradeNo: "not-owned", CreatedAt: 3000},
+		}
+		require.NoError(t, db.Create(&orders).Error)
+		for _, query := range []string{"user_id=2", "p=0", "p=-1", "p=1&p=2", "p=", "page_size=101", "page_size=0", "page_size=", "p=9223372036854775807&page_size=100", "unknown=1", "bad=%ZZ", "p=1&bad=%ZZ", "bad=1;ignored=2"} {
+			assert.False(t, read(ordersPath+"?"+query, bundle.AccessToken, http.StatusOK).Success, query)
+		}
+		response := read(ordersPath+"?page_size=1", bundle.AccessToken, http.StatusOK)
+		require.True(t, response.Success, response.Message)
+		var page model.CustomSubscriptionOrderPage
+		require.NoError(t, common.Unmarshal(response.Data, &page))
+		assert.EqualValues(t, 2, page.Total)
+		require.Len(t, page.Items, 1)
+		assert.Equal(t, "second", page.Items[0].TradeNo)
+		assert.NotContains(t, string(response.Data), "not-owned")
+		response = read(ordersPath+"?p=2&page_size=1", bundle.AccessToken, http.StatusOK)
+		require.True(t, response.Success, response.Message)
+		assert.Contains(t, string(response.Data), `"plan_title":"Original title"`)
+		assert.Contains(t, string(response.Data), `"paid_points":"9007199254740993"`)
+		assert.NotContains(t, string(response.Data), "never-return")
+		require.NoError(t, db.Migrator().DropTable(&model.CustomSubscriptionOrder{}))
+		assert.False(t, read(ordersPath, bundle.AccessToken, http.StatusOK).Success)
+	})
 	require.NoError(t, db.Migrator().DropTable(&model.CustomUserSubscription{}))
 	assert.False(t, read(path, bundle.AccessToken, http.StatusOK).Success)
 }

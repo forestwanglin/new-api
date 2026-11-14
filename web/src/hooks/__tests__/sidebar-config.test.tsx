@@ -104,7 +104,13 @@ describe('security sidebar visibility', () => {
       result.current
         .find((group) => group.id === 'personal')
         ?.items.map((item) => item.title)
-    ).toEqual(['Wallet', 'Profile', 'Security & Access'])
+    ).toEqual([
+      'Wallet',
+      'Points wallet',
+      'My subscription',
+      'Profile',
+      'Security & Access',
+    ])
     expect(
       result.current
         .flatMap((group) => group.items)
@@ -138,6 +144,44 @@ describe('security sidebar visibility', () => {
         .flatMap((group) => group.items)
         .some((item) => item.title === 'Security & Access')
     ).toBe(true)
+  })
+})
+
+describe('points wallet and personal subscription sidebar', () => {
+  it.each(['points_wallet', 'my_subscription'])(
+    'preserves explicit admin and user disablement for %s',
+    (key) => {
+      const admin = sidebarFor({ personal: { enabled: true, [key]: false } })
+      const url =
+        key === 'points_wallet' ? '/points-wallet' : '/my-subscription'
+      expect(
+        admin.result.current
+          .flatMap((group) => group.items)
+          .some((item) => item.url === url)
+      ).toBe(false)
+      admin.unmount()
+      const user = sidebarFor(undefined, {
+        personal: { enabled: true, [key]: false },
+      })
+      expect(
+        user.result.current
+          .flatMap((group) => group.items)
+          .some((item) => item.url === url)
+      ).toBe(false)
+      user.unmount()
+    }
+  )
+  it('maintenance config inherits new personal entries and preserves saved false values', () => {
+    const config = parseSidebarModulesAdmin(
+      '{"personal":{"enabled":true,"topup":true}}'
+    )
+    expect(config.personal.points_wallet).toBe(true)
+    expect(config.personal.my_subscription).toBe(true)
+    config.personal.points_wallet = false
+    config.personal.my_subscription = false
+    const saved = parseSidebarModulesAdmin(serializeSidebarModulesAdmin(config))
+    expect(saved.personal.points_wallet).toBe(false)
+    expect(saved.personal.my_subscription).toBe(false)
   })
 })
 

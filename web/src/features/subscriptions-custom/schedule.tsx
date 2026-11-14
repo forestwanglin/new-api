@@ -17,24 +17,34 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useQuery } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { LoadingState } from '@/components/loading-state'
+import { toIntlLocale } from '@/i18n/languages'
 import { formatNumber } from '@/lib/format'
 import { getServerErrorMessage } from '@/lib/server-error-message'
 import { useAuthStore } from '@/stores/auth-store'
 
-import { getCustomSubscriptionSelf } from './api'
-import { subscriptionCopy as t } from './copy'
+import { customSubscriptionSelfKey, getCustomSubscriptionSelf } from './api'
+import { SubscriptionTime } from './current-subscription'
 import type { PublicSubscriptionPlan } from './plans'
 
 export function SubscriptionSchedule(props: {
   plans: PublicSubscriptionPlan[]
 }) {
+  const { t, i18n } = useTranslation()
+  const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
+  const statusLabels: Record<string, string> = {
+    active: t('Active'),
+    paused: t('Paused'),
+    expired: t('Expired'),
+    cancelled: t('Cancelled'),
+  }
   const userId = useAuthStore((state) => state.auth.user?.id)
   const query = useQuery({
-    queryKey: ['custom-subscription-self', userId],
+    queryKey: customSubscriptionSelfKey(userId),
     queryFn: getCustomSubscriptionSelf,
     enabled: !!userId,
     refetchInterval: 10000,
@@ -56,16 +66,22 @@ export function SubscriptionSchedule(props: {
           onRetry={() => void query.refetch()}
         />
       )}
-      {query.isSuccess && !query.data.length && (
+      {query.isSuccess && !query.data.items.length && (
         <EmptyState title={t('No purchased subscriptions yet')} />
       )}
-      {query.data?.map((subscription) => (
+      {query.data?.items.map((subscription) => (
         <div key={subscription.id} className='sub-management'>
           <strong>
-            {props.plans.find((plan) => plan.id === subscription.plan_id)
-              ?.title ?? t('Plan {{id}}', { id: subscription.plan_id })}
+            {subscription.plan_title ||
+              props.plans.find((plan) => plan.id === subscription.plan_id)
+                ?.title ||
+              t('Plan {{id}}', { id: subscription.plan_id })}
           </strong>
-          <span>{t(subscription.status)}</span>
+          <span>{statusLabels[subscription.status]}</span>
+          <span>
+            <SubscriptionTime value={subscription.active_since_at} /> /{' '}
+            <SubscriptionTime value={subscription.active_until_at} />
+          </span>
           <span>
             {t('Priority {{priority}}', { priority: subscription.priority })}
           </span>
@@ -73,7 +89,7 @@ export function SubscriptionSchedule(props: {
             {t('Remaining service: {{seconds}} seconds', {
               seconds: formatNumber(
                 BigInt(subscription.remaining_duration_ms) / 1000n,
-                'zh-CN'
+                locale
               ),
             })}
           </span>
