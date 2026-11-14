@@ -7825,6 +7825,17 @@
     "Consumed points": "Points consommés",
     "Points settlement pending": "Règlement des points en attente",
     "Points settlement failed": "Échec du règlement des points",
-    "Higher values first": "Les valeurs les plus élevées en premier"
+    "Higher values first": "Les valeurs les plus élevées en premier",
+    "Increase user points": "Augmenter les points de l’utilisateur",
+    "Decrease user points": "Diminuer les points de l’utilisateur",
+    "Replay point adjustment": "Rejouer la demande d’ajustement des points",
+    "Adjust user points": "Ajuster les points de l’utilisateur",
+    "Point type: {{type}} · Points: {{points}}": "Type de points : {{type}} · Points : {{points}}",
+    "Point type ID": "ID du type de points",
+    "Point adjustment request ID": "ID de la demande d’ajustement des points",
+    "Points before adjustment": "Points avant ajustement",
+    "Points after adjustment": "Points après ajustement",
+    "No additional points were changed": "Aucun point supplémentaire n’a été modifié",
+    "Points adjustment details": "Détails de l’ajustement des points"
   }
 }

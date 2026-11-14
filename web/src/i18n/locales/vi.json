@@ -7825,6 +7825,17 @@
     "Consumed points": "Điểm đã tiêu thụ",
     "Points settlement pending": "Đang chờ quyết toán điểm",
     "Points settlement failed": "Quyết toán điểm thất bại",
-    "Higher values first": "Giá trị lớn được ưu tiên"
+    "Higher values first": "Giá trị lớn được ưu tiên",
+    "Increase user points": "Tăng điểm người dùng",
+    "Decrease user points": "Giảm điểm người dùng",
+    "Replay point adjustment": "Phát lại yêu cầu điều chỉnh điểm",
+    "Adjust user points": "Điều chỉnh điểm người dùng",
+    "Point type: {{type}} · Points: {{points}}": "Loại điểm: {{type}} · Điểm: {{points}}",
+    "Point type ID": "ID loại điểm",
+    "Point adjustment request ID": "ID yêu cầu điều chỉnh điểm",
+    "Points before adjustment": "Điểm trước điều chỉnh",
+    "Points after adjustment": "Điểm sau điều chỉnh",
+    "No additional points were changed": "Không thay đổi điểm thêm lần nữa",
+    "Points adjustment details": "Chi tiết điều chỉnh điểm"
   }
 }

@@ -7825,6 +7825,17 @@
     "Consumed points": "消費ポイント",
     "Points settlement pending": "ポイント精算待ち",
     "Points settlement failed": "ポイント精算失敗",
-    "Higher values first": "大きい値を優先"
+    "Higher values first": "大きい値を優先",
+    "Increase user points": "ユーザーのポイントを加算",
+    "Decrease user points": "ユーザーのポイントを減算",
+    "Replay point adjustment": "ポイント調整リクエストの再実行",
+    "Adjust user points": "ユーザーのポイントを調整",
+    "Point type: {{type}} · Points: {{points}}": "ポイント種別：{{type}} · ポイント：{{points}}",
+    "Point type ID": "ポイント種別 ID",
+    "Point adjustment request ID": "ポイント調整リクエスト ID",
+    "Points before adjustment": "調整前のポイント",
+    "Points after adjustment": "調整後のポイント",
+    "No additional points were changed": "ポイントは再度変更されていません",
+    "Points adjustment details": "ポイント調整の詳細"
   }
 }

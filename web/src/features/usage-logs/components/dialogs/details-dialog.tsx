@@ -84,6 +84,7 @@ import {
   renderAuditContent,
   renderLogContent,
 } from '../../lib/format'
+import { buildPointsAuditOperation } from '../../lib/points-audit-operation'
 import { buildQuotaAuditOperation } from '../../lib/quota-audit-operation'
 import {
   getLogTypeConfig,
@@ -607,6 +608,14 @@ export function DetailsDialog(props: DetailsDialogProps) {
         t
       )
     : null
+  const pointsOperation = isTopup
+    ? buildPointsAuditOperation(
+        other?.op?.action ?? '',
+        other?.op?.params ?? {},
+        true,
+        t
+      )
+    : null
   const operationText = renderAuditContent(other, t)
   const details =
     (isTopup ? operationText : null) ??
@@ -1030,6 +1039,12 @@ export function DetailsDialog(props: DetailsDialogProps) {
         {quotaOperation && (
           <DetailSection label={t('Quota adjustment details')}>
             <AuditDetailFields fields={quotaOperation.fields} />
+          </DetailSection>
+        )}
+
+        {pointsOperation && (
+          <DetailSection label={t('Points adjustment details')}>
+            <AuditDetailFields fields={pointsOperation.fields} />
           </DetailSection>
         )}
 

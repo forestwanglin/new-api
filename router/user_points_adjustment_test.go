@@ -24,7 +24,7 @@ func TestAdminUserPointsAPI(t *testing.T) {
 	sqlDB, err := db.DB()
 	require.NoError(t, err)
 	sqlDB.SetMaxOpenConns(1)
-	require.NoError(t, db.AutoMigrate(&model.PointType{}, &model.PointAccount{}, &model.PointTransaction{}, &model.PointLedger{}, &model.User{}, &model.UserSession{}, &model.UserAccessToken{}, &model.AuditLog{}, &model.Option{}))
+	require.NoError(t, db.AutoMigrate(&model.PointType{}, &model.PointAccount{}, &model.PointTransaction{}, &model.PointLedger{}, &model.User{}, &model.UserSession{}, &model.UserAccessToken{}, &model.AuditLog{}, &model.Log{}, &model.Option{}))
 	oldDB, oldLogDB, oldType, oldRedis, oldSecret := model.DB, model.LOG_DB, common.MainDatabaseType(), common.RedisEnabled, common.SessionSecret
 	model.DB, model.LOG_DB = db, db
 	common.SetMainDatabaseType(common.DatabaseTypeSQLite)
@@ -101,6 +101,15 @@ func TestAdminUserPointsAPI(t *testing.T) {
 	require.True(t, result.Success)
 	require.NoError(t, common.Unmarshal(result.Data, &adjustment))
 	assert.True(t, adjustment.Replayed)
+	var successLogs, successAudits, replayAudits, genericAudits int64
+	require.NoError(t, db.Model(&model.Log{}).Where("user_id = ?", users[common.RoleCommonUser].Id).Count(&successLogs).Error)
+	require.NoError(t, db.Model(&model.AuditLog{}).Where("action = ? AND success = ?", "user.points_add", true).Count(&successAudits).Error)
+	require.NoError(t, db.Model(&model.AuditLog{}).Where("action = ?", "user.points_replay").Count(&replayAudits).Error)
+	require.NoError(t, db.Model(&model.AuditLog{}).Where("action = ?", "generic").Count(&genericAudits).Error)
+	assert.EqualValues(t, 1, successLogs)
+	assert.EqualValues(t, 1, successAudits)
+	assert.EqualValues(t, 1, replayAudits)
+	assert.Zero(t, genericAudits)
 	for _, bad := range []string{strings.Replace(body, `"mode":"add"`, `"mode":"override"`, 1), strings.Replace(body, `"9007199254740993"`, `1`, 1), strings.Replace(body, `"9007199254740993"`, `"0"`, 1), strings.Replace(body, `"9007199254740993"`, `"01"`, 1), strings.Replace(body, `"request-1"`, `"bad id"`, 1), strings.TrimSuffix(body, "}") + `,"extra":true}`, body + ` {}`, strings.Replace(body, `"point_type_id"`, `"Point_Type_Id"`, 1), strings.Replace(body, `"request-1"`, `null`, 1), strings.Replace(body, `"9007199254740993"`, `"1"`, 1)} {
 		assert.False(t, request("POST", path, bad, tokens[common.RoleAdminUser], 200).Success, bad)
 	}

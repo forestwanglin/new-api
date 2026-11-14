@@ -982,6 +982,16 @@
 - 验证：新增分类及真实组件筛选回归修改前失败、修改后通过；`bun run test` 指定 model-plaza 分类/页面/折扣 3 文件共 41 用例通过，修改文件 oxlint/oxfmt 和 typecheck 通过。
 - 风险与未覆盖：海外参考价格展示会沿用已有参考汇率，实际售价不受影响；未调用商业模型、修改服务器配置或部署。
 
+### Z060 管理员积分调账使用日志与审计明细
+
+- 需求与原因：任意类型积分增减须像额度调整一样，在使用日志和审计日志中显示可追溯的业务操作。
+- 变更内容：新提交调账记录目标用户使用日志及操作者成功审计；保存类型 ID/code/name、方向、精确数量、事务内前后积分及调账请求 ID。失败仅审计；幂等重放不新增成功调账记录，改为明确的 replay 审计。两处摘要/详情复用积分描述，七语言完整，不按货币转换。
+- 影响面：`controller/user_points{,_test}.go`、`model/user_points_adjustment.go`、既有路由积分测试、新增积分日志共享 helper/回归测试及 [points-schema.md](points-schema.md)。**上游自有文件**：`controller/audit.go`、`web/src/features/usage-logs/lib/format.ts`、使用日志 `components/dialogs/details-dialog.tsx`、审计 `lib/audit-details.ts` / `components/audit-log-details-dialog.tsx`、七种 locale；其余点数扩展文件为 fork 自有。
+- 与上游差异：在 Z058 独立积分调账上扩展 Z030/Z041 已有操作日志机制，沿用 Topup 日志类型但明确积分单位；不增加 schema、HTTP 响应字段或财务写入。
+- 开关与默认值：无新增配置；显式业务审计抑制 generic 重复，普通用户日志视图仍剥离管理员元数据。
+- 验证：新增控制器日志回归已先红后绿；SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 17.11 分离日志库下成功/失败/重放专项通过，原管理员调账模型三库矩阵通过。前端使用/审计摘要和真实详情弹窗、语言切换等 5 文件/106 用例通过；typecheck（1592 文件/2 项目）、修改文件 lint/format、前端生产构建、Go vet/build 和独立检查通过。后端四包回归排除既有无关的 OpenAI 采样兼容、PAT 审计数据库矩阵、路由目录覆盖三项测试，详细命令见任务验证记录。
+- 风险与未覆盖：沿用提交后尽力写日志，与主库积分事务不具备跨库原子性；日志库故障不回滚积分，不补历史或崩溃窗口丢失记录。未部署、未调整生产积分。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
@@ -990,6 +1000,7 @@
 
 | 区域 | 文件 | 关联条目 |
 |---|---|---|
+| 积分调账业务日志 | `controller/audit.go`、`web/src/features/usage-logs/lib/format.ts`、使用日志详情弹窗、审计详情构建/弹窗、七种 locale | Z060 |
 | 管理员积分调账 | `router/api-router.go`、`middleware/access_token_routes.go`、用户API/类型/编辑抽屉/既有测试、七种locale | Z058 |
 | 模型积分准入与结算 | `model/{token,quota_reserve,log,task,midjourney}.go`、`controller/{token,relay,midjourney,plugin_protocol}.go`、`relay/{request_billing,relay_task,mjproxy_handler,common/relay_info}.go`、`service/{billing_session,quota,midjourney,task_billing,task_polling,task_billing_reconcile,violation_fee,relay_error}.go` 及测试；使用日志/任务/绘图 schema 和列、账号/移动菜单、侧栏/维护设置、七种 locale 及相关测试 | Z057 |
 | 首页接入引导取价 | `web/src/features/dashboard/components/overview/access-guide/index.tsx` 及接入引导、首页测试 | Z056 |

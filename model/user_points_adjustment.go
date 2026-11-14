@@ -21,7 +21,9 @@ type UserPointBalances struct {
 }
 type UserPointAdjustment struct {
 	PointWalletBalance
-	Replayed bool `json:"replayed"`
+	Replayed        bool   `json:"replayed"`
+	Username        string `json:"-"`
+	AvailableBefore string `json:"-"`
 }
 
 func GetUserPointBalances(userID, operatorRole int) (*UserPointBalances, error) {
@@ -72,12 +74,13 @@ func AdjustUserPoints(userID, operatorID, operatorRole int, typeID int64, mode, 
 			}
 		}
 		var user User
-		if err := lockForUpdate(tx).Select("id, role").First(&user, userID).Error; err != nil {
+		if err := lockForUpdate(tx).Select("id, role, username").First(&user, userID).Error; err != nil {
 			return err
 		}
 		if operatorRole < common.RoleAdminUser || operatorRole != common.RoleRootUser && operatorRole <= user.Role {
 			return ErrUserQuotaPermission
 		}
+		result.Username = user.Username
 		var pointType PointType
 		if err := tx.First(&pointType, typeID).Error; errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrPointTypeNotFound
@@ -95,6 +98,7 @@ func AdjustUserPoints(userID, operatorID, operatorRole int, typeID int64, mode, 
 			if err := tx.Where("transaction_id = ?", previous.Id).First(&ledger).Error; err != nil {
 				return err
 			}
+			result.AvailableBefore = strconv.FormatInt(ledger.AvailableBefore, 10)
 			result.AvailablePoints = strconv.FormatInt(ledger.AvailableAfter, 10)
 			result.FrozenPoints = strconv.FormatInt(ledger.FrozenAfter, 10)
 			result.Replayed = true
@@ -124,6 +128,7 @@ func AdjustUserPoints(userID, operatorID, operatorRole int, typeID int64, mode, 
 		if delta > 0 && account.AvailablePoints > math.MaxInt64-delta || delta < 0 && account.AvailablePoints < math.MinInt64-delta || account.Version == math.MaxInt64 {
 			return ErrUserPointAdjustmentOverflow
 		}
+		result.AvailableBefore = strconv.FormatInt(account.AvailablePoints, 10)
 		actorID := int64(operatorID)
 		transaction := PointTransaction{UserId: int64(userID), EventKey: event, Action: action, BizType: "ADMIN_ADJUST", BizId: requestID, Points: value, BillingSnapshot: &snapshot, OperatorType: PointOperatorAdmin, OperatorId: &actorID, Remark: "Administrator point adjustment: " + mode}
 		if err := tx.Create(&transaction).Error; err != nil {

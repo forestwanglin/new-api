@@ -7825,6 +7825,17 @@
     "Consumed points": "Consumed points",
     "Points settlement pending": "Points settlement pending",
     "Points settlement failed": "Points settlement failed",
-    "Higher values first": "Higher values first"
+    "Higher values first": "Higher values first",
+    "Increase user points": "Increase user points",
+    "Decrease user points": "Decrease user points",
+    "Replay point adjustment": "Replay point adjustment",
+    "Adjust user points": "Adjust user points",
+    "Point type: {{type}} · Points: {{points}}": "Point type: {{type}} · Points: {{points}}",
+    "Point type ID": "Point type ID",
+    "Point adjustment request ID": "Point adjustment request ID",
+    "Points before adjustment": "Points before adjustment",
+    "Points after adjustment": "Points after adjustment",
+    "No additional points were changed": "No additional points were changed",
+    "Points adjustment details": "Points adjustment details"
   }
 }

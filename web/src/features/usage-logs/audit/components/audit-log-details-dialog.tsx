@@ -50,6 +50,9 @@ export function AuditLogDetailsDialog(props: { entry: AuditLog }) {
   const detail = buildAuditDetails(props.entry, t, {
     scopeResources: scopes.data?.resources,
   })
+  const operationDetailLabel = detail.pointsOperation
+    ? t('Points adjustment details')
+    : t('Token operation details')
   const identifiers = [
     { label: t('Route'), value: props.entry.route },
     { label: t('Request ID'), value: props.entry.request_id },
@@ -112,7 +115,7 @@ export function AuditLogDetailsDialog(props: { entry: AuditLog }) {
           label={
             detail.quotaOperation
               ? t('Quota adjustment details')
-              : t('Token operation details')
+              : operationDetailLabel
           }
         >
           <AuditDetailFields fields={detail.operation.fields} />

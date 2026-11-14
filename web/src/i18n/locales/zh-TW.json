@@ -7825,6 +7825,17 @@
     "Consumed points": "消耗積分",
     "Points settlement pending": "積分待結算",
     "Points settlement failed": "積分結算失敗",
-    "Higher values first": "大值優先"
+    "Higher values first": "大值優先",
+    "Increase user points": "增加使用者積分",
+    "Decrease user points": "扣減使用者積分",
+    "Replay point adjustment": "重播積分調整請求",
+    "Adjust user points": "調整使用者積分",
+    "Point type: {{type}} · Points: {{points}}": "積分類型：{{type}} · 積分：{{points}}",
+    "Point type ID": "積分類型 ID",
+    "Point adjustment request ID": "積分調整請求 ID",
+    "Points before adjustment": "調整前積分",
+    "Points after adjustment": "調整後積分",
+    "No additional points were changed": "未再次變更積分",
+    "Points adjustment details": "積分調整詳情"
   }
 }

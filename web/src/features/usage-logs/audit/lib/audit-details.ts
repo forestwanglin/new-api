@@ -24,6 +24,7 @@ import dayjs from '@/lib/dayjs'
 import { ROLE } from '@/lib/roles'
 
 import { renderAuditContent } from '../../lib/format'
+import { buildPointsAuditOperation } from '../../lib/points-audit-operation'
 import { buildQuotaAuditOperation } from '../../lib/quota-audit-operation'
 import type { LogOtherData } from '../../types'
 import type { AuditLog } from '../api'
@@ -409,7 +410,13 @@ export function buildAuditDetails(
     entry.success,
     t
   )
-  const operation = tokenOperation ?? quotaOperation
+  const pointsOperation = buildPointsAuditOperation(
+    action,
+    params,
+    entry.success,
+    t
+  )
+  const operation = tokenOperation ?? quotaOperation ?? pointsOperation
   const summaryParams: NonNullable<NonNullable<LogOtherData['op']>['params']> =
     {}
   for (const [key, value] of Object.entries(params)) {
@@ -620,6 +627,7 @@ export function buildAuditDetails(
     summary: operation?.summary ?? summary,
     tokenOperation,
     quotaOperation,
+    pointsOperation,
     operation,
     actor,
     actorRole,

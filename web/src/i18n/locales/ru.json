@@ -7827,6 +7827,17 @@
     "Consumed points": "Потраченные баллы",
     "Points settlement pending": "Ожидается расчёт баллов",
     "Points settlement failed": "Ошибка расчёта баллов",
-    "Higher values first": "Сначала большие значения"
+    "Higher values first": "Сначала большие значения",
+    "Increase user points": "Увеличить баллы пользователя",
+    "Decrease user points": "Уменьшить баллы пользователя",
+    "Replay point adjustment": "Повторить запрос корректировки баллов",
+    "Adjust user points": "Изменить баллы пользователя",
+    "Point type: {{type}} · Points: {{points}}": "Тип баллов: {{type}} · Баллы: {{points}}",
+    "Point type ID": "ID типа баллов",
+    "Point adjustment request ID": "ID запроса корректировки баллов",
+    "Points before adjustment": "Баллы до корректировки",
+    "Points after adjustment": "Баллы после корректировки",
+    "No additional points were changed": "Дополнительные изменения баллов не выполнялись",
+    "Points adjustment details": "Подробности корректировки баллов"
   }
 }

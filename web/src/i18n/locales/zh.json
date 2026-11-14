@@ -7825,6 +7825,17 @@
     "Consumed points": "消耗积分",
     "Points settlement pending": "积分待结算",
     "Points settlement failed": "积分结算失败",
-    "Higher values first": "大值优先"
+    "Higher values first": "大值优先",
+    "Increase user points": "增加用户积分",
+    "Decrease user points": "扣减用户积分",
+    "Replay point adjustment": "重放积分调整请求",
+    "Adjust user points": "调整用户积分",
+    "Point type: {{type}} · Points: {{points}}": "积分类型：{{type}} · 积分：{{points}}",
+    "Point type ID": "积分类型 ID",
+    "Point adjustment request ID": "积分调整请求 ID",
+    "Points before adjustment": "调整前积分",
+    "Points after adjustment": "调整后积分",
+    "No additional points were changed": "未再次变更积分",
+    "Points adjustment details": "积分调整详情"
   }
 }

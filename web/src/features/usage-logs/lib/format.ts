@@ -28,6 +28,7 @@ import { translateServerText } from '@/lib/server-error-message'
 
 import type { UsageLog } from '../data/schema'
 import type { LogOtherData } from '../types'
+import { buildPointsAuditOperation } from './points-audit-operation'
 import { buildQuotaAuditOperation } from './quota-audit-operation'
 
 export { normalizeTierLabel }
@@ -623,6 +624,15 @@ export function renderAuditContent(
       return t('Batch deleted {{count}} redemption codes', { count })
     }
     return t('Batch deleted redemption codes (count not recorded)')
+  }
+  const pointsOperation = buildPointsAuditOperation(
+    op.action,
+    op.params ?? {},
+    other?.audit_info?.success !== false,
+    t
+  )
+  if (pointsOperation) {
+    return `${pointsOperation.summary} · ${pointsOperation.description}`
   }
   const template = AUDIT_TEMPLATES[op.action]
   if (!template) return null
