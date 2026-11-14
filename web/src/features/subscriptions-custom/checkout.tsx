@@ -18,22 +18,15 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { Dialog } from '@/components/dialog'
 import { ErrorState } from '@/components/error-state'
-import { LoadingState } from '@/components/loading-state'
 import { Button } from '@/components/ui/button'
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { formatPlanPrice } from '@/features/custom-subscriptions/lib/format'
+import { formatNumber } from '@/lib/format'
 import { getServerErrorMessage } from '@/lib/server-error-message'
 import { useLoginModalStore } from '@/stores/login-modal-store'
 
 import { subscriptionCopy as t } from './copy'
-import { formatOfferPoints } from './plans'
+import { offerPointAmounts } from './plans'
 import {
   useSubscriptionCheckout,
   type SubscriptionCheckoutProps,
@@ -57,6 +50,14 @@ export function SubscriptionCheckout(props: SubscriptionCheckoutProps) {
     changed,
     statusText,
   } = useSubscriptionCheckout(props)
+  const price = selection
+    ? formatPlanPrice(selection.plan.price_amount_minor, 'zh-CN')
+        .replace('¥ ', '¥')
+        .replace(/\.00$/, '')
+    : ''
+  let paymentPlaceholder = t('No payment methods available')
+  if (methods.isPending) paymentPlaceholder = t('Loading payment methods…')
+  if (methods.isError) paymentPlaceholder = t('Payment methods failed to load')
   return (
     <>
       {tradeNo && (
@@ -127,12 +128,7 @@ export function SubscriptionCheckout(props: SubscriptionCheckoutProps) {
               {mutation.isPending
                 ? t('Starting payment…')
                 : t('Pay {{price}}', {
-                    price: selection
-                      ? formatPlanPrice(
-                          selection.plan.price_amount_minor,
-                          'zh-CN'
-                        )
-                      : '',
+                    price,
                   })}
             </Button>
           </>
@@ -147,36 +143,56 @@ export function SubscriptionCheckout(props: SubscriptionCheckoutProps) {
                   ? t('Subscription yearly')
                   : t('Subscription monthly')}
               </h3>
-              <strong>
-                {formatPlanPrice(selection.plan.price_amount_minor, 'zh-CN')}
-              </strong>
+              <strong>{price}</strong>
             </div>
             <section className='sub-order-now'>
               <p>
-                {t('Payment for this purchase')}{' '}
-                <strong>
-                  {formatPlanPrice(selection.plan.price_amount_minor, 'zh-CN')}
-                </strong>
+                {t('Payment for this purchase')} <strong>{price}</strong>
               </p>
               <p>
                 {t('Points credited with this purchase')}{' '}
-                <strong>{formatOfferPoints(selection.plan, 'zh-CN')}</strong>，
-                {t('Points never expire')}
+                {offerPointAmounts(selection.plan).map((entry, index) => (
+                  <span key={entry.id}>
+                    {index > 0 && ' + '}
+                    <strong>{formatNumber(entry.amount, 'zh-CN')}</strong>{' '}
+                    {entry.name}
+                  </span>
+                ))}
+                ，{t('Points never expire')}
               </p>
               <p>
                 {t('Service duration: {{days}} days.', {
                   days: selection.yearly ? 365 : 30,
                 })}
               </p>
-              <p>
-                {t(
-                  'Higher priority subscriptions activate first. Lower priority time is paused and retained; equal priorities follow payment time.'
-                )}
-              </p>
             </section>
-            {methods.isPending && (
-              <LoadingState message={t('Loading payment methods…')} />
-            )}
+            <label className='sub-pay-label' htmlFor='subscription-payment'>
+              {t('Payment method')}
+            </label>
+            <NativeSelect
+              id='subscription-payment'
+              className='sub-pay-select'
+              value={paymentType ?? ''}
+              onChange={(event) => {
+                setPayment(event.target.value)
+                setRequestId(crypto.randomUUID())
+                resetMutation()
+              }}
+              disabled={
+                mutation.isPending || !methods.isSuccess || !methods.data.length
+              }
+            >
+              {!paymentType && (
+                <NativeSelectOption value=''>
+                  {paymentPlaceholder}
+                </NativeSelectOption>
+              )}
+              {methods.data?.map((method) => (
+                <NativeSelectOption key={method.type} value={method.type}>
+                  {method.name}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
             {methods.isError && (
               <ErrorState
                 description={getServerErrorMessage(methods.error)}
@@ -187,44 +203,6 @@ export function SubscriptionCheckout(props: SubscriptionCheckoutProps) {
               <p role='alert'>
                 {t('No payment methods are available. Please contact support.')}
               </p>
-            )}
-            {!!methods.data?.length && (
-              <>
-                <label className='sub-pay-label' htmlFor='subscription-payment'>
-                  {t('Payment method')}
-                </label>
-                <Select
-                  value={paymentType}
-                  onValueChange={(value) => {
-                    setPayment(value)
-                    setRequestId(crypto.randomUUID())
-                    resetMutation()
-                  }}
-                  disabled={mutation.isPending}
-                >
-                  <SelectTrigger
-                    id='subscription-payment'
-                    className='sub-pay-select'
-                  >
-                    <SelectValue>
-                      {
-                        methods.data.find(
-                          (method) => method.type === paymentType
-                        )?.name
-                      }
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {methods.data.map((method) => (
-                        <SelectItem key={method.type} value={method.type}>
-                          {method.name}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </>
             )}
             {mutation.isError && (
               <p role='alert'>{getServerErrorMessage(mutation.error)}</p>

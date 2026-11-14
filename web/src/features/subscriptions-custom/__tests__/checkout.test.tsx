@@ -95,6 +95,38 @@ it('opens login before purchasing and resumes the selected offer after successfu
   expect(within(dialog).getByText(/后台月付计划/)).toBeVisible()
   expect(within(dialog).queryByText(/演示|预览/)).not.toBeInTheDocument()
   expect(within(dialog).getByText(/30 天/)).toBeVisible()
+  expect(within(dialog).getAllByText('¥123.45')).toHaveLength(2)
+  expect(
+    within(dialog).getByRole('heading', { name: '确认单次购买' })
+  ).toBeVisible()
+  expect(
+    within(dialog).queryByText(/优先级高的订阅先使用/)
+  ).not.toBeInTheDocument()
+})
+it('shows whole-yuan checkout prices like the demo without losing minor-unit precision', async () => {
+  signIn()
+  const user = userEvent.setup()
+  const get = vi.mocked(api.get)
+  const originalGet = get.getMockImplementation()
+  if (!originalGet) throw new Error('Missing API fixture')
+  get.mockImplementation((url, ...args) => {
+    if (url === '/api/custom_subscription/plans') {
+      return Promise.resolve({
+        data: {
+          success: true,
+          data: { items: [{ ...configuredPlan, price_amount_minor: '12900' }] },
+        },
+      })
+    }
+    return originalGet(url, ...args)
+  })
+  renderPage()
+  await user.click(await screen.findByRole('button', { name: /单次购买/ }))
+  const dialog = screen.getByRole('dialog')
+  expect(within(dialog).getAllByText('¥129')).toHaveLength(2)
+  expect(
+    within(dialog).getByRole('button', { name: '支付 ¥129' })
+  ).toBeVisible()
 })
 it('does not reopen a canceled login intent on a later unrelated login', async () => {
   const user = userEvent.setup()
@@ -126,10 +158,10 @@ it('submits configured wxpay with exact plan identity and navigates through the 
   renderPage()
   await user.click(await screen.findByRole('button', { name: /单次购买/ }))
   const dialog = screen.getByRole('dialog')
-  await user.click(
-    await within(dialog).findByRole('combobox', { name: '支付方式' })
+  await user.selectOptions(
+    await within(dialog).findByRole('combobox', { name: '支付方式' }),
+    'wxpay'
   )
-  await user.click(await screen.findByRole('option', { name: '微信支付' }))
   await user.click(within(dialog).getByRole('button', { name: /支付 ¥/ }))
   await waitFor(() => expect(submit).toHaveBeenCalledOnce())
   expect(post).toHaveBeenCalledWith(
@@ -165,9 +197,65 @@ it('shows unavailable payments without creating an order and disables automatic 
     await screen.findByText('暂无可用支付方式，请联系客服。')
   ).toBeVisible()
   expect(
+    within(screen.getByRole('dialog')).getByRole('combobox', {
+      name: '支付方式',
+    })
+  ).toBeDisabled()
+  expect(
     within(screen.getByRole('dialog')).getByRole('button', { name: /支付 ¥/ })
   ).toBeDisabled()
   expect(post).not.toHaveBeenCalled()
+})
+
+it('keeps payment selection visible and disabled while payment methods load', async () => {
+  signIn()
+  const user = userEvent.setup()
+  const get = vi.mocked(api.get)
+  const originalGet = get.getMockImplementation()
+  if (!originalGet) throw new Error('Missing API fixture')
+  get.mockImplementation((url, ...args) => {
+    if (url === '/api/custom_subscription/payment_methods') {
+      return new Promise(() => {})
+    }
+    return originalGet(url, ...args)
+  })
+  renderPage()
+  await user.click(await screen.findByRole('button', { name: /单次购买/ }))
+  const dialog = screen.getByRole('dialog')
+  expect(
+    within(dialog).getByRole('combobox', { name: '支付方式' })
+  ).toBeDisabled()
+  expect(within(dialog).getByText('正在加载支付方式…')).toBeVisible()
+  expect(within(dialog).getByRole('button', { name: /支付 ¥/ })).toBeDisabled()
+})
+it('keeps payment selection visible and allows retry after a payment-method request fails', async () => {
+  signIn()
+  const user = userEvent.setup()
+  const get = vi.mocked(api.get)
+  const originalGet = get.getMockImplementation()
+  if (!originalGet) throw new Error('Missing API fixture')
+  let failed = false
+  get.mockImplementation((url, ...args) => {
+    if (url === '/api/custom_subscription/payment_methods' && !failed) {
+      failed = true
+      return Promise.reject(new Error('支付配置加载失败'))
+    }
+    return originalGet(url, ...args)
+  })
+  renderPage()
+  await user.click(await screen.findByRole('button', { name: /单次购买/ }))
+  const dialog = screen.getByRole('dialog')
+  expect(await within(dialog).findByText('支付配置加载失败')).toBeVisible()
+  expect(
+    within(dialog).getByRole('combobox', { name: '支付方式' })
+  ).toBeDisabled()
+  expect(within(dialog).getByRole('button', { name: /支付 ¥/ })).toBeDisabled()
+  await user.click(within(dialog).getByRole('button', { name: /重试|Retry/ }))
+  await waitFor(() =>
+    expect(
+      within(dialog).getByRole('combobox', { name: '支付方式' })
+    ).toBeEnabled()
+  )
 })
 
 it('renders actual active and paused subscriptions from the authenticated self query', async () => {

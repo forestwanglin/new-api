@@ -125,6 +125,8 @@
   "Service duration: {{days}} days.": "本次购买服务期 {{days}} 天。",
   "Higher priority subscriptions activate first. Lower priority time is paused and retained; equal priorities follow payment time.": "优先级高的订阅先使用，低优先级剩余时长暂停保留；相同优先级按支付时间排序。",
   "This is a one-time purchase and does not enable automatic renewal.": "本次为单次购买，不开通自动续费。",
+  "No payment methods available": "暂无可用支付方式",
+  "Payment methods failed to load": "加载失败，请重试",
   "Loading payment methods…": "正在加载支付方式…",
   "No payment methods are available. Please contact support.": "暂无可用支付方式，请联系客服。",
   "Plan changed. Confirm the updated price and points again.": "方案已更新，请重新确认价格和积分。",

@@ -112,7 +112,7 @@ it('disables unavailable renewal and uses the selected database record in the pu
     '后台年付计划 · 年付'
   )
   expect(within(dialog).getByText(/本次支付/)).toHaveTextContent(
-    '¥ 90,071,992,547,409.93'
+    '¥90,071,992,547,409.93'
   )
   expect(within(dialog).getByText(/365 天/)).toBeVisible()
   expect(within(dialog).queryByText(/演示|预览/)).not.toBeInTheDocument()

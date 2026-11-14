@@ -866,6 +866,16 @@
 - 验证：`bun run typecheck`、`bun run test src/features/subscriptions-custom/__tests__`（6文件31用例）、`bunx oxlint -c .oxlintrc.json src/features/subscriptions-custom/checkout.tsx`、`bun run build` 通过。Chrome 实测桌面与390px移动端的打开／取消及摘要布局，移动端弹窗 scrollWidth 等于 clientWidth；检查深色摘要计算色值及页面错误日志（无 error）。
 - 风险与未覆盖：本地无可用支付方式，浏览器验证的是禁用支付状态；支付方式切换及提交路径由既有回归测试覆盖，未进行真实支付。保留当前业务规则，不照搬 demo 中尚未开放的自动续费管理说明。
 
+### Z048 订阅确认弹窗精确还原与支付方式空状态修复
+
+- 需求与原因：继续按 `c-dev/ZYY-AI-demo.html` 的实际单次购买弹窗对齐；支付接口返回空列表时，原条件渲染会同时隐藏支付方式标签和选择器，造成入口丢失。
+- 变更内容：始终展示支付方式区域，复用 `NativeSelect` 恢复 demo 原生选择器外观；加载中、失败、空列表均禁用并展示相应提示，失败仍可重试，只有后端实际返回的渠道可选。移除确认弹窗的优先级排期说明，保留页面原有说明。精确采用系统字体、44%遮罩、阴影、正文/积分单位字号、按钮颜色/边框/内边距与 demo 的间距；支付金额去除币种空格及整数尾部 `.00`，仍复用 BigInt 格式化以保留分金额精度。
+- 影响面：`web/src/features/subscriptions-custom/checkout.tsx`、`copy.json`、`__tests__/{checkout,configured-plans}.test.tsx`、`web/src/styles/subscriptions-custom.css` 及本登记表。
+- 与上游差异：仅调整 fork 的公开订阅确认弹窗；复用通用 Dialog、Button 和 NativeSelect，不新增依赖，不改支付接口、配置、订阅排期或真实支付流程。
+- 开关与默认值：无新配置。空支付方式列表保持支付按钮禁用，不伪造支付宝或微信渠道。
+- 验证：先补充回归测试并确认空/加载/失败状态下选择器缺失导致失败；修复后验证支付方式切换、失败重试、禁用支付、优先级说明删除、整数及超大分金额显示。`bun run typecheck`、订阅模块6文件34用例、涉及文件的 oxlint / oxfmt 与 `bun run build` 通过。Chrome 实测支付宝与微信切换、560px弹窗、13px帮助文字及390px移动端无横向溢出；未进行真实支付。
+- 风险与未覆盖：没有修改服务端支付配置或进行真实扣款；后端返回空列表时只展示禁用选择器，不能代替实际配置支付渠道。保留业务积分类型和30/365天服务时长，不照搬 demo 尚未开放的自动续费文案。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
