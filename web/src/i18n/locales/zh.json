@@ -1,5 +1,7 @@
 {
   "translation": {
+    "Use model": "使用此模型",
+    "Prices use the lowest available group rate. Actual charges depend on usage.": "价格按可用分组中的最低倍率展示，实际费用以用量为准。",
     "Automatic renewal": "自动续费",
     "Benefits": "权益",
     "Created at": "创建时间",

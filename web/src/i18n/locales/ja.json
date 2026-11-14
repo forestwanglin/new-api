@@ -1,5 +1,7 @@
 {
   "translation": {
+    "Use model": "このモデルを使用",
+    "Prices use the lowest available group rate. Actual charges depend on usage.": "利用可能なグループの最低料金を表示しています。実際の料金は使用量により異なります。",
     "Automatic renewal": "自動更新",
     "Benefits": "特典",
     "Created at": "作成日時",

@@ -24,8 +24,14 @@ import type { PricingData } from './types'
 // Pricing APIs
 // ----------------------------------------------------------------------------
 
-// Get model pricing data
-export async function getPricing(): Promise<PricingData> {
-  const res = await api.get('/api/pricing')
+export type PricingSource = 'pricing' | 'model'
+
+// Both routes use the same backend query and response contract.
+export async function getPricing(
+  source: PricingSource = 'pricing'
+): Promise<PricingData> {
+  const res = await api.get(
+    source === 'model' ? '/api/model/pricing' : '/api/pricing'
+  )
   return res.data
 }

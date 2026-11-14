@@ -896,6 +896,16 @@
 - 验证：相关布局、教程与订阅页面测试，`bun check -b`、变更文件 oxlint/格式检查及 `bun run build`；Chrome 实测首页跳转 /dashboard/overview 后选中、内容全宽，Logo /model 选中、教程 footer 与 FAQ；1024px 菜单文字完整，390px 导航可展开并选中首页。
 - 风险与未覆盖：仅前端导航与页脚调整，未改接口、数据和部署；未执行全量前端测试，既有管理员自定义菜单过多时仍按现有截断策略显示。
 
+### Z051 新模型页复用原模型广场定价数据
+
+- 需求与原因：旧模型广场准备关闭，新模型页仍需公开；第一版沿用原查询和返回结构，先展示真实可用模型与价格。
+- 变更内容：新增公开 GET `/api/model/pricing`，直接复用 `TryUserAuth` 与 `GetPricing`，保留游客和登录用户原有分组过滤；PAT规则与原定价接口一致。新页复用原定价hook、搜索、计费标签和价格组件，按真实厂商聚合全部模型（含视频），提供加载、失败重试、空态和登录/使用入口；按用户ID及分组隔离新页缓存。移除静态官网参考价、折扣比较、每元次数和国内/海外归类展示，原接口未提供的数据不补造。
+- 影响面：`web/src/features/model-plaza/index.tsx` 及其测试、新增 `router/model_plaza_test.go`。**上游自有文件**：`router/api-router.go`、`middleware/access_token_routes.go`、`web/src/features/pricing/api.ts`、`web/src/features/pricing/hooks/use-pricing-data.ts`、七种 `web/src/i18n/locales/{en,zh,zh-TW,fr,ru,ja,vi}.json`。
+- 与上游差异：增加独立公开入口，解除新模型页对旧广场导航开关的依赖；不改原 `/api/pricing`、controller查询、响应字段、数据库结构或计费算法。
+- 开关与默认值：无新增配置或依赖。旧广场继续由原导航设置控制；本次未修改运行配置关闭旧广场。新接口默认公开，仍按原handler限制可见分组和有效模型。
+- 验证：`go test ./router -run TestModelPlazaPricing -count=1` 通过，覆盖旧广场关闭/要求登录、新接口公开、响应一致和分组过滤；middleware测试通过。相关前端5文件57用例、`bun check -b`、变更文件lint/格式及 `bun run build` 通过。全量前端268文件中267通过，唯一失败为usage-logs既有文件20秒超时，单独复跑该文件30用例全部通过。Chrome真实本地接口验证厂商分类、搜索和价格展示；只读代码审查无阻断问题。
+- 风险与未覆盖：扩大后端验证时，全局路由覆盖测试仍报6条既有漏配（phone四条、wechat、custom_subscription/plans），用HEAD生产文件overlay复现相同失败；未扩大范围修复。未修改生产配置或部署，未验证生产数据质量与移动端；官网参考价、积分换算及新分类方案留待后续确认。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
@@ -904,6 +914,7 @@
 
 | 区域 | 文件 | 关联条目 |
 |---|---|---|
+| 新模型页公开定价入口 | `router/api-router.go`、`middleware/access_token_routes.go`、`web/src/features/pricing/api.ts`、`web/src/features/pricing/hooks/use-pricing-data.ts`、七种locale | Z051 |
 | 控制台统一顶部导航 | `web/src/components/layout/components/{app-header,public-header}.tsx` 及对应测试 | Z050 |
 | 个人积分/订阅查询与导航 | `model/{main,option,user}.go`、`router/api-router.go`、`middleware/access_token_routes.go`、个人侧栏设置/维护设置、侧栏hooks及测试、七种locale、生成路由（详细文件见Z049） | Z049 |
 | 自定义订阅支付 | `model/topup.go`、`router/api-router.go`、`middleware/access_token_routes.go`、`common/log_text.zh-CN.json`、钱包类型/历史组件/测试、七种 locale | Z045 |

@@ -25,12 +25,17 @@ import type { PricingData } from '@/features/pricing/types'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 import { useLoginModalStore } from '@/stores/login-modal-store'
-import { DEFAULT_CURRENCY_CONFIG, useSystemConfigStore } from '@/stores/system-config-store'
+import {
+  DEFAULT_CURRENCY_CONFIG,
+  useSystemConfigStore,
+} from '@/stores/system-config-store'
 
 import { ModelPlaza } from '..'
 
 vi.mock('@/components/layout', () => ({
-  PublicLayout: (props: { children: React.ReactNode }) => <div>{props.children}</div>,
+  PublicLayout: (props: { children: React.ReactNode }) => (
+    <div>{props.children}</div>
+  ),
 }))
 
 vi.mock('@tanstack/react-router', async (importOriginal) => ({
@@ -43,12 +48,55 @@ vi.mock('@tanstack/react-router', async (importOriginal) => ({
 const pricing: PricingData = {
   success: true,
   data: [
-    { id: 1, model_name: 'deepseek-chat', description: 'General conversation', vendor_id: 11, quota_type: 0, model_ratio: 1, completion_ratio: 4, enable_groups: ['default'] },
-    { id: 2, model_name: 'gpt-api-model', description: 'Code review', vendor_id: 22, quota_type: 0, model_ratio: 2, completion_ratio: 3, enable_groups: ['default'] },
-    { id: 3, model_name: 'sd2.0-720P', description: 'Video generation', vendor_id: 11, quota_type: 1, model_price: 0.3, model_ratio: 0, completion_ratio: 0, enable_groups: ['default'], supported_endpoint_types: ['openai-video'] },
-    { id: 4, model_name: 'tiered-api-model', description: 'Dynamic tokens', vendor_id: 22, quota_type: 0, model_ratio: 0, completion_ratio: 0, billing_mode: 'tiered_expr', billing_expr: 'tier("standard", p * 5 + c * 15)', enable_groups: ['default'] },
+    {
+      id: 1,
+      model_name: 'deepseek-chat',
+      description: 'General conversation',
+      vendor_id: 11,
+      quota_type: 0,
+      model_ratio: 1,
+      completion_ratio: 4,
+      enable_groups: ['default'],
+    },
+    {
+      id: 2,
+      model_name: 'gpt-api-model',
+      description: 'Code review',
+      vendor_id: 22,
+      quota_type: 0,
+      model_ratio: 2,
+      completion_ratio: 3,
+      enable_groups: ['default'],
+    },
+    {
+      id: 3,
+      model_name: 'sd2.0-720P',
+      description: 'Video generation',
+      vendor_id: 11,
+      quota_type: 1,
+      model_price: 0.3,
+      model_ratio: 0,
+      completion_ratio: 0,
+      enable_groups: ['default'],
+      supported_endpoint_types: ['openai-video'],
+    },
+    {
+      id: 4,
+      model_name: 'tiered-api-model',
+      description: 'Dynamic tokens',
+      vendor_id: 22,
+      quota_type: 0,
+      model_ratio: 0,
+      completion_ratio: 0,
+      billing_mode: 'tiered_expr',
+      billing_expr: 'tier("standard", p * 5 + c * 15)',
+      enable_groups: ['default'],
+    },
   ],
-  vendors: [{ id: 11, name: 'DeepSeek' }, { id: 22, name: 'OpenAI' }],
+  vendors: [
+    { id: 11, name: 'DeepSeek' },
+    { id: 22, name: 'OpenAI' },
+  ],
   group_ratio: { default: 1 },
   usable_group: { default: { desc: 'Default', ratio: 1 } },
   supported_endpoint: {},
@@ -58,12 +106,23 @@ const pricing: PricingData = {
 let client: QueryClient
 beforeEach(() => {
   useAuthStore.getState().auth.reset()
-  useSystemConfigStore.getState().setConfig({ currency: { ...DEFAULT_CURRENCY_CONFIG, quotaDisplayType: 'USD' } })
-  client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
+  useSystemConfigStore.getState().setConfig({
+    currency: { ...DEFAULT_CURRENCY_CONFIG, quotaDisplayType: 'USD' },
+  })
+  client = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+  })
+  client.setQueryData(['status'], {
+    price: 1,
+    usd_exchange_rate: 7,
+    quota_display_type: 'USD',
+  })
   vi.spyOn(api, 'get').mockImplementation(async (url) => {
-    if (url === '/api/status') return { data: { success: true, price: 1, usd_exchange_rate: 7 } }
+    if (url === '/api/status') {
+      return { data: { success: true, price: 1, usd_exchange_rate: 7 } }
+    }
     if (url === '/api/model/pricing') return { data: pricing }
-    throw new Error('Unexpected endpoint: ' + url)
+    throw new Error(`Unexpected endpoint: ${url}`)
   })
 })
 
@@ -72,16 +131,24 @@ afterEach(() => {
   client.clear()
   useLoginModalStore.getState().close()
   useAuthStore.getState().auth.reset()
-  useSystemConfigStore.getState().setConfig({ currency: { ...DEFAULT_CURRENCY_CONFIG } })
+  useSystemConfigStore
+    .getState()
+    .setConfig({ currency: { ...DEFAULT_CURRENCY_CONFIG } })
 })
 
 function renderPlaza() {
-  return render(<QueryClientProvider client={client}><ModelPlaza /></QueryClientProvider>)
+  return render(
+    <QueryClientProvider client={client}>
+      <ModelPlaza />
+    </QueryClientProvider>
+  )
 }
 
 it('renders only API models and uses the original token, video and expression prices', async () => {
   renderPlaza()
-  const token = within(await screen.findByRole('row', { name: /deepseek-chat/ }))
+  const token = within(
+    await screen.findByRole('row', { name: /deepseek-chat/ })
+  )
   expect(token.getByText('2')).toBeVisible()
   expect(token.getByText('8')).toBeVisible()
   expect(token.getByText('USD / 1M tokens')).toBeVisible()
@@ -92,22 +159,30 @@ it('renders only API models and uses the original token, video and expression pr
   expect(dynamic.getByText('5')).toBeVisible()
   expect(dynamic.getByText('15')).toBeVisible()
   expect(screen.queryByText('deepseek-v4.1-flash')).not.toBeInTheDocument()
-  expect(screen.queryByText('比官网省', { exact: false })).not.toBeInTheDocument()
+  expect(
+    screen.queryByText('比官网省', { exact: false })
+  ).not.toBeInTheDocument()
 })
 
 it('counts every API model including video under its vendor and combines vendor and search filters', async () => {
   const user = userEvent.setup()
   renderPlaza()
   const sidebar = screen.getByRole('complementary', { name: 'Vendors' })
-  const deepseek = await within(sidebar).findByRole('button', { name: 'DeepSeek 2' })
+  const deepseek = await within(sidebar).findByRole('button', {
+    name: /DeepSeek/,
+  })
+  expect(within(deepseek).getByText('2')).toBeVisible()
   await user.click(deepseek)
   expect(deepseek).toHaveAttribute('aria-pressed', 'true')
   expect(screen.getByText('sd2.0-720P')).toBeVisible()
   expect(screen.queryByText('gpt-api-model')).not.toBeInTheDocument()
-  await user.type(screen.getByRole('textbox', { name: 'Search models' }), 'video')
+  await user.type(
+    screen.getByRole('textbox', { name: 'Search models' }),
+    'video'
+  )
   expect(screen.getByText('sd2.0-720P')).toBeVisible()
   expect(screen.queryByText('deepseek-chat')).not.toBeInTheDocument()
-  await user.click(within(sidebar).getByRole('button', { name: 'All Models 4' }))
+  await user.click(within(sidebar).getByRole('button', { name: /^All Models/ }))
   await user.click(screen.getByRole('button', { name: 'Clear search' }))
   expect(screen.getByText('gpt-api-model')).toBeVisible()
 })
@@ -131,11 +206,17 @@ it('shows request errors and retries the independent public endpoint', async () 
   let failed = true
   vi.mocked(api.get).mockImplementation(async (url) => {
     if (url === '/api/status') return { data: { success: true } }
-    if (failed) return { data: { success: false, message: 'Pricing temporarily unavailable' } }
+    if (failed) {
+      return {
+        data: { success: false, message: 'Pricing temporarily unavailable' },
+      }
+    }
     return { data: pricing }
   })
   renderPlaza()
-  expect(await screen.findByText('Pricing temporarily unavailable')).toBeVisible()
+  expect(
+    await screen.findByText('Pricing temporarily unavailable')
+  ).toBeVisible()
   failed = false
   await userEvent.setup().click(screen.getByRole('button', { name: 'Retry' }))
   expect(await screen.findByText('deepseek-chat')).toBeVisible()
@@ -152,10 +233,22 @@ it('shows no models when the API returns an empty list without falling back to t
 it('reloads group-scoped models after login instead of retaining the anonymous cache', async () => {
   renderPlaza()
   await screen.findByText('deepseek-chat')
-  vi.mocked(api.get).mockResolvedValue({ data: { ...pricing, data: [{ ...pricing.data[0], model_name: 'member-only-model' }] } })
-  act(() => useAuthStore.getState().auth.setUser({ id: 7, username: 'member', role: 1, group: 'vip' }))
+  vi.mocked(api.get).mockResolvedValue({
+    data: {
+      ...pricing,
+      data: [{ ...pricing.data[0], model_name: 'member-only-model' }],
+    },
+  })
+  act(() =>
+    useAuthStore
+      .getState()
+      .auth.setUser({ id: 7, username: 'member', role: 1, group: 'vip' })
+  )
   expect(await screen.findByText('member-only-model')).toBeVisible()
   expect(screen.queryByText('deepseek-chat')).not.toBeInTheDocument()
   const row = within(screen.getByRole('row', { name: /member-only-model/ }))
-  expect(row.getByRole('link', { name: 'Use model' })).toHaveAttribute('href', '/keys')
+  expect(row.getByRole('link', { name: 'Use model' })).toHaveAttribute(
+    'href',
+    '/keys'
+  )
 })

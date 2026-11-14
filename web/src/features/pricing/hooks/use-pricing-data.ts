@@ -21,16 +21,24 @@ import { useMemo } from 'react'
 
 import { useStatus } from '@/hooks/use-status'
 import { requireServerSuccess } from '@/lib/server-error-message'
+import { useAuthStore } from '@/stores/auth-store'
 
-import { getPricing } from '../api'
+import { getPricing, type PricingSource } from '../api'
 import { getArkVideoSpec } from '../lib/ark-video-price'
 
-export function usePricingData(enabled = true) {
+export function usePricingData(
+  enabled = true,
+  source: PricingSource = 'pricing'
+) {
   const { status } = useStatus()
+  const user = useAuthStore((state) => state.auth.user)
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['pricing'],
-    queryFn: async () => requireServerSuccess(await getPricing()),
+    queryKey:
+      source === 'model'
+        ? ['model-pricing', user?.id ?? null, user?.group ?? null]
+        : ['pricing'],
+    queryFn: async () => requireServerSuccess(await getPricing(source)),
     staleTime: 5 * 60 * 1000,
     enabled,
   })

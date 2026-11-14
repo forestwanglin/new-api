@@ -1,5 +1,7 @@
 {
   "translation": {
+    "Use model": "Использовать модель",
+    "Prices use the lowest available group rate. Actual charges depend on usage.": "Цены рассчитаны по минимальному доступному тарифу группы. Итоговая стоимость зависит от использования.",
     "Automatic renewal": "Автоматическое продление",
     "Benefits": "Преимущества",
     "Created at": "Дата создания",
