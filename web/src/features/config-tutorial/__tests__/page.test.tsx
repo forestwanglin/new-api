@@ -17,6 +17,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import {
+  createRootRoute,
+  createRouter,
+  createMemoryHistory,
+  RouterContextProvider,
+} from '@tanstack/react-router'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, expect, it, vi } from 'vitest'
@@ -53,17 +59,24 @@ const document = {
   ],
 }
 function mount() {
+  const router = createRouter({
+    routeTree: createRootRoute(),
+    history: createMemoryHistory({ initialEntries: ['/tutorial'] }),
+  })
   return render(
     <QueryClientProvider
       client={
         new QueryClient({ defaultOptions: { queries: { retry: false } } })
       }
     >
-      <ConfigTutorial />
+      <RouterContextProvider router={router}>
+        <ConfigTutorial />
+      </RouterContextProvider>
     </QueryClientProvider>
   )
 }
 beforeEach(() => {
+  localStorage.removeItem('status')
   window.location.hash = ''
   vi.spyOn(api, 'get').mockResolvedValue({
     data: { success: true, data: document },
@@ -86,16 +99,22 @@ it('reads every chapter anonymously and follows a chapter hash after async loadi
 })
 it('keeps empty and failed content distinct and retries the failed request', async () => {
   const get = vi.mocked(api.get)
-  get
-    .mockResolvedValueOnce({ data: { success: false, message: 'Unavailable' } })
-    .mockResolvedValueOnce({ data: { success: true, data: { groups: [] } } })
+  let failed = false
+  get.mockImplementation(async (url) => {
+    if (url === '/api/status') return { data: { success: true, data: {} } }
+    if (!failed) {
+      failed = true
+      return { data: { success: false, message: 'Unavailable' } }
+    }
+    return { data: { success: true, data: { groups: [] } } }
+  })
   mount()
   await screen.findByText('Unavailable')
   expect(screen.queryByText('No tutorials available')).not.toBeInTheDocument()
   await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
   expect(await screen.findByText('No tutorials available')).toBeInTheDocument()
 })
-it('provides the subscription footer with working FAQ and contact actions', async () => {
+it('provides the subscription footer with tutorial link and contact actions', async () => {
   const user = userEvent.setup()
   mount()
   await screen.findByText('Second chapter')
@@ -103,14 +122,18 @@ it('provides the subscription footer with working FAQ and contact actions', asyn
   expect(footer.getByText('© 2026 ZYY AI')).toBeVisible()
   expect(footer.getByText('帮助')).toBeVisible()
   expect(footer.getByText('合作')).toBeVisible()
-  await user.click(footer.getByRole('button', { name: '常见报错' }))
-  expect(await screen.findByRole('dialog', { name: '常见报错' })).toBeVisible()
-  await user.keyboard('{Escape}')
+  expect(footer.getByRole('link', { name: '常见报错' })).toHaveAttribute(
+    'href',
+    '/tutorial'
+  )
   await user.click(footer.getByRole('button', { name: '联系客服' }))
   const support = await screen.findByRole('dialog', { name: '联系客服' })
   expect(
     within(support).getByRole('button', { name: '复制邮箱' })
-  ).toBeVisible()
+  ).toBeDisabled()
+  expect(
+    within(support).getByRole('button', { name: '复制微信号' })
+  ).toBeDisabled()
   await user.click(within(support).getByRole('button', { name: '知道了' }))
   await waitFor(() =>
     expect(

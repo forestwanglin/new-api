@@ -7789,6 +7789,12 @@
     "No purchased subscriptions yet": "尚無已購買的訂閱",
     "Priority {{priority}}": "優先級 {{priority}}",
     "Remaining service: {{seconds}} seconds": "剩餘服務時長 {{seconds}} 秒",
-    "Paused": "已暫停"
+    "Paused": "已暫停",
+    "WeCom": "企業微信",
+    "Operations Email": "維運電子郵件",
+    "Public WeCom account shown in customer support. Leave empty if unavailable.": "聯絡客服中公開顯示的企業微信帳號，未提供時可留空。",
+    "Public email address shown in customer support. Leave empty if unavailable.": "聯絡客服中公開顯示的維運信箱，未提供時可留空。",
+    "Enter a valid operations email address": "請輸入有效的維運電子郵件地址",
+    "Not configured yet": "尚未設定"
   }
 }

@@ -7789,6 +7789,12 @@
     "No purchased subscriptions yet": "Chưa mua đăng ký nào",
     "Priority {{priority}}": "Ưu tiên {{priority}}",
     "Remaining service: {{seconds}} seconds": "Thời gian còn lại: {{seconds}} giây",
-    "Paused": "Đã tạm dừng"
+    "Paused": "Đã tạm dừng",
+    "WeCom": "WeCom",
+    "Operations Email": "Email vận hành",
+    "Public WeCom account shown in customer support. Leave empty if unavailable.": "Tài khoản WeCom công khai hiển thị trong hỗ trợ. Để trống nếu không có.",
+    "Public email address shown in customer support. Leave empty if unavailable.": "Địa chỉ email công khai hiển thị trong hỗ trợ. Để trống nếu không có.",
+    "Enter a valid operations email address": "Nhập địa chỉ email vận hành hợp lệ",
+    "Not configured yet": "Chưa được cấu hình"
   }
 }

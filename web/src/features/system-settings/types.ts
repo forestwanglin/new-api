@@ -150,6 +150,8 @@ export type SiteSettings = {
   ServerAddress: string
   TaskPublicAddress: string
   'general_setting.docs_link': string
+  'general_setting.support_wecom': string
+  'general_setting.operations_email': string
   'legal.user_agreement': string
   'legal.privacy_policy': string
   HeaderNavModules: string

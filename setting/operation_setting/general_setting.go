@@ -11,6 +11,8 @@ const (
 )
 
 type GeneralSetting struct {
+	SupportWeCom        string `json:"support_wecom"`
+	OperationsEmail     string `json:"operations_email"`
 	DocsLink            string `json:"docs_link"`
 	PingIntervalEnabled bool   `json:"ping_interval_enabled"`
 	PingIntervalSeconds int    `json:"ping_interval_seconds"`

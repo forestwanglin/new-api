@@ -7791,6 +7791,12 @@
     "No purchased subscriptions yet": "Пока нет приобретённых подписок",
     "Priority {{priority}}": "Приоритет {{priority}}",
     "Remaining service: {{seconds}} seconds": "Осталось: {{seconds}} секунд",
-    "Paused": "Приостановлено"
+    "Paused": "Приостановлено",
+    "WeCom": "WeCom",
+    "Operations Email": "Почта поддержки",
+    "Public WeCom account shown in customer support. Leave empty if unavailable.": "Публичный аккаунт WeCom для связи с поддержкой. Можно оставить пустым.",
+    "Public email address shown in customer support. Leave empty if unavailable.": "Публичный адрес электронной почты для поддержки. Можно оставить пустым.",
+    "Enter a valid operations email address": "Введите действительный адрес электронной почты поддержки",
+    "Not configured yet": "Пока не настроено"
   }
 }

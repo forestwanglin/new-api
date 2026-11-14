@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/mail"
 	"slices"
 	"sort"
 	"strconv"
@@ -215,6 +216,13 @@ func UpdateOption(c *gin.Context) {
 	if option.Key == "TaskPublicAddress" && option.Value.(string) != "" {
 		if err := service.ValidateTaskArtifactBaseURL(option.Value.(string)); err != nil {
 			common.ApiError(c, err)
+			return
+		}
+	}
+	if option.Key == "general_setting.operations_email" && option.Value != "" {
+		address, err := mail.ParseAddress(option.Value.(string))
+		if err != nil || address.Address != option.Value.(string) {
+			common.ApiErrorT(c, "Enter a valid operations email address")
 			return
 		}
 	}

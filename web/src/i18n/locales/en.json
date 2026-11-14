@@ -7789,6 +7789,12 @@
     "No purchased subscriptions yet": "No purchased subscriptions yet",
     "Priority {{priority}}": "Priority {{priority}}",
     "Remaining service: {{seconds}} seconds": "Remaining service: {{seconds}} seconds",
-    "Paused": "Paused"
+    "Paused": "Paused",
+    "WeCom": "WeCom",
+    "Operations Email": "Operations Email",
+    "Public WeCom account shown in customer support. Leave empty if unavailable.": "Public WeCom account shown in customer support. Leave empty if unavailable.",
+    "Public email address shown in customer support. Leave empty if unavailable.": "Public email address shown in customer support. Leave empty if unavailable.",
+    "Enter a valid operations email address": "Enter a valid operations email address",
+    "Not configured yet": "Not configured yet"
   }
 }

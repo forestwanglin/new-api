@@ -56,6 +56,8 @@ const _systemInfoSchema = z.object({
   HomePageContent: z.string().optional(),
   general_setting: z.object({
     docs_link: z.string(),
+    support_wecom: z.string(),
+    operations_email: z.string().email().or(z.literal('')),
   }),
   legal: z.object({
     user_agreement: z.string().optional(),
@@ -88,6 +90,12 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
     HomePageContent: normalizeValue(defaultValues.HomePageContent),
     general_setting: {
       docs_link: normalizeValue(defaultValues.general_setting?.docs_link),
+      support_wecom: normalizeValue(
+        defaultValues.general_setting?.support_wecom
+      ),
+      operations_email: normalizeValue(
+        defaultValues.general_setting?.operations_email
+      ),
     },
     legal: {
       user_agreement: normalizeValue(defaultValues.legal?.user_agreement),
@@ -112,6 +120,12 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
     HomePageContent: z.string().optional(),
     general_setting: z.object({
       docs_link: z.string(),
+      support_wecom: z.string().trim(),
+      operations_email: z
+        .string()
+        .trim()
+        .email({ error: () => t('Enter a valid operations email address') })
+        .or(z.literal('')),
     }),
     legal: z.object({
       user_agreement: z.string().optional(),
@@ -370,6 +384,42 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
                     <FormDescription>
                       {t(
                         'Leave empty to disable the privacy policy requirement. Supports Markdown, HTML, or a full URL to redirect users.'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name='general_setting.support_wecom'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('WeCom')}</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'Public WeCom account shown in customer support. Leave empty if unavailable.'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name='general_setting.operations_email'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Operations Email')}</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'Public email address shown in customer support. Leave empty if unavailable.'
                       )}
                     </FormDescription>
                     <FormMessage />

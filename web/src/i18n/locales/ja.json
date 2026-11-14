@@ -7789,6 +7789,12 @@
     "No purchased subscriptions yet": "購入済みのサブスクリプションはありません",
     "Priority {{priority}}": "優先度 {{priority}}",
     "Remaining service: {{seconds}} seconds": "残り利用時間：{{seconds}} 秒",
-    "Paused": "一時停止中"
+    "Paused": "一時停止中",
+    "WeCom": "WeCom",
+    "Operations Email": "運用メール",
+    "Public WeCom account shown in customer support. Leave empty if unavailable.": "サポートに表示する公開 WeCom アカウント。未設定の場合は空欄にしてください。",
+    "Public email address shown in customer support. Leave empty if unavailable.": "サポートに表示する公開メールアドレス。未設定の場合は空欄にしてください。",
+    "Enter a valid operations email address": "有効な運用メールアドレスを入力してください",
+    "Not configured yet": "未設定"
   }
 }

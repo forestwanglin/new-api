@@ -7789,6 +7789,12 @@
     "No purchased subscriptions yet": "暂无已购买的订阅",
     "Priority {{priority}}": "优先级 {{priority}}",
     "Remaining service: {{seconds}} seconds": "剩余服务时长 {{seconds}} 秒",
-    "Paused": "已暂停"
+    "Paused": "已暂停",
+    "WeCom": "企业微信",
+    "Operations Email": "运维邮件",
+    "Public WeCom account shown in customer support. Leave empty if unavailable.": "联系客服中公开展示的企业微信号，未提供时可留空。",
+    "Public email address shown in customer support. Leave empty if unavailable.": "联系客服中公开展示的运维邮箱，未提供时可留空。",
+    "Enter a valid operations email address": "请输入有效的运维邮箱地址",
+    "Not configured yet": "暂未配置"
   }
 }

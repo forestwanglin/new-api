@@ -45,6 +45,8 @@ const SITE_SECTIONS = [
           TaskPublicAddress: settings.TaskPublicAddress,
           general_setting: {
             docs_link: settings['general_setting.docs_link'],
+            support_wecom: settings['general_setting.support_wecom'],
+            operations_email: settings['general_setting.operations_email'],
           },
           legal: {
             user_agreement: settings['legal.user_agreement'],

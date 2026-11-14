@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { Check, Copy } from 'lucide-react'
-import { type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
@@ -30,6 +30,7 @@ import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 import { cn } from '@/lib/utils'
 
 interface CopyButtonProps {
+  disabled?: boolean
   value: string
   children?: ReactNode
   className?: string
@@ -43,6 +44,7 @@ interface CopyButtonProps {
 
 export function CopyButton({
   value,
+  disabled,
   children,
   className,
   iconClassName,
@@ -62,6 +64,7 @@ export function CopyButton({
 
   const button = (
     <Button
+      disabled={disabled}
       variant={variant}
       size={size}
       className={cn('shrink-0', className)}

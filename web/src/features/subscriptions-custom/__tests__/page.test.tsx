@@ -23,6 +23,7 @@ import {
   createRoute,
   createRouter,
   RouterProvider,
+  RouterContextProvider,
 } from '@tanstack/react-router'
 import {
   act,
@@ -47,13 +48,19 @@ async function renderDemo() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
+  const router = createRouter({
+    routeTree: createRootRoute(),
+    history: createMemoryHistory({ initialEntries: ['/subscription'] }),
+  })
   const view = render(
     <QueryClientProvider client={client}>
-      <SubscriptionsCustom />
+      <RouterContextProvider router={router}>
+        <SubscriptionsCustom />
+      </RouterContextProvider>
     </QueryClientProvider>
   )
   await screen.findAllByRole('article')
-  return view
+  return { ...view, router }
 }
 beforeEach(() => {
   const plans = [
@@ -105,41 +112,45 @@ beforeEach(() => {
     bonus_point_type: null,
     ...plan,
   }))
-  vi.spyOn(api, 'get').mockImplementation(async (url) => ({
-    data: {
-      success: true,
-      data:
-        url === '/api/custom_subscription/self'
-          ? {
-              active_subscription_id: null,
-              observed_at: '1794614400000',
-              items: [],
-            }
-          : {
-              items:
-                url === '/api/custom_subscription/plans'
-                  ? plans
-                  : rules.map((rule, index) => ({
-                      id: String(index + 1),
-                      rule_key: String(index),
-                      title: rule.title,
-                      content: {
-                        blocks: [
-                          {
-                            type: 'paragraph',
-                            children: rule.body.map((part) => ({
-                              text: part.text,
-                              style: part.emphasis
-                                ? { color: '#0052d9', fontWeight: 700 }
-                                : {},
-                            })),
-                          },
-                        ],
-                      },
+  vi.spyOn(api, 'get').mockImplementation(async (url) => {
+    let data: unknown
+    if (url === '/api/status') {
+      data = {
+        support_wecom: 'configured-wecom',
+        operations_email: 'ops@example.com',
+      }
+    } else if (url === '/api/custom_subscription/self') {
+      data = {
+        active_subscription_id: null,
+        observed_at: '1794614400000',
+        items: [],
+      }
+    } else {
+      const items =
+        url === '/api/custom_subscription/plans'
+          ? plans
+          : rules.map((rule, index) => ({
+              id: String(index + 1),
+              rule_key: String(index),
+              title: rule.title,
+              content: {
+                blocks: [
+                  {
+                    type: 'paragraph',
+                    children: rule.body.map((part) => ({
+                      text: part.text,
+                      style: part.emphasis
+                        ? { color: '#0052d9', fontWeight: 700 }
+                        : {},
                     })),
-            },
-    },
-  }))
+                  },
+                ],
+              },
+            }))
+      data = { items }
+    }
+    return { data: { success: true, data } }
+  })
 })
 vi.mock('@/components/layout', () => ({
   PublicLayout: ({ children }: { children: React.ReactNode }) => (
@@ -156,18 +167,20 @@ afterEach(() => {
 function signIn() {
   useAuthStore.getState().auth.setUser({ id: 1, username: 'demo', role: 1 })
 }
-it('renders Demo footer columns, copyright and working FAQ', async () => {
-  const user = userEvent.setup()
-  await renderDemo()
+it('renders footer columns and links common errors to the tutorial', async () => {
+  const { router } = await renderDemo()
   const footer = within(screen.getByRole('contentinfo'))
   expect(footer.getByText('帮助')).toBeVisible()
   expect(footer.getByText('合作')).toBeVisible()
   expect(footer.getByText('© 2026 ZYY AI')).toBeVisible()
-  await user.click(footer.getByRole('button', { name: '常见报错' }))
-  expect(screen.getByRole('dialog', { name: '常见报错' })).toBeVisible()
-  expect(screen.getByText('认证失败 / 401')).toBeVisible()
+  expect(footer.getByRole('link', { name: '常见报错' })).toHaveAttribute(
+    'href',
+    '/tutorial'
+  )
+  await userEvent.click(footer.getByRole('link', { name: '常见报错' }))
+  await waitFor(() => expect(router.state.location.pathname).toBe('/tutorial'))
 })
-it('opens customer support with the demo contact details', async () => {
+it('opens customer support with configured contact details', async () => {
   const user = userEvent.setup()
   await renderDemo()
   await user.click(screen.getAllByRole('button', { name: '联系客服' })[0])
@@ -176,12 +189,12 @@ it('opens customer support with the demo contact details', async () => {
   expect(
     within(dialog).getByRole('button', { name: '复制微信号' })
   ).toBeVisible()
-  expect(within(dialog).getByText(/support@ai.winzyy.com/)).toBeVisible()
+  expect(within(dialog).getByText(/ops@example.com/)).toBeVisible()
   const write = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue()
   await user.click(within(dialog).getByRole('button', { name: '复制微信号' }))
-  expect(write).toHaveBeenCalledWith('zyy-ai-support')
+  expect(write).toHaveBeenCalledWith('configured-wecom')
   await user.click(within(dialog).getByRole('button', { name: '复制邮箱' }))
-  expect(write).toHaveBeenCalledWith('support@ai.winzyy.com')
+  expect(write).toHaveBeenCalledWith('ops@example.com')
   await user.click(within(dialog).getByRole('button', { name: '知道了' }))
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 })

@@ -141,6 +141,8 @@ export interface SystemStatus {
   // Allow direct access to common properties
   version?: string
   system_name?: string
+  support_wecom?: string
+  operations_email?: string
   logo?: string
   github_oauth?: boolean
   github_client_id?: string

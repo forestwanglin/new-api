@@ -18,6 +18,12 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
+  createRootRoute,
+  createRouter,
+  createMemoryHistory,
+  RouterContextProvider,
+} from '@tanstack/react-router'
+import {
   act,
   cleanup,
   render,
@@ -69,9 +75,15 @@ function renderPage(
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
+  const router = createRouter({
+    routeTree: createRootRoute(),
+    history: createMemoryHistory({ initialEntries: ['/subscription'] }),
+  })
   render(
     <QueryClientProvider client={client}>
-      <SubscriptionsCustom {...props} />
+      <RouterContextProvider router={router}>
+        <SubscriptionsCustom {...props} />
+      </RouterContextProvider>
     </QueryClientProvider>
   )
   return client
