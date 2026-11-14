@@ -7810,6 +7810,8 @@
     "Save {{percent}}% compared with the official website": "Tiết kiệm {{percent}}% so với trang web chính thức",
     "Overseas reference prices used for discount comparisons are converted at a reference rate of USD 1 = CNY {{rate}}. This rate is for display only and does not change billing.": "Giá tham chiếu của mô hình quốc tế được quy đổi theo tỷ giá tham chiếu 1 USD = {{rate}} CNY để so sánh giảm giá. Tỷ giá này chỉ dùng để hiển thị, không thay đổi phí thực tế.",
     "Model reference exchange rate (CNY per USD)": "Tỷ giá tham chiếu mô hình (CNY mỗi USD)",
-    "CNY per USD used for overseas model reference prices and discounts only. Does not affect billing or payments.": "Số CNY cho mỗi USD, chỉ dùng cho giá tham chiếu và giảm giá của mô hình quốc tế. Không ảnh hưởng đến tính phí hoặc thanh toán."
+    "CNY per USD used for overseas model reference prices and discounts only. Does not affect billing or payments.": "Số CNY cho mỗi USD, chỉ dùng cho giá tham chiếu và giảm giá của mô hình quốc tế. Không ảnh hưởng đến tính phí hoặc thanh toán.",
+    "Access leading domestic and international models in one place · Choose text chat or video generation on demand": "Truy cập các mô hình hàng đầu trong và ngoài nước tại một nơi · Chọn hội thoại văn bản hoặc tạo video theo nhu cầu",
+    "Compare model configurations using fixed token usage. Platform usage counts follow the same point deduction rules.": "So sánh cấu hình mô hình theo lượng token cố định. Số lượt sử dụng trên nền tảng tuân theo cùng quy tắc trừ điểm."
   }
 }

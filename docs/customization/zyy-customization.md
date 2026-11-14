@@ -935,6 +935,13 @@
 - 兼容与限制：未配置或旧状态缓存缺少汇率时延续 7；非法状态值回退默认值。官网节省为展示文案，比较基数仍来自系统已有参考价，不额外抓取厂商官网报价；汇率为管理员设定值，不自动获取实时汇率。
 - 验证：相关前端22文件330用例通过，覆盖自定义汇率保存与status失效、非法值拒绝、模型页响应式调整海外划线价/行折扣/全量最低折扣/说明及国内价格不变、管理员顶部版本入口移除和维护更新组件原有能力。`bun check -b`（1584文件、2项目）、`bun run build`、变更TS/TSX oxlint（无错误，store原有spread warning保留）、22个前端文件oxfmt、`git diff --check`通过；`go test ./controller -run TestModelReferenceExchangeRate -count=1`、`go vet ./controller ./setting/operation_setting`通过。Chrome本地模型页确认「比官网省」、默认1:7说明和顶部无版本图标。未浏览器实测管理员保存汇率的完整流程，未运行全量测试，未部署。
 
+### Z055 恢复模型页介绍与比较说明
+
+- 需求与原因：模型页需展示 demo 原有的完整副标题与固定 token 用量比较说明。
+- 变更内容：标题下展示「国内外主流模型，一站接入 · 文本对话与视频生成，按需选择」，折扣区下方、搜索框上方展示「按固定 token 用量比较不同模型配置，平台次数与扣积分规则一致。」；说明不受折扣有无、加载或筛选状态影响。
+- 影响面：`web/src/features/model-plaza/index.tsx`、七种 locale；复用现有说明样式，无接口、价格或计费逻辑变更。
+- 验证：模型页4个测试文件38个用例通过；`bun check -b`（1584文件、2项目）、变更页面oxlint、8个前端文件oxfmt、`git diff --check`通过。未执行本轮浏览器实测，未部署。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
@@ -943,7 +950,7 @@
 
 | 区域 | 文件 | 关联条目 |
 |---|---|---|
-| 新模型页公开定价入口 | `router/api-router.go`、`middleware/access_token_routes.go`、`web/src/features/pricing/api.ts`、`web/src/features/pricing/hooks/use-pricing-data.ts`、七种locale | Z051、Z052、Z053、Z054 |
+| 新模型页公开定价入口 | `router/api-router.go`、`middleware/access_token_routes.go`、`web/src/features/pricing/api.ts`、`web/src/features/pricing/hooks/use-pricing-data.ts`、七种locale | Z051、Z052、Z053、Z054、Z055 |
 | 模型页参考汇率配置 | `setting/operation_setting/general_setting.go`、`controller/{misc,option}.go`、`web/src/features/system-settings/` 相关表单/类型/注册/hooks、`web/src/lib/status-query.ts`、`web/src/stores/system-config-store.ts` 及相关测试 | Z054 |
 | 公开页页脚与模型折扣展示 | `web/src/components/layout/components/public-layout.tsx`、`web/src/features/pricing/components/model-price-cell.tsx` 及相关测试 | Z053 |
 | 控制台统一顶部导航 | `web/src/components/layout/components/{app-header,public-header}.tsx` 及对应测试 | Z050、Z054 |

@@ -7810,6 +7810,8 @@
     "Save {{percent}}% compared with the official website": "公式サイトより {{percent}}% お得",
     "Overseas reference prices used for discount comparisons are converted at a reference rate of USD 1 = CNY {{rate}}. This rate is for display only and does not change billing.": "海外モデルの割引比較では、参考価格を 1 米ドル = {{rate}} 人民元の参考為替レートで換算します。このレートは表示専用で、実際の課金には影響しません。",
     "Model reference exchange rate (CNY per USD)": "モデルページの参考為替レート（人民元/米ドル）",
-    "CNY per USD used for overseas model reference prices and discounts only. Does not affect billing or payments.": "1 米ドルあたりの人民元額です。海外モデルの取り消し線付き参考価格と割引の計算にのみ使用し、実際の課金や支払いには影響しません。"
+    "CNY per USD used for overseas model reference prices and discounts only. Does not affect billing or payments.": "1 米ドルあたりの人民元額です。海外モデルの取り消し線付き参考価格と割引の計算にのみ使用し、実際の課金や支払いには影響しません。",
+    "Access leading domestic and international models in one place · Choose text chat or video generation on demand": "国内外の主要モデルに一括アクセス · テキスト対話と動画生成を用途に合わせて選択",
+    "Compare model configurations using fixed token usage. Platform usage counts follow the same point deduction rules.": "固定のトークン使用量でモデル構成を比較します。プラットフォームの利用回数はポイント減算ルールと一致します。"
   }
 }

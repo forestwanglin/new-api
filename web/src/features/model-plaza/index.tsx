@@ -154,7 +154,11 @@ export function ModelPlaza() {
         <div className='model-plaza'>
           <header className='mp-head'>
             <h1>{t('Models')}</h1>
-            <p>{t('Browse available models and pricing')}</p>
+            <p>
+              {t(
+                'Access leading domestic and international models in one place · Choose text chat or video generation on demand'
+              )}
+            </p>
           </header>
 
           {!isLoading && !error && bestDiscount !== null && (
@@ -177,6 +181,12 @@ export function ModelPlaza() {
               </b>
             </div>
           )}
+
+          <p className='mp-note text-center'>
+            {t(
+              'Compare model configurations using fixed token usage. Platform usage counts follow the same point deduction rules.'
+            )}
+          </p>
 
           <SearchBar
             value={keyword}

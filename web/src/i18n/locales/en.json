@@ -7810,6 +7810,8 @@
     "Save {{percent}}% compared with the official website": "Save {{percent}}% compared with the official website",
     "Overseas reference prices used for discount comparisons are converted at a reference rate of USD 1 = CNY {{rate}}. This rate is for display only and does not change billing.": "Overseas reference prices used for discount comparisons are converted at a reference rate of USD 1 = CNY {{rate}}. This rate is for display only and does not change billing.",
     "Model reference exchange rate (CNY per USD)": "Model reference exchange rate (CNY per USD)",
-    "CNY per USD used for overseas model reference prices and discounts only. Does not affect billing or payments.": "CNY per USD used for overseas model reference prices and discounts only. Does not affect billing or payments."
+    "CNY per USD used for overseas model reference prices and discounts only. Does not affect billing or payments.": "CNY per USD used for overseas model reference prices and discounts only. Does not affect billing or payments.",
+    "Access leading domestic and international models in one place · Choose text chat or video generation on demand": "Access leading domestic and international models in one place · Choose text chat or video generation on demand",
+    "Compare model configurations using fixed token usage. Platform usage counts follow the same point deduction rules.": "Compare model configurations using fixed token usage. Platform usage counts follow the same point deduction rules."
   }
 }

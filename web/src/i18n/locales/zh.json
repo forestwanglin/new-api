@@ -7810,6 +7810,8 @@
     "Save {{percent}}% compared with the official website": "比官网省 {{percent}}%",
     "Overseas reference prices used for discount comparisons are converted at a reference rate of USD 1 = CNY {{rate}}. This rate is for display only and does not change billing.": "海外模型的折扣比较采用参考汇率 1 美元 = {{rate}} 元人民币换算，仅用于价格展示，不作为实际计费依据。",
     "Model reference exchange rate (CNY per USD)": "模型页参考汇率（人民币/美元）",
-    "CNY per USD used for overseas model reference prices and discounts only. Does not affect billing or payments.": "每 1 美元对应的人民币金额，仅用于海外模型的划线参考价及折扣计算，不影响实际计费或支付。"
+    "CNY per USD used for overseas model reference prices and discounts only. Does not affect billing or payments.": "每 1 美元对应的人民币金额，仅用于海外模型的划线参考价及折扣计算，不影响实际计费或支付。",
+    "Access leading domestic and international models in one place · Choose text chat or video generation on demand": "国内外主流模型，一站接入 · 文本对话与视频生成，按需选择",
+    "Compare model configurations using fixed token usage. Platform usage counts follow the same point deduction rules.": "按固定 token 用量比较不同模型配置，平台次数与扣积分规则一致。"
   }
 }
