@@ -24,6 +24,8 @@ import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { PublicLayout } from '@/components/layout'
 import { LoadingState } from '@/components/loading-state'
+import { SubscriptionsCustomFooter } from '@/features/subscriptions-custom/footer'
+import { SupportDialog } from '@/features/subscriptions-custom/support-dialog'
 import { getServerErrorMessage } from '@/lib/server-error-message'
 
 import { getPublicTutorial, publicTutorialKey } from './api'
@@ -39,6 +41,7 @@ export function ConfigTutorial() {
     staleTime: 0,
   })
   const [active, setActive] = useState('')
+  const [supportOpen, setSupportOpen] = useState(false)
   const selectChapter = (anchor: string) => {
     setActive(anchor)
     // Repeated clicks do not emit hashchange; restore the current chapter
@@ -160,6 +163,8 @@ export function ConfigTutorial() {
       <main className='config-tutorial'>
         <div className='tutorial-wrap'>{content}</div>
       </main>
+      <SupportDialog open={supportOpen} onOpenChange={setSupportOpen} />
+      <SubscriptionsCustomFooter onContact={() => setSupportOpen(true)} />
     </PublicLayout>
   )
 }

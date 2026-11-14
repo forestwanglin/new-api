@@ -46,6 +46,7 @@ import type { TopNavLink } from '../types'
 import { HeaderLogo } from './header-logo'
 
 export interface PublicHeaderProps {
+  activeNavHref?: string
   navLinks?: TopNavLink[]
   mobileLinks?: TopNavLink[]
   navContent?: React.ReactNode
@@ -69,7 +70,7 @@ export function PublicHeader(props: PublicHeaderProps) {
     showLanguageSwitcher = true,
     logo: customLogo,
     siteName: customSiteName,
-    homeUrl = '/',
+    homeUrl = '/model',
     showAuthButtons = true,
     showNotifications = true,
   } = props
@@ -86,7 +87,11 @@ export function PublicHeader(props: PublicHeaderProps) {
   const dynamicLinks = useTopNavLinks()
   const notifications = useNotifications()
   const routerState = useRouterState()
-  const pathname = routerState.location.pathname
+  const pathname =
+    (props.activeNavHref ?? routerState.location.pathname).replace(
+      /\/+$/,
+      ''
+    ) || '/'
 
   const user = auth.user
   const isAuthenticated = !!user
@@ -177,7 +182,9 @@ export function PublicHeader(props: PublicHeaderProps) {
             {props.navContent ??
               (props.showNavigation !== false &&
                 links.map((link) => {
-                  const isActive = pathname === link.href
+                  const isActive =
+                    !link.external &&
+                    pathname === (link.href.replace(/\/+$/, '') || '/')
                   if (link.external) {
                     return (
                       <a
@@ -202,6 +209,8 @@ export function PublicHeader(props: PublicHeaderProps) {
                     <Link
                       key={`${link.title}:${link.href}`}
                       to={link.href}
+                      activeOptions={{ exact: true }}
+                      aria-current={isActive ? 'page' : undefined}
                       title={t(link.title)}
                       disabled={link.disabled}
                       onClick={(event) => handleNavLinkClick(event, link)}
@@ -278,7 +287,13 @@ export function PublicHeader(props: PublicHeaderProps) {
                         role='link'
                         key={`${link.title}:${link.href}`}
                         variant='ghost'
-                        className='justify-start'
+                        className={cn(
+                          'justify-start',
+                          !link.external &&
+                            pathname ===
+                              (link.href.replace(/\/+$/, '') || '/') &&
+                            'bg-accent text-foreground font-semibold'
+                        )}
                         disabled={link.disabled}
                         render={
                           link.external ? (
@@ -293,6 +308,14 @@ export function PublicHeader(props: PublicHeaderProps) {
                           ) : (
                             <Link
                               to={link.href}
+                              activeOptions={{ exact: true }}
+                              aria-current={
+                                !link.external &&
+                                pathname ===
+                                  (link.href.replace(/\/+$/, '') || '/')
+                                  ? 'page'
+                                  : undefined
+                              }
                               onClick={(event) =>
                                 handleNavLinkClick(event, link, true)
                               }

@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, expect, it, vi } from 'vitest'
 
@@ -94,6 +94,29 @@ it('keeps empty and failed content distinct and retries the failed request', asy
   expect(screen.queryByText('No tutorials available')).not.toBeInTheDocument()
   await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
   expect(await screen.findByText('No tutorials available')).toBeInTheDocument()
+})
+it('provides the subscription footer with working FAQ and contact actions', async () => {
+  const user = userEvent.setup()
+  mount()
+  await screen.findByText('Second chapter')
+  const footer = within(screen.getByRole('contentinfo'))
+  expect(footer.getByText('© 2026 ZYY AI')).toBeVisible()
+  expect(footer.getByText('帮助')).toBeVisible()
+  expect(footer.getByText('合作')).toBeVisible()
+  await user.click(footer.getByRole('button', { name: '常见报错' }))
+  expect(await screen.findByRole('dialog', { name: '常见报错' })).toBeVisible()
+  await user.keyboard('{Escape}')
+  await user.click(footer.getByRole('button', { name: '联系客服' }))
+  const support = await screen.findByRole('dialog', { name: '联系客服' })
+  expect(
+    within(support).getByRole('button', { name: '复制邮箱' })
+  ).toBeVisible()
+  await user.click(within(support).getByRole('button', { name: '知道了' }))
+  await waitFor(() =>
+    expect(
+      screen.queryByRole('dialog', { name: '联系客服' })
+    ).not.toBeInTheDocument()
+  )
 })
 it('updates selection on browser hash navigation and ignores unknown anchors', async () => {
   mount()

@@ -27,6 +27,7 @@ import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 
 import { SidebarProvider } from '@/components/ui/sidebar'
+import { SearchProvider } from '@/context/search-provider'
 import { api } from '@/lib/api'
 
 import { AppHeader } from '../app-header'
@@ -73,4 +74,50 @@ it('keeps mobile top navigation reachable without the desktop-only wrapper', asy
   expect(
     screen.queryByRole('button', { name: 'Search' })
   ).not.toBeInTheDocument()
+})
+
+it('reuses public navigation styling and keeps the console header in document flow', async () => {
+  vi.spyOn(api, 'get').mockImplementation(async (url) => ({
+    data: { success: true, data: url === '/api/notice' ? '' : {} },
+  }))
+  client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const root = createRootRoute({
+    component: () => (
+      <SearchProvider>
+        <SidebarProvider>
+          <AppHeader showProfileDropdown={false} showConfigDrawer={false} />
+        </SidebarProvider>
+      </SearchProvider>
+    ),
+  })
+  const router = createRouter({
+    routeTree: root,
+    history: createMemoryHistory({ initialEntries: ['/'] }),
+  })
+  await router.load()
+  render(
+    <QueryClientProvider client={client}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>
+  )
+  expect(await screen.findByRole('link', { name: 'Models' })).toHaveClass(
+    'rounded-[8px]',
+    'text-[15px]',
+    'px-[15px]'
+  )
+  expect(screen.getByRole('link', { name: 'Homepage' })).toHaveAttribute(
+    'aria-current',
+    'page'
+  )
+  expect(screen.getByRole('button', { name: 'Search' })).toHaveClass(
+    'sm:w-8',
+    'lg:w-8',
+    'xl:w-64'
+  )
+  expect(screen.getByRole('banner')).toHaveClass('sticky', 'shrink-0')
+  expect(screen.getByRole('banner')).not.toHaveClass('fixed')
+  expect(
+    screen.getByRole('banner').querySelector('a[href="/model"]')
+  ).not.toBeNull()
+  expect(screen.getByRole('button', { name: 'Toggle Sidebar' })).toBeVisible()
 })

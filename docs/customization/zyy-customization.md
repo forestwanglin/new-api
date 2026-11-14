@@ -886,6 +886,16 @@
 - 验证：SQLite3.50.4、MySQL8.4.13、PostgreSQL17.11 隔离数据库矩阵通过，覆盖用户隔离、超大整数、所有订单状态/倒序/分页、无账务写入、初始化并发/回滚及编辑删除保留。`go test ./model ./controller -run 'TestPointWallet|TestSubscriptionRule' -count=1`（配置专用测试DSN）、self/ledger路由测试、middleware测试及相关包vet通过；前端受影响模块测试、`bun check -b`、本任务文件lint/格式检查、`bun run build`通过。Chrome使用隔离SQLite真实接口，核对91500总额、87000通用/4500GPT、来源汇总、三种状态订单倒序、历史方案名及精确到期时间、跳转、禁用开关；390px钱包无整页横向溢出，控制台无error/warn。
 - 风险与未覆盖：邀请待释放积分与按来源剩余积分无权威读模型，按已确认策略展示暂不可用。自动续费、退款及真实商户扣款未接入/验证。全量lint在未改动文件存在既有错误；全局路由登记覆盖测试仍报6条既有漏配，本次新增路由已登记并通过鉴权回归。未验证最低数据库版本、完整生产库升级或生产支付。
 
+### Z050 控制台统一顶部导航与教程页脚
+
+- 需求与原因：控制台顶部与订阅、配置教程保持一致，进入控制台或点击 Logo 后能识别当前栏目，教程底部提供统一帮助入口。
+- 变更内容：AppHeader 复用 PublicHeader 品牌与菜单样式，保留侧栏开关、搜索、通知、语言、主题设置和账号工具；使用 sticky 保留头部占位，控制台内容仍全宽。控制台各路由选中首页；公开导航兼容尾斜杠，桌面与手机菜单均标记 aria-current。Logo 默认跳转 /model。窄桌面搜索收为图标，避免挤压菜单。配置教程复用订阅页 footer、FAQ 与客服弹窗。
+- 影响面：`web/src/components/layout/components/{app-header,public-header}.tsx` 及其测试、`web/src/features/config-tutorial/index.tsx` 及其 page 测试。**上游自有文件**：上述 app-header、public-header 及已有测试；教程模块为 fork 文件。
+- 与上游差异：统一 fork 的公开页和控制台导航展示，扩展教程帮助入口；复用现有 PublicHeader、SidebarTrigger、Search、SubscriptionsCustomFooter 和 SupportDialog，无新增基础控件或依赖。
+- 开关与默认值：无新增配置或环境变量；保留现有导航开关，PublicHeader 增加可选 activeNavHref 供控制台指定所属栏目，显式 homeUrl 仍优先。
+- 验证：相关布局、教程与订阅页面测试，`bun check -b`、变更文件 oxlint/格式检查及 `bun run build`；Chrome 实测首页跳转 /dashboard/overview 后选中、内容全宽，Logo /model 选中、教程 footer 与 FAQ；1024px 菜单文字完整，390px 导航可展开并选中首页。
+- 风险与未覆盖：仅前端导航与页脚调整，未改接口、数据和部署；未执行全量前端测试，既有管理员自定义菜单过多时仍按现有截断策略显示。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
@@ -894,6 +904,7 @@
 
 | 区域 | 文件 | 关联条目 |
 |---|---|---|
+| 控制台统一顶部导航 | `web/src/components/layout/components/{app-header,public-header}.tsx` 及对应测试 | Z050 |
 | 个人积分/订阅查询与导航 | `model/{main,option,user}.go`、`router/api-router.go`、`middleware/access_token_routes.go`、个人侧栏设置/维护设置、侧栏hooks及测试、七种locale、生成路由（详细文件见Z049） | Z049 |
 | 自定义订阅支付 | `model/topup.go`、`router/api-router.go`、`middleware/access_token_routes.go`、`common/log_text.zh-CN.json`、钱包类型/历史组件/测试、七种 locale | Z045 |
 | 登录认证弹窗与手机绑定 | `model/auth_flow.go`、`controller/{wechat,misc,option}.go`、`router/api-router.go`、前端 Dialog/auth/settings、布局/路由/导航/HTTP 入口、七种 locale | Z042 |

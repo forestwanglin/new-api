@@ -20,6 +20,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
   createMemoryHistory,
   createRootRoute,
+  createRoute,
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router'
@@ -44,7 +45,8 @@ afterEach(() => {
 
 async function renderHeader(
   props: PublicHeaderProps = {},
-  status: Record<string, unknown> = {}
+  status: Record<string, unknown> = {},
+  pathname = '/'
 ) {
   vi.spyOn(api, 'get').mockImplementation(async (url) => ({
     data: { success: true, data: url === '/api/notice' ? '' : status },
@@ -57,8 +59,10 @@ async function renderHeader(
     component: () => <PublicHeader siteName='New API' {...props} />,
   })
   const router = createRouter({
-    routeTree: root,
-    history: createMemoryHistory({ initialEntries: ['/'] }),
+    routeTree: root.addChildren([
+      createRoute({ getParentRoute: () => root, path: '$' }),
+    ]),
+    history: createMemoryHistory({ initialEntries: [pathname] }),
   })
   await router.load()
   return render(
@@ -191,4 +195,39 @@ it('opens authentication immediately for restricted navigation and keeps its des
   expect(
     screen.queryByRole('dialog', { name: 'Sign in required' })
   ).not.toBeInTheDocument()
+})
+
+it.each([
+  ['/dashboard', 'Homepage'],
+  ['/dashboard/', 'Homepage'],
+  ['/model', 'Models'],
+  ['/model/', 'Models'],
+  ['/tutorial/', 'Configuration tutorial'],
+  ['/subscription/', '订阅'],
+])('selects the current top menu at %s', async (pathname, name) => {
+  await renderHeader({}, {}, pathname)
+  const selected = screen.getByRole('link', { name })
+  expect(selected).toHaveAttribute('aria-current', 'page')
+  expect(selected).toHaveClass('bg-accent', 'font-semibold')
+  await userEvent
+    .setup()
+    .click(screen.getByRole('button', { name: 'Toggle navigation menu' }))
+  const menu = await screen.findByRole('dialog', {
+    name: 'Toggle navigation menu',
+  })
+  expect(within(menu).getByRole('link', { name })).toHaveAttribute(
+    'aria-current',
+    'page'
+  )
+})
+it('opens models from the logo and selects the model menu', async () => {
+  useSystemConfigStore.getState().setLoading(false)
+  await renderHeader()
+  const logo = await screen.findByRole('link', { name: 'logo New API' })
+  expect(logo).toHaveAttribute('href', '/model')
+  await userEvent.setup().click(logo)
+  expect(await screen.findByRole('link', { name: 'Models' })).toHaveAttribute(
+    'aria-current',
+    'page'
+  )
 })

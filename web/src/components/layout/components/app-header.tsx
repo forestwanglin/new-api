@@ -21,15 +21,13 @@ import { LanguageSwitcher } from '@/components/language-switcher'
 import { NotificationPopover } from '@/components/notification-popover'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
-import { SystemUpdateAction } from '@/features/system-update/system-update-action'
+import { SidebarTrigger } from '@/components/ui/sidebar'
 import { useNotifications } from '@/hooks/use-notifications'
 import { useTopNavLinks } from '@/hooks/use-top-nav-links'
 
 import { defaultTopNavLinks } from '../config/top-nav.config'
 import type { TopNavLink } from '../types'
-import { Header } from './header'
-import { SystemBrand } from './system-brand'
-import { TopNav } from './top-nav'
+import { PublicHeader } from './public-header'
 
 /**
  * General application Header component
@@ -112,43 +110,41 @@ export function AppHeader({
   const notifications = useNotifications()
 
   return (
-    <Header>
-      <div className='@container/system-brand flex min-w-0 flex-1 items-center gap-1'>
-        <SystemBrand variant='inline' />
-        <SystemUpdateAction presentation='version' />
-      </div>
-
-      {leftContent ? (
-        <div className='ms-2 flex items-center'>{leftContent}</div>
-      ) : null}
-
-      {rightContent ?? (
-        <div className='ms-auto flex shrink-0 items-center gap-1 sm:gap-2'>
-          {showTopNav && (
-            <div className='me-1 shrink-0'>
-              <TopNav links={links} />
-            </div>
-          )}
-          {showSearch && (
-            <Search className='w-8 flex-none [&>span]:hidden sm:[&>span]:inline' />
-          )}
-          {showNotifications && (
-            <NotificationPopover
-              open={notifications.popoverOpen}
-              onOpenChange={notifications.setPopoverOpen}
-              unreadCount={notifications.unreadCount}
-              activeTab={notifications.activeTab}
-              onTabChange={notifications.setActiveTab}
-              notice={notifications.notice}
-              announcements={notifications.announcements}
-              loading={notifications.loading}
-            />
-          )}
-          <LanguageSwitcher />
-          {showConfigDrawer && <ConfigDrawer />}
-          {showProfileDropdown && <ProfileDropdown />}
-        </div>
-      )}
-    </Header>
+    <PublicHeader
+      className='sticky w-full shrink-0'
+      navLinks={links}
+      activeNavHref='/dashboard'
+      showNavigation={showTopNav}
+      leftContent={
+        <>
+          <SidebarTrigger variant='ghost' className='size-8' />
+          {leftContent}
+        </>
+      }
+      rightContent={
+        rightContent ?? (
+          <div className='ms-auto flex shrink-0 items-center gap-1 sm:gap-2'>
+            {showSearch && (
+              <Search className='w-8 flex-none sm:w-8 sm:pe-0 lg:w-8 xl:w-64 xl:pe-12 [&>kbd]:hidden xl:[&>kbd]:flex [&>span]:hidden xl:[&>span]:inline' />
+            )}
+            {showNotifications && (
+              <NotificationPopover
+                open={notifications.popoverOpen}
+                onOpenChange={notifications.setPopoverOpen}
+                unreadCount={notifications.unreadCount}
+                activeTab={notifications.activeTab}
+                onTabChange={notifications.setActiveTab}
+                notice={notifications.notice}
+                announcements={notifications.announcements}
+                loading={notifications.loading}
+              />
+            )}
+            <LanguageSwitcher />
+            {showConfigDrawer && <ConfigDrawer />}
+            {showProfileDropdown && <ProfileDropdown />}
+          </div>
+        )
+      }
+    />
   )
 }
