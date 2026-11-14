@@ -81,6 +81,14 @@ func TestFixedPriceBillingDatabaseMatrix(t *testing.T) {
 			common.SetDatabaseTypes(dialect.name, dialect.name)
 			t.Cleanup(func() { model.DB, model.LOG_DB = oldDB, oldLogDB; common.SetDatabaseTypes(oldMainType, oldLogType) })
 			require.NoError(t, db.AutoMigrate(&model.User{}, &model.Token{}, &model.Channel{}))
+			pointModels := []any{&model.PointType{}, &model.PointModelRule{}, &model.PointAccount{}, &model.PointTransaction{}, &model.PointLedger{}, &model.PointFreeze{}, &model.PointCallBilling{}, &model.PointCallEvent{}, &model.PointCallOperation{}}
+			require.False(t, db.Migrator().HasTable(&model.PointType{}), "requires an isolated points database")
+			require.NoError(t, db.AutoMigrate(pointModels...))
+			t.Cleanup(func() {
+				for i := len(pointModels) - 1; i >= 0; i-- {
+					require.NoError(t, db.Migrator().DropTable(pointModels[i]))
+				}
+			})
 			require.NoError(t, logDB.AutoMigrate(&model.Log{}))
 			versionQuery := "select version()"
 			if dialect.name == common.DatabaseTypeSQLite {
@@ -99,24 +107,31 @@ func runFixedPriceAccountingCases(t *testing.T, db, logDB *gorm.DB) {
 	const mixed = `len <= 32000 ? tier("short", fixed(0.01)) : tier("long", p * 2)`
 	const flat = `tier("request", fixed(0.01))`
 	const startingQuota = 2_000_000
+	previousRate := operation_setting.USDExchangeRate
+	operation_setting.USDExchangeRate = 1
+	t.Cleanup(func() { operation_setting.USDExchangeRate = previousRate })
+	pointType := model.PointType{Code: "FIXED_TEST", Name: "Fixed test points", ConsumePriority: 100}
+	require.NoError(t, db.Create(&pointType).Error)
+	require.NoError(t, db.Create(&model.PointModelRule{PointTypeId: pointType.Id, MatchType: model.PointMatchExact, MatchValue: "fixed-test", Enabled: true}).Error)
 	const imageExpression = `tier("standard", p * 5 + cr * 1.25 + img * 8 + img_cr * 2 + c * 30)`
 	imageUsage := &dto.Usage{PromptTokens: 1000, CompletionTokens: 100, TotalTokens: 1100,
 		PromptTokensDetails: dto.InputTokenDetails{CachedTokens: 300, ImageTokens: 600, CachedTokensDetails: &dto.CachedTokenDetails{ImageTokens: common.GetPointer(200)}}}
 	operation_setting.SetToolPriceForTest("fixed_billing_tool", 4)
 	t.Cleanup(func() { operation_setting.DeleteToolPriceForTest("fixed_billing_tool") })
 	for index, tc := range []struct {
-		name, expression                          string
-		estimate                                  int
-		usage                                     *dto.Usage
-		audio, stream, refund, insufficient, tool bool
-		realtime, reserveInsufficient             bool
-		wallet, outboundImages, retryReservation  int
-		groupRatio                                float64
-		want                                      int
-		unit                                      billingexpr.BillingUnit
-		requestedImages, actualImages             int
+		name, expression                              string
+		estimate                                      int
+		usage                                         *dto.Usage
+		audio, stream, refund, insufficient, tool     bool
+		realtime, reserveInsufficient, negativeWallet bool
+		wallet, outboundImages, retryReservation      int
+		groupRatio                                    float64
+		want                                          int
+		unit                                          billingexpr.BillingUnit
+		requestedImages, actualImages                 int
 	}{
 		{name: "missing usage charges once", expression: flat, want: 5000, unit: billingexpr.BillingUnitRequest},
+		{name: "negative wallet with sufficient points", expression: flat, negativeWallet: true, want: 5000, unit: billingexpr.BillingUnitRequest},
 		{name: "zero usage charges once", expression: flat, usage: &dto.Usage{}, want: 5000, unit: billingexpr.BillingUnitRequest},
 		{name: "stream charges once", expression: flat, stream: true, usage: &dto.Usage{PromptTokens: 100, CompletionTokens: 20, TotalTokens: 120}, want: 5000, unit: billingexpr.BillingUnitRequest},
 		{name: "audio zero usage charges once", expression: flat, audio: true, usage: &dto.Usage{}, want: 5000, unit: billingexpr.BillingUnitRequest},
@@ -128,20 +143,20 @@ func runFixedPriceAccountingCases(t *testing.T, db, logDB *gorm.DB) {
 		{name: "explicit zero remains free", expression: `tier("free", fixed(0))`, usage: &dto.Usage{PromptTokens: 100, TotalTokens: 100}, unit: billingexpr.BillingUnitRequest},
 		{name: "multipliers and separate tool surcharge", expression: flat + ` * (param("fast") == true ? 2 : 1)`, groupRatio: 1.5, tool: true, want: 18000, unit: billingexpr.BillingUnitRequest},
 		{name: "failed request refunds exactly once", expression: flat, refund: true},
-		{name: "insufficient wallet never reserves tokens", expression: flat, insufficient: true},
+		{name: "insufficient points never reserves tokens", expression: flat, insufficient: true},
 		{name: "image cache stream settles usage and refunds unused reservation", expression: imageExpression, estimate: 10000, usage: imageUsage, stream: true, want: 4113, unit: billingexpr.BillingUnitToken},
 		{name: "audio settlement records image cache billing inputs", expression: imageExpression, estimate: 10000, usage: imageUsage, audio: true, want: 4113, unit: billingexpr.BillingUnitToken},
 		{name: "realtime records actual expression inputs", expression: imageExpression, estimate: 10000, usage: imageUsage, realtime: true, want: 4000, unit: billingexpr.BillingUnitToken},
-		{name: "image cache insufficient wallet never reserves tokens", expression: imageExpression, estimate: 10000, insufficient: true},
+		{name: "image cache insufficient points never reserves tokens", expression: imageExpression, estimate: 10000, insufficient: true},
 		{name: "image quantity refunds missing images", expression: `tier("image", fixed(0.04)) * image_count`, requestedImages: 3, actualImages: 2, want: 40000, unit: billingexpr.BillingUnitRequest},
 		{name: "image quantity keeps request when actual missing", expression: `tier("image", fixed(0.04)) * image_count`, requestedImages: 3, want: 60000, unit: billingexpr.BillingUnitRequest},
 		{name: "image quantity zero price stays free", expression: `tier("image", fixed(0)) * image_count`, requestedImages: 3, actualImages: 2, unit: billingexpr.BillingUnitRequest},
 		{name: "image quantity failure refunds reservation", expression: `tier("image", fixed(0.04)) * image_count`, requestedImages: 3, refund: true},
-		{name: "image quantity exceeds one-image wallet before submission", expression: `tier("image", fixed(0.04)) * image_count`, requestedImages: 4, wallet: 20000, insufficient: true},
+		{name: "image quantity exceeds available points before submission", expression: `tier("image", fixed(0.04)) * image_count`, requestedImages: 4, wallet: 20000, insufficient: true},
 		{name: "image override reserves extra quantity", expression: `tier("image", fixed(0.04)) * image_count`, requestedImages: 1, outboundImages: 4, want: 80000, unit: billingexpr.BillingUnitRequest},
-		{name: "image override cannot exceed remaining wallet", expression: `tier("image", fixed(0.04)) * image_count`, requestedImages: 1, outboundImages: 4, wallet: 40000, reserveInsufficient: true, refund: true},
+		{name: "image override cannot exceed remaining points", expression: `tier("image", fixed(0.04)) * image_count`, requestedImages: 1, outboundImages: 4, wallet: 40000, reserveInsufficient: true, refund: true},
 		{name: "task retry holds a pricier channel and refunds all of it", expression: flat, retryReservation: 40000, refund: true},
-		{name: "task retry cannot exceed remaining wallet", expression: flat, retryReservation: 40000, wallet: 20000, reserveInsufficient: true, refund: true},
+		{name: "task retry cannot exceed remaining points", expression: flat, retryReservation: 40000, wallet: 20000, reserveInsufficient: true, refund: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			quota := startingQuota
@@ -151,8 +166,15 @@ func runFixedPriceAccountingCases(t *testing.T, db, logDB *gorm.DB) {
 			if tc.wallet > 0 {
 				quota = tc.wallet
 			}
+			// With USDExchangeRate=1, each 500 quota costs exactly one point.
+			pointBudget := int64(quota / 500)
+			if tc.negativeWallet {
+				quota = -1
+			}
 			user := model.User{Username: fmt.Sprintf("fixed_billing_%d", index), Quota: quota, Status: common.UserStatusEnabled}
 			require.NoError(t, db.Create(&user).Error)
+			account := model.PointAccount{UserId: int64(user.Id), PointTypeId: pointType.Id, AvailablePoints: pointBudget}
+			require.NoError(t, db.Create(&account).Error)
 			token := model.Token{UserId: user.Id, Key: fmt.Sprintf("fixed-billing-test-%d", index), Name: "fixed-billing", RemainQuota: startingQuota, Status: common.TokenStatusEnabled}
 			require.NoError(t, db.Create(&token).Error)
 			channel := model.Channel{Name: "fixed-billing", Key: "unused", Status: common.ChannelStatusEnabled}
@@ -193,7 +215,7 @@ func runFixedPriceAccountingCases(t *testing.T, db, logDB *gorm.DB) {
 				require.Nil(t, apiErr)
 				held, err := model.GetUserQuota(user.Id, true)
 				require.NoError(t, err)
-				assert.Equal(t, quota-reservation, held)
+				assert.Equal(t, quota, held, "reservation holds points and Key quota; money is booked at settlement")
 				if tc.outboundImages > 0 {
 					reserveErr := PrepareImageBillingForRequest(ctx, info, tc.outboundImages)
 					if tc.reserveInsufficient {
@@ -300,6 +322,10 @@ func runFixedPriceAccountingCases(t *testing.T, db, logDB *gorm.DB) {
 			require.NoError(t, db.First(&user, user.Id).Error)
 			require.NoError(t, db.First(&token, token.Id).Error)
 			assert.Equal(t, quota-tc.want, user.Quota)
+			require.NoError(t, db.First(&account, account.Id).Error)
+			wantPoints := int64((tc.want + 499) / 500)
+			assert.Equal(t, pointBudget-wantPoints, account.AvailablePoints)
+			assert.Zero(t, account.FrozenPoints, "finalization releases the call's unused holds")
 			assert.Equal(t, startingQuota-tc.want, token.RemainQuota)
 			assert.Equal(t, tc.want, user.UsedQuota)
 			assert.Equal(t, tc.want, token.UsedQuota)

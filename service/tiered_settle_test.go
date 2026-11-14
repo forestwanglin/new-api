@@ -12,6 +12,7 @@ import (
 	"github.com/QuantumNous/new-api/pkg/billingexpr"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relaykit/dto"
+	"github.com/QuantumNous/new-api/setting/model_setting"
 	"github.com/QuantumNous/new-api/types"
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
@@ -373,14 +374,27 @@ func TestPrepareTieredBillingForSelectedGroupUpdatesReservation(t *testing.T) {
 }
 
 func TestPrepareTieredBillingForSelectedGroupStartsBillingAfterFreeGroup(t *testing.T) {
+	grok := model_setting.GetGrokSettings()
+	previousFeeEnabled := grok.ViolationDeductionEnabled
+	grok.ViolationDeductionEnabled = false
+	t.Cleanup(func() { grok.ViolationDeductionEnabled = previousFeeEnabled })
 	truncate(t)
 	gin.SetMode(gin.TestMode)
 
 	const userID = 700
 	seedUser(t, userID, 500_000)
+	pointModels := []any{&model.PointType{}, &model.PointModelRule{}, &model.PointAccount{}, &model.PointTransaction{}, &model.PointLedger{}, &model.PointFreeze{}, &model.PointCallBilling{}, &model.PointCallEvent{}, &model.PointCallOperation{}}
+	require.NoError(t, model.DB.AutoMigrate(pointModels...))
+	t.Cleanup(func() { require.NoError(t, model.DB.Migrator().DropTable(pointModels...)) })
+	pointType := model.PointType{Code: "TIERED_TEST", Name: "Tiered points", ConsumePriority: 100}
+	require.NoError(t, model.DB.Create(&pointType).Error)
+	require.NoError(t, model.DB.Create(&model.PointModelRule{PointTypeId: pointType.Id, MatchType: model.PointMatchExact, MatchValue: "gpt-test", Enabled: true}).Error)
+	account := model.PointAccount{UserId: userID, PointTypeId: pointType.Id, AvailablePoints: 100_000}
+	require.NoError(t, model.DB.Create(&account).Error)
 
 	relayInfo := &relaycommon.RelayInfo{
 		UserId:          userID,
+		ChannelMeta:     &relaycommon.ChannelMeta{},
 		IsPlayground:    true,
 		ForcePreConsume: true,
 		OriginModelName: "gpt-test",
@@ -403,8 +417,13 @@ func TestPrepareTieredBillingForSelectedGroupStartsBillingAfterFreeGroup(t *test
 	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
 
+	require.Nil(t, PreConsumeBilling(ctx, 0, relayInfo))
+	freeSession, ok := relayInfo.Billing.(*BillingSession)
+	require.True(t, ok)
+	require.True(t, freeSession.freePoints)
 	require.Nil(t, PrepareTieredBillingForSelectedGroup(ctx, relayInfo))
 	require.NotNil(t, relayInfo.Billing)
+	assert.NotSame(t, freeSession, relayInfo.Billing)
 	assert.False(t, relayInfo.PriceData.FreeModel, "FreeModel must be cleared after switching to a paid group")
 	assert.Equal(t, 100_000, relayInfo.FinalPreConsumedQuota)
 	assert.Equal(t, 0.20, relayInfo.TieredBillingSnapshot.GroupRatio)
@@ -412,7 +431,10 @@ func TestPrepareTieredBillingForSelectedGroupStartsBillingAfterFreeGroup(t *test
 
 	userQuota, err := model.GetUserQuota(userID, false)
 	require.NoError(t, err)
-	assert.Equal(t, 400_000, userQuota)
+	assert.Equal(t, 500_000, userQuota, "points admission holds points without deducting wallet before observed usage")
+	require.NoError(t, model.DB.First(&account, account.Id).Error)
+	assert.Positive(t, account.FrozenPoints)
+	assert.Equal(t, int64(100_000), account.AvailablePoints+account.FrozenPoints)
 }
 
 func TestPrepareTieredBillingForSelectedGroupPaidToFreeKeepsFreeModelFalse(t *testing.T) {

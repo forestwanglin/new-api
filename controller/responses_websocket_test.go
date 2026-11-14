@@ -27,6 +27,7 @@ import (
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/config"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/alicebob/miniredis/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
@@ -40,6 +41,7 @@ var responsesWSTestUserSequence atomic.Int64
 
 func setupResponsesWSRequestTest(t *testing.T) (*model.User, *model.Token) {
 	t.Helper()
+	require.NoError(t, i18n.Init())
 	previousDB := model.DB
 	previousLogDB := model.LOG_DB
 	previousType := common.MainDatabaseType()
@@ -355,7 +357,14 @@ func newResponsesWSBillingTest(t *testing.T, expression string, handle func(*web
 		"group_ratio_setting.group_ratio": `{"default":1}`,
 		"perf_metrics_setting.enabled":    "true",
 	}))
-	require.NoError(t, model.DB.AutoMigrate(&model.Channel{}, &model.Ability{}))
+	require.NoError(t, model.DB.AutoMigrate(&model.Channel{}, &model.Ability{}, &model.PointType{}, &model.PointModelRule{}, &model.PointAccount{}, &model.PointTransaction{}, &model.PointLedger{}, &model.PointFreeze{}, &model.PointCallBilling{}, &model.PointCallEvent{}, &model.PointCallOperation{}))
+	previousRate := operation_setting.USDExchangeRate
+	operation_setting.USDExchangeRate = 1
+	t.Cleanup(func() { operation_setting.USDExchangeRate = previousRate })
+	pointType := model.PointType{Code: fmt.Sprintf("WS_%d", user.Id), Name: "WS points", ConsumePriority: 100}
+	require.NoError(t, model.DB.Create(&pointType).Error)
+	require.NoError(t, model.DB.Create(&model.PointModelRule{PointTypeId: pointType.Id, MatchType: model.PointMatchExact, MatchValue: "ws-billing", Enabled: true}).Error)
+	require.NoError(t, model.DB.Create(&model.PointAccount{UserId: int64(user.Id), PointTypeId: pointType.Id, AvailablePoints: 100_000}).Error)
 	require.NoError(t, model.LOG_DB.AutoMigrate(&model.Log{}))
 	require.NoError(t, model.DB.Model(user).Updates(map[string]any{"quota": 100000, "setting": `{"billing_preference":"wallet_only"}`}).Error)
 	require.NoError(t, model.DB.Model(token).Update("remain_quota", 3000).Error)
@@ -610,7 +619,11 @@ func TestResponsesWebSocketReusesConnectionAndSettlesEachRequest(t *testing.T) {
 	require.Len(t, logs, 2)
 	for index, expectedQuota := range []int{1000, 2000} {
 		assert.Equal(t, expectedQuota, logs[index].Quota)
-		assert.Equal(t, fmt.Sprintf("responses-ws-billing-ws-%d", index), logs[index].RequestId)
+		var pointLog struct {
+			CallID string `json:"model_call_request_id"`
+		}
+		require.NoError(t, common.UnmarshalJsonStr(logs[index].Other, &pointLog))
+		assert.Equal(t, fmt.Sprintf("responses-ws-billing-ws-%d", index), pointLog.CallID)
 		assert.Equal(t, 1000, logs[index].PromptTokens)
 		assert.Equal(t, 10, logs[index].CompletionTokens)
 	}

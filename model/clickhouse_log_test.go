@@ -1,9 +1,12 @@
 package model
 
 import (
+	"context"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 
@@ -151,4 +154,92 @@ func TestAssignDisplayLogIds(t *testing.T) {
 	assert.Equal(t, []int{21, 22, 23}, []int{logs[0].Id, logs[1].Id, logs[2].Id})
 
 	assert.NotPanics(t, func() { assignDisplayLogIds(nil, 0) })
+}
+
+// Separate ClickHouse writes can be visible after a failed acknowledgment and
+// then be inserted again by recovery. Public accounting must project one row
+// per financial event, without collapsing unrelated legacy request logs.
+func TestClickHousePointLogProjection(t *testing.T) {
+	dsn := os.Getenv("TEST_CLICKHOUSE_DSN")
+	if dsn == "" {
+		t.Skip("isolated ClickHouse test database DSN is not configured")
+	}
+	t.Setenv("POINT_LOG_TEST_DSN", dsn)
+	db, kind, err := chooseDB("POINT_LOG_TEST_DSN", true)
+	require.NoError(t, err)
+	require.Equal(t, common.DatabaseTypeClickHouse, kind)
+	require.False(t, db.Migrator().HasTable(&Log{}), "requires an isolated empty log database")
+	connection, err := db.DB()
+	require.NoError(t, err)
+	previousDB, previousKind := LOG_DB, common.LogDatabaseType()
+	LOG_DB = db
+	common.SetLogDatabaseType(kind)
+	t.Cleanup(func() {
+		LOG_DB = previousDB
+		common.SetLogDatabaseType(previousKind)
+		require.NoError(t, connection.Close())
+	})
+	require.NoError(t, migrateClickHouseLogDB())
+	t.Cleanup(func() { require.NoError(t, db.Exec("DROP TABLE logs").Error) })
+	var version string
+	require.NoError(t, db.Raw("SELECT version()").Scan(&version).Error)
+	t.Logf("database: ClickHouse %s", version)
+	now := time.Now().Unix()
+	debit := PointBillingMetadata{Version: 1, CallID: "call", EventID: "call:debit", Status: "committed", TotalPoints: "4", Items: []PointBillingItem{}}
+	refund := debit
+	refund.EventID, refund.TotalPoints = "call:refund", "-1"
+	pending := debit
+	pending.EventID, pending.Status = "call:pending", "pending"
+	rows := []Log{
+		{UserId: 73, TokenId: 42, CreatedAt: now, Type: LogTypeConsume, RequestId: "debit", Quota: 100, PromptTokens: 5, CompletionTokens: 7, Other: common.MapToJsonStr(map[string]any{"points_billing": debit})},
+		{UserId: 73, TokenId: 42, CreatedAt: now, Type: LogTypeRefund, RequestId: "refund", Quota: 40, Other: common.MapToJsonStr(map[string]any{"points_billing": refund})},
+		{UserId: 73, TokenId: 42, CreatedAt: now, Type: LogTypeConsume, RequestId: "legacy-shared", Quota: 10, Other: "{}"},
+		{UserId: 73, TokenId: 42, CreatedAt: now, Type: LogTypeManage, RequestId: "malformed", Other: "invalid-json"},
+		{UserId: 73, TokenId: 42, CreatedAt: now, Type: LogTypeError, RequestId: "pending", Other: common.MapToJsonStr(map[string]any{"points_billing": pending})},
+	}
+	for _, index := range []int{0, 0, 1, 1, 2, 2, 3, 4} {
+		row := rows[index]
+		require.NoError(t, db.Create(&row).Error)
+	}
+	var physical int64
+	require.NoError(t, db.Model(&Log{}).Count(&physical).Error)
+	require.EqualValues(t, 8, physical)
+	filter := LogFilter{}
+	logs, total, err := GetAllLogs(filter, 0, 100)
+	require.NoError(t, err)
+	require.EqualValues(t, 6, total)
+	require.Len(t, logs, 6)
+	var points int64
+	for _, log := range logs {
+		meta := pointMetadataFromLog(log)
+		if meta != nil && meta.Status == "committed" {
+			n, err := strconv.ParseInt(meta.TotalPoints, 10, 64)
+			require.NoError(t, err)
+			points += n
+		}
+	}
+	assert.EqualValues(t, 3, points)
+	logs, total, err = GetAllLogs(LogFilter{Type: LogTypeRefund}, 0, 100)
+	require.NoError(t, err)
+	assert.EqualValues(t, 1, total)
+	require.Len(t, logs, 1)
+	logs, total, err = GetUserLogs(73, filter, 2, 2)
+	require.NoError(t, err)
+	assert.EqualValues(t, 6, total)
+	assert.Len(t, logs, 2, "pagination applies after financial deduplication")
+	logs, err = GetLogByTokenId(42)
+	require.NoError(t, err)
+	assert.Len(t, logs, 6)
+	count := 0
+	require.NoError(t, StreamAllLogs(context.Background(), filter, common.RoleAdminUser, func(*Log) error { count++; return nil }))
+	assert.Equal(t, 6, count)
+	count = 0
+	require.NoError(t, StreamUserLogs(context.Background(), 73, filter, func(*Log) error { count++; return nil }))
+	assert.Equal(t, 6, count)
+	stat, err := SumUsedQuota(LogTypeConsume, 0, 0, "", "", "", 0, "")
+	require.NoError(t, err)
+	assert.Equal(t, 120, stat.Quota)
+	assert.Equal(t, 3, stat.Rpm)
+	assert.Equal(t, 12, stat.Tpm)
+	assert.Equal(t, 12, SumUsedToken(LogTypeConsume, 0, 0, "", "", ""))
 }

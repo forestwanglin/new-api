@@ -337,3 +337,39 @@ it('shows loading placeholders without displaying stale log fields', () => {
     screen.queryByRole('button', { name: /^Model:/ })
   ).not.toBeInTheDocument()
 })
+
+it('shows every consumed point type after cost in mobile cards and honors column visibility', () => {
+  const record = {
+    ...log,
+    other: JSON.stringify({
+      points_billing: {
+        version: 1,
+        call_id: 'call',
+        event_id: 'event',
+        status: 'committed',
+        total_points: '15',
+        items: [
+          {
+            point_type_id: '1',
+            code: 'GPT',
+            name: 'Model points',
+            points: '10',
+          },
+          {
+            point_type_id: '2',
+            code: 'GENERAL',
+            name: 'General points',
+            points: '5',
+          },
+        ],
+      },
+    }),
+  }
+  const result = renderLogs({ logs: [record] })
+  expect(screen.getByText('Consumed points')).toBeVisible()
+  expect(screen.getByText('Model points')).toBeVisible()
+  expect(screen.getByText('General points')).toBeVisible()
+  result.unmount()
+  renderLogs({ logs: [record], visibility: { consumed_points: false } })
+  expect(screen.queryByText('Consumed points')).not.toBeInTheDocument()
+})

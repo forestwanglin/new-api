@@ -246,7 +246,7 @@ func creditCustomSubscriptionPoints(tx *gorm.DB, order *CustomSubscriptionOrder,
 			return 0, err
 		}
 		amount := amounts[id]
-		if account.AvailablePoints < 0 || account.FrozenPoints < 0 || account.AvailablePoints > math.MaxInt64-amount || account.Version < 0 || account.Version == math.MaxInt64 {
+		if account.FrozenPoints < 0 || account.AvailablePoints > math.MaxInt64-amount || account.Version < 0 || account.Version == math.MaxInt64 {
 			return 0, ErrCustomSubscriptionPointsInvalid
 		}
 		after := account.AvailablePoints + amount

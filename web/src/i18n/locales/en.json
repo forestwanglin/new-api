@@ -7812,6 +7812,10 @@
     "Model reference exchange rate (CNY per USD)": "Model reference exchange rate (CNY per USD)",
     "CNY per USD used for overseas model reference prices and discounts only. Does not affect billing or payments.": "CNY per USD used for overseas model reference prices and discounts only. Does not affect billing or payments.",
     "Access leading domestic and international models in one place · Choose text chat or video generation on demand": "Access leading domestic and international models in one place · Choose text chat or video generation on demand",
-    "Compare model configurations using fixed token usage. Platform usage counts follow the same point deduction rules.": "Compare model configurations using fixed token usage. Platform usage counts follow the same point deduction rules."
+    "Compare model configurations using fixed token usage. Platform usage counts follow the same point deduction rules.": "Compare model configurations using fixed token usage. Platform usage counts follow the same point deduction rules.",
+    "Consumed points": "Consumed points",
+    "Points settlement pending": "Points settlement pending",
+    "Points settlement failed": "Points settlement failed",
+    "Higher values first": "Higher values first"
   }
 }

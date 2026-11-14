@@ -132,6 +132,9 @@ func migratePoints(db *gorm.DB) error {
 	if err := db.AutoMigrate(&PointType{}, &PointModelRule{}, &PointAccount{}, &PointTransaction{}, &PointLedger{}, &PointFreeze{}); err != nil {
 		return fmt.Errorf("migrate points schema: %w", err)
 	}
+	if err := migratePointCallBilling(db); err != nil {
+		return err
+	}
 	return initializePointTypes(db)
 }
 

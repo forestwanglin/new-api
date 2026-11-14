@@ -20,6 +20,7 @@ import (
 	"github.com/QuantumNous/new-api/setting"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 func CovertMjpActionToModelName(mjAction string) string {
@@ -51,6 +52,10 @@ func PrepareMidjourneyTaskBilling(relayInfo *relaycommon.RelayInfo, task *model.
 		return false, errors.New("legacy Midjourney billing does not support subscriptions")
 	}
 
+	task.PointsBillingID = relayInfo.PointsBillingID
+	if relayInfo.PointsBillingID != "" {
+		task.TokenId = relayInfo.TokenId
+	}
 	task.Quota = quota
 	task.BillingChannelId = task.ChannelId
 	if relayInfo.ChannelMeta != nil && relayInfo.ChannelId > 0 {
@@ -69,6 +74,32 @@ func SettleMidjourneyTaskBilling(relayInfo *relaycommon.RelayInfo, task *model.M
 	}
 	if task == nil || task.Id == 0 {
 		return false, errors.New("Midjourney task must be persisted before billing")
+	}
+
+	if task.PointsBillingID != "" {
+		result, err := model.SetPointCallTarget(task.PointsBillingID, task.PointsBillingID+":mj-submit", task.Quota, true, false, func(tx *gorm.DB, call *model.PointCallBilling) error {
+			locked, err := model.LockPointsMidjourneyBilling(tx, task.Id, task.OutcomeVersion)
+			if err != nil {
+				return err
+			}
+			if locked.PointsBillingID != call.ID || locked.UserId != call.UserID {
+				return model.ErrPointCallConflict
+			}
+			return model.CommitPointsMidjourneyBilling(tx, locked, task.Quota)
+		})
+		if err != nil {
+			return false, err
+		}
+		model.SyncPointCallCaches(result.Call.UserID, result.Call.TokenID)
+		relayInfo.PointsBillingMetadata = &result.Metadata
+		if s, ok := relayInfo.Billing.(*BillingSession); ok {
+			s.mu.Lock()
+			s.settled = true
+			s.fundingSettled = true
+			s.recordPointsMetadata(&result.Metadata)
+			s.mu.Unlock()
+		}
+		return true, nil
 	}
 
 	result, billingErr := postConsumeQuotaWithResult(relayInfo, task.Quota, 0, true)
@@ -94,6 +125,9 @@ func SettleMidjourneyTaskBilling(relayInfo *relaycommon.RelayInfo, task *model.M
 
 // RefundMidjourneyQuota reverses every accounting element recorded for a billed legacy task.
 func RefundMidjourneyQuota(ctx context.Context, task *model.Midjourney, reason string) bool {
+	if task.PointsBillingID != "" {
+		return refundPointsMidjourney(ctx, task, reason)
+	}
 	quota := task.Quota
 	if quota == 0 {
 		return true

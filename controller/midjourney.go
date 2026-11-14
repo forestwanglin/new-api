@@ -37,6 +37,17 @@ func runMidjourneyTaskUpdateOnce(ctx context.Context, report func(processed, tot
 		ctx = context.Background()
 	}
 
+	pending, pendingErr := model.GetPointsMidjourneyPendingSettlement(ctx, 200)
+	if pendingErr != nil {
+		logger.LogWarn(ctx, common.LogText("failed to read pending Midjourney points settlements: %v", pendingErr))
+	} else {
+		for _, task := range pending {
+			if ctx.Err() != nil {
+				return summary
+			}
+			service.SettlePointsMidjourneyOutcome(ctx, task)
+		}
+	}
 	tasks := model.GetAllUnFinishTasks()
 	if len(tasks) == 0 {
 		return summary
@@ -49,6 +60,10 @@ func runMidjourneyTaskUpdateOnce(ctx context.Context, report func(processed, tot
 	nullTaskIds := make([]int, 0)
 	for _, task := range tasks {
 		if task.MjId == "" {
+			if task.PointsBillingID != "" {
+				logger.LogWarn(ctx, common.LogText("points Midjourney task %d has no upstream identity; retaining uncertain billing", task.Id))
+				continue
+			}
 			// 统计失败的未完成任务
 			nullTaskIds = append(nullTaskIds, task.Id)
 			continue
@@ -101,6 +116,30 @@ func runMidjourneyTaskUpdateOnce(ctx context.Context, report func(processed, tot
 			continue
 		}
 		requestUrl := fmt.Sprintf("%s/mj/task/list-by-condition", *midjourneyChannel.BaseURL)
+		claimedIDs := make([]string, 0, len(taskIds))
+		polledTasks := make(map[string]*model.Midjourney, len(taskIds))
+		for _, taskID := range taskIds {
+			task := taskM[taskID]
+			if task == nil {
+				continue
+			}
+			now := time.Now().UnixMilli()
+			won, err := model.TryClaimPointsMidjourneyPoll(task, now, now+60000)
+			if err != nil {
+				logger.LogWarn(ctx, common.LogText("failed to claim Midjourney points poll %s: %v", taskID, err))
+				continue
+			}
+			if !won {
+				continue
+			}
+			claimedIDs = append(claimedIDs, taskID)
+			polledTasks[taskID] = task
+			defer model.ReleasePointsMidjourneyPoll(task)
+		}
+		if len(claimedIDs) == 0 {
+			continue
+		}
+		taskIds = claimedIDs
 
 		body, err := common.Marshal(map[string]any{
 			"ids": taskIds,
@@ -151,7 +190,7 @@ func runMidjourneyTaskUpdateOnce(ctx context.Context, report func(processed, tot
 		cancel()
 
 		for _, responseItem := range responseItems {
-			task := taskM[responseItem.MjId]
+			task := polledTasks[responseItem.MjId]
 			if task == nil {
 				logger.LogWarn(ctx, common.LogText("Midjourney task response ignored: unknown mj_id=%s", responseItem.MjId))
 				continue
@@ -205,6 +244,9 @@ func runMidjourneyTaskUpdateOnce(ctx context.Context, report func(processed, tot
 			if (task.Progress != "100%" && responseItem.FailReason != "") || (task.Progress == "100%" && task.Status == "FAILURE") {
 				logger.LogInfo(ctx, common.LogText("%s failed: %s", task.MjId, task.FailReason))
 				task.Progress = "100%"
+				if task.PointsBillingID != "" {
+					task.Status = "FAILURE"
+				}
 				if task.Quota != 0 {
 					shouldReturnQuota = true
 				}
@@ -212,6 +254,8 @@ func runMidjourneyTaskUpdateOnce(ctx context.Context, report func(processed, tot
 			won, err := task.UpdateWithStatus(preStatus)
 			if err != nil {
 				logger.LogError(ctx, common.LogText("UpdateMidjourneyTask task error: %s", err.Error()))
+			} else if won && task.PointsBillingID != "" && (task.Status == "SUCCESS" || task.Status == "FAILURE") {
+				service.SettlePointsMidjourneyOutcome(ctx, task)
 			} else if won && shouldReturnQuota {
 				service.RefundMidjourneyQuota(ctx, task, "Composition failed")
 			}

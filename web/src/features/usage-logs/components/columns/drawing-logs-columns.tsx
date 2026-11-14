@@ -50,6 +50,7 @@ import {
 import type { MidjourneyLog } from '../../types'
 import { ImageDialog } from '../dialogs/image-dialog'
 import { PromptDialog } from '../dialogs/prompt-dialog'
+import { LogPointsDisplay } from '../log-points-display'
 import {
   createDurationColumn,
   createChannelColumn,
@@ -191,6 +192,14 @@ export function useDrawingLogsColumns(
 
     columns.push(
       createProgressColumn<MidjourneyLog>({ headerLabel: t('Progress') }),
+      {
+        id: 'consumed_points',
+        header: t('Consumed points'),
+        cell: ({ row }) => (
+          <LogPointsDisplay billing={row.original.points_billing} />
+        ),
+      },
+
       {
         accessorKey: 'image_url',
         header: t('Image'),

@@ -28,17 +28,25 @@ import (
 // BillingSession 封装单次请求的预扣费/结算/退款生命周期。
 // 实现 relaycommon.BillingSettler 接口。
 type BillingSession struct {
-	relayInfo        *relaycommon.RelayInfo
-	funding          FundingSource
-	preConsumedQuota int    // 实际预扣额度（信任用户可能为 0）
-	tokenConsumed    int    // 令牌额度实际扣减量
-	extraReserved    int    // 发送前补充预扣的额度（订阅退款时需要单独回滚）
-	trusted          bool   // 是否命中信任额度旁路
-	fundingSettled   bool   // funding.Settle 已成功，资金来源已提交
-	settled          bool   // Settle 全部完成（资金 + 令牌）
-	refunded         bool   // Refund 已调用
-	lang             string // 请求声明的语言，为空表示未声明
-	mu               sync.Mutex
+	pointsObserved      bool
+	pointsUncertain     bool
+	pointsMode          bool
+	pointsID            string
+	freePoints          bool
+	pointsEventSequence int
+	pointsRealtimeQuota int
+	pointsContext       *gin.Context
+	relayInfo           *relaycommon.RelayInfo
+	funding             FundingSource
+	preConsumedQuota    int    // 实际预扣额度（信任用户可能为 0）
+	tokenConsumed       int    // 令牌额度实际扣减量
+	extraReserved       int    // 发送前补充预扣的额度（订阅退款时需要单独回滚）
+	trusted             bool   // 是否命中信任额度旁路
+	fundingSettled      bool   // funding.Settle 已成功，资金来源已提交
+	settled             bool   // Settle 全部完成（资金 + 令牌）
+	refunded            bool   // Refund 已调用
+	lang                string // 请求声明的语言，为空表示未声明
+	mu                  sync.Mutex
 }
 
 // Settle 根据实际消耗额度进行结算。
@@ -49,6 +57,9 @@ func (s *BillingSession) Settle(actualQuota int) error {
 	defer s.mu.Unlock()
 	if s.settled {
 		return nil
+	}
+	if s.pointsMode {
+		return s.pointsSettle(actualQuota, true)
 	}
 	delta := actualQuota - s.preConsumedQuota
 	if delta == 0 {
@@ -87,6 +98,17 @@ func (s *BillingSession) Settle(actualQuota int) error {
 // Refund 退还所有预扣费，幂等安全，异步执行。
 func (s *BillingSession) Refund(c *gin.Context) {
 	s.mu.Lock()
+	if s.pointsMode {
+		if !s.settled && !s.refunded && !s.pointsObserved && !s.pointsUncertain {
+			if err := s.pointsSettle(0, true); err != nil {
+				logger.LogError(c, common.LogText("points refund pending: %s", err.Error()))
+			} else {
+				s.refunded = true
+			}
+		}
+		s.mu.Unlock()
+		return
+	}
 	if s.settled || s.refunded || !s.needsRefundLocked() {
 		s.mu.Unlock()
 		return
@@ -136,6 +158,9 @@ func (s *BillingSession) NeedsRefund() bool {
 }
 
 func (s *BillingSession) needsRefundLocked() bool {
+	if s.pointsMode {
+		return !s.settled && !s.refunded && !s.freePoints && !s.pointsObserved && !s.pointsUncertain
+	}
 	if s.settled || s.refunded || s.fundingSettled {
 		// fundingSettled 时资金来源已提交结算，不能再退预扣费
 		return false
@@ -167,6 +192,9 @@ func (s *BillingSession) ReserveBeforeSubmit(targetQuota int) error {
 func (s *BillingSession) reserve(targetQuota int, requireAvailableQuota bool) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.pointsMode {
+		return s.pointsReserve(targetQuota)
+	}
 
 	if s.relayInfo != nil {
 		_, imageRequest := s.relayInfo.Request.(*dto.ImageRequest)
@@ -382,110 +410,15 @@ func (s *BillingSession) syncRelayInfo() {
 }
 
 // ---------------------------------------------------------------------------
-// NewBillingSession 工厂 — 根据计费偏好创建会话并处理回退
+// NewBillingSession 工厂 — 新调用统一使用积分会话
 // ---------------------------------------------------------------------------
 
-// NewBillingSession 根据用户计费偏好创建 BillingSession，处理 subscription_first / wallet_first 的回退。
+// NewBillingSession creates points admission for every new paid call. Legacy
+// funding implementations remain for already-submitted markerless tasks.
 func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preConsumedQuota int) (*BillingSession, *types.NewAPIError) {
 	if relayInfo == nil {
 		return nil, types.NewError(fmt.Errorf("relayInfo is nil"), types.ErrorCodeInvalidRequest, types.ErrOptionWithSkipRetry())
 	}
 
-	pref := common.NormalizeBillingPreference(relayInfo.UserSetting.BillingPreference)
-
-	// 钱包路径需要先检查用户额度
-	tryWallet := func() (*BillingSession, *types.NewAPIError) {
-		userQuota, err := model.GetUserQuota(relayInfo.UserId, false)
-		if err != nil {
-			return nil, types.NewError(err, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry())
-		}
-		if userQuota <= 0 {
-			return nil, types.NewErrorWithStatusCode(
-				errors.New(i18n.T(c, i18n.MsgQuotaUserInsufficient, map[string]any{"Remaining": logger.FormatQuota(userQuota)})),
-				types.ErrorCodeInsufficientUserQuota, http.StatusForbidden,
-				types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
-		}
-		if userQuota-preConsumedQuota < 0 {
-			return nil, types.NewErrorWithStatusCode(
-				errors.New(i18n.T(c, i18n.MsgQuotaPreConsumeInsufficient, map[string]any{"Remaining": logger.FormatQuota(userQuota), "Required": logger.FormatQuota(preConsumedQuota)})),
-				types.ErrorCodeInsufficientUserQuota, http.StatusForbidden,
-				types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
-		}
-		relayInfo.UserQuota = userQuota
-
-		session := &BillingSession{
-			relayInfo: relayInfo,
-			funding:   &WalletFunding{userId: relayInfo.UserId},
-			lang:      i18n.StatedLang(c),
-		}
-		if apiErr := session.preConsume(c, preConsumedQuota); apiErr != nil {
-			return nil, apiErr
-		}
-		return session, nil
-	}
-
-	trySubscription := func() (*BillingSession, *types.NewAPIError) {
-		subConsume := int64(preConsumedQuota)
-		if subConsume <= 0 {
-			subConsume = 1
-		}
-		session := &BillingSession{
-			relayInfo: relayInfo,
-			lang:      i18n.StatedLang(c),
-			funding: &SubscriptionFunding{
-				requestId: relayInfo.RequestId,
-				userId:    relayInfo.UserId,
-				modelName: relayInfo.GetBillingModelName(),
-				amount:    subConsume,
-			},
-		}
-		// 必须传 subConsume 而非 preConsumedQuota，保证 SubscriptionFunding.amount、
-		// preConsume 参数和 FinalPreConsumedQuota 三者一致，避免订阅多扣费。
-		if apiErr := session.preConsume(c, int(subConsume)); apiErr != nil {
-			return nil, apiErr
-		}
-		return session, nil
-	}
-
-	switch pref {
-	case "subscription_only":
-		return trySubscription()
-	case "wallet_only":
-		return tryWallet()
-	case "wallet_first":
-		session, err := tryWallet()
-		if err != nil {
-			if err.GetErrorCode() == types.ErrorCodeInsufficientUserQuota {
-				return trySubscription()
-			}
-			return nil, err
-		}
-		return session, nil
-	case "subscription_first":
-		fallthrough
-	default:
-		hasSub, subCheckErr := model.HasActiveUserSubscription(relayInfo.UserId)
-		if subCheckErr != nil {
-			return nil, types.NewError(subCheckErr, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry())
-		}
-		if !hasSub {
-			return tryWallet()
-		}
-		session, apiErr := trySubscription()
-		if apiErr != nil {
-			if apiErr.GetErrorCode() == types.ErrorCodeInsufficientUserQuota {
-				// 仅当用户的活跃订阅允许钱包回退时才回退到钱包，否则返回订阅额度不足错误
-				allowOverflow, overflowErr := model.UserActiveSubscriptionsAllowWalletOverflow(relayInfo.UserId)
-				if overflowErr != nil {
-					return nil, types.NewError(overflowErr, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry())
-				}
-				if allowOverflow {
-					return tryWallet()
-				}
-				return nil, apiErr
-			}
-			return nil, apiErr
-		}
-		return session, nil
-	}
+	return newPointsBillingSession(c, relayInfo, preConsumedQuota)
 }

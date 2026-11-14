@@ -193,10 +193,13 @@ export function parseTaskResult() { return {}; }
 func TestPreConsumePolicyDatabaseMatrix(t *testing.T) {
 	previousConfig := config.GlobalConfig.ExportAllConfigs()
 	previousUnit, previousBatch := common.QuotaPerUnit, common.BatchUpdateEnabled
+	previousRate := operation_setting.USDExchangeRate
+	operation_setting.USDExchangeRate = 1
 	common.QuotaPerUnit, common.BatchUpdateEnabled = 500000, false
 	t.Cleanup(func() {
 		require.NoError(t, config.GlobalConfig.LoadFromDB(previousConfig))
 		common.QuotaPerUnit, common.BatchUpdateEnabled = previousUnit, previousBatch
+		operation_setting.USDExchangeRate = previousRate
 	})
 	for _, dialect := range []struct{ kind, env string }{{"sqlite", ""}, {"mysql", "TEST_MYSQL_DSN"}, {"postgres", "TEST_POSTGRES_DSN"}} {
 		t.Run(dialect.kind, func(t *testing.T) {
@@ -204,7 +207,10 @@ func TestPreConsumePolicyDatabaseMatrix(t *testing.T) {
 				t.Skip("set " + dialect.env + " to run this database")
 			}
 			db := modelManagementDB(t, dialect.kind, os.Getenv(dialect.env))
-			require.NoError(t, db.AutoMigrate(&model.Token{}))
+			require.NoError(t, db.AutoMigrate(&model.Token{}, &model.PointType{}, &model.PointModelRule{}, &model.PointAccount{}, &model.PointTransaction{}, &model.PointLedger{}, &model.PointFreeze{}, &model.PointCallBilling{}, &model.PointCallEvent{}, &model.PointCallOperation{}))
+			pointType := model.PointType{Code: "POLICY_TEST", Name: "Policy points", ConsumePriority: 100}
+			require.NoError(t, db.Create(&pointType).Error)
+			require.NoError(t, db.Create(&model.PointModelRule{PointTypeId: pointType.Id, MatchType: model.PointMatchExact, MatchValue: "policy-model", Enabled: true}).Error)
 			for key, value := range map[string]string{
 				"quota_setting.trust_quota_usd":        "10.5",
 				"quota_setting.pre_consume_multiplier": "1.5",
@@ -255,13 +261,13 @@ func TestPreConsumePolicyDatabaseMatrix(t *testing.T) {
 				force, unlimited      bool
 				wantHeld              int
 			}{
-				{"above threshold", 10, 1, 5500000, 5500000, false, false, 0},
+				{"above threshold", 10, 1, 5500000, 5500000, false, false, 1500},
 				{"custom threshold", 20, 1, 5500000, 5500000, false, false, 1500},
 				{"zero disables bypass", 0, 1, 5500000, 5500000, false, false, 1500},
 				{"wallet equals threshold", 10, 1, 5000000, 5500000, false, false, 1500},
 				{"token equals threshold", 10, 1, 5500000, 5000000, false, false, 1500},
-				{"fractional threshold", 10.5, 1, 5250001, 5250001, false, false, 0},
-				{"unlimited token", 10, 1, 5500000, 0, false, true, 0},
+				{"fractional threshold", 10.5, 1, 5250001, 5250001, false, false, 1500},
+				{"unlimited token", 10, 1, 5500000, 0, false, true, 1500},
 				{"forced reservation", 10, 1, 5500000, 5500000, true, false, 1500},
 				{"half input cost", 0, 0.5, 100000, 100000, false, false, 750},
 				{"fractional multiple refunds excess", 0, 2.5, 100000, 100000, false, false, 3750},
@@ -272,19 +278,26 @@ func TestPreConsumePolicyDatabaseMatrix(t *testing.T) {
 					require.NoError(t, model.UpdateOption("quota_setting.pre_consume_multiplier", strconv.FormatFloat(tc.multiplier, 'f', -1, 64)))
 					user := model.User{Username: fmt.Sprintf("policy-user-%d", i), Quota: tc.wallet, Group: "default", AffCode: fmt.Sprintf("policy-aff-%d", i)}
 					require.NoError(t, db.Create(&user).Error)
-					token := model.Token{UserId: user.Id, Key: fmt.Sprintf("policy-token-%d", i), RemainQuota: tc.token, UnlimitedQuota: tc.unlimited}
+					account := model.PointAccount{UserId: int64(user.Id), PointTypeId: pointType.Id, AvailablePoints: 100_000}
+					require.NoError(t, db.Create(&account).Error)
+					token := model.Token{UserId: user.Id, Key: fmt.Sprintf("policy-token-%d", i), RemainQuota: tc.token, UnlimitedQuota: tc.unlimited, Status: common.TokenStatusEnabled}
 					require.NoError(t, db.Create(&token).Error)
 					ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 					ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
 					ctx.Set("token_quota", tc.token)
-					info := &relaycommon.RelayInfo{UserId: user.Id, TokenId: token.Id, TokenKey: token.Key, TokenUnlimited: tc.unlimited, ForcePreConsume: tc.force, OriginModelName: "policy-model", UserGroup: "default", UsingGroup: "default", BillingRequestInput: &billingexpr.RequestInput{}}
+					info := &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{}, UserId: user.Id, TokenId: token.Id, TokenKey: token.Key, TokenUnlimited: tc.unlimited, ForcePreConsume: tc.force, OriginModelName: "policy-model", UserGroup: "default", UsingGroup: "default", BillingRequestInput: &billingexpr.RequestInput{}}
 					info.UserSetting.BillingPreference = "wallet_only"
 					price, err := helper.ModelPriceHelper(ctx, info, 1000, &types.TokenCountMeta{MaxTokens: 10000})
 					require.NoError(t, err)
 					require.Nil(t, service.PreConsumeBilling(ctx, price.QuotaToPreConsume, info))
 					assert.Equal(t, tc.wantHeld, info.FinalPreConsumedQuota)
 					require.NoError(t, db.First(&user, user.Id).Error)
-					assert.Equal(t, tc.wallet-tc.wantHeld, user.Quota)
+					assert.Equal(t, tc.wallet, user.Quota, "new calls reserve points rather than money")
+					require.NoError(t, db.First(&account, account.Id).Error)
+					heldPoints, err := model.PointCallPoints(int64(tc.wantHeld), "1", "500000")
+					require.NoError(t, err)
+					assert.Equal(t, heldPoints, account.FrozenPoints)
+					assert.Equal(t, int64(100_000)-heldPoints, account.AvailablePoints)
 					if !tc.unlimited {
 						require.NoError(t, db.First(&token, token.Id).Error)
 						assert.Equal(t, tc.token-tc.wantHeld, token.RemainQuota)
@@ -295,6 +308,9 @@ func TestPreConsumePolicyDatabaseMatrix(t *testing.T) {
 					require.NoError(t, info.Billing.Settle(actual))
 					require.NoError(t, db.First(&user, user.Id).Error)
 					assert.Equal(t, tc.wallet-actual, user.Quota)
+					require.NoError(t, db.First(&account, account.Id).Error)
+					assert.Equal(t, int64(99_995), account.AvailablePoints)
+					assert.Zero(t, account.FrozenPoints)
 					if !tc.unlimited {
 						require.NoError(t, db.First(&token, token.Id).Error)
 						assert.Equal(t, tc.token-actual, token.RemainQuota)

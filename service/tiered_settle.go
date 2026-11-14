@@ -227,6 +227,11 @@ func PrepareTieredBillingForSelectedGroup(c *gin.Context, relayInfo *relaycommon
 	// initial group was free so downstream state stays consistent.
 	relayInfo.PriceData.FreeModel = false
 
+	if session, ok := relayInfo.Billing.(*BillingSession); ok && session.pointsMode && session.freePoints {
+		// A free initial group owns no financial hold. A paid selected group
+		// must establish a real points reservation before its upstream attempt.
+		relayInfo.Billing = nil
+	}
 	if relayInfo.Billing == nil {
 		return PreConsumeBilling(c, snap.EstimatedQuotaAfterGroup, relayInfo)
 	}

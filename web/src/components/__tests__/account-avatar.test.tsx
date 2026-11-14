@@ -5,7 +5,8 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router'
-import { render, screen, waitFor, act } from '@testing-library/react'
+import { render, screen, waitFor, act, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, expect, test, vi } from 'vitest'
 
 import { useAuthStore, type AuthUser } from '@/stores/auth-store'
@@ -42,10 +43,21 @@ async function showEntry(
       }
     }
   )
-  const currentUser = { ...user, avatar_url: avatar }
+  const currentUser = {
+    ...user,
+    avatar_url: avatar,
+    sidebar_modules: JSON.stringify({
+      personal: { enabled: true, topup: true },
+    }),
+  }
   useAuthStore.getState().auth.setUser(currentUser)
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
+  })
+  client.setQueryData(['status'], {
+    SidebarModulesAdmin: JSON.stringify({
+      personal: { enabled: true, topup: true },
+    }),
   })
   const router = createRouter({
     routeTree: createRootRoute({
@@ -86,6 +98,28 @@ async function showEntry(
 }
 
 for (const mobile of [false, true]) {
+  test(`${mobile ? 'mobile' : 'desktop'} entry hides the retired wallet despite saved true preferences`, async () => {
+    await showEntry(mobile, undefined, false)
+    if (mobile) {
+      expect(screen.getByRole('link', { name: 'Profile' })).toHaveAttribute(
+        'href',
+        '/profile'
+      )
+      expect(
+        screen.queryByRole('link', { name: 'Wallet' })
+      ).not.toBeInTheDocument()
+    } else {
+      const user = userEvent.setup()
+      await user.click(screen.getByRole('button'))
+      const menu = await screen.findByRole('menu')
+      expect(
+        within(menu).getByRole('menuitem', { name: 'Profile' })
+      ).toBeVisible()
+      expect(
+        within(menu).queryByRole('menuitem', { name: 'Wallet' })
+      ).not.toBeInTheDocument()
+    }
+  })
   test(`${mobile ? 'mobile' : 'desktop'} entry displays a loaded user avatar`, async () => {
     await showEntry(mobile, user.avatar_url, true)
     expect(await screen.findByRole('img', { name: '@Alice' })).toHaveAttribute(

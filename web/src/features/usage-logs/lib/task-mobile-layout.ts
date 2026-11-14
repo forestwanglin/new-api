@@ -30,4 +30,5 @@ export const TASK_MOBILE_SUMMARY_FIELDS: readonly TaskMobileSummaryField[] = [
   { id: 'duration', label: 'Duration', primaryOnly: true },
   { id: 'progress', label: 'Progress' },
   { id: 'artifacts', label: 'Artifacts' },
+  { id: 'consumed_points', label: 'Consumed points' },
 ]

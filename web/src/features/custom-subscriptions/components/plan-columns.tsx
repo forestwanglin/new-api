@@ -77,7 +77,7 @@ export function usePlanColumns(props: {
     },
     {
       accessorKey: 'priority',
-      header: t('Priority'),
+      header: `${t('Priority')} (${t('Higher values first')})`,
       size: 100,
       cell: ({ row }) => formatNumber(row.original.priority, locale),
     },

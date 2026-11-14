@@ -7812,6 +7812,10 @@
     "Model reference exchange rate (CNY per USD)": "Taux de référence des modèles (CNY par USD)",
     "CNY per USD used for overseas model reference prices and discounts only. Does not affect billing or payments.": "Montant en CNY par USD utilisé uniquement pour les prix de référence et les réductions des modèles étrangers. Sans effet sur la facturation ou les paiements.",
     "Access leading domestic and international models in one place · Choose text chat or video generation on demand": "Accédez aux principaux modèles chinois et internationaux en un seul endroit · Choisissez la conversation textuelle ou la génération vidéo selon vos besoins",
-    "Compare model configurations using fixed token usage. Platform usage counts follow the same point deduction rules.": "Comparez les configurations de modèles avec une utilisation fixe de tokens. Le décompte des utilisations de la plateforme suit les mêmes règles de déduction de points."
+    "Compare model configurations using fixed token usage. Platform usage counts follow the same point deduction rules.": "Comparez les configurations de modèles avec une utilisation fixe de tokens. Le décompte des utilisations de la plateforme suit les mêmes règles de déduction de points.",
+    "Consumed points": "Points consommés",
+    "Points settlement pending": "Règlement des points en attente",
+    "Points settlement failed": "Échec du règlement des points",
+    "Higher values first": "Les valeurs les plus élevées en premier"
   }
 }

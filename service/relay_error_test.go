@@ -13,6 +13,7 @@ import (
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/model"
+	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	kitdto "github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/setting/system_setting"
@@ -277,4 +278,31 @@ func TestRequestPolicyEventsReachLogAdminInfo(t *testing.T) {
 	other := model.NewLogOther()
 	AppendRelayLogAdminInfo(untouched, nil, other)
 	assert.NotContains(t, other.Snapshot()["admin_info"], "request_policy", "requests without decisions do not carry an empty record")
+}
+
+func TestPointsUncertainOutcomeRetainsHoldAndStopsRetry(t *testing.T) {
+	for _, code := range []types.ErrorCode{types.ErrorCodeDoRequestFailed, types.ErrorCodeReadResponseBodyFailed, types.ErrorCodeBadResponse, types.ErrorCodeBadResponseBody, types.ErrorCodeEmptyResponse, types.ErrorCodeAwsInvokeError, types.ErrorCodeChannelResponseTimeExceeded} {
+		t.Run(string(code), func(t *testing.T) {
+			c, _ := gin.CreateTestContext(httptest.NewRecorder())
+			info := &relaycommon.RelayInfo{RequestId: "uncertain"}
+			s := &BillingSession{pointsMode: true, pointsID: "uncertain", pointsContext: c, relayInfo: info}
+			info.Billing = s
+			c.Set("points_billing_session", s)
+			apiErr := types.NewError(errors.New("outcome unknown"), code)
+			decision := DecideRelayRetry(c, apiErr, 3)
+			assert.Equal(t, "stop", decision.Action)
+			assert.Equal(t, "uncertain_upstream_outcome", decision.Reason)
+			assert.False(t, s.NeedsRefund())
+			// No DB fixture: accidental release would attempt financial SQL.
+			s.Refund(c)
+			assert.False(t, s.refunded)
+			assert.True(t, c.GetBool("points_upstream_uncertain"))
+			meta, ok := info.PointsBillingMetadata.(*model.PointBillingMetadata)
+			require.True(t, ok)
+			assert.Equal(t, "pending", meta.Status)
+		})
+	}
+	for _, code := range []types.ErrorCode{types.ErrorCodeReadRequestBodyFailed, types.ErrorCodeConvertRequestFailed, types.ErrorCodeBadResponseStatusCode, types.ErrorCodeSensitiveWordsDetected} {
+		assert.False(t, PointsBillingOutcomeUncertain(types.NewError(errors.New("rejected"), code)))
+	}
 }

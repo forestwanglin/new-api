@@ -21,6 +21,14 @@ func DecideRelayRetry(c *gin.Context, err *types.NewAPIError, retryTimes int) Po
 	if err == nil {
 		return PolicyDecision{Action: "stop", Reason: "request_completed", Source: "system"}
 	}
+	if c != nil && PointsBillingOutcomeUncertain(err) {
+		if value, ok := c.Get("points_billing_session"); ok {
+			if session, ok := value.(*BillingSession); ok && session.pointsMode && !session.freePoints {
+				PreserveUncertainPointsBilling(session.relayInfo)
+				return PolicyDecision{Action: "stop", Reason: "uncertain_upstream_outcome", Source: "system"}
+			}
+		}
+	}
 	if ShouldSkipRetryAfterChannelAffinityFailure(c) {
 		source := RequestPolicy(c).SessionModeSource
 		if source == "" {

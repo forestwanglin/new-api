@@ -22,6 +22,45 @@ For commercial licensing, please contact support@quantumnous.com
  */
 import { z } from 'zod'
 
+const pointInteger = z
+  .string()
+  .max(20)
+  .regex(/^-?(0|[1-9]\d*)$/)
+
+export const pointBillingSchema = z
+  .object({
+    version: z.literal(1),
+    call_id: z.string(),
+    event_id: z.string(),
+    status: z.enum(['committed', 'pending', 'error']),
+    total_points: pointInteger,
+    items: z.array(
+      z.object({
+        point_type_id: z.string().regex(/^[1-9]\d*$/),
+        code: z.string(),
+        name: z.string(),
+        points: pointInteger,
+      })
+    ),
+  })
+  .refine((value) => {
+    if (value.status !== 'committed') return true
+    if (
+      !pointInteger.safeParse(value.total_points).success ||
+      value.items.some((item) => !pointInteger.safeParse(item.points).success)
+    ) {
+      return false
+    }
+    const ids = value.items.map((item) => item.point_type_id)
+    return (
+      new Set(ids).size === ids.length &&
+      value.items.reduce((total, item) => total + BigInt(item.points), 0n) ===
+        BigInt(value.total_points)
+    )
+  })
+
+export type PointBilling = z.infer<typeof pointBillingSchema>
+
 // Usage log schema
 export const usageLogSchema = z.object({
   id: z.number(),

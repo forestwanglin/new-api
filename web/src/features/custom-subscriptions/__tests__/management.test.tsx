@@ -123,6 +123,7 @@ describe('custom subscription management', () => {
     const title = await screen.findByRole('textbox', { name: 'Plan name' })
     const priority = screen.getByRole('textbox', { name: 'Priority' })
     expect(priority).toHaveValue('12')
+    expect(screen.getAllByText(/Higher values first/).length).toBeGreaterThan(0)
     await user.clear(priority)
     await user.type(priority, '0')
     await user.clear(title)

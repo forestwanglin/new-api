@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -122,7 +123,19 @@ func ChargeViolationFeeIfNeeded(ctx *gin.Context, relayInfo *relaycommon.RelayIn
 		return false
 	}
 
-	if err := PostConsumeQuota(relayInfo, feeQuota, 0, true); err != nil {
+	var chargeErr error
+	if relayInfo.PointsBillingID != "" {
+		result, err := model.SetPointCallTarget(relayInfo.PointsBillingID, relayInfo.PointsBillingID+":fee:violation", feeQuota, true, true, nil)
+		chargeErr = err
+		if err == nil {
+			model.SyncPointCallCaches(result.Call.UserID, result.Call.TokenID)
+			relayInfo.PointsBillingMetadata = &result.Metadata
+			ctx.Set("points_billing", &result.Metadata)
+		}
+	} else {
+		chargeErr = errors.New("violation fee requires points billing identity")
+	}
+	if err := chargeErr; err != nil {
 		logger.LogError(ctx, common.LogText("failed to charge violation fee: %s", err.Error()))
 		return false
 	}

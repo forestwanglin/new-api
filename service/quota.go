@@ -3,7 +3,6 @@ package service
 import (
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -89,15 +88,6 @@ func PreWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usag
 	if relayInfo.UsePrice {
 		return nil
 	}
-	userQuota, err := model.GetUserQuota(relayInfo.UserId, false)
-	if err != nil {
-		return err
-	}
-
-	token, err := model.GetTokenByKey(strings.TrimPrefix(relayInfo.TokenKey, "sk-"), false)
-	if err != nil {
-		return err
-	}
 
 	modelName := relayInfo.OriginModelName
 	textInputTokens := usage.InputTokenDetails.TextTokens
@@ -138,20 +128,11 @@ func PreWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usag
 	quota, clamp := calculateAudioQuota(quotaInfo)
 	noteQuotaClamp(relayInfo, clamp)
 
-	if userQuota < quota {
-		return fmt.Errorf("user quota is not enough, user quota: %s, need quota: %s", logger.FormatQuota(userQuota), logger.FormatQuota(quota))
+	if relayInfo.PointsBillingID != "" {
+		return pointsRealtimeConsume(relayInfo, quota)
 	}
+	return errors.New("realtime points billing session is missing")
 
-	if !token.UnlimitedQuota && token.RemainQuota < quota {
-		return fmt.Errorf("token quota is not enough, token remain quota: %s, need quota: %s", logger.FormatQuota(token.RemainQuota), logger.FormatQuota(quota))
-	}
-
-	err = PostConsumeQuota(relayInfo, quota, 0, false)
-	if err != nil {
-		return err
-	}
-	logger.LogInfo(ctx, common.LogText("realtime streaming consume quota success, quota: %d", quota))
-	return nil
 }
 
 func PostWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, modelName string,

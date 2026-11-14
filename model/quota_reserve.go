@@ -3,6 +3,7 @@ package model
 import (
 	"context"
 	"errors"
+	"math"
 
 	"github.com/QuantumNous/new-api/common"
 	"gorm.io/gorm"
@@ -119,42 +120,10 @@ func persistUserQuotaDelta(id int, delta int) error {
 	return nil
 }
 
-func persistTokenQuotaDelta(id int, delta int) error {
-	if common.BatchUpdateEnabled {
-		addNewRecord(BatchUpdateTypeTokenQuota, id, delta)
-		return nil
-	}
-	result := DB.Model(&Token{}).Where("id = ?", id).Updates(
-		map[string]any{
-			"remain_quota":  gorm.Expr("remain_quota + ?", delta),
-			"used_quota":    gorm.Expr("used_quota - ?", delta),
-			"accessed_time": common.GetTimestamp(),
-		},
-	)
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected != 1 {
-		return gorm.ErrRecordNotFound
-	}
-	return nil
-}
-
 func reserveUserQuotaDB(id int, quota int) (bool, error) {
 	result := DB.Model(&User{}).
 		Where("id = ? AND quota >= ?", id, quota).
 		Update("quota", gorm.Expr("quota - ?", quota))
-	return result.RowsAffected == 1, result.Error
-}
-
-func reserveTokenQuotaDB(id int, quota int) (bool, error) {
-	result := DB.Model(&Token{}).
-		Where("id = ? AND remain_quota >= ?", id, quota).
-		Updates(map[string]any{
-			"remain_quota":  gorm.Expr("remain_quota - ?", quota),
-			"used_quota":    gorm.Expr("used_quota + ?", quota),
-			"accessed_time": common.GetTimestamp(),
-		})
 	return result.RowsAffected == 1, result.Error
 }
 
@@ -197,43 +166,82 @@ func TryReserveUserQuota(id int, quota int) (bool, error) {
 	return true, nil
 }
 
-// TryReserveTokenQuota atomically checks and deducts a token quota. Unlimited
-// tokens skip the balance check but still update remain/used accounting.
-func TryReserveTokenQuota(id int, key string, quota int, unlimited bool) (bool, error) {
+// ReserveTokenQuotaTx uses the current persisted token, never a cached budget.
+// The caller owns the transaction and must invalidate the cache after commit.
+func ReserveTokenQuotaTx(tx *gorm.DB, id int, quota int, _ bool) (bool, error) {
 	if quota < 0 {
 		return false, errors.New("quota cannot be negative")
 	}
-	if quota == 0 {
-		return true, nil
+	token, err := lockTokenQuotaTx(tx, id)
+	if err != nil {
+		return false, err
 	}
-	if unlimited {
-		return true, DecreaseTokenQuota(id, key, quota)
-	}
-	if !common.RedisEnabled {
-		return reserveTokenQuotaDB(id, quota)
-	}
-
-	result, err := cacheTryReserveTokenQuota(id, key, int64(quota))
-	if err == nil && result == cacheQuotaMiss {
-		if _, hydrateErr := GetTokenByKey(key, true); hydrateErr == nil {
-			result, err = cacheTryReserveTokenQuota(id, key, int64(quota))
-		}
-	}
-	if err != nil || result == cacheQuotaMiss {
-		if err != nil {
-			common.SysLog(common.LogText("token quota cache reserve unavailable, falling back to database: %s", err.Error()))
-		}
-		return reserveTokenQuotaDB(id, quota)
-	}
-	if result == cacheQuotaInsufficient {
+	if token.Status != common.TokenStatusEnabled || (token.ExpiredTime != -1 && token.ExpiredTime < common.GetTimestamp()) {
 		return false, nil
 	}
-	if err = persistTokenQuotaDelta(id, -quota); err != nil {
-		compensated, compensateErr := cacheApplyTokenQuotaDelta(id, key, int64(quota))
-		if compensateErr != nil || compensated != cacheQuotaOK {
-			common.SysError(common.LogText("failed to compensate reserved token quota: result=%d error=%v", compensated, compensateErr))
-		}
+	if !token.UnlimitedQuota && token.RemainQuota < quota {
+		return false, nil
+	}
+	if err := adjustLockedTokenQuotaTx(tx, token, -quota); err != nil {
 		return false, err
 	}
 	return true, nil
+}
+
+// AdjustTokenQuotaTx records an observed debit (negative) or refund (positive).
+// Unlike admission, already-observed usage may exceed the remaining budget.
+func AdjustTokenQuotaTx(tx *gorm.DB, id int, delta int) error {
+	// A key deleted during an in-flight call is unusable for new admission,
+	// but its tombstone must still account for observed usage and refunds.
+	tx = tx.Unscoped().Session(&gorm.Session{})
+	token, err := lockTokenQuotaTx(tx, id)
+	if err != nil {
+		return err
+	}
+	return adjustLockedTokenQuotaTx(tx, token, delta)
+}
+
+func lockTokenQuotaTx(tx *gorm.DB, id int) (*Token, error) {
+	if id <= 0 {
+		return nil, errors.New("invalid token id")
+	}
+	// Acquire SQLite's writer lock before reading; other engines use row locks.
+	if common.UsingMainDatabase(common.DatabaseTypeSQLite) {
+		if err := tx.Model(&Token{}).Where("id = ?", id).UpdateColumn("accessed_time", gorm.Expr("accessed_time")).Error; err != nil {
+			return nil, err
+		}
+	}
+	var token Token
+	if err := lockForUpdate(tx).First(&token, id).Error; err != nil {
+		return nil, err
+	}
+	return &token, nil
+}
+
+func adjustLockedTokenQuotaTx(tx *gorm.DB, token *Token, delta int) error {
+	if (delta > 0 && (token.RemainQuota > math.MaxInt-delta || token.UsedQuota < math.MinInt+delta)) ||
+		(delta < 0 && (token.RemainQuota < math.MinInt-delta || token.UsedQuota > math.MaxInt+delta)) {
+		return errors.New("token quota overflow")
+	}
+	result := tx.Model(&Token{}).Where("id = ?", token.Id).Updates(map[string]any{
+		"remain_quota":  token.RemainQuota + delta,
+		"used_quota":    token.UsedQuota - delta,
+		"accessed_time": common.GetTimestamp(),
+	})
+	return result.Error
+}
+
+// TryReserveTokenQuota keeps the legacy API but uses the same DB authority as
+// points reservations. BatchUpdateEnabled and Redis cannot change admission.
+func TryReserveTokenQuota(id int, key string, quota int, unlimited bool) (bool, error) {
+	var reserved bool
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		var err error
+		reserved, err = ReserveTokenQuotaTx(tx, id, quota, unlimited)
+		return err
+	})
+	if err == nil && reserved {
+		invalidateTokenQuotaAfterCommit(key)
+	}
+	return reserved && err == nil, err
 }

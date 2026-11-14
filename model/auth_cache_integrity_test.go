@@ -262,7 +262,7 @@ func TestAuthCacheIntegrityDatabaseMatrix(t *testing.T) {
 				}))
 				defer func() { require.NoError(t, DB.Callback().Query().Remove("auth_cache_db_failure")) }()
 				_, err = GetTokenByKey(token.Key, false)
-				require.NoError(t, err, "valid token cache must not query the database")
+				assert.Error(t, err, "cached metadata cannot authorize quota while the authoritative database is unavailable")
 				_, err = GetUserSessionCached(session.SID)
 				require.NoError(t, err, "valid session cache must not query the database")
 				require.NoError(t, common.RDB.HSet(t.Context(), getTokenCacheKey(token.Key), "CacheMAC", "invalid").Err())

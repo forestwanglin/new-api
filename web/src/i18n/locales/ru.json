@@ -7814,6 +7814,10 @@
     "Model reference exchange rate (CNY per USD)": "Справочный курс моделей (CNY за USD)",
     "CNY per USD used for overseas model reference prices and discounts only. Does not affect billing or payments.": "Количество CNY за USD только для справочных цен и скидок зарубежных моделей. Не влияет на списания или платежи.",
     "Access leading domestic and international models in one place · Choose text chat or video generation on demand": "Ведущие китайские и международные модели в одном месте · Выбирайте текстовый диалог или генерацию видео по необходимости",
-    "Compare model configurations using fixed token usage. Platform usage counts follow the same point deduction rules.": "Сравнивайте конфигурации моделей при фиксированном расходе токенов. Подсчёт использований платформы соответствует правилам списания баллов."
+    "Compare model configurations using fixed token usage. Platform usage counts follow the same point deduction rules.": "Сравнивайте конфигурации моделей при фиксированном расходе токенов. Подсчёт использований платформы соответствует правилам списания баллов.",
+    "Consumed points": "Потраченные баллы",
+    "Points settlement pending": "Ожидается расчёт баллов",
+    "Points settlement failed": "Ошибка расчёта баллов",
+    "Higher values first": "Сначала большие значения"
   }
 }

@@ -335,7 +335,7 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (*TaskSubmitRe
 
 	// 7. 预扣费：首次尝试创建计费会话；重试时会话已存在，换到更贵的渠道要在
 	//    发起上游请求前补足预扣，余额不足就不发请求。
-	if info.Billing != nil || !info.PriceData.FreeModel {
+	{
 		info.ForcePreConsume = true
 		if apiErr := service.PreConsumeBilling(c, info.PriceData.Quota, info); apiErr != nil {
 			return nil, service.TaskErrorFromAPIError(apiErr)
@@ -351,9 +351,11 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (*TaskSubmitRe
 	// 9. 发送请求
 	resp, err := adaptor.DoRequest(c, info, requestBody)
 	if err != nil {
+		service.PreserveUncertainPointsBilling(info)
 		return nil, service.TaskErrorWrapper(err, "do_request_failed", http.StatusInternalServerError, common.UpstreamAddresses(c)...)
 	}
 	if resp == nil {
+		service.PreserveUncertainPointsBilling(info)
 		return nil, service.TaskErrorWrapperLocal(errors.New("upstream returned an empty response"), "fail_to_fetch_task", http.StatusBadGateway)
 	}
 	defer resp.Body.Close()
@@ -368,9 +370,11 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (*TaskSubmitRe
 	// task barrier and billing settlement.
 	parsed, taskErr := adaptor.ParseResponse(c, resp, info)
 	if taskErr != nil {
+		service.PreserveUncertainPointsBilling(info)
 		return nil, taskErr
 	}
 	if parsed == nil {
+		service.PreserveUncertainPointsBilling(info)
 		return nil, service.TaskErrorWrapperLocal(errors.New("task adaptor returned an empty response"), "plugin_submit_response_invalid", http.StatusBadGateway)
 	}
 

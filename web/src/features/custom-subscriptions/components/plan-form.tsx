@@ -109,7 +109,12 @@ export function PlanForm(props: {
           <PlanTextField name='code' label='Plan code' />
           <PlanTextField name='title' label='Plan name' />
           <PlanTextField name='subtitle' label='Subtitle' />
-          <PlanTextField name='priority' label='Priority' numeric />
+          <PlanTextField
+            name='priority'
+            label='Priority'
+            numeric
+            description='Higher values first'
+          />
           <div className='grid gap-4 sm:grid-cols-2'>
             <PlanTextField name='tier_code' label='Tier code' />
             <PlanTextField name='tier_rank' label='Tier rank' numeric />

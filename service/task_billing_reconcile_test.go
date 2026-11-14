@@ -7,7 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/model"
+	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -170,4 +172,112 @@ func TestReconcileArkSeedanceTaskBillingSkipsIneligibleTasks(t *testing.T) {
 	} {
 		assert.Equal(t, testCase.wantQuota, reloadTask(t, testCase.task.ID).Quota, testCase.taskReason)
 	}
+}
+
+func TestPointsTaskRecoveryReplaysAcceptedFailureWithoutStaleRecharge(t *testing.T) {
+	truncate(t)
+	pointsModels := []any{&model.PointType{}, &model.PointModelRule{}, &model.PointAccount{}, &model.PointTransaction{}, &model.PointLedger{}, &model.PointFreeze{}, &model.PointCallBilling{}, &model.PointCallEvent{}, &model.PointCallOperation{}}
+	require.NoError(t, model.DB.AutoMigrate(pointsModels...))
+	t.Cleanup(func() {
+		for i := len(pointsModels) - 1; i >= 0; i-- {
+			require.NoError(t, model.DB.Migrator().DropTable(pointsModels[i]))
+		}
+	})
+	seedUser(t, 801, 100)
+	seedToken(t, 801, 801, "points-recovery-token", 1000)
+	typ := model.PointType{Code: "RECOVERY", Name: "Recovery points", ConsumePriority: 100}
+	require.NoError(t, model.DB.Create(&typ).Error)
+	require.NoError(t, model.DB.Create(&model.PointModelRule{PointTypeId: typ.Id, MatchType: model.PointMatchExact, MatchValue: "points-recovery", Enabled: true}).Error)
+	account := model.PointAccount{UserId: 801, PointTypeId: typ.Id, AvailablePoints: 100}
+	require.NoError(t, model.DB.Create(&account).Error)
+	require.NoError(t, model.CreatePointCall("call-recovery", 801, 801, "points-recovery", "1", "1000"))
+	require.NoError(t, model.ReservePointCall("call-recovery", "call-recovery:reserve", 20, false))
+	task := &model.Task{TaskID: "points-recovery-task", Status: model.TaskStatusInProgress, Quota: 20, UserId: 801,
+		PrivateData: model.TaskPrivateData{PointsBillingID: "call-recovery", TokenId: 801}}
+	require.NoError(t, model.DB.Create(task).Error)
+	_, err := settlePointsTask(task, 20, "call-recovery:submit")
+	require.NoError(t, err)
+	assert.Equal(t, 80, getUserQuota(t, 801))
+
+	// Local expiry and repeated inability to observe accepted upstream work
+	// are not authoritative failures and must never trigger a refund.
+	previousTimeout, previousFailures := constant.TaskTimeoutMinutes, constant.TaskPollMaxFailures
+	constant.TaskTimeoutMinutes, constant.TaskPollMaxFailures = 1, 1
+	t.Cleanup(func() {
+		constant.TaskTimeoutMinutes, constant.TaskPollMaxFailures = previousTimeout, previousFailures
+	})
+	task.SubmitTime = time.Now().Add(-2 * time.Minute).Unix()
+	task.PrivateData.UpstreamTaskID = "accepted-upstream-recovery-task"
+	require.NoError(t, model.DB.Model(task).Updates(map[string]any{"submit_time": task.SubmitTime, "private_data": task.PrivateData}).Error)
+	sweepTimedOutTasks(context.Background())
+	task = reloadTask(t, task.ID)
+	assert.EqualValues(t, model.TaskStatusInProgress, task.Status)
+	assert.Equal(t, 20, task.Quota)
+	for _, class := range []string{pollClassTransport, pollClassAuth, pollClassHookError, pollClassUnrecognized, pollClassTransient, pollClassNotFound} {
+		now := time.Now().UnixMilli()
+		won, claimErr := model.TryClaimPointsTaskPoll(task, now, now+60000)
+		require.NoError(t, claimErr)
+		require.True(t, won)
+		require.NoError(t, recordPollFailure(context.Background(), nil, task, model.TaskStatusInProgress, class, 503, "unverified outcome"))
+		task = reloadTask(t, task.ID)
+		assert.EqualValues(t, model.TaskStatusInProgress, task.Status, class)
+		assert.Equal(t, 20, task.Quota, class)
+		assert.Nil(t, task.PrivateData.PointsOutcome, "lookup errors cannot manufacture an upstream failure")
+	}
+	// The shared not-found/gone shortcut must preserve funds as well.
+	nowMissing := time.Now().UnixMilli()
+	wonMissing, err := model.TryClaimPointsTaskPoll(task, nowMissing, nowMissing+60000)
+	require.NoError(t, err)
+	require.True(t, wonMissing)
+	require.NoError(t, failTaskFromPoll(context.Background(), nil, task, model.TaskStatusInProgress, "Upstream task not found"))
+	task = reloadTask(t, task.ID)
+	assert.EqualValues(t, model.TaskStatusInProgress, task.Status)
+	assert.Equal(t, 7, task.PrivateData.PollFailures)
+	assert.Equal(t, 80, getUserQuota(t, 801))
+	assert.Equal(t, 980, getTokenRemainQuota(t, 801))
+	require.NoError(t, model.DB.First(&account, account.Id).Error)
+	assert.EqualValues(t, 80, account.AvailablePoints)
+	assert.Zero(t, account.FrozenPoints)
+
+	now := time.Now().UnixMilli()
+	won, err := model.TryClaimPointsTaskPoll(task, now, now+60000)
+	require.NoError(t, err)
+	require.True(t, won)
+	stale := *task
+	task.Status = model.TaskStatusFailure
+	task.Progress = "100%"
+	task.PrivateData.PointsOutcome = relaycommon.FailTaskInfo("Upstream task not found")
+	won, err = task.UpdateWithStatus(model.TaskStatusInProgress)
+	require.NoError(t, err)
+	require.True(t, won)
+
+	// Publishing the accepted outcome succeeds while finance fails. The task
+	// must remain durably pending rather than losing the refund after restart.
+	t.Cleanup(func() { model.DB.Exec("DROP TRIGGER IF EXISTS fail_points_task_refund") })
+	require.NoError(t, model.DB.Exec(`CREATE TRIGGER fail_points_task_refund BEFORE UPDATE OF quota ON users BEGIN SELECT RAISE(ABORT, 'forced points refund failure'); END`).Error)
+	assert.False(t, RefundTaskQuota(context.Background(), task, "failed"))
+	require.NoError(t, model.DB.Exec("DROP TRIGGER fail_points_task_refund").Error)
+	pending := reloadTask(t, task.ID)
+	assert.Greater(t, pending.OutcomeVersion, pending.AppliedOutcomeVersion)
+	assert.Equal(t, 20, pending.Quota, "task marker rolls back with failed financial transaction")
+	assert.True(t, model.HasUnfinishedSyncTasks(), "accepted terminal finance wakes recovery")
+
+	recoverPointsTaskSettlements(context.Background())
+	settled := reloadTask(t, task.ID)
+	assert.Zero(t, settled.Quota)
+	assert.Equal(t, settled.OutcomeVersion, settled.AppliedOutcomeVersion)
+	assert.Equal(t, 100, getUserQuota(t, 801))
+	assert.Equal(t, 1000, getTokenRemainQuota(t, 801))
+	require.NoError(t, model.DB.First(&account, account.Id).Error)
+	assert.EqualValues(t, 100, account.AvailablePoints)
+	assert.Zero(t, account.FrozenPoints)
+
+	stale.Status = model.TaskStatusSuccess
+	stale.PrivateData.PointsOutcome = &relaycommon.TaskInfo{Status: string(model.TaskStatusSuccess), TotalTokens: 10}
+	won, err = stale.UpdateWithStatus(model.TaskStatusInProgress)
+	require.NoError(t, err)
+	assert.False(t, won)
+	assert.False(t, adjustPointsTask(context.Background(), &stale, 10, "stale correction"))
+	recoverPointsTaskSettlements(context.Background())
+	assert.Equal(t, 100, getUserQuota(t, 801), "old success and duplicate recovery cannot recharge")
 }

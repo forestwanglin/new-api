@@ -125,6 +125,7 @@ export function CommonLogMobileCard<TData>(props: {
   const metadata: FieldName[] = ['user', 'channel', 'token', 'group']
   const visibleMetadata = metadata.filter((id) => fields[id].visible)
   const costCell = props.cells.get('quota')
+  const pointsCell = props.cells.get('consumed_points')
   const contentCell = props.cells.get('content')
   const channelCell = props.cells.get('channel')
   const cacheRead = other?.cache_tokens || 0
@@ -161,6 +162,17 @@ export function CommonLogMobileCard<TData>(props: {
           </div>
         )}
       </div>
+      {pointsCell && (
+        <div className='grid min-w-0 gap-1'>
+          <span className='text-muted-foreground text-xs'>
+            {t('Consumed points')}
+          </span>
+          {flexRender(
+            pointsCell.column.columnDef.cell,
+            pointsCell.getContext()
+          )}
+        </div>
+      )}
       <div
         className='grid min-w-0 grid-cols-2 items-stretch gap-x-3'
         data-slot='log-time-and-timing'

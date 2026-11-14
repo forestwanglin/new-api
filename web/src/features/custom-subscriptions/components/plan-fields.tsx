@@ -21,6 +21,7 @@ import { useTranslation } from 'react-i18next'
 
 import {
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -38,6 +39,7 @@ export function PlanTextField(props: {
   name: TextName
   label: string
   multiline?: boolean
+  description?: string
   numeric?: boolean
   disabled?: boolean
   onValueChange?: (value: string) => void
@@ -66,6 +68,9 @@ export function PlanTextField(props: {
               />
             )}
           </FormControl>
+          {props.description && (
+            <FormDescription>{t(props.description)}</FormDescription>
+          )}
           <FormMessage />
         </FormItem>
       )}

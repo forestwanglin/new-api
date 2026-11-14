@@ -70,6 +70,7 @@ describe('points management', () => {
     expect(await screen.findByText('DS')).toBeVisible()
     expect(screen.getByText('Future points')).toBeVisible()
     expect(screen.getByText('20')).toBeVisible()
+    expect(screen.getByText(/Higher values first/)).toBeVisible()
     expect(
       screen.getByRole('button', { name: 'Manage model rules' })
     ).toBeEnabled()

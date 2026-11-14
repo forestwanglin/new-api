@@ -7,7 +7,6 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
-	"github.com/bytedance/gopkg/util/gopool"
 	"gorm.io/gorm"
 )
 
@@ -286,6 +285,13 @@ func GetTokenByKey(key string, fromDB bool) (token *Token, err error) {
 		// Try Redis first
 		token, err := cacheGetTokenByKey(key)
 		if err == nil {
+			// Quota counters are primary-DB authoritative even on a cache hit.
+			// A stale low counter cannot indefinitely reject a valid request.
+			var current Token
+			if err := DB.Select("remain_quota", "used_quota", "unlimited_quota").First(&current, token.Id).Error; err != nil {
+				return nil, err
+			}
+			token.RemainQuota, token.UsedQuota, token.UnlimitedQuota = current.RemainQuota, current.UsedQuota, current.UnlimitedQuota
 			return token, nil
 		}
 		// Don't return error - fall through to DB
@@ -316,9 +322,13 @@ func (token *Token) Update() (err error) {
 	if cacheErr := invalidateTokenCacheForMutation(token.Key); cacheErr != nil {
 		common.SysLog(common.LogText("failed to invalidate token cache before update: %s", cacheErr.Error()))
 	}
-	return DB.Model(token).Select("name", "status", "expired_time", "remain_quota", "unlimited_quota",
+	err = DB.Model(token).Select("name", "status", "expired_time", "remain_quota", "unlimited_quota",
 		"model_limits_enabled", "model_limits", "allow_ips", "group", "cross_group_retry", "auto_groups",
 		"allow_user_quota_query").Updates(token).Error
+	if err == nil {
+		invalidateTokenQuotaAfterCommit(token.Key)
+	}
+	return err
 }
 
 func (token *Token) SelectUpdate() (err error) {
@@ -326,7 +336,11 @@ func (token *Token) SelectUpdate() (err error) {
 		common.SysLog(common.LogText("failed to invalidate token cache before status update: %s", cacheErr.Error()))
 	}
 	// This can update zero values
-	return DB.Model(token).Select("accessed_time", "status").Updates(token).Error
+	err = DB.Model(token).Select("accessed_time", "status").Updates(token).Error
+	if err == nil {
+		invalidateTokenQuotaAfterCommit(token.Key)
+	}
+	return err
 }
 
 func (token *Token) Delete() (err error) {
@@ -361,9 +375,11 @@ func DisableModelLimits(tokenId int) error {
 	if err != nil {
 		return err
 	}
-	token.ModelLimitsEnabled = false
-	token.ModelLimits = ""
-	return token.Update()
+	err = DB.Model(token).Updates(map[string]any{"model_limits_enabled": false, "model_limits": ""}).Error
+	if err == nil {
+		invalidateTokenQuotaAfterCommit(token.Key)
+	}
+	return err
 }
 
 func DeleteTokenById(id int, userId int) (err error) {
@@ -379,64 +395,54 @@ func DeleteTokenById(id int, userId int) (err error) {
 	return token.Delete()
 }
 
-func IncreaseTokenQuota(tokenId int, key string, quota int) (err error) {
+func IncreaseTokenQuota(tokenId int, key string, quota int) error {
 	if quota < 0 {
 		return errors.New("quota cannot be negative")
 	}
-	if common.RedisEnabled {
-		gopool.Go(func() {
-			// 守卫式增量：哈希不存在时跳过，由下次读取从数据库水合，
-			// 绝不创建只有配额字段的残缺哈希。
-			if _, err := cacheApplyTokenQuotaDelta(tokenId, key, int64(quota)); err != nil {
-				common.SysLog(common.LogText("failed to increase token quota: %s", err.Error()))
-			}
-		})
+	if err := increaseTokenQuota(tokenId, quota); err != nil {
+		return err
 	}
-	if common.BatchUpdateEnabled {
-		addNewRecord(BatchUpdateTypeTokenQuota, tokenId, quota)
-		return nil
-	}
-	return increaseTokenQuota(tokenId, quota)
+	invalidateTokenQuotaAfterCommit(key)
+	return nil
 }
 
-func increaseTokenQuota(id int, quota int) (err error) {
-	err = DB.Model(&Token{}).Where("id = ?", id).Updates(
-		map[string]any{
-			"remain_quota":  gorm.Expr("remain_quota + ?", quota),
-			"used_quota":    gorm.Expr("used_quota - ?", quota),
-			"accessed_time": common.GetTimestamp(),
-		},
-	).Error
-	return err
+// Kept for draining existing local deltas; new writes never enqueue token quota.
+func increaseTokenQuota(id int, quota int) error {
+	return DB.Transaction(func(tx *gorm.DB) error { return AdjustTokenQuotaTx(tx, id, quota) })
 }
 
-func DecreaseTokenQuota(id int, key string, quota int) (err error) {
+func DecreaseTokenQuota(id int, key string, quota int) error {
 	if quota < 0 {
 		return errors.New("quota cannot be negative")
 	}
-	if common.RedisEnabled {
-		gopool.Go(func() {
-			if _, err := cacheApplyTokenQuotaDelta(id, key, int64(-quota)); err != nil {
-				common.SysLog(common.LogText("failed to decrease token quota: %s", err.Error()))
-			}
-		})
+	if err := decreaseTokenQuota(id, quota); err != nil {
+		return err
 	}
-	if common.BatchUpdateEnabled {
-		addNewRecord(BatchUpdateTypeTokenQuota, id, -quota)
-		return nil
-	}
-	return decreaseTokenQuota(id, quota)
+	invalidateTokenQuotaAfterCommit(key)
+	return nil
 }
 
-func decreaseTokenQuota(id int, quota int) (err error) {
-	err = DB.Model(&Token{}).Where("id = ?", id).Updates(
-		map[string]any{
-			"remain_quota":  gorm.Expr("remain_quota - ?", quota),
-			"used_quota":    gorm.Expr("used_quota + ?", quota),
-			"accessed_time": common.GetTimestamp(),
-		},
-	).Error
-	return err
+func decreaseTokenQuota(id int, quota int) error {
+	return DB.Transaction(func(tx *gorm.DB) error { return AdjustTokenQuotaTx(tx, id, -quota) })
+}
+
+func invalidateTokenQuotaAfterCommit(key string) {
+	if err := invalidateTokenCacheForMutation(key); err != nil {
+		common.SysLog(common.LogText("failed to invalidate committed token quota cache: %s", err.Error()))
+	}
+}
+
+// InvalidateTokenQuotaCache is a postcommit secondary effect, never a reason to
+// compensate a committed financial transaction. Reads obtain budget from DB.
+func InvalidateTokenQuotaCache(id int) error {
+	if !common.RedisEnabled || id <= 0 {
+		return nil
+	}
+	var token Token
+	if err := DB.Unscoped().Select("id", commonKeyCol).First(&token, id).Error; err != nil {
+		return err
+	}
+	return invalidateTokenCacheForMutation(token.Key)
 }
 
 // CountUserTokens returns total number of tokens for the given user, used for pagination

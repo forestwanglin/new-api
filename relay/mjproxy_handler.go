@@ -118,6 +118,9 @@ func RelayMidjourneyNotify(c *gin.Context) *dto.MidjourneyResponse {
 			Result:      "",
 		}
 	}
+	if midjourneyTask.PointsBillingID != "" {
+		return nil
+	} // Fenced authoritative polling owns points-mode outcomes.
 	midjourneyTask.Progress = midjRequest.Progress
 	midjourneyTask.PromptEn = midjRequest.PromptEn
 	midjourneyTask.State = midjRequest.State
@@ -212,26 +215,32 @@ func RelaySwapFace(c *gin.Context, info *relaycommon.RelayInfo) *dto.MidjourneyR
 		}
 	}
 
-	userQuota, err := model.GetUserQuota(info.UserId, false)
-	if err != nil {
-		return &dto.MidjourneyResponse{
-			Code:        4,
-			Description: err.Error(),
-		}
-	}
+	quotaToReserve := priceData.Quota
 
-	if userQuota-priceData.Quota < 0 {
-		return &dto.MidjourneyResponse{
-			Code:        4,
-			Description: "quota_not_enough",
-		}
+	if apiErr := service.PreConsumeBilling(c, quotaToReserve, info); apiErr != nil {
+		return &dto.MidjourneyResponse{Code: 4, Description: apiErr.Error()}
 	}
+	billingAccepted := false
+	defer func() {
+		if !billingAccepted && info.Billing != nil {
+			info.Billing.Refund(c)
+		}
+	}()
+
 	requestURL := getMjRequestPath(c.Request.URL.String())
 	baseURL := c.GetString("base_url")
 	fullRequestURL := fmt.Sprintf("%s%s", baseURL, requestURL)
 	service.RequestPolicy(c).BeginAttempt(&model.Channel{Id: c.GetInt("channel_id")}, info.UsingGroup)
 	mjResp, _, err := service.DoMidjourneyHttpRequest(c, time.Second*60, fullRequestURL)
 	accepted := service.RecordMidjourneyPolicyResponse(c, mjResp, err)
+	billingAccepted = accepted
+	if err != nil || mjResp.Response.Description == "empty_response_body" {
+		switch mjResp.Response.Description {
+		case "read_request_body_failed", "marshal_request_body_failed", "create_request_failed":
+		default:
+			service.PreserveUncertainPointsBilling(info)
+		}
+	}
 	if err != nil {
 		return &mjResp.Response
 	}
@@ -535,24 +544,31 @@ func RelayMidjourneySubmit(c *gin.Context, relayInfo *relaycommon.RelayInfo) *dt
 		}
 	}
 
-	userQuota, err := model.GetUserQuota(relayInfo.UserId, false)
-	if err != nil {
-		return &dto.MidjourneyResponse{
-			Code:        4,
-			Description: err.Error(),
-		}
+	quotaToReserve := priceData.Quota
+	if !consumeQuota {
+		quotaToReserve = 0
 	}
-
-	if consumeQuota && userQuota-priceData.Quota < 0 {
-		return &dto.MidjourneyResponse{
-			Code:        4,
-			Description: "quota_not_enough",
-		}
+	if apiErr := service.PreConsumeBilling(c, quotaToReserve, relayInfo); apiErr != nil {
+		return &dto.MidjourneyResponse{Code: 4, Description: apiErr.Error()}
 	}
+	billingAccepted := false
+	defer func() {
+		if !billingAccepted && relayInfo.Billing != nil {
+			relayInfo.Billing.Refund(c)
+		}
+	}()
 
 	service.RequestPolicy(c).BeginAttempt(&model.Channel{Id: c.GetInt("channel_id")}, relayInfo.UsingGroup)
 	midjResponseWithStatus, responseBody, err := service.DoMidjourneyHttpRequest(c, time.Second*60, fullRequestURL)
 	accepted := service.RecordMidjourneyPolicyResponse(c, midjResponseWithStatus, err)
+	billingAccepted = accepted
+	if err != nil || midjResponseWithStatus.Response.Description == "empty_response_body" {
+		switch midjResponseWithStatus.Response.Description {
+		case "read_request_body_failed", "marshal_request_body_failed", "create_request_failed":
+		default:
+			service.PreserveUncertainPointsBilling(relayInfo)
+		}
+	}
 	if err != nil {
 		return &midjResponseWithStatus.Response
 	}

@@ -98,7 +98,27 @@ func ensureLogRequestId(log *Log) {
 
 func createLog(log *Log) error {
 	ensureLogRequestId(log)
+	if meta := pointMetadataFromLog(log); meta != nil && meta.Status == "committed" && meta.EventID != "" {
+		return publishPointBillingLog(log, meta)
+	}
 	return LOG_DB.Create(log).Error
+}
+
+// logReadSource makes the public ClickHouse view idempotent by financial
+// event. A timed-out external insert may become visible only after recovery
+// retries it; MergeTree does not enforce request-id uniqueness. Deduplicate
+// before filters, pagination, counts, exports and sums. Noncommitted/legacy
+// rows retain their original multiplicity, including a shared request ID.
+func logReadSource() *gorm.DB {
+	if !common.UsingLogDatabase(common.DatabaseTypeClickHouse) {
+		return LOG_DB
+	}
+	const financial = "JSONExtractString(other, 'points_billing', 'status') = 'committed' AND JSONExtractString(other, 'points_billing', 'event_id') != ''"
+	return LOG_DB.Table(`(SELECT * FROM logs WHERE NOT (` + financial + `)
+ UNION ALL
+ SELECT * FROM (SELECT * FROM logs WHERE ` + financial + `
+ ORDER BY created_at DESC, length(other) DESC, request_id DESC
+ LIMIT 1 BY user_id, JSONExtractString(other, 'points_billing', 'event_id'))) AS logs`)
 }
 
 func clickHouseLogOrder(prefix string) string {
@@ -140,7 +160,7 @@ func GetLogByTokenId(tokenId int) (logs []*Log, err error) {
 	if common.UsingLogDatabase(common.DatabaseTypeClickHouse) {
 		order = clickHouseLogOrder("")
 	}
-	err = LOG_DB.Model(&Log{}).Where("token_id = ?", tokenId).Order(order).Limit(common.MaxRecentItems).Find(&logs).Error
+	err = logReadSource().Model(&Log{}).Where("token_id = ?", tokenId).Order(order).Limit(common.MaxRecentItems).Find(&logs).Error
 	formatUserLogs(logs, 0)
 	return logs, err
 }
@@ -346,6 +366,12 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 	upstreamRequestId := c.GetString(common.UpstreamRequestIdKey)
 	createdAt := common.GetTimestamp()
 	other := params.Other
+	if other == nil {
+		other = NewLogOther()
+	}
+	if points, ok := c.Get("points_billing"); ok {
+		other.SetPublic("points_billing", points)
+	}
 	content := other.setContent(params.Content)
 	otherStr := other.JSONString()
 	// 判断是否需要记录 IP
@@ -524,7 +550,7 @@ func (f LogFilter) apply(tx *gorm.DB) (*gorm.DB, error) {
 }
 
 func GetAllLogs(filter LogFilter, startIdx int, num int) (logs []*Log, total int64, err error) {
-	tx, err := filter.apply(LOG_DB)
+	tx, err := filter.apply(logReadSource())
 	if err != nil {
 		return nil, 0, err
 	}
@@ -590,7 +616,7 @@ func GetAllLogs(filter LogFilter, startIdx int, num int) (logs []*Log, total int
 const logSearchCountLimit = 10000
 
 func GetUserLogs(userId int, filter LogFilter, startIdx int, num int) (logs []*Log, total int64, err error) {
-	tx, err := filter.apply(LOG_DB.Where("logs.user_id = ?", userId))
+	tx, err := filter.apply(logReadSource().Where("logs.user_id = ?", userId))
 	if err != nil {
 		return nil, 0, err
 	}
@@ -617,7 +643,7 @@ func GetUserLogs(userId int, filter LogFilter, startIdx int, num int) (logs []*L
 // administrator with role sees it. Rows are read one at a time, so an export
 // never holds the whole result in memory.
 func StreamAllLogs(ctx context.Context, filter LogFilter, role int, fn func(*Log) error) error {
-	tx, err := filter.apply(LOG_DB.WithContext(ctx))
+	tx, err := filter.apply(logReadSource().WithContext(ctx))
 	if err != nil {
 		return err
 	}
@@ -645,7 +671,7 @@ func StreamAllLogs(ctx context.Context, filter LogFilter, role int, fn func(*Log
 // StreamUserLogs is StreamAllLogs for one user's own logs, shaped like the
 // user log list.
 func StreamUserLogs(ctx context.Context, userId int, filter LogFilter, fn func(*Log) error) error {
-	tx, err := filter.apply(LOG_DB.WithContext(ctx).Where("logs.user_id = ?", userId))
+	tx, err := filter.apply(logReadSource().WithContext(ctx).Where("logs.user_id = ?", userId))
 	if err != nil {
 		return err
 	}
@@ -687,10 +713,10 @@ type Stat struct {
 }
 
 func SumUsedQuota(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, channel int, group string) (stat Stat, err error) {
-	tx := LOG_DB.Table("logs").Select("COALESCE(sum(quota), 0) quota")
+	tx := logReadSource().Model(&Log{}).Select("COALESCE(sum(quota), 0) quota")
 
 	// 为rpm和tpm创建单独的查询
-	rpmTpmQuery := LOG_DB.Table("logs").Select("count(*) rpm, COALESCE(sum(prompt_tokens), 0) + COALESCE(sum(completion_tokens), 0) tpm")
+	rpmTpmQuery := logReadSource().Model(&Log{}).Select("count(*) rpm, COALESCE(sum(prompt_tokens), 0) + COALESCE(sum(completion_tokens), 0) tpm")
 
 	if tx, err = applyExplicitLogTextFilter(tx, "username", username); err != nil {
 		return stat, err
@@ -749,7 +775,7 @@ func SumUsedQuota(logType int, startTimestamp int64, endTimestamp int64, modelNa
 }
 
 func SumUsedToken(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string) (token int) {
-	tx := LOG_DB.Table("logs").Select("COALESCE(sum(prompt_tokens), 0) + COALESCE(sum(completion_tokens), 0)")
+	tx := logReadSource().Model(&Log{}).Select("COALESCE(sum(prompt_tokens), 0) + COALESCE(sum(completion_tokens), 0)")
 	if username != "" {
 		tx = tx.Where("username = ?", username)
 	}

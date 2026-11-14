@@ -9,6 +9,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
+	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 
 	"github.com/tidwall/gjson"
@@ -74,6 +75,27 @@ func reconcileArkSeedanceTaskBilling(ctx context.Context, now int64) (TaskBillin
 		}
 		if task.FinishTime == 0 || task.FinishTime > settleBefore {
 			summary.Skipped++
+			continue
+		}
+		if task.PrivateData.PointsBillingID != "" {
+			if !strings.HasPrefix(strings.ToLower(taskModelName(task)), arkSeedanceModelPrefix) {
+				summary.Skipped++
+				continue
+			}
+			summary.Eligible++
+			before := task.Quota
+			if err := refreshPointsTaskOutcome(ctx, task); err != nil {
+				summary.Failed++
+				logger.LogWarn(ctx, common.LogText("failed to refresh points task billing outcome %s: %v", task.TaskID, err))
+				continue
+			}
+			current, err := model.GetPointsTaskOutcome(ctx, task.ID)
+			if err != nil || current.AppliedOutcomeVersion < current.OutcomeVersion {
+				summary.Failed++
+				continue
+			}
+			summary.Settled++
+			summary.AdjustedQuota += int64(current.Quota - before)
 			continue
 		}
 		actualQuota, ok := arkSeedanceActualQuota(task)
@@ -185,4 +207,91 @@ func arkSeedanceOtherMultiplier(billingContext *model.TaskBillingContext) float6
 		multiplier *= ratio
 	}
 	return multiplier
+}
+
+// recoverPointsTaskSettlements replays accepted durable outcomes after a
+// financial failure or process restart. It never fabricates a new outcome
+// version from a stale scan, and remains part of the bounded async system task.
+func recoverPointsTaskSettlements(ctx context.Context) {
+	tasks, err := model.GetPointsTasksPendingSettlement(ctx, 200)
+	if err != nil {
+		logger.LogWarn(ctx, common.LogText("failed to read pending points task settlements: %v", err))
+		return
+	}
+	for _, scanned := range tasks {
+		if ctx.Err() != nil {
+			return
+		}
+		task, reloadErr := model.GetPointsTaskOutcome(ctx, scanned.ID)
+		if reloadErr != nil {
+			logger.LogWarn(ctx, common.LogText("failed to reload points task %d: %v", scanned.ID, reloadErr))
+			continue
+		}
+		if task.PrivateData.PointsBillingID == "" || task.AppliedOutcomeVersion >= task.OutcomeVersion {
+			continue
+		}
+		settleAcceptedPointsTask(ctx, task)
+	}
+}
+
+func settleAcceptedPointsTask(ctx context.Context, task *model.Task) {
+	if task.Status == model.TaskStatusFailure {
+		RefundTaskQuota(ctx, task, task.FailReason)
+		return
+	}
+	if task.Status != model.TaskStatusSuccess {
+		return
+	}
+	result := task.PrivateData.PointsOutcome
+	if result == nil {
+		// An immediate result with no measured facts retains its committed
+		// estimate, matching the original missing-usage policy.
+		RecalculateTaskQuota(ctx, task, task.Quota, common.NewMessage("Confirmed the task billing outcome"))
+		return
+	}
+	var adaptor TaskPollingAdaptor
+	if GetTaskAdaptorFunc != nil {
+		adaptor = GetTaskAdaptorFunc(task.Platform)
+	}
+	if !settleTaskBillingOnComplete(ctx, adaptor, task, result) {
+		RecalculateTaskQuota(ctx, task, task.Quota, common.NewMessage("Confirmed the task billing outcome"))
+	}
+}
+
+// refreshPointsTaskOutcome performs a fresh, exclusively fenced upstream read
+// for an explicit reconciliation correction. Stored scan data is never treated
+// as newer authoritative evidence. Failed/refunded tasks are not reopened.
+func refreshPointsTaskOutcome(ctx context.Context, scanned *model.Task) error {
+	task, err := model.GetPointsTaskOutcome(ctx, scanned.ID)
+	if err != nil {
+		return err
+	}
+	if task.PrivateData.PointsBillingID == "" || task.Status != model.TaskStatusSuccess {
+		return nil
+	}
+	if task.AppliedOutcomeVersion < task.OutcomeVersion {
+		settleAcceptedPointsTask(ctx, task)
+		return nil
+	}
+	if GetTaskAdaptorFunc == nil {
+		return nil
+	}
+	adaptor := GetTaskAdaptorFunc(task.Platform)
+	if adaptor == nil {
+		return nil
+	}
+	ch, err := model.CacheGetChannel(task.ChannelId)
+	if err != nil {
+		return err
+	}
+	info := &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{
+		ChannelType: ch.Type, ChannelId: ch.Id, ChannelBaseUrl: ch.GetBaseURL(),
+		ChannelSetting: ch.GetSetting(), HeadersOverride: ch.GetHeaderOverride(), ApiKey: ch.Key,
+	}}
+	adaptor.Init(info)
+	upstreamID := task.GetUpstreamTaskID()
+	if upstreamID == "" {
+		return nil
+	}
+	return updatePointsAwareVideoTask(ctx, adaptor, ch, upstreamID, map[string]*model.Task{upstreamID: task}, true)
 }

@@ -22,7 +22,7 @@ For commercial licensing, please contact support@quantumnous.com
 import type { RequestRuleTrace } from '@/features/pricing/lib/billing-expr'
 import type { PolicyEvent } from '@/features/system-settings/request-policies/api'
 
-import type { UsageLog } from './data/schema'
+import type { PointBilling, UsageLog } from './data/schema'
 // ============================================================================
 // Log Category Types
 // ============================================================================
@@ -115,6 +115,7 @@ export interface ToolSurchargeItem {
 }
 
 export interface LogOtherData {
+  points_billing?: PointBilling
   admin_info?: {
     request_policy?: PolicyEvent[]
     is_multi_key?: boolean
@@ -294,6 +295,7 @@ export interface LogStatistics {
 // ============================================================================
 
 export interface MidjourneyLog {
+  points_billing?: PointBilling
   id: number
   user_id: number
   channel_id: number
@@ -322,6 +324,7 @@ export interface MidjourneyLog {
 // ============================================================================
 
 export interface TaskLog {
+  points_billing?: PointBilling
   id: number
   user_id: number
   username?: string

@@ -54,7 +54,6 @@ const DEFAULT_SIDEBAR_MODULES: SidebarModulesAdminConfig = {
   },
   personal: {
     enabled: true,
-    topup: true,
     points_wallet: true,
     my_subscription: true,
     personal: true,
@@ -186,6 +185,8 @@ function isModuleEnabled(
   adminConfig: SidebarModulesAdminConfig,
   userConfig: SidebarModulesUserConfig
 ): boolean {
+  // The legacy wallet stays routable, but no console preference restores its entry.
+  if (url === '/wallet') return false
   const mapping = URL_TO_CONFIG_MAP[url]
   if (!mapping) {
     // No mapping config, default to visible (e.g. system settings and new features)

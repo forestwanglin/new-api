@@ -19,6 +19,7 @@ import (
 	"github.com/QuantumNous/new-api/relay"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/types"
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
@@ -544,7 +545,7 @@ func openTaskDialectDatabase(t *testing.T, models ...any) (*gorm.DB, common.Data
 }
 
 func TestImmediateTaskSettlementDatabase(t *testing.T) {
-	db, dialect := openTaskDialectDatabase(t, &model.User{}, &model.Channel{}, &model.Task{}, &model.Log{})
+	db, dialect := openTaskDialectDatabase(t, &model.User{}, &model.Channel{}, &model.Task{}, &model.Log{}, &model.PointType{}, &model.PointModelRule{}, &model.PointAccount{}, &model.PointTransaction{}, &model.PointLedger{}, &model.PointFreeze{}, &model.PointCallBilling{}, &model.PointCallEvent{}, &model.PointCallOperation{})
 	oldDB, oldLogDB := model.DB, model.LOG_DB
 	oldMain, oldLog := common.MainDatabaseType(), common.LogDatabaseType()
 	oldRedis, oldMemory, oldBatch, oldConsume, oldExport := common.RedisEnabled, common.MemoryCacheEnabled, common.BatchUpdateEnabled, common.LogConsumeEnabled, common.DataExportEnabled
@@ -556,6 +557,13 @@ func TestImmediateTaskSettlementDatabase(t *testing.T) {
 		common.SetDatabaseTypes(oldMain, oldLog)
 		common.RedisEnabled, common.MemoryCacheEnabled, common.BatchUpdateEnabled, common.LogConsumeEnabled, common.DataExportEnabled = oldRedis, oldMemory, oldBatch, oldConsume, oldExport
 	})
+
+	previousRate := operation_setting.USDExchangeRate
+	operation_setting.USDExchangeRate = 1
+	t.Cleanup(func() { operation_setting.USDExchangeRate = previousRate })
+	pointType := model.PointType{Code: "TASK_TEST", Name: "Task points", ConsumePriority: 100}
+	require.NoError(t, db.Create(&pointType).Error)
+	require.NoError(t, db.Create(&model.PointModelRule{PointTypeId: pointType.Id, MatchType: model.PointMatchExact, MatchValue: "document-model", Enabled: true}).Error)
 
 	const expression = `u("units") == 7 ? tier("missing", u("missing") * 1.0) : u("units") == 8 ? tier("invalid", -1.0) : u("units") > 3 ? tier("bulk", u("units") * 0.01) : tier("small", u("units") * 0.01)`
 	withTieredBillingConfig(t, map[string]string{"document-model": "tiered_expr"}, map[string]string{"document-model": expression})
@@ -595,6 +603,8 @@ export function buildQueryRequest(){throw new Error("completed submissions must 
 			initial := int(20 * common.QuotaPerUnit)
 			user := model.User{Username: fmt.Sprintf("task_user_%d", index), AffCode: fmt.Sprintf("task_aff_%d", index), Quota: initial}
 			require.NoError(t, db.Create(&user).Error)
+			account := model.PointAccount{UserId: int64(user.Id), PointTypeId: pointType.Id, AvailablePoints: 20_000}
+			require.NoError(t, db.Create(&account).Error)
 			ch := model.Channel{Name: "test provider", Type: constant.ChannelTypeTaskPlugin}
 			require.NoError(t, db.Create(&ch).Error)
 			c := taskSubmissionTestContext()
@@ -634,6 +644,11 @@ export function buildQueryRequest(){throw new Error("completed submissions must 
 			require.NoError(t, db.First(&updated, user.Id).Error)
 			assert.Equal(t, initial-want, updated.Quota)
 			assert.Equal(t, want, updated.UsedQuota)
+			require.NoError(t, db.First(&account, account.Id).Error)
+			expectedPoints, err := model.PointCallPoints(int64(want), "1", fmt.Sprint(common.QuotaPerUnit))
+			require.NoError(t, err)
+			assert.Equal(t, int64(20_000)-expectedPoints, account.AvailablePoints)
+			assert.Zero(t, account.FrozenPoints)
 			var logs []model.Log
 			require.NoError(t, db.Where("user_id = ?", user.Id).Find(&logs).Error)
 			require.Len(t, logs, 1)
@@ -689,4 +704,58 @@ func TestExecuteTaskSubmissionRefundsWhenFinalReserveFails(t *testing.T) {
 	assert.Equal(t, []string{"reserve", "refund"}, events)
 	assert.Equal(t, 1, billing.refunds)
 	assert.False(t, c.Writer.Written())
+}
+
+func TestExecutePointsTaskSubmissionPersistsAcceptanceAfterCallerCancellation(t *testing.T) {
+	db, dialect := openTaskDialectDatabase(t, &model.User{}, &model.Channel{}, &model.Task{}, &model.Log{}, &model.PointType{}, &model.PointModelRule{}, &model.PointAccount{}, &model.PointTransaction{}, &model.PointLedger{}, &model.PointFreeze{}, &model.PointCallBilling{}, &model.PointCallEvent{}, &model.PointCallOperation{})
+	oldDB, oldLogDB := model.DB, model.LOG_DB
+	oldMain, oldLog := common.MainDatabaseType(), common.LogDatabaseType()
+	oldRedis, oldBatch, oldConsume := common.RedisEnabled, common.BatchUpdateEnabled, common.LogConsumeEnabled
+	oldRate, oldUnit := operation_setting.USDExchangeRate, common.QuotaPerUnit
+	model.DB, model.LOG_DB = db, db
+	common.SetDatabaseTypes(dialect, dialect)
+	common.RedisEnabled, common.BatchUpdateEnabled, common.LogConsumeEnabled = false, false, false
+	operation_setting.USDExchangeRate, common.QuotaPerUnit = 1, 1000
+	t.Cleanup(func() {
+		model.DB, model.LOG_DB = oldDB, oldLogDB
+		common.SetDatabaseTypes(oldMain, oldLog)
+		common.RedisEnabled, common.BatchUpdateEnabled, common.LogConsumeEnabled = oldRedis, oldBatch, oldConsume
+		operation_setting.USDExchangeRate, common.QuotaPerUnit = oldRate, oldUnit
+	})
+	user := model.User{Username: "cancelled_points_user", AffCode: "cancelled_points_aff", Quota: 100}
+	require.NoError(t, db.Create(&user).Error)
+	pointType := model.PointType{Code: "CANCELLED", Name: "Cancellation points", ConsumePriority: 100}
+	require.NoError(t, db.Create(&pointType).Error)
+	require.NoError(t, db.Create(&model.PointModelRule{PointTypeId: pointType.Id, MatchType: model.PointMatchExact, MatchValue: "plugin-model", Enabled: true}).Error)
+	account := model.PointAccount{UserId: int64(user.Id), PointTypeId: pointType.Id, AvailablePoints: 10}
+	require.NoError(t, db.Create(&account).Error)
+	c := taskSubmissionTestContext()
+	requestContext, cancel := context.WithCancel(c.Request.Context())
+	defer cancel()
+	c.Request = c.Request.WithContext(requestContext)
+	info := taskSubmissionRelayInfo(nil)
+	info.UserId, info.IsPlayground = user.Id, true
+	require.Nil(t, service.PreConsumeBilling(c, 10, info))
+
+	outcome, taskErr := executeTaskSubmissionWith(c, info, func(*gin.Context, *relaycommon.RelayInfo) (*relay.TaskSubmitResult, *dto.TaskError) {
+		cancel()
+		return &relay.TaskSubmitResult{UpstreamTaskID: "accepted-before-cancel", Platform: constant.TaskPlatform("plugin"), Quota: 20}, nil
+	})
+	require.Nil(t, taskErr)
+	require.NotNil(t, outcome)
+	var task model.Task
+	require.NoError(t, db.First(&task, outcome.Task.ID).Error)
+	assert.Equal(t, "accepted-before-cancel", task.PrivateData.UpstreamTaskID)
+	assert.Equal(t, info.PointsBillingID, task.PrivateData.PointsBillingID)
+	assert.Equal(t, 20, task.Quota)
+	assert.Equal(t, task.OutcomeVersion, task.AppliedOutcomeVersion)
+	require.NoError(t, db.First(&user, user.Id).Error)
+	assert.Equal(t, 80, user.Quota)
+	require.NoError(t, db.First(&account, account.Id).Error)
+	assert.EqualValues(t, -10, account.AvailablePoints, "accepted work settles its actual cost even when an extra hold is unavailable")
+	assert.Zero(t, account.FrozenPoints)
+	call, err := model.GetPointCall(info.PointsBillingID)
+	require.NoError(t, err)
+	assert.Equal(t, "submitted", call.Dispatch)
+	assert.EqualValues(t, 20, call.BookedQuota)
 }

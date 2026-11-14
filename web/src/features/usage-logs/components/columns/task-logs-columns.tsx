@@ -33,6 +33,7 @@ import { cn } from '@/lib/utils'
 import { taskActionMapper, taskStatusMapper } from '../../lib/mappers'
 import type { TaskLog } from '../../types'
 import { TaskDetailsDialog } from '../dialogs/task-details-dialog'
+import { LogPointsDisplay } from '../log-points-display'
 import { PluginAuthorLink } from '../plugin-author-link'
 import { TaskArtifactsCell } from '../task-artifacts'
 import { useUsageLogsContext } from '../usage-logs-provider'
@@ -251,6 +252,14 @@ export function useTaskLogsColumns(
         },
       },
       createProgressColumn<TaskLog>({ headerLabel: t('Progress') }),
+      {
+        id: 'consumed_points',
+        header: t('Consumed points'),
+        cell: ({ row }) => (
+          <LogPointsDisplay billing={row.original.points_billing} />
+        ),
+      },
+
       {
         id: 'artifacts',
         header: t('Artifacts'),

@@ -71,7 +71,6 @@ export const SIDEBAR_MODULES_DEFAULT: SidebarModulesAdminConfig = {
   },
   personal: {
     enabled: true,
-    topup: true,
     points_wallet: true,
     my_subscription: true,
     personal: true,
@@ -212,7 +211,12 @@ export function parseSidebarModulesAdmin(
 
       Object.entries(raw as Record<string, unknown>).forEach(
         ([moduleKey, moduleValue]) => {
-          if (moduleKey === 'enabled') return
+          if (
+            moduleKey === 'enabled' ||
+            (sectionKey === 'personal' && moduleKey === 'topup')
+          ) {
+            return
+          }
           sectionConfig[moduleKey] = toBoolean(
             moduleValue,
             defaultSection[moduleKey] ?? true

@@ -952,6 +952,16 @@
 - 验证：新增回归修复前失败、修复后通过；接入引导及首页 2 个测试文件 17 用例通过，覆盖普通用户、旧接口拒绝、新接口取价、分组倍率及不请求旧接口。`bun run typecheck`（1584 文件、2 项目）、`bun run build`、三文件 oxlint/oxfmt 与 `git diff --check` 通过；`go test ./router -run TestModelPlazaPricing -count=1` 通过。
 - 风险与未覆盖：仅调整前端取价来源，需更新服务器前端资源才能生效；未连接生产用户会话或执行服务器部署。
 
+### Z057 模型调用积分准入、原子结算与恢复
+
+- 需求与原因：新模型调用必须用适用积分覆盖预估费用，按大值优先扣减；继续费用记账，允许实际费用形成积分欠额并由同类型充值补足，保留 Key 预算、业务冻结隔离和旧任务兼容。
+- 变更内容：新增 `PointCallBilling` / `PointCallEvent` / `PointCallOperation`，积分、有限 Key 预留、用户 quota、流水/版本同主库事务。按对外模型匹配规则及快照，精确计算累计 ceil，多类型分摊，退款逆序恢复。新调用不再使用旧订阅额度/偏好；旧无标识任务仍原路完成。同步、Realtime、图片音频、插件任务、Midjourney、违规附加费统一接入。异步结果使用持久租约/fence、outcome/applied 版本及原子任务结算；旧轮询不能重开已退款任务。未知已发送结果保留冻结并停止重发，接受任务后的客户端取消仍独立限时持久化。按 retry_at 公平恢复财务目标、缓存和日志，Task/MJ 结算队列也使用持久重试租约。充值允许负可用值，原冻结/溢出/支付幂等不变。日志费用后显示本条各类型积分贡献，任务/绘图显示安全汇总；隐藏旧钱包侧栏/账号/移动入口，保留积分钱包/我的订阅；积分类型及订阅计划优先级标明“大值优先”，同步七种语言和设置默认值。
+- 影响面：新增 `model/point_call_{billing,effects}.go`、`model/task_points_outcome.go`、`service/points_{billing,task_billing,billing_recovery}.go`、共享积分日志 renderer；调整积分迁移/充值及既有回归。**上游自有文件**：`model/{token,quota_reserve,log,task,midjourney}.go`、`controller/{token,relay,midjourney,plugin_protocol}.go`、`relay/{request_billing,relay_task,mjproxy_handler}.go`、`relay/common/relay_info.go`、`service/{billing_session,quota,midjourney,task_billing,task_polling,task_billing_reconcile,violation_fee,relay_error}.go` 及对应既有测试；前端使用日志/任务/绘图 schema、列、移动卡片，账号下拉/移动抽屉、侧栏 hooks/维护设置/用户菜单设置，积分类型页/订阅计划字段及七种 locale 和既有测试。上游升级时需整体复核，不能只保留新增财务文件。
+- 与上游差异：替代余额充足/信任额度/旧订阅准入，以及 Redis/批量 Key 记账。新二进制所有 Key 预算写入以主库为唯一权威，提交后缓存失效；用户/channel统计为副作用。新增持久积分账务和安全日志投影，Task/MJ 终态及修正依据持久版本事实。`service/tiered_settle.go`（上游自有文件）在免费组切付费组时将无持仓免费会话替换为真实积分预留，保持选路前准入。
+- 开关与默认值：无新增生产依赖或业务开关，新调用常开。换算 `ceil(quota × USDExchangeRate ×1000 / QuotaPerUnit)`；大值优先，同值小 ID 先。GENERAL=100、GPT=10 仍原值，不自动改配置。`model_points_recovery` 每分钟处理有界队列，60秒持久重试租约，未知 dispatch 不自动过期退款。旧路由/支付接口和已有订阅不删除。
+- 验证：`go test ./model -run TestPointCall -count=1` 在真实 SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 17.11 全通过，覆盖账户/冻结一致性、并发预留、负账/同类型补足、累计取整、重复/冲突事件、故障回滚/恢复、日志插入后未确认去重和 limit1 队首失败不阻塞后项。`go test ./service -run TestPointsUncertainOutcomeRetainsHoldAndStopsRetry -count=1` 通过，验证模糊传输/响应错误保留冻结并停止重发。固定价格（独立日志库）、即时任务及预占策略矩阵三数据库通过，Key 主库权威/缓存矩阵三数据库通过，Task/MJ 迁移、防旧结果覆盖及公平恢复三数据库通过。真实 ClickHouse 26.8.37.168 日志读取去重红绿通过，覆盖列表/count/分页、Key 查询、导出和费用/token 聚合；物理重放不承诺唯一，公共投影按用户及已提交事件去重（大日志库需关注新增 JSON/排序查询成本，未做生产规模压测）。后端 model/service/controller/relay/.../middleware/router 集成排除下述已在独立 HEAD 复现的4项既有测试后通过，go vet 受影响包、go build ./... 通过。4项基线为 TestOpenAIChatSamplingCompatibility、TestAPITokenAuditDatabaseMatrix、TestAdaptorMasksDialedHostsInDialFailure、TestAccessTokenRouteRulesCoverEveryDashboardRoute，未修无关功能或弱化断言。前端91个专项测试、typecheck（1586文件/2项目）、生产构建、修改文件lint/format通过；全量排除既有 detail-preview localized 测试超时后273文件/2948用例通过，该超时独立 HEAD 同样复现。全库格式检查另有33个未修改文件的既有问题。隔离Chrome桌面与390×844移动端核实积分列、多类型展示、旧钱包菜单隐藏及优先级文案；HTTP/WebSocket 使用本地上游桩完成真实准入/结算测试，未发起商业模型付费请求。
+- 风险与未覆盖：**禁止混跑旧/新准入节点；必须停止全部旧 writer，取得旧 user/token 批量账务的持久排空/对账证据后统一切换**。旧批量实现先丢缓冲后 SQL、失败仅日志，空缓冲/等待/finished 都不构成证据；无法证明时阻止启用，先运维对账或另行发布可靠排空准备版本。回滚也需排空新冻结/任务/副作用并保留表。未知上游结果仍需凭证据对账，不能按超时擅退。详见 [points-schema.md](points-schema.md)。仅隔离测试库验证，未执行生产升级、部署或正式发行版完整数据库演练；ClickHouse 日志故障恢复单独验证，主库三引擎矩阵不代表 ClickHouse。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
@@ -960,6 +970,7 @@
 
 | 区域 | 文件 | 关联条目 |
 |---|---|---|
+| 模型积分准入与结算 | `model/{token,quota_reserve,log,task,midjourney}.go`、`controller/{token,relay,midjourney,plugin_protocol}.go`、`relay/{request_billing,relay_task,mjproxy_handler,common/relay_info}.go`、`service/{billing_session,quota,midjourney,task_billing,task_polling,task_billing_reconcile,violation_fee,relay_error}.go` 及测试；使用日志/任务/绘图 schema 和列、账号/移动菜单、侧栏/维护设置、七种 locale 及相关测试 | Z057 |
 | 首页接入引导取价 | `web/src/features/dashboard/components/overview/access-guide/index.tsx` 及接入引导、首页测试 | Z056 |
 | 新模型页公开定价入口 | `router/api-router.go`、`middleware/access_token_routes.go`、`web/src/features/pricing/api.ts`、`web/src/features/pricing/hooks/use-pricing-data.ts`、七种locale | Z051、Z052、Z053、Z054、Z055 |
 | 模型页参考汇率配置 | `setting/operation_setting/general_setting.go`、`controller/{misc,option}.go`、`web/src/features/system-settings/` 相关表单/类型/注册/hooks、`web/src/lib/status-query.ts`、`web/src/stores/system-config-store.ts` 及相关测试 | Z054 |

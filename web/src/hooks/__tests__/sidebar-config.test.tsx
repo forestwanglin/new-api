@@ -105,7 +105,6 @@ describe('security sidebar visibility', () => {
         .find((group) => group.id === 'personal')
         ?.items.map((item) => item.title)
     ).toEqual([
-      'Wallet',
       'Points wallet',
       'My subscription',
       'Profile',
@@ -396,4 +395,23 @@ describe('point ledger sidebar visibility', () => {
       ).toBe(false)
     }
   )
+})
+
+describe('legacy wallet navigation retirement', () => {
+  it('hides the old wallet despite saved true settings and retains the points wallet and subscriptions', () => {
+    const { result } = sidebarFor(
+      { personal: { enabled: true, topup: true } },
+      { personal: { enabled: true, topup: true } }
+    )
+    const urls = result.current
+      .flatMap((group) => group.items)
+      .map((item) => item.url)
+    expect(urls).not.toContain('/wallet')
+    expect(urls).toContain('/points-wallet')
+    expect(urls).toContain('/my-subscription')
+    expect(
+      parseSidebarModulesAdmin('{"personal":{"enabled":true,"topup":true}}')
+        .personal.topup
+    ).toBeUndefined()
+  })
 })

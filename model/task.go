@@ -67,8 +67,15 @@ type Task struct {
 	Properties Properties            `json:"properties" gorm:"type:json"`
 	Username   string                `json:"username,omitempty" gorm:"-"`
 	// 禁止返回给用户，内部可能包含key等隐私信息
-	PrivateData TaskPrivateData `json:"-" gorm:"column:private_data;type:json"`
-	Data        json.RawMessage `json:"data" gorm:"type:json"`
+	PrivateData   TaskPrivateData       `json:"-" gorm:"column:private_data;type:json"`
+	Data          json.RawMessage       `json:"data" gorm:"type:json"`
+	PointsBilling *PointBillingMetadata `json:"points_billing,omitempty" gorm:"-"`
+	// Billing outcome and polling fences stay private. Legacy rows retain zero.
+	OutcomeVersion        int64 `json:"-" gorm:"not null;default:0;index:idx_task_points_pending"`
+	AppliedOutcomeVersion int64 `json:"-" gorm:"not null;default:0"`
+	PollFence             int64 `json:"-" gorm:"not null;default:0"`
+	PollLeaseUntil        int64 `json:"-" gorm:"not null;default:0"`
+	SettlementRetryAt     int64 `json:"-" gorm:"not null;default:0;index:idx_task_points_retry"`
 }
 
 func (t *Task) SetData(data any) {
@@ -109,9 +116,11 @@ func (m Properties) Value() (driver.Value, error) {
 }
 
 type TaskPrivateData struct {
-	Key            string `json:"key,omitempty"`
-	UpstreamTaskID string `json:"upstream_task_id,omitempty"` // 上游真实 task ID
-	ResultURL      string `json:"result_url,omitempty"`       // 任务成功后的结果 URL（视频地址等）
+	PointsBillingID string                `json:"points_billing_id,omitempty"`
+	PointsOutcome   *commonRelay.TaskInfo `json:"points_outcome,omitempty"`
+	Key             string                `json:"key,omitempty"`
+	UpstreamTaskID  string                `json:"upstream_task_id,omitempty"` // 上游真实 task ID
+	ResultURL       string                `json:"result_url,omitempty"`       // 任务成功后的结果 URL（视频地址等）
 	// Execution records safe, immutable request provenance. It lives next to
 	// other private task state so public task DTOs cannot expose it by accident.
 	Execution *TaskExecutionSnapshot `json:"execution,omitempty"`
@@ -210,7 +219,7 @@ func (p *TaskPrivateData) Scan(val any) error {
 }
 
 func (p TaskPrivateData) Value() (driver.Value, error) {
-	if p.Key == "" && p.UpstreamTaskID == "" && p.ResultURL == "" &&
+	if p.PointsBillingID == "" && p.PointsOutcome == nil && p.Key == "" && p.UpstreamTaskID == "" && p.ResultURL == "" &&
 		p.Execution == nil && p.BillingSource == "" && p.SubscriptionId == 0 &&
 		p.TokenId == 0 && p.NodeName == "" && p.BillingContext == nil &&
 		!p.ResponsesBackground && len(p.PluginState) == 0 && p.PollFailures == 0 &&
@@ -315,6 +324,9 @@ func TaskGetAllUserTask(userId int, startIdx int, num int, queryParams SyncTaskQ
 		return nil
 	}
 
+	if err := enrichPointsTasks(tasks); err != nil {
+		return nil
+	}
 	return tasks
 }
 
@@ -360,6 +372,9 @@ func TaskGetAllTasks(startIdx int, num int, queryParams SyncTaskQueryParams) []*
 		return nil
 	}
 
+	if err := enrichPointsTasks(tasks); err != nil {
+		return nil
+	}
 	return tasks
 }
 
@@ -414,9 +429,8 @@ func GetSettledTasksForBillingReconcile(submittedAfter int64, limit int) ([]*Tas
 func HasUnfinishedSyncTasks() bool {
 	var id int64
 	err := DB.Model(&Task{}).
-		Where("progress != ?", "100%").
-		Where("status != ?", TaskStatusFailure).
-		Where("status != ?", TaskStatusSuccess).
+		Where("(progress != ? AND status NOT IN ?) OR (outcome_version > applied_outcome_version AND status IN ?)",
+			"100%", []TaskStatus{TaskStatusFailure, TaskStatusSuccess}, []TaskStatus{TaskStatusFailure, TaskStatusSuccess}).
 		Limit(1).
 		Pluck("id", &id).Error
 	return err == nil && id != 0
@@ -555,12 +569,18 @@ func (t *Task) Snapshot() taskSnapshot {
 }
 
 func (Task *Task) Update() error {
+	if Task.PrivateData.PointsBillingID != "" {
+		return ErrPointsTaskConditionalWriteRequired
+	}
 	var err error
 	err = DB.Save(Task).Error
 	return err
 }
 
 func (t *Task) UpdateQuota() error {
+	if t.PrivateData.PointsBillingID != "" {
+		return ErrPointsTaskConditionalWriteRequired
+	}
 	return DB.Model(t).Update("quota", t.Quota).Error
 }
 
@@ -574,6 +594,9 @@ func (t *Task) UpdateQuota() error {
 // falls back to INSERT ON CONFLICT when the WHERE-guarded UPDATE matches
 // zero rows, which silently bypasses the CAS guard.
 func (t *Task) UpdateWithStatus(fromStatus TaskStatus) (bool, error) {
+	if t.PrivateData.PointsBillingID != "" {
+		return updatePointsTaskOutcome(t, fromStatus, false)
+	}
 	result := DB.Model(t).Where("status = ?", fromStatus).Select("*").Updates(t)
 	if result.Error != nil {
 		return false, result.Error
@@ -591,7 +614,7 @@ func TaskBulkUpdateByID(ids []int64, params map[string]any) error {
 		return nil
 	}
 	return DB.Model(&Task{}).
-		Where("id in (?)", ids).
+		Where("id in (?) AND outcome_version = 0", ids).
 		Updates(params).Error
 }
 

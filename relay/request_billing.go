@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/logger"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
@@ -61,8 +60,7 @@ func PrepareRequestBilling(c *gin.Context, info *relaycommon.RelayInfo) *types.N
 		return types.NewError(err, types.ErrorCodeModelPriceError, types.ErrOptionWithStatusCode(http.StatusBadRequest))
 	}
 	if priceData.FreeModel {
-		logger.LogInfo(c, common.LogText("model %s is free, skipping pre-consume", info.OriginModelName))
-		return nil
+		priceData.QuotaToPreConsume = 0
 	}
 	return service.PreConsumeBilling(c, priceData.QuotaToPreConsume, info)
 }
@@ -74,6 +72,9 @@ func RefundFailedRequestBilling(c *gin.Context, info *relaycommon.RelayInfo, api
 		return nil
 	}
 	apiErr = service.NormalizeViolationFeeError(apiErr)
+	if service.PointsBillingOutcomeUncertain(apiErr) {
+		service.PreserveUncertainPointsBilling(info)
+	}
 	if info.Billing != nil {
 		info.Billing.Refund(c)
 	}

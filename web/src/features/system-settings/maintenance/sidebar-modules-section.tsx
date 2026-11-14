@@ -128,10 +128,6 @@ export function SidebarModulesSection({
       },
     },
     personal: {
-      topup: {
-        title: t('Wallet'),
-        description: t('Top up balance and view billing history.'),
-      },
       points_wallet: {
         title: t('Points wallet'),
         description: t('View points balances, details and rules.'),

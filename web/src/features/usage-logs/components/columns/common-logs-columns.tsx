@@ -75,6 +75,7 @@ import {
 import type { LogOtherData } from '../../types'
 import { DetailsDialog } from '../dialogs/details-dialog'
 import { LogCostDisplay } from '../log-cost-display'
+import { LogPointsDisplay } from '../log-points-display'
 import { ModelBadge } from '../model-badge'
 import { TimingMetricsCell, StreamTpsCell } from '../timing-metrics-cell'
 import { useUsageLogsContext } from '../usage-logs-provider'
@@ -788,6 +789,17 @@ export function useCommonLogsColumns(
             />
           )
         },
+      },
+
+      {
+        id: 'consumed_points',
+        header: t('Consumed points'),
+        cell: ({ row }) => (
+          <LogPointsDisplay
+            billing={parseLogOther(row.original.other)?.points_billing}
+          />
+        ),
+        meta: { label: t('Consumed points') },
       },
 
       {

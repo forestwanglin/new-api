@@ -363,7 +363,7 @@ func serveTaskPluginProtocol(
 	if background {
 		outcome.Task.PrivateData.ResponsesBackground = true
 		if outcome.Task.ID != 0 {
-			if err := model.DB.Model(outcome.Task).Update("private_data", outcome.Task.PrivateData).Error; err != nil {
+			if err := model.SetTaskResponsesBackground(c.Request.Context(), outcome.Task.ID); err != nil {
 				logger.LogError(c, common.LogText("persist task background flag failed: %s", err.Error()))
 			}
 		}

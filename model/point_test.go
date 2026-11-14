@@ -1,7 +1,9 @@
 package model
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"math"
 	"os"
 	"path/filepath"
@@ -425,5 +427,315 @@ func TestUserPointBalancesDatabaseMatrix(t *testing.T) {
 			require.Error(t, err)
 			assert.Nil(t, items, "read failure must not fabricate empty balances")
 		})
+	}
+}
+
+func TestPointCallExactConversionAndModelMatch(t *testing.T) {
+	for _, tt := range []struct {
+		quota      int64
+		rate, unit string
+		want       int64
+	}{
+		{0, "1", "10000", 0}, {1, "1", "10000", 1}, {10, "1", "10000", 1}, {11, "1", "10000", 2},
+		{1, "0.0000000000000000000000000001", "1", 1},
+	} {
+		got, err := PointCallPoints(tt.quota, tt.rate, tt.unit)
+		require.NoError(t, err)
+		assert.Equal(t, tt.want, got)
+	}
+	_, err := PointCallPoints(1, "0", "1")
+	require.Error(t, err)
+	_, err = PointCallPoints(math.MaxInt64, "1000", "1")
+	require.Error(t, err)
+	assert.True(t, PointModelMatches(PointMatchPattern, "gpt-*", "gpt-a/b[1]"))
+	assert.True(t, PointModelMatches(PointMatchPattern, "a[?]", "a[x]"))
+	assert.False(t, PointModelMatches(PointMatchPattern, "gpt-*", "GPT-a"))
+	assert.False(t, PointModelMatches(PointMatchExact, "gpt-*", "gpt-a"))
+}
+
+func TestPointCallFinancialLifecycle(t *testing.T) {
+	for _, dialect := range []string{"sqlite", "mysql", "postgres"} {
+		t.Run(dialect, func(t *testing.T) { testPointCallFinancialLifecycle(t, dialect) })
+	}
+}
+func testPointCallFinancialLifecycle(t *testing.T, dialect string) {
+	previousEnabled := common.LogConsumeEnabled
+	common.LogConsumeEnabled = true
+	t.Cleanup(func() { common.LogConsumeEnabled = previousEnabled })
+	previousPath, previousDB := common.SQLitePath, DB
+	common.SQLitePath = filepath.Join(t.TempDir(), "point-call.db")
+	t.Cleanup(func() { common.SQLitePath = previousPath; DB = previousDB })
+	dsn := "local"
+	switch dialect {
+	case "mysql":
+		dsn = os.Getenv("TEST_MYSQL_DSN")
+	case "postgres":
+		dsn = os.Getenv("TEST_POSTGRES_DSN")
+	}
+	if dsn == "" {
+		t.Skip("isolated test database DSN is not configured")
+	}
+	t.Setenv("POINT_CALL_TEST_DSN", dsn)
+	db, dbType, err := chooseDB("POINT_CALL_TEST_DSN", false)
+	require.NoError(t, err)
+	DB = db
+	previousType := common.MainDatabaseType()
+	common.SetMainDatabaseType(dbType)
+	t.Cleanup(func() { common.SetMainDatabaseType(previousType) })
+	t.Cleanup(func() {
+		for _, m := range []any{&PointCallOperation{}, &PointCallEvent{}, &PointCallBilling{}, &PointFreeze{}, &PointLedger{}, &PointTransaction{}, &PointAccount{}, &PointModelRule{}, &PointType{}, &Token{}, &User{}} {
+			require.NoError(t, db.Migrator().DropTable(m))
+		}
+		connection, e := db.DB()
+		require.NoError(t, e)
+		require.NoError(t, connection.Close())
+	})
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	sqlDB.SetMaxOpenConns(1)
+	// Connection closed by database teardown after dropping fixtures.
+	require.NoError(t, db.AutoMigrate(&User{}, &Token{}))
+	require.NoError(t, migratePoints(db))
+	require.NoError(t, migratePoints(db))
+	user := User{Username: "point-call", Quota: -100}
+	require.NoError(t, db.Create(&user).Error)
+	token := Token{UserId: user.Id, Key: "point-call-key", RemainQuota: 100, Status: common.TokenStatusEnabled, ExpiredTime: -1}
+	require.NoError(t, db.Create(&token).Error)
+	var general, gpt PointType
+	require.NoError(t, db.Where("code = ?", PointTypeGeneral).First(&general).Error)
+	require.NoError(t, db.Where("code = ?", PointTypeGPT).First(&gpt).Error)
+	require.NoError(t, db.Model(&gpt).Update("consume_priority", 200).Error)
+	gptAccount := PointAccount{UserId: int64(user.Id), PointTypeId: gpt.Id, AvailablePoints: 10, FrozenPoints: 7}
+	generalAccount := PointAccount{UserId: int64(user.Id), PointTypeId: general.Id, AvailablePoints: 5}
+	require.NoError(t, db.Create(&gptAccount).Error)
+	require.NoError(t, db.Create(&generalAccount).Error)
+	require.NoError(t, CreatePointCall("call", user.Id, token.Id, "gpt-test", "1", "1000"))
+	require.NoError(t, ReservePointCall("call", "call:reserve", 15, false))
+	dispatchedCall, err := GetPointCall("call")
+	require.NoError(t, err)
+	assert.Equal(t, "dispatching", dispatchedCall.Dispatch)
+	var a PointAccount
+	a = PointAccount{}
+	require.NoError(t, db.First(&a, gptAccount.Id).Error)
+	assert.EqualValues(t, 0, a.AvailablePoints)
+	assert.EqualValues(t, 17, a.FrozenPoints)
+	require.NoError(t, CreatePointCall("other", user.Id, token.Id, "gpt-test", "1", "1000"))
+	require.ErrorIs(t, ReservePointCall("other", "other:reserve", 1, false), ErrInsufficientPoints)
+	require.NoError(t, db.First(&token, token.Id).Error)
+	assert.EqualValues(t, 85, token.RemainQuota, "failed point reserve rolls back key")
+	r, err := SetPointCallTarget("call", "call:charge", 20, true, false, nil)
+	require.NoError(t, err)
+	assert.Equal(t, "20", r.Metadata.TotalPoints)
+	require.Len(t, r.Metadata.Items, 2)
+	assert.Equal(t, "10", r.Metadata.Items[0].Points)
+	assert.Equal(t, "10", r.Metadata.Items[1].Points)
+	a = PointAccount{}
+	require.NoError(t, db.First(&a, gptAccount.Id).Error)
+	assert.EqualValues(t, 0, a.AvailablePoints)
+	assert.EqualValues(t, 7, a.FrozenPoints, "foreign freezes untouched")
+	a = PointAccount{}
+	require.NoError(t, db.First(&a, generalAccount.Id).Error)
+	assert.EqualValues(t, -5, a.AvailablePoints)
+	replay, err := SetPointCallTarget("call", "call:charge", 20, true, false, nil)
+	require.NoError(t, err)
+	assert.True(t, replay.Replayed)
+	_, err = SetPointCallTarget("call", "call:charge", 21, true, false, nil)
+	require.ErrorIs(t, err, ErrPointCallConflict)
+	require.NoError(t, db.First(&user, user.Id).Error)
+	assert.Equal(t, -120, user.Quota)
+	require.NoError(t, db.First(&token, token.Id).Error)
+	assert.Equal(t, 80, token.RemainQuota)
+	r, err = SetPointCallTarget("call", "call:refund", 0, true, false, nil)
+	require.NoError(t, err)
+	assert.Equal(t, "-20", r.Metadata.TotalPoints)
+	a = PointAccount{}
+	require.NoError(t, db.First(&a, generalAccount.Id).Error)
+	assert.EqualValues(t, 5, a.AvailablePoints)
+	require.NoError(t, db.First(&token, token.Id).Error)
+	assert.Equal(t, 100, token.RemainQuota)
+	require.NoError(t, db.First(&user, user.Id).Error)
+	assert.Equal(t, -100, user.Quota)
+	var freezes []PointFreeze
+	require.NoError(t, db.Where("reason = ?", "call").Find(&freezes).Error)
+	for _, f := range freezes {
+		assert.Zero(t, f.RemainingPoints)
+		assert.Equal(t, PointFreezeClosed, f.Status)
+	}
+
+	// Dispatch intent and holds commit together; a failed marker must not leave
+	// a successful token/points reservation without a returned session.
+	require.NoError(t, CreatePointCall("dispatch-rollback", user.Id, token.Id, "gpt-test", "1", "1000"))
+	require.NoError(t, db.Callback().Update().Before("gorm:update").Register("test:dispatch-failure", func(tx *gorm.DB) {
+		if call, ok := tx.Statement.Dest.(*PointCallBilling); ok && call.ID == "dispatch-rollback" && call.Dispatch == "dispatching" {
+			tx.AddError(errors.New("injected dispatch persistence failure"))
+		}
+	}))
+	require.Error(t, ReservePointCall("dispatch-rollback", "dispatch-rollback:reserve", 3, false))
+	require.NoError(t, db.Callback().Update().Remove("test:dispatch-failure"))
+	dispatchedCall, err = GetPointCall("dispatch-rollback")
+	require.NoError(t, err)
+	assert.Equal(t, "unsubmitted", dispatchedCall.Dispatch)
+	assert.Zero(t, dispatchedCall.ReservedQuota)
+	require.NoError(t, db.First(&token, token.Id).Error)
+	assert.Equal(t, 100, token.RemainQuota)
+	a = PointAccount{}
+	require.NoError(t, db.First(&a, gptAccount.Id).Error)
+	assert.EqualValues(t, 10, a.AvailablePoints)
+	assert.EqualValues(t, 7, a.FrozenPoints)
+
+	// An already-owned zero account can absorb post-use overage (including fees).
+	require.NoError(t, db.Model(&PointAccount{}).Where("user_id = ?", user.Id).Update("available_points", 0).Error)
+	require.NoError(t, CreatePointCall("zero", user.Id, token.Id, "gpt-test", "1", "1000"))
+	require.NoError(t, ReservePointCall("zero", "zero:reserve", 0, false))
+	zero, err := SetPointCallTarget("zero", "zero:actual", 2, true, false, nil)
+	require.NoError(t, err)
+	assert.Equal(t, "2", zero.Metadata.TotalPoints)
+	a = PointAccount{}
+	require.NoError(t, db.First(&a, generalAccount.Id).Error)
+	assert.EqualValues(t, -2, a.AvailablePoints)
+	// Same-type credit naturally repays debt, preserving foreign frozen funds.
+	order := CustomSubscriptionOrder{Id: 991, UserId: int64(user.Id), PaidPoints: 100, PaidPointTypeId: general.Id, PlanSnapshot: "{}"}
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		_, err := creditCustomSubscriptionPoints(tx, &order, time.Now().UnixMilli())
+		return err
+	}))
+	a = PointAccount{}
+	require.NoError(t, db.First(&a, generalAccount.Id).Error)
+	assert.EqualValues(t, 98, a.AvailablePoints)
+	require.NoError(t, db.Model(&PointAccount{}).Where("id = ?", gptAccount.Id).Update("available_points", -97).Error)
+	require.NoError(t, CreatePointCall("net", user.Id, token.Id, "gpt-test", "1", "1000"))
+	require.ErrorIs(t, ReservePointCall("net", "net:reserve", 2, false), ErrInsufficientPoints, "eligible debt is not clamped away")
+	require.NoError(t, db.Model(&PointAccount{}).Where("id = ?", gptAccount.Id).Update("available_points", -99).Error)
+	require.NoError(t, CreatePointCall("negative-zero", user.Id, token.Id, "gpt-test", "1", "1000"))
+	require.ErrorIs(t, ReservePointCall("negative-zero", "negative-zero:reserve", 0, false), ErrInsufficientPoints, "negative net available cannot cover even a zero estimate")
+	require.NoError(t, db.Model(&PointAccount{}).Where("id = ?", gptAccount.Id).Update("available_points", 0).Error)
+	// Cumulative ceil includes fees, not independently rounded charge deltas.
+	require.NoError(t, CreatePointCall("round", user.Id, token.Id, "gpt-test", "1", "10000"))
+	require.NoError(t, ReservePointCall("round", "round:reserve", 1, false))
+	rounded, err := SetPointCallTarget("round", "round:base", 1, true, false, nil)
+	require.NoError(t, err)
+	assert.Equal(t, "1", rounded.Metadata.TotalPoints)
+	rounded, err = SetPointCallTarget("round", "round:fee", 1, true, true, nil)
+	require.NoError(t, err)
+	assert.Equal(t, "0", rounded.Metadata.TotalPoints)
+	rounded, err = SetPointCallTarget("round", "round:base-refund", 0, true, false, nil)
+	require.NoError(t, err)
+	assert.Equal(t, "0", rounded.Metadata.TotalPoints, "base refund retains independently due fee")
+	rounded, err = SetPointCallTarget("round", "round:fee-refund", 0, true, true, nil)
+	require.NoError(t, err)
+	assert.Equal(t, "-1", rounded.Metadata.TotalPoints)
+	// A financial SQL error rolls back quota/key/points, leaving a durable target.
+	require.NoError(t, CreatePointCall("recover", user.Id, token.Id, "gpt-test", "1", "1000"))
+	require.NoError(t, ReservePointCall("recover", "recover:reserve", 2, false))
+	const callback = "point_call:fail_ledger"
+	require.NoError(t, db.Callback().Create().Before("gorm:create").Register(callback, func(tx *gorm.DB) {
+		if tx.Statement.Schema != nil && tx.Statement.Schema.Name == "PointLedger" {
+			tx.AddError(errors.New("injected ledger failure"))
+		}
+	}))
+	_, err = SetPointCallTarget("recover", "recover:actual", 3, true, false, nil)
+	require.Error(t, err)
+	require.NoError(t, db.Callback().Create().Remove(callback))
+	c, err := GetPointCall("recover")
+	require.NoError(t, err)
+	assert.Zero(t, c.BookedQuota)
+	assert.EqualValues(t, 2, c.TokenQuota)
+	var op PointCallOperation
+	require.NoError(t, db.First(&op, "id = ?", "recover:actual").Error)
+	assert.Equal(t, "pending", op.State)
+	previousLogDB := LOG_DB
+	LOG_DB = db
+	t.Cleanup(func() { LOG_DB = previousLogDB })
+	require.NoError(t, db.AutoMigrate(&Log{}))
+	t.Cleanup(func() { require.NoError(t, db.Migrator().DropTable(&Log{})) })
+	_, err = ReconcilePointCallEffects(context.Background(), 100)
+	require.NoError(t, err)
+	c, err = GetPointCall("recover")
+	require.NoError(t, err)
+	assert.EqualValues(t, 3, c.BookedQuota)
+	var logsBefore int64
+	require.NoError(t, db.Model(&Log{}).Count(&logsBefore).Error)
+	require.Positive(t, logsBefore)
+	// Simulate crash after external insert and before primary acknowledgment.
+	require.NoError(t, db.Model(&PointCallEvent{}).Where("id = ?", "recover:actual").Updates(map[string]any{"log_state": "pending", "retry_at": 0}).Error)
+	_, err = ReconcilePointCallEffects(context.Background(), 100)
+	require.NoError(t, err)
+	var logsAfter int64
+	require.NoError(t, db.Model(&Log{}).Count(&logsAfter).Error)
+	assert.Equal(t, logsBefore, logsAfter)
+	var replayEvent PointCallEvent
+	require.NoError(t, db.First(&replayEvent, "id = ?", "recover:actual").Error)
+	assert.Equal(t, "done", replayEvent.LogState)
+	// A permanently bad head item cannot starve a later financial target or
+	// event when the recovery batch is smaller than the outstanding queue.
+	require.NoError(t, db.Create(&PointCallOperation{ID: "0-bad-op", CallID: "missing", State: "pending"}).Error)
+	require.NoError(t, db.Create(&PointCallEvent{ID: "0-bad-event", CallID: "missing", Payload: "{}", Metadata: "{}", CacheState: "pending", LogState: "pending"}).Error)
+	require.NoError(t, stagePointCallTarget("recover", "fair:actual", 4, true, false))
+	_, err = ReconcilePointCallEffects(context.Background(), 1)
+	require.NoError(t, err)
+	_, err = ReconcilePointCallEffects(context.Background(), 1)
+	require.NoError(t, err)
+	fairCall, err := GetPointCall("recover")
+	require.NoError(t, err)
+	assert.EqualValues(t, 4, fairCall.BookedQuota)
+	var fairEvent PointCallEvent
+	require.NoError(t, db.First(&fairEvent, "id = ?", "fair:actual").Error)
+	assert.Equal(t, "done", fairEvent.CacheState)
+	assert.Equal(t, "done", fairEvent.LogState)
+	var badOperation PointCallOperation
+	require.NoError(t, db.First(&badOperation, "id = ?", "0-bad-op").Error)
+	assert.Greater(t, badOperation.RetryAt, time.Now().UnixMilli())
+	// A zero lower-priority account does not steal debt from the last account
+	// actually consumed; a subsequent correction preserves its original type.
+	require.NoError(t, db.Model(&PointAccount{}).Where("id = ?", gptAccount.Id).Update("available_points", 5).Error)
+	require.NoError(t, db.Model(&PointAccount{}).Where("id = ?", generalAccount.Id).Update("available_points", 0).Error)
+	require.NoError(t, CreatePointCall("last", user.Id, token.Id, "gpt-test", "1", "1000"))
+	require.NoError(t, ReservePointCall("last", "last:reserve", 5, false))
+	_, err = SetPointCallTarget("last", "last:actual", 8, true, false, nil)
+	require.NoError(t, err)
+	a = PointAccount{}
+	require.NoError(t, db.First(&a, gptAccount.Id).Error)
+	assert.EqualValues(t, -3, a.AvailablePoints)
+	a = PointAccount{}
+	require.NoError(t, db.First(&a, generalAccount.Id).Error)
+	assert.Zero(t, a.AvailablePoints)
+	_, err = SetPointCallTarget("last", "last:refund", 0, true, false, nil)
+	require.NoError(t, err)
+	require.NoError(t, db.Model(&PointAccount{}).Where("id = ?", gptAccount.Id).Update("available_points", 0).Error)
+	// Parallel callers cannot hold more than the signed available balance.
+	require.NoError(t, db.Model(&PointAccount{}).Where("id = ?", generalAccount.Id).Update("available_points", 50).Error)
+	require.NoError(t, db.Model(&Token{}).Where("id = ?", token.Id).Update("remain_quota", 1000).Error)
+	for i := range 8 {
+		require.NoError(t, CreatePointCall(fmt.Sprintf("parallel-%d", i), user.Id, token.Id, "gpt-test", "1", "1000"))
+	}
+	if dialect != "sqlite" {
+		sqlDB.SetMaxOpenConns(8)
+	}
+	answers := make(chan error, 8)
+	var wg sync.WaitGroup
+	for i := range 8 {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			answers <- ReservePointCall(fmt.Sprintf("parallel-%d", i), fmt.Sprintf("parallel-%d:reserve", i), 10, false)
+		}(i)
+	}
+	wg.Wait()
+	close(answers)
+	successful := 0
+	for err := range answers {
+		if err == nil {
+			successful++
+		} else {
+			require.ErrorIs(t, err, ErrInsufficientPoints)
+		}
+	}
+	assert.Equal(t, 5, successful)
+	// Each account snapshot must reconcile to its preceding snapshot/version.
+	var rows []PointLedger
+	require.NoError(t, db.Order("account_id, account_version").Find(&rows).Error)
+	for _, row := range rows {
+		assert.Equal(t, row.AvailableBefore+row.AvailableDelta, row.AvailableAfter)
+		assert.Equal(t, row.FrozenBefore+row.FrozenDelta, row.FrozenAfter)
 	}
 }

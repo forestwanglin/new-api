@@ -103,8 +103,15 @@ test('regular users only find their own console pages in search', async () => {
   const entries = await searchEntriesFor(ROLE.USER)
 
   expect(entries).toEqual(
-    expect.arrayContaining(['API Keys', 'Usage Logs', 'Wallet', 'Profile'])
+    expect.arrayContaining([
+      'API Keys',
+      'Usage Logs',
+      'Points wallet',
+      'My subscription',
+      'Profile',
+    ])
   )
+  expect(entries).not.toContain('Wallet')
   for (const entry of [...adminEntries, ...superAdminEntries]) {
     expect(entries).not.toContain(entry)
   }
@@ -127,4 +134,14 @@ test('pages hidden in the sidebar settings stay out of search', async () => {
 
   expect(entries).not.toContain('Wallet')
   expect(entries).toContain('Profile')
+})
+
+test('saved true wallet preference cannot restore the retired command menu entry', async () => {
+  const entries = await searchEntriesFor(
+    ROLE.USER,
+    JSON.stringify({ personal: { enabled: true, topup: true } })
+  )
+  expect(entries).not.toContain('Wallet')
+  expect(entries).toContain('Points wallet')
+  expect(entries).toContain('My subscription')
 })

@@ -7812,6 +7812,10 @@
     "Model reference exchange rate (CNY per USD)": "模型頁參考匯率（人民幣/美元）",
     "CNY per USD used for overseas model reference prices and discounts only. Does not affect billing or payments.": "每 1 美元對應的人民幣金額，僅用於海外模型的刪除線參考價及折扣計算，不影響實際計費或付款。",
     "Access leading domestic and international models in one place · Choose text chat or video generation on demand": "國內外主流模型，一站接入 · 文字對話與影片生成，按需選擇",
-    "Compare model configurations using fixed token usage. Platform usage counts follow the same point deduction rules.": "按固定 token 用量比較不同模型配置，平台次數與扣積分規則一致。"
+    "Compare model configurations using fixed token usage. Platform usage counts follow the same point deduction rules.": "按固定 token 用量比較不同模型配置，平台次數與扣積分規則一致。",
+    "Consumed points": "消耗積分",
+    "Points settlement pending": "積分待結算",
+    "Points settlement failed": "積分結算失敗",
+    "Higher values first": "大值優先"
   }
 }

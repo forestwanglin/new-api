@@ -220,6 +220,10 @@ function DrawingLogsCard<TData>({
           cell={cells.get('duration')}
           primaryOnly
         />
+        <SummaryField
+          label={t('Consumed points')}
+          cell={cells.get('consumed_points')}
+        />
         <SummaryField label={t('Image')} cell={cells.get('image_url')} />
         <SummaryField
           label={t('Prompt')}

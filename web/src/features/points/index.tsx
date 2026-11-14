@@ -70,7 +70,7 @@ export function Points() {
           { id: 'name', header: t('Name'), cell: (type) => type.name },
           {
             id: 'priority',
-            header: t('Consumption priority'),
+            header: `${t('Consumption priority')} (${t('Higher values first')})`,
             className: 'text-right',
             cellClassName: 'text-right tabular-nums',
             cell: (type) => formatNumber(type.consume_priority, locale),

@@ -38,7 +38,10 @@ export function PlanDetails(props: { plan: CustomSubscriptionPlan }) {
     [t('Plan name'), plan.title],
     [t('Plan code'), plan.code],
     [t('Subtitle'), plan.subtitle || '—'],
-    [t('Priority'), formatNumber(plan.priority, locale)],
+    [
+      `${t('Priority')} (${t('Higher values first')})`,
+      formatNumber(plan.priority, locale),
+    ],
     [t('Tier code'), plan.tier_code],
     [t('Tier rank'), formatNumber(plan.tier_rank, locale)],
     [
