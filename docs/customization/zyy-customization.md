@@ -906,6 +906,16 @@
 - 验证：`go test ./router -run TestModelPlazaPricing -count=1` 通过，覆盖旧广场关闭/要求登录、新接口公开、响应一致和分组过滤；middleware测试通过。相关前端5文件57用例、`bun check -b`、变更文件lint/格式及 `bun run build` 通过。全量前端268文件中267通过，唯一失败为usage-logs既有文件20秒超时，单独复跑该文件30用例全部通过。Chrome真实本地接口验证厂商分类、搜索和价格展示；只读代码审查无阻断问题。
 - 风险与未覆盖：扩大后端验证时，全局路由覆盖测试仍报6条既有漏配（phone四条、wechat、custom_subscription/plans），用HEAD生产文件overlay复现相同失败；未扩大范围修复。未修改生产配置或部署，未验证生产数据质量与移动端；官网参考价、积分换算及新分类方案留待后续确认。
 
+### Z052 新模型页国内与海外分类
+
+- 需求与原因：新模型页需要按国内、海外区分厂商，同时让自定义别名、无厂商和未识别厂商的模型保持可发现；沿用现有定价接口，不增加管理员配置。
+- 变更内容：左侧增加全部模型、国内模型、海外模型及其他模型入口，国内和海外支持整组筛选及厂商筛选；仅展示接口中实际存在的分类，搜索与分类组合生效，数量随搜索更新。前端按规范化后的厂商名称及中英文别名匹配归属，不依赖固定厂商 ID、不根据调用模型名称猜测厂商；未知归属统一进入其他模型。
+- 影响面：`web/src/features/model-plaza/` 分类配置、侧栏及页面与行为测试，必要的 `web/src/styles/model-plaza.css`。**上游自有文件**：七种 `web/src/i18n/locales/{en,zh,zh-TW,fr,ru,ja,vi}.json`。
+- 与上游差异：扩展 fork 新模型页的展示层分类；保持现有 `/api/model/pricing` 查询、返回结构、数据库及价格组件不变，复用项目 Button 与 SearchBar。
+- 开关与默认值：无新配置、依赖或管理入口；厂商归属映射由前端维护，新增同厂商模型自动归组；`code-auto-review` 等模型未关联可识别厂商时归其他模型，关联后按厂商归组。
+- 验证：模型页3文件28用例及日志详情页30用例（合计4文件58用例）通过；`bun check -b`（1580文件、2项目）、变更文件 oxlint/oxfmt、`git diff --check` 和 `bun run build` 通过。Chrome 本地真实接口验证国内2个、海外7个、其他1个，分组筛选、搜索零结果计数及清除筛选正常；独立只读审查无阻断问题。全量测试269文件中268通过、2906用例中2905通过，唯一失败为 `usage-logs/components/__tests__/detail-preview.test.tsx` 的 `task log prices use localized unit labels from pricing metadata` 20秒超时，定向复跑该文件30用例全部通过。
+- 风险与未覆盖：新增厂商或厂商更名需要更新前端别名映射并发布；国内/海外表示厂商归属，不代表接入渠道或部署位置；本次不关闭旧广场、不修改生产配置或部署。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
@@ -914,7 +924,7 @@
 
 | 区域 | 文件 | 关联条目 |
 |---|---|---|
-| 新模型页公开定价入口 | `router/api-router.go`、`middleware/access_token_routes.go`、`web/src/features/pricing/api.ts`、`web/src/features/pricing/hooks/use-pricing-data.ts`、七种locale | Z051 |
+| 新模型页公开定价入口 | `router/api-router.go`、`middleware/access_token_routes.go`、`web/src/features/pricing/api.ts`、`web/src/features/pricing/hooks/use-pricing-data.ts`、七种locale | Z051、Z052 |
 | 控制台统一顶部导航 | `web/src/components/layout/components/{app-header,public-header}.tsx` 及对应测试 | Z050 |
 | 个人积分/订阅查询与导航 | `model/{main,option,user}.go`、`router/api-router.go`、`middleware/access_token_routes.go`、个人侧栏设置/维护设置、侧栏hooks及测试、七种locale、生成路由（详细文件见Z049） | Z049 |
 | 自定义订阅支付 | `model/topup.go`、`router/api-router.go`、`middleware/access_token_routes.go`、`common/log_text.zh-CN.json`、钱包类型/历史组件/测试、七种 locale | Z045 |

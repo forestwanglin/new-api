@@ -252,3 +252,161 @@ it('reloads group-scoped models after login instead of retaining the anonymous c
     '/keys'
   )
 })
+
+it('groups API vendors into clickable domestic and overseas categories', async () => {
+  const user = userEvent.setup()
+  renderPlaza()
+  const sidebar = screen.getByRole('complementary', { name: 'Vendors' })
+  const domestic = await within(sidebar).findByRole('button', {
+    name: /^Domestic Models/,
+  })
+  const overseas = within(sidebar).getByRole('button', {
+    name: /^Overseas Models/,
+  })
+  expect(within(domestic).getByText('2')).toBeVisible()
+  expect(within(overseas).getByText('2')).toBeVisible()
+  expect(
+    within(sidebar).queryByRole('button', { name: /^Other Models/ })
+  ).not.toBeInTheDocument()
+  await user.click(domestic)
+  expect(domestic).toHaveAttribute('aria-pressed', 'true')
+  expect(screen.getByRole('heading', { name: 'Domestic Models' })).toBeVisible()
+  expect(screen.getByText('deepseek-chat')).toBeVisible()
+  expect(screen.getByText('sd2.0-720P')).toBeVisible()
+  expect(screen.queryByText('gpt-api-model')).not.toBeInTheDocument()
+  await user.click(overseas)
+  expect(overseas).toHaveAttribute('aria-pressed', 'true')
+  expect(domestic).toHaveAttribute('aria-pressed', 'false')
+  expect(screen.getByText('gpt-api-model')).toBeVisible()
+  expect(screen.queryByText('deepseek-chat')).not.toBeInTheDocument()
+})
+
+it('uses vendor aliases without binding classification to a fixed database ID', async () => {
+  vi.mocked(api.get).mockResolvedValue({
+    data: {
+      ...pricing,
+      data: [
+        { ...pricing.data[0], model_name: 'alias-domestic', vendor_id: 101 },
+        { ...pricing.data[0], model_name: 'chinese-domestic', vendor_id: 202 },
+        { ...pricing.data[0], model_name: 'alias-overseas', vendor_id: -303 },
+      ],
+      vendors: [
+        { id: 101, name: '  zHiPu  ' },
+        { id: 202, name: '通义千问' },
+        { id: -303, name: 'claude' },
+      ],
+    },
+  })
+  const user = userEvent.setup()
+  renderPlaza()
+  const domestic = await screen.findByRole('button', {
+    name: /^Domestic Models/,
+  })
+  expect(within(domestic).getByText('2')).toBeVisible()
+  await user.click(domestic)
+  expect(screen.getByText('alias-domestic')).toBeVisible()
+  expect(screen.getByText('chinese-domestic')).toBeVisible()
+  expect(screen.queryByText('alias-overseas')).not.toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: /^claude/ }))
+  expect(screen.getByText('alias-overseas')).toBeVisible()
+  expect(screen.queryByText('alias-domestic')).not.toBeInTheDocument()
+})
+
+it('keeps missing and unrecognized vendors in other models while a custom name with a known vendor follows its vendor', async () => {
+  vi.mocked(api.get).mockResolvedValue({
+    data: {
+      ...pricing,
+      data: [
+        { ...pricing.data[0], model_name: 'code-auto-review', vendor_id: 0 },
+        { ...pricing.data[0], model_name: 'custom-service', vendor_id: 99 },
+        {
+          ...pricing.data[0],
+          model_name: 'code-auto-review-openai',
+          vendor_id: 22,
+        },
+      ],
+      vendors: [...pricing.vendors, { id: 99, name: 'Private Service' }],
+    },
+  })
+  const user = userEvent.setup()
+  renderPlaza()
+  const other = await screen.findByRole('button', { name: /^Other Models/ })
+  expect(within(other).getByText('2')).toBeVisible()
+  expect(
+    screen.queryByRole('button', { name: /^Domestic Models/ })
+  ).not.toBeInTheDocument()
+  expect(
+    screen.queryByRole('button', { name: /^Unknown/ })
+  ).not.toBeInTheDocument()
+  await user.click(other)
+  expect(screen.getByText('code-auto-review')).toBeVisible()
+  expect(screen.getByText('custom-service')).toBeVisible()
+  expect(screen.queryByText('code-auto-review-openai')).not.toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: /^Overseas Models/ }))
+  expect(screen.getByText('code-auto-review-openai')).toBeVisible()
+})
+
+it('updates category and vendor counts for search without hiding categories with no matches', async () => {
+  const user = userEvent.setup()
+  renderPlaza()
+  const sidebar = screen.getByRole('complementary', { name: 'Vendors' })
+  const domestic = await within(sidebar).findByRole('button', {
+    name: /^Domestic Models/,
+  })
+  await user.click(domestic)
+  await user.type(
+    screen.getByRole('textbox', { name: 'Search models' }),
+    'video'
+  )
+  expect(within(domestic).getByText('1')).toBeVisible()
+  expect(
+    within(
+      within(sidebar).getByRole('button', { name: /^DeepSeek/ })
+    ).getByText('1')
+  ).toBeVisible()
+  expect(
+    within(
+      within(sidebar).getByRole('button', { name: /^Overseas Models/ })
+    ).getByText('0')
+  ).toBeVisible()
+  expect(
+    within(
+      within(sidebar).getByRole('button', { name: /^All Models/ })
+    ).getByText('1')
+  ).toBeVisible()
+  expect(screen.getByText('sd2.0-720P')).toBeVisible()
+  await user.click(
+    within(sidebar).getByRole('button', { name: /^Overseas Models/ })
+  )
+  expect(screen.getByText('No models found')).toBeVisible()
+  expect(screen.getByRole('heading', { name: 'Overseas Models' })).toBeVisible()
+  await user.click(screen.getByRole('button', { name: 'Clear all filters' }))
+  expect(screen.getByRole('textbox', { name: 'Search models' })).toHaveValue('')
+  expect(
+    within(sidebar).getByRole('button', { name: /^All Models/ })
+  ).toHaveAttribute('aria-pressed', 'true')
+  expect(screen.getByText('deepseek-chat')).toBeVisible()
+  expect(screen.getByText('gpt-api-model')).toBeVisible()
+})
+
+it('allows keyboard selection of a category and keeps it selected when search has no matches', async () => {
+  const user = userEvent.setup()
+  renderPlaza()
+  const domestic = await screen.findByRole('button', {
+    name: /^Domestic Models/,
+  })
+  domestic.focus()
+  await user.keyboard('{Enter}')
+  expect(domestic).toHaveAttribute('aria-pressed', 'true')
+  await user.type(
+    screen.getByRole('textbox', { name: 'Search models' }),
+    'nonexistent-model'
+  )
+  expect(domestic).toHaveAttribute('aria-pressed', 'true')
+  expect(screen.getByText('No models found')).toBeVisible()
+  await user.click(screen.getByRole('button', { name: 'Clear all filters' }))
+  expect(screen.getByRole('button', { name: /^All Models/ })).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  )
+})

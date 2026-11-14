@@ -1,5 +1,8 @@
 {
   "translation": {
+    "Domestic Models": "國內模型",
+    "Overseas Models": "海外模型",
+    "Other Models": "其他模型",
     "Use model": "使用此模型",
     "Prices use the lowest available group rate. Actual charges depend on usage.": "價格按可用分組中的最低倍率顯示，實際費用以用量為準。",
     "Automatic renewal": "自動續訂",

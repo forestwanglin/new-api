@@ -135,6 +135,14 @@
     background 0.15s,
     color 0.15s;
 }
+.model-plaza .mp-category {
+  font-weight: 700;
+  color: var(--foreground);
+}
+.model-plaza .mp-vendors {
+  margin-top: 4px;
+  padding-left: 14px;
+}
 .model-plaza .mp-item:hover {
   background: var(--mp-soft);
   color: var(--foreground);
