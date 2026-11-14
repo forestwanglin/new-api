@@ -94,7 +94,13 @@ export function SubscriptionCheckout(props: SubscriptionCheckoutProps) {
           if (!open && !mutation.isPending) onClose()
         }}
         title={t('Confirm one-time purchase')}
-        contentClassName='sm:max-w-lg'
+        contentClassName='sub-checkout'
+        headerClassName='sub-checkout-header'
+        titleClassName='sub-checkout-title'
+        bodyClassName='sub-checkout-body'
+        footerClassName='sub-checkout-footer'
+        overlayClassName='sub-checkout-overlay'
+        showCloseButton={false}
         footer={
           <>
             <Button
@@ -133,39 +139,41 @@ export function SubscriptionCheckout(props: SubscriptionCheckoutProps) {
         }
       >
         {selection && (
-          <div className='space-y-4'>
-            <h3 className='font-semibold'>
-              {selection.plan.title} ·{' '}
-              {selection.yearly
-                ? t('Subscription yearly')
-                : t('Subscription monthly')}
-            </h3>
-            <p>
-              {t('Payment for this purchase')}:{' '}
+          <div>
+            <div className='sub-order-line'>
+              <h3>
+                {selection.plan.title} ·{' '}
+                {selection.yearly
+                  ? t('Subscription yearly')
+                  : t('Subscription monthly')}
+              </h3>
               <strong>
                 {formatPlanPrice(selection.plan.price_amount_minor, 'zh-CN')}
               </strong>
-            </p>
-            <p>
-              {t('Points credited with this purchase')}:{' '}
-              <strong>{formatOfferPoints(selection.plan, 'zh-CN')}</strong>，
-              {t('Points never expire')}
-            </p>
-            <p>
-              {t('Service duration: {{days}} days.', {
-                days: selection.yearly ? 365 : 30,
-              })}
-            </p>
-            <p>
-              {t(
-                'Higher priority subscriptions activate first. Lower priority time is paused and retained; equal priorities follow payment time.'
-              )}
-            </p>
-            <p>
-              {t(
-                'This is a one-time purchase and does not enable automatic renewal.'
-              )}
-            </p>
+            </div>
+            <section className='sub-order-now'>
+              <p>
+                {t('Payment for this purchase')}{' '}
+                <strong>
+                  {formatPlanPrice(selection.plan.price_amount_minor, 'zh-CN')}
+                </strong>
+              </p>
+              <p>
+                {t('Points credited with this purchase')}{' '}
+                <strong>{formatOfferPoints(selection.plan, 'zh-CN')}</strong>，
+                {t('Points never expire')}
+              </p>
+              <p>
+                {t('Service duration: {{days}} days.', {
+                  days: selection.yearly ? 365 : 30,
+                })}
+              </p>
+              <p>
+                {t(
+                  'Higher priority subscriptions activate first. Lower priority time is paused and retained; equal priorities follow payment time.'
+                )}
+              </p>
+            </section>
             {methods.isPending && (
               <LoadingState message={t('Loading payment methods…')} />
             )}
@@ -182,7 +190,7 @@ export function SubscriptionCheckout(props: SubscriptionCheckoutProps) {
             )}
             {!!methods.data?.length && (
               <>
-                <label htmlFor='subscription-payment'>
+                <label className='sub-pay-label' htmlFor='subscription-payment'>
                   {t('Payment method')}
                 </label>
                 <Select
@@ -194,7 +202,10 @@ export function SubscriptionCheckout(props: SubscriptionCheckoutProps) {
                   }}
                   disabled={mutation.isPending}
                 >
-                  <SelectTrigger id='subscription-payment'>
+                  <SelectTrigger
+                    id='subscription-payment'
+                    className='sub-pay-select'
+                  >
                     <SelectValue>
                       {
                         methods.data.find(
@@ -229,7 +240,14 @@ export function SubscriptionCheckout(props: SubscriptionCheckoutProps) {
                 {t('Plan changed. Confirm the updated price and points again.')}
               </Button>
             )}
-            <p>{t('Contact support for refunds under applicable rules.')}</p>
+            <p className='sub-order-consent'>
+              {t(
+                'This is a one-time purchase and does not enable automatic renewal.'
+              )}
+            </p>
+            <p className='sub-order-help'>
+              {t('Contact support for refunds under applicable rules.')}
+            </p>
           </div>
         )}
       </Dialog>

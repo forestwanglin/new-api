@@ -856,6 +856,16 @@
 - 验证：Go1.26.10；修复前签名别名通知和支付关联回归测试均按预期失败；修复后 SQLite 定向模型及真实router测试通过，包含0.01元微信支付、GET／POST通知、签名返回、重复回调、标准字段优先、篡改／空值／超长拒绝、用途／渠道／归属／缺失关联及订单号冲突拒绝，校验quota和积分仅入账一次。`go test ./router -run TestCustomSubscription -count=1`、`go test ./model -run 'CustomSubscription|SubscriptionRule|PointsDatabaseMatrix|PaymentMethod|RechargeEpay' -count=1`、`go vet ./controller ./model ./router`、`go build ./...`、`git diff --check`通过。主任务设置专用测试DSN，隔离SQLite3.50.4／MySQL8.4.13／PostgreSQL16.16执行 `go test ./model -run 'CustomSubscription|SubscriptionRule|PointsDatabaseMatrix' -count=2 -v` 通过（16.622s）；`go test ./model ./middleware ./service -count=1` 通过。
 - 风险与未覆盖：未操作生产服务器、真实扣款或部署；已被网关误记为投递成功的旧记录不会自动重试，需部署后另行受控恢复。本条不合并钱包与订阅HTTP入口，也不引入主动支付对账。
 
+### Z047 订阅购买确认弹窗对齐 demo 样式
+
+- 需求与原因：按 `c-dev/ZYY-AI-demo.html` 与截图还原公开订阅页购买确认弹窗的视觉层级。
+- 变更内容：弹窗采用560px宽度、12px圆角、独立遮罩与无分隔线按钮区；套餐与价格并排，支付金额、到账积分和服务说明收进浅蓝摘要，支付方式选择器铺满内容宽度，单次购买提示置于选择器下方。复用现有 Dialog、Select、Button，保留真实30／365天服务期、优先级排期、积分类型及支付状态校验。
+- 影响面：`web/src/features/subscriptions-custom/checkout.tsx`、`web/src/styles/subscriptions-custom.css` 及本登记表；均为 fork 自有文件，未修改上游自有组件。
+- 与上游差异：延续 Z045 的 fork 自定义订阅界面，调整其确认弹窗样式；不扩展上游钱包或旧订阅弹窗。
+- 开关与默认值：无新依赖或配置；Portal 弹窗独立定义订阅色彩变量并支持深色模式，移动端保留16px外侧空间、20px内边距和换行。
+- 验证：`bun run typecheck`、`bun run test src/features/subscriptions-custom/__tests__`（6文件31用例）、`bunx oxlint -c .oxlintrc.json src/features/subscriptions-custom/checkout.tsx`、`bun run build` 通过。Chrome 实测桌面与390px移动端的打开／取消及摘要布局，移动端弹窗 scrollWidth 等于 clientWidth；检查深色摘要计算色值及页面错误日志（无 error）。
+- 风险与未覆盖：本地无可用支付方式，浏览器验证的是禁用支付状态；支付方式切换及提交路径由既有回归测试覆盖，未进行真实支付。保留当前业务规则，不照搬 demo 中尚未开放的自动续费管理说明。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
