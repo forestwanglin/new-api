@@ -22,6 +22,8 @@ type GeneralSetting struct {
 	CustomCurrencySymbol string `json:"custom_currency_symbol"`
 	// 自定义货币与美元汇率（1 USD = X Custom）
 	CustomCurrencyExchangeRate float64 `json:"custom_currency_exchange_rate"`
+	// Model plaza reference conversion only; independent from billing and payment rates.
+	ModelReferenceExchangeRate float64 `json:"model_reference_exchange_rate"`
 }
 
 // 默认配置
@@ -32,6 +34,7 @@ var generalSetting = GeneralSetting{
 	QuotaDisplayType:           QuotaDisplayTypeUSD,
 	CustomCurrencySymbol:       "¤",
 	CustomCurrencyExchangeRate: 1.0,
+	ModelReferenceExchangeRate: 7.0,
 }
 
 func init() {

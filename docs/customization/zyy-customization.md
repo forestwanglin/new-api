@@ -926,6 +926,15 @@
 - 验证：新增价格与布局回归先红后绿；模型、原定价、布局、教程、订阅及首页相关27文件301用例通过；`bun check -b`（1583文件、2项目）、变更文件 oxlint/oxfmt、`git diff --check`、`bun run build` 通过。Chrome真实本地接口验证国内价格不变，海外示例实价3/18保持、参考价5/30变为35/210，展示0.9折及省91%；顶部全量最低折扣不受分类和搜索空态影响。1172px高视口下，短页及空态footer底边均为1172px，长列表footer随内容下推。独立审查未发现阻断问题。
 - 风险与未覆盖：固定汇率不是实时汇率或结算汇率；无法得到有效数值参考价的模型不展示伪造折扣，不参与顶部最低折扣比较。未运行全量前端测试或移动端浏览器实测，未部署。
 
+### Z054 模型页可配置参考汇率与官网节省文案，隐藏顶部版本提示
+
+- 需求与原因：模型页的美元兑人民币参考汇率需由管理员维护，划线价、折扣及底部汇率说明需统一；节省文案使用「比官网省」，顶部站名旁永久隐藏新版本提示。
+- 变更内容：在「计费与支付 → 货币与展示」新增模型页参考汇率，保存为 `general_setting.model_reference_exchange_rate`，默认 7，仅接受有限正数；通过现有 `/api/status` 的 `model_reference_exchange_rate` 提供给公开页，保存后刷新状态缓存。海外模型参考价使用配置倍率，国内/其他保持原有倍率；行折扣、全量最低折扣与页脚引用同一值。公开与控制台共用顶部导航移除版本提示入口，维护页面的更新检查能力保留。
+- 影响面：`setting/operation_setting/general_setting.go`、`controller/{misc,option}.go`，前端 system-settings 的字段类型、货币设置表单、导航注册与保存 hook，状态映射与系统配置 store，model-plaza 页面与折扣计算，public-header 及相关回归测试，七语言文案。
+- 与上游差异：通过现有 option 存取机制增加展示配置，无数据库结构、定价查询或模型定价响应变更；实际输入/输出价格、充值汇率和计费算法不变。无新增依赖。
+- 兼容与限制：未配置或旧状态缓存缺少汇率时延续 7；非法状态值回退默认值。官网节省为展示文案，比较基数仍来自系统已有参考价，不额外抓取厂商官网报价；汇率为管理员设定值，不自动获取实时汇率。
+- 验证：相关前端22文件330用例通过，覆盖自定义汇率保存与status失效、非法值拒绝、模型页响应式调整海外划线价/行折扣/全量最低折扣/说明及国内价格不变、管理员顶部版本入口移除和维护更新组件原有能力。`bun check -b`（1584文件、2项目）、`bun run build`、变更TS/TSX oxlint（无错误，store原有spread warning保留）、22个前端文件oxfmt、`git diff --check`通过；`go test ./controller -run TestModelReferenceExchangeRate -count=1`、`go vet ./controller ./setting/operation_setting`通过。Chrome本地模型页确认「比官网省」、默认1:7说明和顶部无版本图标。未浏览器实测管理员保存汇率的完整流程，未运行全量测试，未部署。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
@@ -934,9 +943,10 @@
 
 | 区域 | 文件 | 关联条目 |
 |---|---|---|
-| 新模型页公开定价入口 | `router/api-router.go`、`middleware/access_token_routes.go`、`web/src/features/pricing/api.ts`、`web/src/features/pricing/hooks/use-pricing-data.ts`、七种locale | Z051、Z052、Z053 |
+| 新模型页公开定价入口 | `router/api-router.go`、`middleware/access_token_routes.go`、`web/src/features/pricing/api.ts`、`web/src/features/pricing/hooks/use-pricing-data.ts`、七种locale | Z051、Z052、Z053、Z054 |
+| 模型页参考汇率配置 | `setting/operation_setting/general_setting.go`、`controller/{misc,option}.go`、`web/src/features/system-settings/` 相关表单/类型/注册/hooks、`web/src/lib/status-query.ts`、`web/src/stores/system-config-store.ts` 及相关测试 | Z054 |
 | 公开页页脚与模型折扣展示 | `web/src/components/layout/components/public-layout.tsx`、`web/src/features/pricing/components/model-price-cell.tsx` 及相关测试 | Z053 |
-| 控制台统一顶部导航 | `web/src/components/layout/components/{app-header,public-header}.tsx` 及对应测试 | Z050 |
+| 控制台统一顶部导航 | `web/src/components/layout/components/{app-header,public-header}.tsx` 及对应测试 | Z050、Z054 |
 | 个人积分/订阅查询与导航 | `model/{main,option,user}.go`、`router/api-router.go`、`middleware/access_token_routes.go`、个人侧栏设置/维护设置、侧栏hooks及测试、七种locale、生成路由（详细文件见Z049） | Z049 |
 | 自定义订阅支付 | `model/topup.go`、`router/api-router.go`、`middleware/access_token_routes.go`、`common/log_text.zh-CN.json`、钱包类型/历史组件/测试、七种 locale | Z045 |
 | 登录认证弹窗与手机绑定 | `model/auth_flow.go`、`controller/{wechat,misc,option}.go`、`router/api-router.go`、前端 Dialog/auth/settings、布局/路由/导航/HTTP 入口、七种 locale | Z042 |

@@ -26,6 +26,7 @@ import {
   type CurrencyDisplayType,
   type SystemConfig,
   DEFAULT_CURRENCY_CONFIG,
+  DEFAULT_MODEL_REFERENCE_EXCHANGE_RATE,
 } from '@/stores/system-config-store'
 
 /**
@@ -91,7 +92,16 @@ export function mapStatusDataToConfig(
     ),
   }
 
+  const referenceRate = toNumber(
+    data.model_reference_exchange_rate,
+    DEFAULT_MODEL_REFERENCE_EXCHANGE_RATE
+  )
+
   return {
+    modelReferenceExchangeRate:
+      Number.isFinite(referenceRate) && referenceRate > 0
+        ? referenceRate
+        : DEFAULT_MODEL_REFERENCE_EXCHANGE_RATE,
     systemName: (data.system_name as string | undefined) || DEFAULT_SYSTEM_NAME,
     logo: (data.logo as string | undefined) || DEFAULT_LOGO,
     footerHtml: data.footer_html as string | undefined,

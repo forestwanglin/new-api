@@ -16,6 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { DEFAULT_MODEL_REFERENCE_EXCHANGE_RATE } from '@/stores/system-config-store'
+
 import { SettingsPage } from '../components/settings-page'
 import type { BillingSettings } from '../types'
 import {
@@ -37,6 +39,8 @@ const defaultBillingSettings: BillingSettings = {
   'general_setting.quota_display_type': 'USD',
   'general_setting.custom_currency_symbol': '¤',
   'general_setting.custom_currency_exchange_rate': 1,
+  'general_setting.model_reference_exchange_rate':
+    DEFAULT_MODEL_REFERENCE_EXCHANGE_RATE,
   DisplayInCurrencyEnabled: true,
   DisplayTokenStatEnabled: true,
   ModelPrice: '',

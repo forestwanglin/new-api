@@ -4,10 +4,7 @@
     "Model discount": "Giảm giá mô hình",
     "Models from": "Mô hình chỉ từ",
     "{{discount}} tenths of reference price": "{{discount}}/10 giá tham chiếu",
-    "Compared with the reference price": "So với giá tham chiếu",
     "Save up to {{percent}}%": "Tiết kiệm đến {{percent}}%",
-    "Save {{percent}}% compared with the reference price": "Tiết kiệm {{percent}}% so với giá tham chiếu",
-    "Overseas reference prices used for discount comparisons are converted at a fixed rate of USD 1 = CNY 7. This rate is for display only and does not change billing.": "Giá tham chiếu của mô hình nước ngoài được quy đổi theo tỷ giá cố định 1 USD = 7 CNY để so sánh giảm giá. Tỷ giá này chỉ dùng để hiển thị và không thay đổi cách tính phí.",
     "Domestic Models": "Mô hình Trung Quốc",
     "Overseas Models": "Mô hình quốc tế",
     "Other Models": "Mô hình khác",
@@ -7808,6 +7805,11 @@
     "Public WeCom account shown in customer support. Leave empty if unavailable.": "Tài khoản WeCom công khai hiển thị trong hỗ trợ. Để trống nếu không có.",
     "Public email address shown in customer support. Leave empty if unavailable.": "Địa chỉ email công khai hiển thị trong hỗ trợ. Để trống nếu không có.",
     "Enter a valid operations email address": "Nhập địa chỉ email vận hành hợp lệ",
-    "Not configured yet": "Chưa được cấu hình"
+    "Not configured yet": "Chưa được cấu hình",
+    "Compared with the official website": "So với trang web chính thức",
+    "Save {{percent}}% compared with the official website": "Tiết kiệm {{percent}}% so với trang web chính thức",
+    "Overseas reference prices used for discount comparisons are converted at a reference rate of USD 1 = CNY {{rate}}. This rate is for display only and does not change billing.": "Giá tham chiếu của mô hình quốc tế được quy đổi theo tỷ giá tham chiếu 1 USD = {{rate}} CNY để so sánh giảm giá. Tỷ giá này chỉ dùng để hiển thị, không thay đổi phí thực tế.",
+    "Model reference exchange rate (CNY per USD)": "Tỷ giá tham chiếu mô hình (CNY mỗi USD)",
+    "CNY per USD used for overseas model reference prices and discounts only. Does not affect billing or payments.": "Số CNY cho mỗi USD, chỉ dùng cho giá tham chiếu và giảm giá của mô hình quốc tế. Không ảnh hưởng đến tính phí hoặc thanh toán."
   }
 }

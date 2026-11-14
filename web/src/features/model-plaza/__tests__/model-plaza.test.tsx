@@ -27,6 +27,7 @@ import { useAuthStore } from '@/stores/auth-store'
 import { useLoginModalStore } from '@/stores/login-modal-store'
 import {
   DEFAULT_CURRENCY_CONFIG,
+  DEFAULT_MODEL_REFERENCE_EXCHANGE_RATE,
   useSystemConfigStore,
 } from '@/stores/system-config-store'
 
@@ -108,6 +109,7 @@ beforeEach(() => {
   useAuthStore.getState().auth.reset()
   useSystemConfigStore.getState().setConfig({
     currency: { ...DEFAULT_CURRENCY_CONFIG, quotaDisplayType: 'USD' },
+    modelReferenceExchangeRate: DEFAULT_MODEL_REFERENCE_EXCHANGE_RATE,
   })
   client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
@@ -131,9 +133,10 @@ afterEach(() => {
   client.clear()
   useLoginModalStore.getState().close()
   useAuthStore.getState().auth.reset()
-  useSystemConfigStore
-    .getState()
-    .setConfig({ currency: { ...DEFAULT_CURRENCY_CONFIG } })
+  useSystemConfigStore.getState().setConfig({
+    currency: { ...DEFAULT_CURRENCY_CONFIG },
+    modelReferenceExchangeRate: DEFAULT_MODEL_REFERENCE_EXCHANGE_RATE,
+  })
 })
 
 function renderPlaza() {
@@ -428,10 +431,10 @@ it('keeps sale prices and domestic references unchanged while multiplying overse
   expect(overseas.getByLabelText('Original price 28')).toBeVisible()
   expect(overseas.getByLabelText('Original price 84')).toBeVisible()
   expect(
-    overseas.getByText('Save 93% compared with the reference price')
+    overseas.getByText('Save 93% compared with the official website')
   ).toBeVisible()
   expect(
-    domestic.getByText('Save 50% compared with the reference price')
+    domestic.getByText('Save 50% compared with the official website')
   ).toBeVisible()
   const columns = screen.getAllByRole('columnheader')
   expect(columns.at(-1)).toHaveTextContent('Discount ratio')
@@ -453,7 +456,7 @@ it('keeps the headline lowest discount across all models when the list is filter
   expect(promotion).toHaveTextContent('Save up to 93%')
   expect(
     screen.getByText(
-      'Overseas reference prices used for discount comparisons are converted at a fixed rate of USD 1 = CNY 7. This rate is for display only and does not change billing.'
+      'Overseas reference prices used for discount comparisons are converted at a reference rate of USD 1 = CNY 7. This rate is for display only and does not change billing.'
     )
   ).toBeVisible()
 })
@@ -472,4 +475,36 @@ it('shows overseas references without changing full-rate token or expression sal
   expect(dynamic.getByText('15')).toBeVisible()
   expect(dynamic.getByLabelText('Original price 35')).toBeVisible()
   expect(dynamic.getByLabelText('Original price 105')).toBeVisible()
+})
+
+it('reacts to the configured reference exchange rate in overseas prices, discounts and explanation only', async () => {
+  vi.mocked(api.get).mockResolvedValue({
+    data: { ...pricing, group_ratio: { default: 0.5 } },
+  })
+  renderPlaza()
+  await screen.findByRole('row', { name: /gpt-api-model/ })
+  act(() =>
+    useSystemConfigStore.getState().setConfig({ modelReferenceExchangeRate: 5 })
+  )
+  const overseas = within(screen.getByRole('row', { name: /gpt-api-model/ }))
+  expect(overseas.getByText('2')).toBeVisible()
+  expect(overseas.getByText('6')).toBeVisible()
+  expect(overseas.getByLabelText('Original price 20')).toBeVisible()
+  expect(overseas.getByLabelText('Original price 60')).toBeVisible()
+  expect(
+    overseas.getByText('Save 90% compared with the official website')
+  ).toBeVisible()
+  expect(
+    screen.getByRole('status', { name: 'Model discount' })
+  ).toHaveTextContent('Save up to 90%')
+  const domestic = within(screen.getByRole('row', { name: /deepseek-chat/ }))
+  expect(domestic.getByLabelText('Original price 2')).toBeVisible()
+  expect(
+    domestic.getByText('Save 50% compared with the official website')
+  ).toBeVisible()
+  expect(
+    screen.getByText(
+      'Overseas reference prices used for discount comparisons are converted at a reference rate of USD 1 = CNY 5. This rate is for display only and does not change billing.'
+    )
+  ).toBeVisible()
 })

@@ -21,6 +21,8 @@ import { persist } from 'zustand/middleware'
 
 import { DEFAULT_SYSTEM_NAME, DEFAULT_LOGO } from '@/lib/constants'
 
+export const DEFAULT_MODEL_REFERENCE_EXCHANGE_RATE = 7
+
 export type CurrencyDisplayType = 'USD' | 'CNY' | 'TOKENS' | 'CUSTOM'
 
 export interface CurrencyConfig {
@@ -45,6 +47,8 @@ export interface SystemConfig {
   demoSiteEnabled?: boolean
   displayTokenStatEnabled?: boolean
   currency: CurrencyConfig
+  /** USD to CNY reference conversion used only by the public model page. */
+  modelReferenceExchangeRate: number
 }
 
 export const DEFAULT_CURRENCY_CONFIG: CurrencyConfig = {
@@ -76,6 +80,7 @@ export const useSystemConfigStore = create<SystemConfigState>()(
         systemName: DEFAULT_SYSTEM_NAME,
         logo: DEFAULT_LOGO,
         currency: { ...DEFAULT_CURRENCY_CONFIG },
+        modelReferenceExchangeRate: DEFAULT_MODEL_REFERENCE_EXCHANGE_RATE,
       },
       loading: true,
       loadedLogoUrl: DEFAULT_LOGO,

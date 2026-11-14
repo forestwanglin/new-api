@@ -4,10 +4,7 @@
     "Model discount": "Model discount",
     "Models from": "Models from",
     "{{discount}} tenths of reference price": "{{discount}}/10 of reference price",
-    "Compared with the reference price": "Compared with the reference price",
     "Save up to {{percent}}%": "Save up to {{percent}}%",
-    "Save {{percent}}% compared with the reference price": "Save {{percent}}% compared with the reference price",
-    "Overseas reference prices used for discount comparisons are converted at a fixed rate of USD 1 = CNY 7. This rate is for display only and does not change billing.": "Overseas reference prices used for discount comparisons are converted at a fixed rate of USD 1 = CNY 7. This rate is for display only and does not change billing.",
     "Domestic Models": "Domestic Models",
     "Overseas Models": "Overseas Models",
     "Other Models": "Other Models",
@@ -7808,6 +7805,11 @@
     "Public WeCom account shown in customer support. Leave empty if unavailable.": "Public WeCom account shown in customer support. Leave empty if unavailable.",
     "Public email address shown in customer support. Leave empty if unavailable.": "Public email address shown in customer support. Leave empty if unavailable.",
     "Enter a valid operations email address": "Enter a valid operations email address",
-    "Not configured yet": "Not configured yet"
+    "Not configured yet": "Not configured yet",
+    "Compared with the official website": "Compared with the official website",
+    "Save {{percent}}% compared with the official website": "Save {{percent}}% compared with the official website",
+    "Overseas reference prices used for discount comparisons are converted at a reference rate of USD 1 = CNY {{rate}}. This rate is for display only and does not change billing.": "Overseas reference prices used for discount comparisons are converted at a reference rate of USD 1 = CNY {{rate}}. This rate is for display only and does not change billing.",
+    "Model reference exchange rate (CNY per USD)": "Model reference exchange rate (CNY per USD)",
+    "CNY per USD used for overseas model reference prices and discounts only. Does not affect billing or payments.": "CNY per USD used for overseas model reference prices and discounts only. Does not affect billing or payments."
   }
 }

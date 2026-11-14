@@ -52,6 +52,16 @@ describe('model reference comparisons', () => {
     ).toBe(0.6)
   })
 
+  it('uses the configured reference rate only for overseas comparisons', () => {
+    expect(getModelDiscountRatio(model(), 5)).toBeCloseTo(0.12)
+    expect(getModelDiscountRatio(model({ vendor_name: 'DeepSeek' }), 5)).toBe(
+      0.6
+    )
+    expect(getModelDiscountRatio(model({ vendor_name: 'Private' }), 5)).toBe(
+      0.6
+    )
+  })
+
   it('compares numeric expression and request prices using their display multiplier', () => {
     expect(
       getModelDiscountRatio(

@@ -4,10 +4,7 @@
     "Model discount": "Скидка на модели",
     "Models from": "Модели от",
     "{{discount}} tenths of reference price": "{{discount}}/10 справочной цены",
-    "Compared with the reference price": "По сравнению со справочной ценой",
     "Save up to {{percent}}%": "Экономия до {{percent}}%",
-    "Save {{percent}}% compared with the reference price": "Экономия {{percent}}% от справочной цены",
-    "Overseas reference prices used for discount comparisons are converted at a fixed rate of USD 1 = CNY 7. This rate is for display only and does not change billing.": "Справочные цены зарубежных моделей для сравнения скидок пересчитываются по фиксированному курсу 1 USD = 7 CNY. Этот курс используется только для отображения и не влияет на тарификацию.",
     "Domestic Models": "Китайские модели",
     "Overseas Models": "Зарубежные модели",
     "Other Models": "Другие модели",
@@ -7810,6 +7807,11 @@
     "Public WeCom account shown in customer support. Leave empty if unavailable.": "Публичный аккаунт WeCom для связи с поддержкой. Можно оставить пустым.",
     "Public email address shown in customer support. Leave empty if unavailable.": "Публичный адрес электронной почты для поддержки. Можно оставить пустым.",
     "Enter a valid operations email address": "Введите действительный адрес электронной почты поддержки",
-    "Not configured yet": "Пока не настроено"
+    "Not configured yet": "Пока не настроено",
+    "Compared with the official website": "По сравнению с официальным сайтом",
+    "Save {{percent}}% compared with the official website": "Экономия {{percent}}% по сравнению с официальным сайтом",
+    "Overseas reference prices used for discount comparisons are converted at a reference rate of USD 1 = CNY {{rate}}. This rate is for display only and does not change billing.": "Для сравнения скидок справочные цены зарубежных моделей пересчитываются по курсу 1 USD = {{rate}} CNY. Этот курс используется только для отображения и не влияет на списания.",
+    "Model reference exchange rate (CNY per USD)": "Справочный курс моделей (CNY за USD)",
+    "CNY per USD used for overseas model reference prices and discounts only. Does not affect billing or payments.": "Количество CNY за USD только для справочных цен и скидок зарубежных моделей. Не влияет на списания или платежи."
   }
 }

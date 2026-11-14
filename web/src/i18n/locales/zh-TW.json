@@ -4,10 +4,7 @@
     "Model discount": "模型折扣",
     "Models from": "模型低至",
     "{{discount}} tenths of reference price": "{{discount}} 折",
-    "Compared with the reference price": "相比參考價",
     "Save up to {{percent}}%": "最高省 {{percent}}%",
-    "Save {{percent}}% compared with the reference price": "比參考價省 {{percent}}%",
-    "Overseas reference prices used for discount comparisons are converted at a fixed rate of USD 1 = CNY 7. This rate is for display only and does not change billing.": "海外模型的折扣比較採用固定參考匯率 1 美元 = 7 元人民幣換算，僅用於價格展示，不作為實際計費依據。",
     "Domestic Models": "國內模型",
     "Overseas Models": "海外模型",
     "Other Models": "其他模型",
@@ -7808,6 +7805,11 @@
     "Public WeCom account shown in customer support. Leave empty if unavailable.": "聯絡客服中公開顯示的企業微信帳號，未提供時可留空。",
     "Public email address shown in customer support. Leave empty if unavailable.": "聯絡客服中公開顯示的維運信箱，未提供時可留空。",
     "Enter a valid operations email address": "請輸入有效的維運電子郵件地址",
-    "Not configured yet": "尚未設定"
+    "Not configured yet": "尚未設定",
+    "Compared with the official website": "相比官網",
+    "Save {{percent}}% compared with the official website": "比官網省 {{percent}}%",
+    "Overseas reference prices used for discount comparisons are converted at a reference rate of USD 1 = CNY {{rate}}. This rate is for display only and does not change billing.": "海外模型的折扣比較採用參考匯率 1 美元 = {{rate}} 元人民幣換算，僅用於價格展示，不作為實際計費依據。",
+    "Model reference exchange rate (CNY per USD)": "模型頁參考匯率（人民幣/美元）",
+    "CNY per USD used for overseas model reference prices and discounts only. Does not affect billing or payments.": "每 1 美元對應的人民幣金額，僅用於海外模型的刪除線參考價及折扣計算，不影響實際計費或付款。"
   }
 }

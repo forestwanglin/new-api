@@ -65,6 +65,10 @@ const createPricingSchema = (t: (key: string) => string) =>
       DisplayInCurrencyEnabled: z.boolean(),
       DisplayTokenStatEnabled: z.boolean(),
       general_setting: z.object({
+        model_reference_exchange_rate: z.coerce
+          .number()
+          .finite(t('Exchange rate must be greater than 0'))
+          .positive(t('Exchange rate must be greater than 0')),
         quota_display_type: z.enum(['USD', 'CNY', 'TOKENS', 'CUSTOM']),
         custom_currency_symbol: z.string().max(8).optional(),
         custom_currency_exchange_rate: z.coerce
@@ -238,9 +242,7 @@ export function PricingSection({ defaultValues }: PricingSectionProps) {
                     <FormLabel>
                       {displayType === 'CNY'
                         ? t('CNY per USD')
-                        : displayType === 'USD'
-                          ? t('USD Exchange Rate')
-                          : t('USD Exchange Rate')}
+                        : t('USD Exchange Rate')}
                     </FormLabel>
                     <FormControl>
                       <Input
@@ -259,6 +261,31 @@ export function PricingSection({ defaultValues }: PricingSectionProps) {
                 )}
               />
             )}
+
+            <FormField
+              control={form.control}
+              name='general_setting.model_reference_exchange_rate'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    {t('Model reference exchange rate (CNY per USD)')}
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      type='number'
+                      step='any'
+                      {...safeNumberFieldProps(field)}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    {t(
+                      'CNY per USD used for overseas model reference prices and discounts only. Does not affect billing or payments.'
+                    )}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             {displayType === 'CUSTOM' && (
               <div className='grid gap-4 sm:grid-cols-2'>

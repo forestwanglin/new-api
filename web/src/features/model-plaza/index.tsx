@@ -36,6 +36,10 @@ import { toIntlLocale } from '@/i18n/languages'
 import { getServerErrorMessage } from '@/lib/server-error-message'
 import { useAuthStore } from '@/stores/auth-store'
 import { useLoginModalStore } from '@/stores/login-modal-store'
+import {
+  DEFAULT_MODEL_REFERENCE_EXCHANGE_RATE,
+  useSystemConfigStore,
+} from '@/stores/system-config-store'
 
 import {
   getModelCategory,
@@ -57,6 +61,11 @@ import '@/styles/model-plaza.css'
 
 export function ModelPlaza() {
   const { t, i18n } = useTranslation()
+  const referenceExchangeRate = useSystemConfigStore(
+    (state) =>
+      state.config.modelReferenceExchangeRate ??
+      DEFAULT_MODEL_REFERENCE_EXCHANGE_RATE
+  )
   const isAuthenticated = useAuthStore((state) => !!state.auth.user)
   const { models, isLoading, error, refetch, priceRate, usdExchangeRate } =
     usePricingData(true, 'model')
@@ -135,7 +144,7 @@ export function ModelPlaza() {
   }, [searchedModels, filter, locale])
 
   const discounts = models
-    .map(getModelDiscountRatio)
+    .map((model) => getModelDiscountRatio(model, referenceExchangeRate))
     .filter((ratio): ratio is number => ratio !== null && ratio < 1)
   const bestDiscount = discounts.length ? Math.min(...discounts) : null
 
@@ -160,7 +169,7 @@ export function ModelPlaza() {
                   discount: formatModelDiscount(bestDiscount),
                 })}
               </strong>
-              <span>{t('Compared with the reference price')}</span>
+              <span>{t('Compared with the official website')}</span>
               <b>
                 {t('Save up to {{percent}}%', {
                   percent: Math.round((1 - bestDiscount) * 100),
@@ -272,7 +281,10 @@ export function ModelPlaza() {
                                 priceRate,
                                 usdExchangeRate,
                                 originalPriceMultiplier:
-                                  getReferencePriceMultiplier(model),
+                                  getReferencePriceMultiplier(
+                                    model,
+                                    referenceExchangeRate
+                                  ),
                               }}
                             />
                           </td>
@@ -280,7 +292,10 @@ export function ModelPlaza() {
                             data-label={t('Discount ratio')}
                             className='is-right'
                           >
-                            <ModelDiscount model={model} />
+                            <ModelDiscount
+                              model={model}
+                              referenceExchangeRate={referenceExchangeRate}
+                            />
                           </td>
                         </tr>
                       ))}
@@ -293,7 +308,8 @@ export function ModelPlaza() {
                   </p>
                   <p className='mp-note'>
                     {t(
-                      'Overseas reference prices used for discount comparisons are converted at a fixed rate of USD 1 = CNY 7. This rate is for display only and does not change billing.'
+                      'Overseas reference prices used for discount comparisons are converted at a reference rate of USD 1 = CNY {{rate}}. This rate is for display only and does not change billing.',
+                      { rate: String(referenceExchangeRate) }
                     )}
                   </p>
                 </>
@@ -310,9 +326,10 @@ export function ModelPlaza() {
 
 function ModelDiscount(props: {
   model: Parameters<typeof getModelDiscountRatio>[0]
+  referenceExchangeRate: number
 }) {
   const { t } = useTranslation()
-  const ratio = getModelDiscountRatio(props.model)
+  const ratio = getModelDiscountRatio(props.model, props.referenceExchangeRate)
   if (ratio === null) return <span className='mp-unavailable'>—</span>
   return (
     <>
@@ -323,7 +340,7 @@ function ModelDiscount(props: {
       </span>
       {ratio < 1 && (
         <span className='mp-saving'>
-          {t('Save {{percent}}% compared with the reference price', {
+          {t('Save {{percent}}% compared with the official website', {
             percent: Math.round((1 - ratio) * 100),
           })}
         </span>

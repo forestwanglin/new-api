@@ -4,10 +4,7 @@
     "Model discount": "Réduction des modèles",
     "Models from": "Modèles à partir de",
     "{{discount}} tenths of reference price": "{{discount}}/10 du prix de référence",
-    "Compared with the reference price": "Par rapport au prix de référence",
     "Save up to {{percent}}%": "Économisez jusqu’à {{percent}}%",
-    "Save {{percent}}% compared with the reference price": "Économisez {{percent}}% par rapport au prix de référence",
-    "Overseas reference prices used for discount comparisons are converted at a fixed rate of USD 1 = CNY 7. This rate is for display only and does not change billing.": "Les prix de référence des modèles étrangers sont convertis au taux fixe de 1 USD = 7 CNY pour comparer les réductions. Ce taux sert uniquement à l’affichage et ne modifie pas la facturation.",
     "Domestic Models": "Modèles chinois",
     "Overseas Models": "Modèles internationaux",
     "Other Models": "Autres modèles",
@@ -7808,6 +7805,11 @@
     "Public WeCom account shown in customer support. Leave empty if unavailable.": "Compte WeCom public affiché dans le support. Laissez vide si indisponible.",
     "Public email address shown in customer support. Leave empty if unavailable.": "Adresse e-mail publique affichée dans le support. Laissez vide si indisponible.",
     "Enter a valid operations email address": "Saisissez une adresse e-mail valide pour les opérations",
-    "Not configured yet": "Pas encore configuré"
+    "Not configured yet": "Pas encore configuré",
+    "Compared with the official website": "Par rapport au site officiel",
+    "Save {{percent}}% compared with the official website": "Économisez {{percent}}% par rapport au site officiel",
+    "Overseas reference prices used for discount comparisons are converted at a reference rate of USD 1 = CNY {{rate}}. This rate is for display only and does not change billing.": "Les prix de référence des modèles étrangers sont convertis au taux de référence de 1 USD = {{rate}} CNY pour comparer les réductions. Ce taux sert uniquement à l’affichage et ne modifie pas la facturation.",
+    "Model reference exchange rate (CNY per USD)": "Taux de référence des modèles (CNY par USD)",
+    "CNY per USD used for overseas model reference prices and discounts only. Does not affect billing or payments.": "Montant en CNY par USD utilisé uniquement pour les prix de référence et les réductions des modèles étrangers. Sans effet sur la facturation ou les paiements."
   }
 }

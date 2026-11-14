@@ -30,6 +30,7 @@ import {
 import {
   STATUS_QUERY_KEY,
   ensureStatus,
+  mapStatusDataToConfig,
   statusQueryOptions,
 } from '@/lib/status-query'
 import { useSystemConfigStore } from '@/stores/system-config-store'
@@ -260,6 +261,30 @@ describe('module guard status freshness', () => {
         enabled: false,
         requireAuth: true,
       })
+    }
+  )
+})
+
+describe('model reference exchange rate status mapping', () => {
+  test.each([8.25, '8.25'])(
+    'accepts configured rate %s without changing payment conversion',
+    (rate) => {
+      const config = mapStatusDataToConfig({
+        model_reference_exchange_rate: rate,
+        usd_exchange_rate: 6.5,
+      })
+      expect(config.modelReferenceExchangeRate).toBe(8.25)
+      expect(config.currency?.usdExchangeRate).toBe(6.5)
+    }
+  )
+
+  test.each([undefined, null, '', 0, -1, Infinity, 'NaN', 'Infinity'])(
+    'falls back to 7 for invalid rate %s',
+    (rate) => {
+      expect(
+        mapStatusDataToConfig({ model_reference_exchange_rate: rate })
+          .modelReferenceExchangeRate
+      ).toBe(7)
     }
   )
 })

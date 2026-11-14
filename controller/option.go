@@ -3,6 +3,7 @@ package controller
 import (
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"net/mail"
 	"slices"
@@ -216,6 +217,13 @@ func UpdateOption(c *gin.Context) {
 	if option.Key == "TaskPublicAddress" && option.Value.(string) != "" {
 		if err := service.ValidateTaskArtifactBaseURL(option.Value.(string)); err != nil {
 			common.ApiError(c, err)
+			return
+		}
+	}
+	if option.Key == "general_setting.model_reference_exchange_rate" {
+		rate, err := strconv.ParseFloat(option.Value.(string), 64)
+		if err != nil || math.IsNaN(rate) || math.IsInf(rate, 0) || rate <= 0 {
+			common.ApiErrorT(c, "Exchange rate must be greater than 0")
 			return
 		}
 	}

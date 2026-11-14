@@ -29,6 +29,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, expect, it, vi } from 'vitest'
 
 import { api } from '@/lib/api'
+import { useAuthStore } from '@/stores/auth-store'
 import { useLoginModalStore } from '@/stores/login-modal-store'
 import { useSystemConfigStore } from '@/stores/system-config-store'
 
@@ -38,6 +39,7 @@ const initialSystemConfig = useSystemConfigStore.getState()
 const clients: QueryClient[] = []
 afterEach(() => {
   cleanup()
+  useAuthStore.getState().auth.reset()
   useLoginModalStore.getState().close()
   useSystemConfigStore.setState(initialSystemConfig)
   clients.splice(0).forEach((client) => client.clear())
@@ -230,4 +232,14 @@ it('opens models from the logo and selects the model menu', async () => {
     'aria-current',
     'page'
   )
+})
+
+it('never shows the system version control beside branding even for administrators', async () => {
+  useAuthStore
+    .getState()
+    .auth.setUser({ id: 1, username: 'admin', role: 100, group: 'default' })
+  await renderHeader({ showAuthButtons: false }, { version: 'v1.0.0' })
+  expect(
+    screen.queryByRole('button', { name: /System updates, current version:/ })
+  ).not.toBeInTheDocument()
 })

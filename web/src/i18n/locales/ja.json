@@ -4,10 +4,7 @@
     "Model discount": "モデルの割引",
     "Models from": "モデル料金は参考価格の",
     "{{discount}} tenths of reference price": "参考価格の {{discount}}/10",
-    "Compared with the reference price": "参考価格との比較",
     "Save up to {{percent}}%": "最大 {{percent}}% お得",
-    "Save {{percent}}% compared with the reference price": "参考価格より {{percent}}% お得",
-    "Overseas reference prices used for discount comparisons are converted at a fixed rate of USD 1 = CNY 7. This rate is for display only and does not change billing.": "海外モデルの割引比較は、1 米ドル = 7 人民元の固定参考レートで換算します。表示専用であり、実際の課金には適用されません。",
     "Domestic Models": "中国国内モデル",
     "Overseas Models": "海外モデル",
     "Other Models": "その他のモデル",
@@ -7808,6 +7805,11 @@
     "Public WeCom account shown in customer support. Leave empty if unavailable.": "サポートに表示する公開 WeCom アカウント。未設定の場合は空欄にしてください。",
     "Public email address shown in customer support. Leave empty if unavailable.": "サポートに表示する公開メールアドレス。未設定の場合は空欄にしてください。",
     "Enter a valid operations email address": "有効な運用メールアドレスを入力してください",
-    "Not configured yet": "未設定"
+    "Not configured yet": "未設定",
+    "Compared with the official website": "公式サイトとの比較",
+    "Save {{percent}}% compared with the official website": "公式サイトより {{percent}}% お得",
+    "Overseas reference prices used for discount comparisons are converted at a reference rate of USD 1 = CNY {{rate}}. This rate is for display only and does not change billing.": "海外モデルの割引比較では、参考価格を 1 米ドル = {{rate}} 人民元の参考為替レートで換算します。このレートは表示専用で、実際の課金には影響しません。",
+    "Model reference exchange rate (CNY per USD)": "モデルページの参考為替レート（人民元/米ドル）",
+    "CNY per USD used for overseas model reference prices and discounts only. Does not affect billing or payments.": "1 米ドルあたりの人民元額です。海外モデルの取り消し線付き参考価格と割引の計算にのみ使用し、実際の課金や支払いには影響しません。"
   }
 }

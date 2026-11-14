@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { parseCurrencyDisplayType } from '@/lib/currency'
+import { DEFAULT_MODEL_REFERENCE_EXCHANGE_RATE } from '@/stores/system-config-store'
 
 import { CheckinSettingsSection } from '../general/checkin-settings-section'
 import { PricingSection } from '../general/pricing-section'
@@ -90,6 +91,9 @@ const BILLING_SECTIONS = [
           DisplayInCurrencyEnabled: settings.DisplayInCurrencyEnabled,
           DisplayTokenStatEnabled: settings.DisplayTokenStatEnabled,
           general_setting: {
+            model_reference_exchange_rate:
+              settings['general_setting.model_reference_exchange_rate'] ??
+              DEFAULT_MODEL_REFERENCE_EXCHANGE_RATE,
             quota_display_type: parseCurrencyDisplayType(
               settings['general_setting.quota_display_type']
             ),

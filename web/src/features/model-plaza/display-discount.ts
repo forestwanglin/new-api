@@ -26,20 +26,23 @@ import {
 } from '@/features/pricing/lib/model-helpers'
 import { getSeedanceVideoSpec } from '@/features/pricing/lib/video-price'
 import type { PricingModel } from '@/features/pricing/types'
+import { DEFAULT_MODEL_REFERENCE_EXCHANGE_RATE } from '@/stores/system-config-store'
 
 import { getModelCategory } from './categories'
 
-/** Fixed reference conversion only; never applied to charged prices. */
-export const OVERSEAS_REFERENCE_MULTIPLIER = 7
-
-export function getReferencePriceMultiplier(model: PricingModel): number {
-  return getModelCategory(model) === 'overseas'
-    ? OVERSEAS_REFERENCE_MULTIPLIER
-    : 1
+/** Reference conversion only; never applied to charged prices. */
+export function getReferencePriceMultiplier(
+  model: PricingModel,
+  referenceExchangeRate = DEFAULT_MODEL_REFERENCE_EXCHANGE_RATE
+): number {
+  return getModelCategory(model) === 'overseas' ? referenceExchangeRate : 1
 }
 
 /** All comparable price entries share the same group multiplier. */
-export function getModelDiscountRatio(model: PricingModel): number | null {
+export function getModelDiscountRatio(
+  model: PricingModel,
+  referenceExchangeRate = DEFAULT_MODEL_REFERENCE_EXCHANGE_RATE
+): number | null {
   if (getSeedanceVideoSpec(model) || isUnconfiguredTaskUsageModel(model)) {
     return null
   }
@@ -74,7 +77,9 @@ export function getModelDiscountRatio(model: PricingModel): number | null {
       return null
     }
   }
-  const ratio = getDisplayGroupRatio(model) / getReferencePriceMultiplier(model)
+  const ratio =
+    getDisplayGroupRatio(model) /
+    getReferencePriceMultiplier(model, referenceExchangeRate)
   return Number.isFinite(ratio) && ratio >= 0 ? ratio : null
 }
 
