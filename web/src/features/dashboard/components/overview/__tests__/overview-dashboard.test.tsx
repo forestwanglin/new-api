@@ -81,7 +81,7 @@ beforeEach(() => {
             data: { default: { desc: 'Default', ratio: 1 } },
           },
         }
-      case '/api/pricing':
+      case '/api/model/pricing':
         return {
           data: {
             success: true,

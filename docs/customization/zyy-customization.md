@@ -942,6 +942,16 @@
 - 影响面：`web/src/features/model-plaza/index.tsx`、七种 locale；复用现有说明样式，无接口、价格或计费逻辑变更。
 - 验证：模型页4个测试文件38个用例通过；`bun check -b`（1584文件、2项目）、变更页面oxlint、8个前端文件oxfmt、`git diff --check`通过。未执行本轮浏览器实测，未部署。
 
+### Z056 首页接入引导解除旧模型广场开关依赖
+
+- 需求与原因：关闭旧模型广场后，普通用户登录并进入首页时，接入引导仍请求受旧广场开关控制的 `/api/pricing`，导致权限不足错误。
+- 变更内容：首页接入引导显式使用已有 `usePricingData(true, 'model')`，通过 `/api/model/pricing` 获取模型及分组价格，复用按用户 ID 和分组隔离的缓存。
+- 影响面：`web/src/features/dashboard/components/overview/access-guide/index.tsx` 及接入引导、首页回归测试。**上游自有文件**：上述组件及两个已有测试文件。
+- 与上游差异：接入引导的数据源使用 Z051 的独立公开定价入口；保留旧模型广场访问限制、后端查询和响应结构。
+- 开关与默认值：无新增配置或依赖；新入口仍沿用现有登录身份和分组过滤。
+- 验证：新增回归修复前失败、修复后通过；接入引导及首页 2 个测试文件 17 用例通过，覆盖普通用户、旧接口拒绝、新接口取价、分组倍率及不请求旧接口。`bun run typecheck`（1584 文件、2 项目）、`bun run build`、三文件 oxlint/oxfmt 与 `git diff --check` 通过；`go test ./router -run TestModelPlazaPricing -count=1` 通过。
+- 风险与未覆盖：仅调整前端取价来源，需更新服务器前端资源才能生效；未连接生产用户会话或执行服务器部署。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
@@ -950,6 +960,7 @@
 
 | 区域 | 文件 | 关联条目 |
 |---|---|---|
+| 首页接入引导取价 | `web/src/features/dashboard/components/overview/access-guide/index.tsx` 及接入引导、首页测试 | Z056 |
 | 新模型页公开定价入口 | `router/api-router.go`、`middleware/access_token_routes.go`、`web/src/features/pricing/api.ts`、`web/src/features/pricing/hooks/use-pricing-data.ts`、七种locale | Z051、Z052、Z053、Z054、Z055 |
 | 模型页参考汇率配置 | `setting/operation_setting/general_setting.go`、`controller/{misc,option}.go`、`web/src/features/system-settings/` 相关表单/类型/注册/hooks、`web/src/lib/status-query.ts`、`web/src/stores/system-config-store.ts` 及相关测试 | Z054 |
 | 公开页页脚与模型折扣展示 | `web/src/components/layout/components/public-layout.tsx`、`web/src/features/pricing/components/model-price-cell.tsx` 及相关测试 | Z053 |

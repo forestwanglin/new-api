@@ -30,6 +30,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 import type { ApiKey } from '@/features/keys/types'
 import { api } from '@/lib/api'
+import { useAuthStore } from '@/stores/auth-store'
 
 import { AccessGuideCard } from '../index'
 
@@ -72,6 +73,7 @@ let tokenList: ApiKey[]
 
 beforeEach(() => {
   window.localStorage.clear()
+  useAuthStore.getState().auth.setUser(null)
   tokenList = []
   client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
 
@@ -98,6 +100,14 @@ beforeEach(() => {
           },
         }
       case '/api/pricing':
+        return {
+          data: {
+            success: false,
+            code: 'AUTH_INSUFFICIENT_PRIVILEGE',
+            message: 'Unauthorized, insufficient privileges',
+          },
+        }
+      case '/api/model/pricing':
         return {
           data: {
             success: true,
@@ -136,6 +146,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  useAuthStore.getState().auth.setUser(null)
   client.clear()
 })
 
@@ -166,6 +177,31 @@ function getCommandItem(label: string): HTMLElement {
 }
 
 describe('AccessGuideCard', () => {
+  test('shows model prices for a regular user when the legacy model square is disabled', async () => {
+    useAuthStore.getState().auth.setUser({
+      id: 1,
+      username: 'regular-user',
+      role: 1,
+      group: 'default',
+    })
+    tokenList = [makeKey(5, { name: 'App key', group: 'vip' })]
+
+    await renderCard()
+
+    expect(
+      await screen.findByRole('button', { name: /gpt-4o-mini/ })
+    ).toHaveTextContent('/1M')
+    expect(screen.getByRole('option', { name: /App key/ })).toHaveTextContent(
+      '×0.5'
+    )
+    expect(screen.queryByText('deepseek-chat')).not.toBeInTheDocument()
+    expect(api.get).toHaveBeenCalledWith('/api/model/pricing')
+    expect(api.get).not.toHaveBeenCalledWith('/api/pricing')
+    expect(
+      screen.queryByText('Unauthorized, insufficient privileges')
+    ).not.toBeInTheDocument()
+  })
+
   test('shows the empty state and hides models before a key exists', async () => {
     await renderCard()
 
