@@ -104,6 +104,7 @@ func WeChatAuth(c *gin.Context) {
 		return
 	}
 	code := c.Query("code")
+	affiliateCode := c.Query("aff")
 	if c.Request.Method == http.MethodPost {
 		var req wechatBindRequest
 		if common.DecodeJson(c.Request.Body, &req) != nil {
@@ -111,6 +112,7 @@ func WeChatAuth(c *gin.Context) {
 			return
 		}
 		code = req.Code
+		affiliateCode = req.Aff
 	}
 	identity, err := getWeChatIdentityByCode(code)
 	if err != nil {
@@ -145,7 +147,13 @@ func WeChatAuth(c *gin.Context) {
 			user.Role = common.RoleCommonUser
 			user.Status = common.UserStatusEnabled
 
-			if err := user.Insert(0); err != nil {
+			inviterID, err := service.ResolveAffiliateInviter(model.DB, affiliateCode)
+			if err != nil {
+				common.ApiError(c, err)
+				return
+			}
+			user.InviterId = inviterID
+			if err := user.Insert(inviterID); err != nil {
 				common.ApiError(c, err)
 				return
 			}
@@ -183,6 +191,7 @@ func WeChatAuth(c *gin.Context) {
 
 type wechatBindRequest struct {
 	Code string `json:"code"`
+	Aff  string `json:"aff"`
 }
 
 func WeChatBind(c *gin.Context) {

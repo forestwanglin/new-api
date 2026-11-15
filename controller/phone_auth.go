@@ -53,6 +53,7 @@ type phoneAuthRequest struct {
 	SendToken      string `json:"send_token"`
 	SMSToken       string `json:"sms_token"`
 	Code           string `json:"code"`
+	Aff            string `json:"aff"`
 }
 
 func VerifyPhoneCaptcha(c *gin.Context) {
@@ -65,7 +66,7 @@ func VerifyPhoneCaptcha(c *gin.Context) {
 		common.ApiErrorT(c, "Invalid request")
 		return
 	}
-	token, err := service.VerifyPhoneImage(req.ChallengeToken, req.Answer, req.Phone, req.BindToken, browser)
+	token, err := service.VerifyPhoneImage(req.ChallengeToken, req.Answer, req.Phone, req.BindToken, browser, req.Aff)
 	if err != nil {
 		common.ApiError(c, err)
 		return

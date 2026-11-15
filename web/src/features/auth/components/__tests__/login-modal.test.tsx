@@ -17,13 +17,15 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 import { api } from '@/lib/api'
+import { useAuthStore } from '@/stores/auth-store'
 import { useLoginModalStore } from '@/stores/login-modal-store'
 
+import { saveAffiliateCode } from '../../lib/storage'
 import { LoginModal } from '../login-modal'
 
 vi.mock('@tanstack/react-router', () => ({
@@ -43,6 +45,8 @@ vi.mock('@/hooks/use-status', () => ({
   }),
 }))
 beforeEach(() => {
+  localStorage.clear()
+  useAuthStore.getState().auth.reset()
   useLoginModalStore.getState().open()
   vi.spyOn(api, 'get').mockResolvedValue({
     data: {
@@ -56,6 +60,8 @@ beforeEach(() => {
   })
 })
 afterEach(() => {
+  localStorage.clear()
+  useAuthStore.getState().auth.reset()
   useLoginModalStore.getState().close()
   vi.restoreAllMocks()
 })
@@ -81,7 +87,8 @@ it('shows only WeChat and phone tabs and closes with its accessible close button
   expect(useLoginModalStore.getState().isOpen).toBe(false)
 })
 
-it('keeps unbound WeChat users in the WeChat tab and asks for phone verification', async () => {
+it('keeps unbound WeChat users in the WeChat tab and retains their invitation until phone verification', async () => {
+  saveAffiliateCode('iQO5')
   vi.spyOn(api, 'post').mockResolvedValue({
     data: {
       success: true,
@@ -106,7 +113,222 @@ it('keeps unbound WeChat users in the WeChat tab and asks for phone verification
     'true'
   )
   expect(useLoginModalStore.getState().isOpen).toBe(true)
+  expect(localStorage.getItem('aff')).toBe('iQO5')
   expect(
     screen.getByRole('button', { name: 'Get verification code' })
   ).toBeDisabled()
+})
+
+const bundle = {
+  user: { id: 42, username: 'new-user', role: 1 },
+  access_token: 'access',
+  token_type: 'Bearer',
+  access_expires_at: 9999999999,
+  session: {
+    sid: 'new-session',
+    current: true,
+    login_method: 'wechat',
+    ip: '127.0.0.1',
+    user_agent: 'Browser',
+    created_at: 1,
+    last_active_at: 1,
+    expires_at: 9999999999,
+  },
+}
+
+it('sends the invitation to WeChat and clears it only after successful authentication', async () => {
+  saveAffiliateCode('iQO5')
+  const post = vi
+    .spyOn(api, 'post')
+    .mockResolvedValue({ data: { success: true, data: bundle } })
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <LoginModal />
+    </QueryClientProvider>
+  )
+  await userEvent.type(
+    await screen.findByLabelText('WeChat verification code'),
+    '765432'
+  )
+  await userEvent.click(screen.getByRole('button', { name: 'Confirm' }))
+  await waitFor(() => expect(useAuthStore.getState().auth.user?.id).toBe(42))
+  expect(post).toHaveBeenCalledWith(
+    '/api/oauth/wechat',
+    { code: '765432', aff: 'iQO5' },
+    expect.objectContaining({ headers: { 'X-Phone-Auth': 'browser' } })
+  )
+  expect(localStorage.getItem('aff')).toBeNull()
+})
+
+it('retains the invitation when WeChat verification fails', async () => {
+  saveAffiliateCode('iQO5')
+  vi.spyOn(api, 'post').mockResolvedValue({
+    data: { success: false, message: 'Invalid code' },
+  })
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <LoginModal />
+    </QueryClientProvider>
+  )
+  await userEvent.type(
+    await screen.findByLabelText('WeChat verification code'),
+    '765432'
+  )
+  await userEvent.click(screen.getByRole('button', { name: 'Confirm' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Invalid code')
+  expect(localStorage.getItem('aff')).toBe('iQO5')
+})
+
+it('keeps a newer invitation when an older login completes', async () => {
+  saveAffiliateCode('first')
+  vi.spyOn(api, 'post').mockImplementation(async () => {
+    saveAffiliateCode('second')
+    return { data: { success: true, data: bundle } }
+  })
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <LoginModal />
+    </QueryClientProvider>
+  )
+  await userEvent.type(
+    await screen.findByLabelText('WeChat verification code'),
+    '765432'
+  )
+  await userEvent.click(screen.getByRole('button', { name: 'Confirm' }))
+  await waitFor(() => expect(useAuthStore.getState().auth.user?.id).toBe(42))
+  expect(localStorage.getItem('aff')).toBe('second')
+})
+
+it('retains the invitation when the login modal is closed without authentication', async () => {
+  saveAffiliateCode('iQO5')
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <LoginModal />
+    </QueryClientProvider>
+  )
+  await userEvent.click(
+    await screen.findByRole('button', { name: 'Close sign in dialog' })
+  )
+  expect(localStorage.getItem('aff')).toBe('iQO5')
+  expect(useAuthStore.getState().auth.user).toBeNull()
+})
+
+it('uses the latest invitation when a new link is opened before submitting WeChat verification', async () => {
+  saveAffiliateCode('first')
+  const post = vi
+    .spyOn(api, 'post')
+    .mockResolvedValue({ data: { success: true, data: bundle } })
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <LoginModal />
+    </QueryClientProvider>
+  )
+  await screen.findByLabelText('WeChat verification code')
+  saveAffiliateCode('second')
+  await userEvent.type(
+    screen.getByLabelText('WeChat verification code'),
+    '765432'
+  )
+  await userEvent.click(screen.getByRole('button', { name: 'Confirm' }))
+  await waitFor(() => expect(useAuthStore.getState().auth.user?.id).toBe(42))
+  expect(post).toHaveBeenCalledWith(
+    '/api/oauth/wechat',
+    { code: '765432', aff: 'second' },
+    expect.any(Object)
+  )
+  expect(localStorage.getItem('aff')).toBeNull()
+})
+
+it('keeps the original WeChat invitation through phone binding when a newer invitation arrives', async () => {
+  saveAffiliateCode('first')
+  const post = vi.spyOn(api, 'post').mockImplementation(async (path) => {
+    if (path === '/api/oauth/wechat') {
+      return {
+        data: {
+          success: true,
+          data: { require_phone_binding: true, bind_token: 'pending-wechat' },
+        },
+      }
+    }
+    if (path === '/api/phone/captcha/verify') {
+      return { data: { success: true, data: { send_token: 'permit' } } }
+    }
+    if (path === '/api/phone/sms/send') {
+      return {
+        data: { success: true, data: { sms_token: 'sms', retry_after: 90 } },
+      }
+    }
+    return { data: { success: true, data: bundle } }
+  })
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <LoginModal />
+    </QueryClientProvider>
+  )
+  await userEvent.type(
+    await screen.findByLabelText('WeChat verification code'),
+    '765432'
+  )
+  await userEvent.click(screen.getByRole('button', { name: 'Confirm' }))
+  await screen.findByText('Bind a phone number to finish WeChat sign in')
+  saveAffiliateCode('second')
+  await userEvent.type(
+    screen.getByLabelText('Phone number (mainland China +86)'),
+    '13800138000'
+  )
+  await userEvent.type(
+    screen.getByLabelText('Image verification code'),
+    '12345'
+  )
+  const send = screen.getByRole('button', { name: 'Get verification code' })
+  await waitFor(() => expect(send).toBeEnabled())
+  await userEvent.click(send)
+  await userEvent.type(screen.getByLabelText('SMS verification code'), '123456')
+  await userEvent.click(
+    screen.getByRole('button', { name: 'Bind phone and sign in' })
+  )
+  await waitFor(() => expect(useAuthStore.getState().auth.user?.id).toBe(42))
+  expect(post).toHaveBeenCalledWith(
+    '/api/phone/captcha/verify',
+    expect.objectContaining({ aff: 'first', bind_token: 'pending-wechat' }),
+    expect.any(Object)
+  )
+  expect(localStorage.getItem('aff')).toBe('second')
+})
+
+it('retains the invitation during MFA and clears it after the final verification bundle', async () => {
+  saveAffiliateCode('iQO5')
+  vi.spyOn(api, 'post').mockImplementation(async (path) => {
+    if (path === '/api/oauth/wechat') {
+      return {
+        data: {
+          success: true,
+          data: {
+            require_verification: true,
+            flow_token: 'pending-login',
+            expires_at: Math.floor(Date.now() / 1000) + 300,
+            methods: [{ method: '2fa', available: true }],
+          },
+        },
+      }
+    }
+    return { data: { success: true, data: bundle } }
+  })
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <LoginModal />
+    </QueryClientProvider>
+  )
+  await userEvent.type(
+    await screen.findByLabelText('WeChat verification code'),
+    '765432'
+  )
+  await userEvent.click(screen.getByRole('button', { name: 'Confirm' }))
+  const code = await screen.findByLabelText('Authenticator code or backup code')
+  expect(localStorage.getItem('aff')).toBe('iQO5')
+  expect(useAuthStore.getState().auth.user).toBeNull()
+  await userEvent.type(code, '123456')
+  await userEvent.click(screen.getByRole('button', { name: 'Verify' }))
+  await waitFor(() => expect(useAuthStore.getState().auth.user?.id).toBe(42))
+  expect(localStorage.getItem('aff')).toBeNull()
 })

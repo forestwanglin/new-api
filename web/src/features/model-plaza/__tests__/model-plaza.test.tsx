@@ -533,3 +533,47 @@ it('shows codex-auto-review in the overseas filter without vendor metadata', asy
   expect(screen.queryByText('codex-auto-review')).not.toBeInTheDocument()
   expect(screen.getByText('custom-service')).toBeVisible()
 })
+
+it.each([0, 11, 99])(
+  'groups codex-auto-review with OpenAI when its API vendor is %s',
+  async (vendor_id) => {
+    vi.mocked(api.get).mockResolvedValue({
+      data: {
+        ...pricing,
+        data: [
+          { ...pricing.data[0], model_name: 'codex-auto-review', vendor_id },
+          pricing.data[1],
+          {
+            ...pricing.data[0],
+            model_name: 'codex-auto-review-custom',
+            vendor_id: 99,
+          },
+        ],
+        vendors: [...pricing.vendors, { id: 99, name: 'Private Service' }],
+      },
+    })
+    renderPlaza()
+    const vendor = await screen.findByRole('button', { name: /^OpenAI/ })
+    expect(within(vendor).getByText('2')).toBeVisible()
+    await userEvent.setup().click(vendor)
+    expect(screen.getByText('codex-auto-review')).toBeVisible()
+    expect(screen.getByText('gpt-api-model')).toBeVisible()
+    expect(screen.queryByText('custom-review')).not.toBeInTheDocument()
+  }
+)
+
+it('names the codex-auto-review vendor OpenAI when the response has no OpenAI vendor', async () => {
+  vi.mocked(api.get).mockResolvedValue({
+    data: {
+      ...pricing,
+      data: [
+        { ...pricing.data[0], model_name: 'codex-auto-review', vendor_id: 0 },
+      ],
+      vendors: [],
+    },
+  })
+  renderPlaza()
+  const vendor = await screen.findByRole('button', { name: /^OpenAI/ })
+  await userEvent.setup().click(vendor)
+  expect(screen.getByText('codex-auto-review')).toBeVisible()
+})

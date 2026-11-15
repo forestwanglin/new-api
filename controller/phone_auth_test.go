@@ -16,6 +16,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 func phoneAuthControllerRequest(method, path, body, browser string, handler gin.HandlerFunc) *httptest.ResponseRecorder {
@@ -65,6 +66,8 @@ func TestPhoneControllerWeChatBindingRetainsLoginVerification(t *testing.T) {
 			user, _ := setupSecurityEnrollmentTest(t)
 			require.NoError(t, model.DB.AutoMigrate(&model.ExternalIdentityClaim{}))
 			require.NoError(t, model.DB.Model(user).Update("wechat_id", "phone-binding-openid").Error)
+			inviter := model.User{Username: "binding-inviter", AffCode: "iQO5"}
+			require.NoError(t, model.DB.Create(&inviter).Error)
 			if withMFA {
 				require.NoError(t, model.DB.Create(&model.TwoFA{UserId: user.Id, Secret: "JBSWY3DPEHPK3PXP", IsEnabled: true}).Error)
 			}
@@ -112,7 +115,7 @@ func TestPhoneControllerWeChatBindingRetainsLoginVerification(t *testing.T) {
 			require.Equal(t, captcha.Data.Browser, captchaResponse.Result().Cookies()[0].Value)
 			browser := captcha.Data.Browser
 			browserIdentity := common.GenerateHMACWithKey([]byte("phone-browser:"+common.SessionSecret), browser)
-			response := phoneAuthControllerRequest("POST", "/api/oauth/wechat", `{"code":"wechat-code"}`, browser, WeChatAuth)
+			response := phoneAuthControllerRequest("POST", "/api/oauth/wechat", `{"code":"wechat-code","aff":"iQO5"}`, browser, WeChatAuth)
 			var pending struct {
 				Success bool `json:"success"`
 				Data    struct {
@@ -137,7 +140,7 @@ func TestPhoneControllerWeChatBindingRetainsLoginVerification(t *testing.T) {
 			payload, err := common.Marshal(map[string]string{"digest": common.GenerateHMACWithKey([]byte("phone-code:"+common.SessionSecret), "12345")})
 			require.NoError(t, err)
 			require.NoError(t, model.DB.Model(imageFlow).Update("payload", string(payload)).Error)
-			body, err := common.Marshal(map[string]string{"challenge_token": captcha.Data.Token, "answer": "12345", "phone": "13800138000", "bind_token": pending.Data.Token})
+			body, err := common.Marshal(map[string]string{"challenge_token": captcha.Data.Token, "answer": "12345", "phone": "13800138000", "bind_token": pending.Data.Token, "aff": "iQO5"})
 			require.NoError(t, err)
 			verified := phoneAuthControllerRequest("POST", "/api/phone/captcha/verify", string(body), browser, VerifyPhoneCaptcha)
 			var permit struct {
@@ -173,6 +176,8 @@ func TestPhoneControllerWeChatBindingRetainsLoginVerification(t *testing.T) {
 			owner, err := model.GetPhoneUserID("13800138000")
 			require.NoError(t, err)
 			require.Equal(t, user.Id, owner)
+			require.NoError(t, model.DB.First(user, user.Id).Error)
+			require.Zero(t, user.InviterId, "binding a phone must not attribute an existing account")
 			if withMFA {
 				require.True(t, result.Data.RequireVerification)
 				require.Empty(t, result.Data.AccessToken)
@@ -194,6 +199,210 @@ func TestPhoneControllerWeChatBindingRetainsLoginVerification(t *testing.T) {
 			replay := phoneAuthControllerRequest("POST", "/api/phone/login", loginBody, browser, PhoneLogin)
 			require.NotContains(t, replay.Body.String(), `"success":true`)
 			require.Empty(t, replay.Header().Values("Set-Cookie"))
+		})
+	}
+}
+
+// Keep referral coverage on the real public auth handlers and database. Only
+// WeChat's code exchange and Alibaba SMS delivery are external test doubles.
+func setupAffiliateAuthTest(t *testing.T) *model.User {
+	t.Helper()
+	inviter, _ := setupSecurityEnrollmentTest(t)
+	require.NoError(t, model.DB.AutoMigrate(&model.ExternalIdentityClaim{}, &model.Log{}))
+	require.NoError(t, model.DB.Model(inviter).Update("aff_code", "iQO5").Error)
+	previousRegister := common.RegisterEnabled
+	common.RegisterEnabled = true
+	t.Cleanup(func() { common.RegisterEnabled = previousRegister })
+	return inviter
+}
+
+func TestPhoneAffiliateAttribution(t *testing.T) {
+	for _, tc := range []struct {
+		name, aff                                  string
+		existing, previouslyInvited, lookupFailure bool
+		wantInviter                                bool
+	}{
+		{name: "new user receives inviter", aff: "iQO5", wantInviter: true},
+		{name: "new user trims invitation", aff: "  iQO5  ", wantInviter: true},
+		{name: "new user without invitation"},
+		{name: "new user with unknown invitation", aff: "missing"},
+		{name: "oversized invitation ignored", aff: strings.Repeat("a", 33)},
+		{name: "existing user keeps empty inviter", aff: "iQO5", existing: true},
+		{name: "existing user keeps previous inviter", aff: "iQO5", existing: true, previouslyInvited: true},
+		{name: "database failure aborts registration", aff: "iQO5", lookupFailure: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			inviter := setupAffiliateAuthTest(t)
+			var existing model.User
+			previousInviter := 0
+			if tc.existing {
+				if tc.previouslyInvited {
+					prior := model.User{Username: "previous-inviter", AffCode: "prior"}
+					require.NoError(t, model.DB.Create(&prior).Error)
+					previousInviter = prior.Id
+				}
+				existing = model.User{Username: "existing-phone-user", AffCode: "phone", InviterId: previousInviter, Status: common.UserStatusEnabled}
+				require.NoError(t, model.DB.Create(&existing).Error)
+				require.NoError(t, model.DB.Create(&model.ExternalIdentityClaim{Provider: "phone", Subject: "13800138000", UserId: existing.Id}).Error)
+			}
+			if tc.lookupFailure {
+				require.NoError(t, model.DB.Callback().Query().After("gorm:query").Register("test:affiliate_failure", func(tx *gorm.DB) {
+					if tx.Statement.Table == "users" && len(tx.Statement.Selects) == 1 && tx.Statement.Selects[0] == "id" && strings.Contains(tx.Statement.SQL.String(), "aff_code") {
+						tx.AddError(fmt.Errorf("affiliate database unavailable"))
+					}
+				}))
+				t.Cleanup(func() { _ = model.DB.Callback().Query().Remove("test:affiliate_failure") })
+			}
+			completed := completeAffiliatePhoneLogin(t, tc.aff)
+			var result struct {
+				Success bool `json:"success"`
+			}
+			require.NoError(t, common.Unmarshal(completed.Body.Bytes(), &result))
+			if tc.lookupFailure {
+				require.False(t, result.Success)
+				owner, err := model.GetPhoneUserID("13800138000")
+				require.NoError(t, err)
+				require.Zero(t, owner)
+				return
+			}
+			require.True(t, result.Success)
+			owner, err := model.GetPhoneUserID("13800138000")
+			require.NoError(t, err)
+			var user model.User
+			require.NoError(t, model.DB.First(&user, owner).Error)
+			want := previousInviter
+			if tc.wantInviter {
+				want = inviter.Id
+			}
+			require.Equal(t, want, user.InviterId)
+			if tc.existing {
+				require.Equal(t, existing.Id, user.Id)
+			}
+		})
+	}
+}
+
+func completeAffiliatePhoneLogin(t *testing.T, affiliateCode string) *httptest.ResponseRecorder {
+	t.Helper()
+	settings := system_setting.GetPhoneSettings()
+	previousSettings := *settings
+	*settings = system_setting.PhoneSettings{Enabled: true, Region: "cn-hangzhou", SignName: "test", TemplateCode: "SMS_TEST"}
+	t.Cleanup(func() { *settings = previousSettings })
+	t.Setenv("ALIYUN_SMS_ACCESS_KEY_ID", "testid")
+	t.Setenv("ALIYUN_SMS_ACCESS_KEY_SECRET", "testsecret")
+	originalClient := http.DefaultClient
+	smsCode := ""
+	http.DefaultClient = &http.Client{Transport: controllerSMSRoundTripper(func(r *http.Request) (*http.Response, error) {
+		require.Equal(t, "https://dysmsapi.aliyuncs.com/", r.URL.String())
+		require.NoError(t, r.ParseForm())
+		var template map[string]string
+		require.NoError(t, common.UnmarshalJsonStr(r.Form.Get("TemplateParam"), &template))
+		smsCode = template["code"]
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"Code":"OK"}`)), Header: http.Header{}}, nil
+	})}
+	t.Cleanup(func() { http.DefaultClient = originalClient })
+	browser := strings.Repeat("a", 43)
+	browserIdentity := common.GenerateHMACWithKey([]byte("phone-browser:"+common.SessionSecret), browser)
+	payload, err := common.Marshal(map[string]string{"digest": common.GenerateHMACWithKey([]byte("phone-code:"+common.SessionSecret), "12345")})
+	require.NoError(t, err)
+	image, _, err := model.CreateAuthFlow(model.AuthFlowCreate{Purpose: "phone_image", SessionId: browserIdentity, Payload: string(payload), ExpiresAt: time.Now().Add(time.Minute)})
+	require.NoError(t, err)
+	body, err := common.Marshal(map[string]string{"challenge_token": image, "answer": "12345", "phone": "13800138000", "aff": affiliateCode})
+	require.NoError(t, err)
+	verified := phoneAuthControllerRequest("POST", "/api/phone/captcha/verify", string(body), browser, VerifyPhoneCaptcha)
+	var permit struct {
+		Success bool `json:"success"`
+		Data    struct {
+			Token string `json:"send_token"`
+		} `json:"data"`
+	}
+	require.NoError(t, common.Unmarshal(verified.Body.Bytes(), &permit))
+	require.True(t, permit.Success, verified.Body.String())
+	sent := phoneAuthControllerRequest("POST", "/api/phone/sms/send", fmt.Sprintf(`{"send_token":%q}`, permit.Data.Token), browser, SendPhoneSMS)
+	var sms struct {
+		Success bool `json:"success"`
+		Data    struct {
+			Token string `json:"sms_token"`
+		} `json:"data"`
+	}
+	require.NoError(t, common.Unmarshal(sent.Body.Bytes(), &sms))
+	require.True(t, sms.Success, sent.Body.String())
+	require.Len(t, smsCode, 6)
+	return phoneAuthControllerRequest("POST", "/api/phone/login", fmt.Sprintf(`{"sms_token":%q,"code":%q}`, sms.Data.Token, smsCode), browser, PhoneLogin)
+}
+
+func TestWeChatAffiliateAttribution(t *testing.T) {
+	for _, tc := range []struct {
+		name, aff                                  string
+		existing, previouslyInvited, lookupFailure bool
+		wantInviter                                bool
+	}{
+		{name: "new user attributed before phone binding", aff: "iQO5", wantInviter: true},
+		{name: "new user trims invitation", aff: "  iQO5  ", wantInviter: true},
+		{name: "new user without invitation"},
+		{name: "new user with unknown invitation", aff: "missing"},
+		{name: "oversized invitation ignored", aff: strings.Repeat("a", 33)},
+		{name: "existing user keeps empty inviter", aff: "iQO5", existing: true},
+		{name: "existing user keeps previous inviter", aff: "iQO5", existing: true, previouslyInvited: true},
+		{name: "database failure aborts registration", aff: "iQO5", lookupFailure: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			inviter := setupAffiliateAuthTest(t)
+			previousInviter := 0
+			if tc.existing {
+				if tc.previouslyInvited {
+					prior := model.User{Username: "previous-inviter", AffCode: "prior"}
+					require.NoError(t, model.DB.Create(&prior).Error)
+					previousInviter = prior.Id
+				}
+				existing := model.User{Username: "existing-wechat-user", AffCode: "wechat", WeChatId: "affiliate-openid", InviterId: previousInviter, Status: common.UserStatusEnabled}
+				require.NoError(t, model.DB.Create(&existing).Error)
+			}
+			oldEnabled, oldAddress := common.WeChatAuthEnabled, common.WeChatServerAddress
+			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				_, _ = w.Write([]byte(`{"success":true,"data":"affiliate-openid"}`))
+			}))
+			common.WeChatAuthEnabled, common.WeChatServerAddress = true, upstream.URL
+			t.Cleanup(func() {
+				upstream.Close()
+				common.WeChatAuthEnabled, common.WeChatServerAddress = oldEnabled, oldAddress
+			})
+			if tc.lookupFailure {
+				require.NoError(t, model.DB.Callback().Query().After("gorm:query").Register("test:affiliate_failure", func(tx *gorm.DB) {
+					if tx.Statement.Table == "users" && len(tx.Statement.Selects) == 1 && tx.Statement.Selects[0] == "id" && strings.Contains(tx.Statement.SQL.String(), "aff_code") {
+						tx.AddError(fmt.Errorf("affiliate database unavailable"))
+					}
+				}))
+				t.Cleanup(func() { _ = model.DB.Callback().Query().Remove("test:affiliate_failure") })
+			}
+			body, err := common.Marshal(map[string]string{"code": "wechat-code", "aff": tc.aff})
+			require.NoError(t, err)
+			response := phoneAuthControllerRequest("POST", "/api/oauth/wechat", string(body), strings.Repeat("a", 43), WeChatAuth)
+			var result struct {
+				Success bool `json:"success"`
+				Data    struct {
+					Required    bool   `json:"require_phone_binding"`
+					AccessToken string `json:"access_token"`
+				} `json:"data"`
+			}
+			require.NoError(t, common.Unmarshal(response.Body.Bytes(), &result))
+			if tc.lookupFailure {
+				require.False(t, result.Success)
+				var count int64
+				require.NoError(t, model.DB.Model(&model.User{}).Where("wechat_id = ?", "affiliate-openid").Count(&count).Error)
+				require.Zero(t, count)
+				return
+			}
+			require.True(t, result.Success)
+			require.True(t, result.Data.Required)
+			require.Empty(t, result.Data.AccessToken)
+			var user model.User
+			require.NoError(t, model.DB.Where("wechat_id = ?", "affiliate-openid").First(&user).Error)
+			want := previousInviter
+			if tc.wantInviter {
+				want = inviter.Id
+			}
+			require.Equal(t, want, user.InviterId)
 		})
 	}
 }

@@ -26,6 +26,7 @@ For commercial licensing, please contact support@quantumnous.com
 
 const STORAGE_KEYS = {
   AFFILIATE: 'aff',
+  AFFILIATE_SAVED_AT: 'aff_saved_at',
   STATUS: 'status',
 } as const
 
@@ -33,13 +34,38 @@ const STORAGE_KEYS = {
 // Affiliate Code Storage
 // ============================================================================
 
+const AFFILIATE_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000
+
 /**
  * Get affiliate code from localStorage
  */
 export function getAffiliateCode(): string {
   if (typeof window === 'undefined') return ''
   try {
-    return window.localStorage.getItem(STORAGE_KEYS.AFFILIATE) ?? ''
+    const code =
+      window.localStorage.getItem(STORAGE_KEYS.AFFILIATE)?.trim() ?? ''
+    if (!code || code.length > 32) return ''
+    const savedAt = window.localStorage.getItem(STORAGE_KEYS.AFFILIATE_SAVED_AT)
+    // Give existing plain affiliate codes the same lifetime from migration.
+    if (savedAt === null) {
+      window.localStorage.setItem(
+        STORAGE_KEYS.AFFILIATE_SAVED_AT,
+        String(Date.now())
+      )
+      return code
+    }
+    const timestamp = Number(savedAt)
+    if (
+      !Number.isFinite(timestamp) ||
+      timestamp <= 0 ||
+      timestamp > Date.now() ||
+      Date.now() - timestamp >= AFFILIATE_LIFETIME_MS
+    ) {
+      window.localStorage.removeItem(STORAGE_KEYS.AFFILIATE)
+      window.localStorage.removeItem(STORAGE_KEYS.AFFILIATE_SAVED_AT)
+      return ''
+    }
+    return code
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Failed to get affiliate code:', error)
@@ -51,11 +77,36 @@ export function getAffiliateCode(): string {
  * Save affiliate code to localStorage
  */
 export function saveAffiliateCode(code: string): void {
-  if (typeof window === 'undefined') return
+  const normalized = code.trim()
+  if (typeof window === 'undefined' || !normalized || normalized.length > 32) {
+    return
+  }
   try {
-    window.localStorage.setItem(STORAGE_KEYS.AFFILIATE, code)
+    window.localStorage.setItem(STORAGE_KEYS.AFFILIATE, normalized)
+    window.localStorage.setItem(
+      STORAGE_KEYS.AFFILIATE_SAVED_AT,
+      String(Date.now())
+    )
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Failed to save affiliate code:', error)
+  }
+}
+
+/** Clear only the invitation that completed this authentication attempt. */
+export function clearAffiliateCode(expectedCode: string): void {
+  if (typeof window === 'undefined' || !expectedCode) return
+  try {
+    if (
+      window.localStorage.getItem(STORAGE_KEYS.AFFILIATE)?.trim() !==
+      expectedCode
+    ) {
+      return
+    }
+    window.localStorage.removeItem(STORAGE_KEYS.AFFILIATE)
+    window.localStorage.removeItem(STORAGE_KEYS.AFFILIATE_SAVED_AT)
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Failed to clear affiliate code:', error)
   }
 }

@@ -67,8 +67,31 @@ export function ModelPlaza() {
       DEFAULT_MODEL_REFERENCE_EXCHANGE_RATE
   )
   const isAuthenticated = useAuthStore((state) => !!state.auth.user)
-  const { models, isLoading, error, refetch, priceRate, usdExchangeRate } =
-    usePricingData(true, 'model')
+  const {
+    models: pricingModels,
+    vendors,
+    isLoading,
+    error,
+    refetch,
+    priceRate,
+    usdExchangeRate,
+  } = usePricingData(true, 'model')
+  const models = useMemo(() => {
+    const openAI = vendors.find(
+      (vendor) => vendor.name.trim().toLowerCase() === 'openai'
+    )
+    // The review endpoint is an OpenAI model even when its API metadata is absent or stale.
+    return pricingModels.map((model) =>
+      model.model_name === 'codex-auto-review'
+        ? {
+            ...model,
+            vendor_id: openAI?.id,
+            vendor_name: 'OpenAI',
+            vendor_icon: openAI?.icon,
+          }
+        : model
+    )
+  }, [pricingModels, vendors])
   const [keyword, setKeyword] = useState('')
   const [filter, setFilter] = useState<ModelFilter>({
     category: null,
@@ -149,7 +172,10 @@ export function ModelPlaza() {
   const bestDiscount = discounts.length ? Math.min(...discounts) : null
 
   return (
-    <PublicLayout showMainContainer={false}>
+    <PublicLayout
+      showMainContainer={false}
+      headerProps={{ activeNavHref: '/model' }}
+    >
       <main className='pt-16'>
         <div className='model-plaza'>
           <header className='mp-head'>

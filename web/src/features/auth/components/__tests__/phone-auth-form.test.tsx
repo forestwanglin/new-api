@@ -23,12 +23,14 @@ import { afterEach, expect, it, vi } from 'vitest'
 
 import { api } from '@/lib/api'
 
+import { saveAffiliateCode } from '../../lib/storage'
 import { PhoneAuthForm } from '../phone-auth-form'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }))
 afterEach(() => {
+  localStorage.clear()
   vi.useRealTimers()
   vi.restoreAllMocks()
 })
@@ -40,7 +42,7 @@ function deferred<T>() {
   })
   return { promise, resolve }
 }
-function fixture() {
+function fixture(affiliateCode?: string, onResult = vi.fn()) {
   let challenge = 0
   vi.spyOn(api, 'get').mockImplementation(async () => ({
     data: {
@@ -57,7 +59,11 @@ function fixture() {
   })
   const content = (enabled: boolean) => (
     <QueryClientProvider client={client}>
-      <PhoneAuthForm onResult={vi.fn()} enabled={enabled} />
+      <PhoneAuthForm
+        onResult={onResult}
+        enabled={enabled}
+        affiliateCode={affiliateCode}
+      />
     </QueryClientProvider>
   )
   const view = render(content(true))
@@ -213,4 +219,55 @@ it('refreshes a used challenge when agreement is re-enabled so SMS verification 
   expect(view.answer).toHaveValue('')
   await view.user.type(view.answer, '54321')
   await waitFor(() => expect(view.send).toBeEnabled())
+})
+
+it('passes the invitation when verifying the image so the server can retain it for registration', async () => {
+  const post = vi.spyOn(api, 'post').mockResolvedValue({
+    data: { success: true, data: { send_token: 'permit' } },
+  })
+  const view = fixture('iQO5')
+  await fill(view)
+  await waitFor(() => expect(view.send).toBeEnabled())
+  expect(post).toHaveBeenCalledWith(
+    '/api/phone/captcha/verify',
+    expect.objectContaining({ aff: 'iQO5', phone: '13800138000' }),
+    expect.objectContaining({ headers: { 'X-Phone-Auth': 'browser' } })
+  )
+})
+
+it('uses the latest invitation at image verification and keeps it frozen through SMS login', async () => {
+  saveAffiliateCode('first')
+  const post = vi.spyOn(api, 'post').mockImplementation(async (path) => {
+    if (path === '/api/phone/captcha/verify') {
+      return { data: { success: true, data: { send_token: 'permit' } } }
+    }
+    if (path === '/api/phone/sms/send') {
+      return {
+        data: {
+          success: true,
+          data: { sms_token: 'sms-proof', retry_after: 90 },
+        },
+      }
+    }
+    return { data: { success: true, data: { authenticated: true } } }
+  })
+  const onResult = vi.fn()
+  const view = fixture(undefined, onResult)
+  saveAffiliateCode('second')
+  await fill(view)
+  await waitFor(() => expect(view.send).toBeEnabled())
+  saveAffiliateCode('third')
+  await view.user.click(view.send)
+  await view.user.type(screen.getByLabelText('SMS verification code'), '123456')
+  await view.user.click(
+    screen.getByRole('button', { name: 'Register / Sign in' })
+  )
+  await waitFor(() =>
+    expect(onResult).toHaveBeenCalledWith({ authenticated: true }, 'second')
+  )
+  expect(post).toHaveBeenCalledWith(
+    '/api/phone/captcha/verify',
+    expect.objectContaining({ aff: 'second' }),
+    expect.any(Object)
+  )
 })

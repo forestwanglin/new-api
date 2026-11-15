@@ -992,6 +992,17 @@
 - 验证：新增控制器日志回归已先红后绿；SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 17.11 分离日志库下成功/失败/重放专项通过，原管理员调账模型三库矩阵通过。前端使用/审计摘要和真实详情弹窗、语言切换等 5 文件/106 用例通过；typecheck（1592 文件/2 项目）、修改文件 lint/format、前端生产构建、Go vet/build 和独立检查通过。后端四包回归排除既有无关的 OpenAI 采样兼容、PAT 审计数据库矩阵、路由目录覆盖三项测试，详细命令见任务验证记录。
 - 风险与未覆盖：沿用提交后尽力写日志，与主库积分事务不具备跨库原子性；日志库故障不回滚积分，不补历史或崩溃窗口丢失记录。未部署、未调整生产积分。
 
+### Z061 邀请入口归因、登录弹窗主题及模型厂商修正
+
+- 需求与原因：保留 `/sign-up?aff=...` 链接，修复跳转时邀请参数丢失、新微信/手机用户未记录邀请人，以及模型导航和登录弹窗主题显示问题。
+- 变更内容：等待身份初始化，已登录沿用 `/dashboard`；未登录先保存 aff，再跳转 `/` 模型首页并打开登录/注册弹窗，预加载不产生副作用。提交微信校验或手机图形验证码时读取当前邀请，随现有服务端认证流程固定；只在创建新用户时解析并写入 `InviterId`，老用户无论有无邀请人均不修改。待绑定手机、MFA、失败或关闭弹窗保留邀请；完整认证成功后仅清除本次使用的邀请，保留期间新打开的其他邀请。
+- 影响面：`controller/{wechat,phone_auth}.go`、`service/phone_auth.go` 及既有测试；前端 auth 存储、登录弹窗、手机表单、sign-up/root 路由及回归测试；model-plaza 页面/测试、登录弹窗 CSS/主题测试。**上游自有文件**：`controller/wechat.go`、`web/src/routes/{__root.tsx,(auth)/sign-up.tsx}`；其余认证扩展和模型页为 fork 自有，升级时需整体复核调用链。
+- 与上游差异：扩展 Z042 手机/微信认证以复用已有邀请机制，无 schema 或新增依赖；在 Z059 精确分类规则上，将精确名称 `codex-auto-review` 的前端展示/厂商筛选统一为 OpenAI，不改后端元数据、模型调用或售价。`/` 模型页显式选中模型导航；登录弹窗使用既有主题 tokens，二维码保持白底。
+- 开关与默认值：无新增配置。邀请去空白、限 32 字符（服务端 32 字节），本地保存 30 天，兼容既有单独 aff 存储；新有效链接替换待处理邀请，无参数不清空。未知/过长邀请码按普通注册处理，数据库查询失败仍返回错误。原认证浏览器绑定、有效期、单次校验及 MFA 不变。
+- 安全依据：已阅读 OWASP Authentication / Session Management Cheat Sheets；按 ASVS 5.0.0 的 2.2.1/2.2.2（服务端输入校验）、2.3.1/2.3.3（流程顺序/事务）、6.3.4（认证路径一致性）、6.5.1/6.5.5（单次/过期校验）、7.2.1（服务端会话验证）复核受影响流程，不代表全系统 ASVS 审计。
+- 验证：新增回归先红后绿；前端受影响 25 文件/185 用例、typecheck（1596 文件/2 项目）、修改文件 lint/format、生产构建通过；Go build/vet 通过。`go test ./controller ./service -run 'Test(Phone|WeChat)AffiliateAttribution|TestPhone' -count=1` 在 SQLite 3.50.4 通过；真实 MySQL 8.4.13、PostgreSQL 16.16 以 `TEST_SECURITY_DIALECT=mysql/postgres`、对应 `TEST_MYSQL_DSN/TEST_POSTGRES_DSN` 执行 `go test ./controller -run 'Test(Phone|WeChat)AffiliateAttribution|TestPhoneController' -count=1 -v` 通过，覆盖新/老用户、无效邀请码、查询失败、绑定/MFA 及认证 proof 回归。前端全量 279 文件/3014 用例通过，唯一失败为既有 detail-preview 本地化价格用例 20 秒超时，单独运行同样超时（Z057 已确认基线）；Go controller/service 全量仅既有 `TestOpenAIChatSamplingCompatibility` 四个子用例失败，使用原 HEAD 文件 overlay 同样复现。隔离 Chrome 验证邀请保存/弹窗/导航、明暗切换、OpenAI 筛选和 390×844 移动端。
+- 风险与未覆盖：仅隔离测试数据库写入；未执行真实微信/短信注册、推送或部署。微信用户沿用现有“创建账号后绑定手机”时序，邀请在首次创建时确定；本地邀请不是认证凭据。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
@@ -1000,6 +1011,7 @@
 
 | 区域 | 文件 | 关联条目 |
 |---|---|---|
+| 邀请入口及认证归因 | `controller/wechat.go`、`web/src/routes/{__root.tsx,(auth)/sign-up.tsx}`；与 fork 自有手机/微信认证扩展联动 | Z061 |
 | 积分调账业务日志 | `controller/audit.go`、`web/src/features/usage-logs/lib/format.ts`、使用日志详情弹窗、审计详情构建/弹窗、七种 locale | Z060 |
 | 管理员积分调账 | `router/api-router.go`、`middleware/access_token_routes.go`、用户API/类型/编辑抽屉/既有测试、七种locale | Z058 |
 | 模型积分准入与结算 | `model/{token,quota_reserve,log,task,midjourney}.go`、`controller/{token,relay,midjourney,plugin_protocol}.go`、`relay/{request_billing,relay_task,mjproxy_handler,common/relay_info}.go`、`service/{billing_session,quota,midjourney,task_billing,task_polling,task_billing_reconcile,violation_fee,relay_error}.go` 及测试；使用日志/任务/绘图 schema 和列、账号/移动菜单、侧栏/维护设置、七种 locale 及相关测试 | Z057 |

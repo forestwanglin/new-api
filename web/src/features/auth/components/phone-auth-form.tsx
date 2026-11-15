@@ -29,6 +29,7 @@ import { Label } from '@/components/ui/label'
 import { markServerErrorHandled } from '@/lib/handle-server-error'
 import { getServerErrorMessage } from '@/lib/server-error-message'
 
+import { getAffiliateCode } from '../lib/storage'
 import { getPhoneCaptcha, phoneAuthRequest } from '../phone-api'
 
 const phoneSchema = z.object({
@@ -39,9 +40,10 @@ const phoneSchema = z.object({
 type PhoneFields = z.infer<typeof phoneSchema>
 
 interface PhoneAuthFormProps {
+  affiliateCode?: string
   bindToken?: string
   enabled: boolean
-  onResult: (result: unknown) => Promise<void> | void
+  onResult: (result: unknown, affiliateCode?: string) => Promise<void> | void
 }
 
 export function PhoneAuthForm(props: PhoneAuthFormProps) {
@@ -49,6 +51,8 @@ export function PhoneAuthForm(props: PhoneAuthFormProps) {
   const id = useId()
   const [sendToken, setSendToken] = useState('')
   const [smsToken, setSMSToken] = useState('')
+  const sendAffiliateCode = useRef('')
+  const smsAffiliateCode = useRef('')
   const [retryAt, setRetryAt] = useState(0)
   const [now, setNow] = useState(Date.now())
   const [error, setError] = useState('')
@@ -119,6 +123,7 @@ export function PhoneAuthForm(props: PhoneAuthFormProps) {
       setImageVerifying(true)
       setError('')
       try {
+        const affiliateCode = props.affiliateCode ?? getAffiliateCode()
         const result = await phoneAuthRequest<{ send_token: string }>(
           '/api/phone/captcha/verify',
           {
@@ -126,11 +131,13 @@ export function PhoneAuthForm(props: PhoneAuthFormProps) {
             answer,
             challenge_token: challenge.challenge_token,
             bind_token: props.bindToken,
+            aff: affiliateCode || undefined,
           },
           challenge.browser_token,
           controller.signal
         )
         if (!controller.signal.aborted && active.current) {
+          sendAffiliateCode.current = affiliateCode
           setSendToken(result.send_token)
         }
       } catch (failure) {
@@ -155,6 +162,7 @@ export function PhoneAuthForm(props: PhoneAuthFormProps) {
     answer,
     props.enabled,
     props.bindToken,
+    props.affiliateCode,
     captcha.data,
     form,
     refetchCaptcha,
@@ -177,12 +185,14 @@ export function PhoneAuthForm(props: PhoneAuthFormProps) {
       if (kind === 'send') {
         // Sending is single-use, including provider failures and timeouts.
         const permit = sendToken
+        const affiliateCode = sendAffiliateCode.current
         setSendToken('')
         const result = await request<{
           sms_token: string
           retry_after: number
         }>('/api/phone/sms/send', { send_token: permit })
         if (!controller.signal.aborted && active.current) {
+          smsAffiliateCode.current = affiliateCode
           setSMSToken(result.sms_token)
           setRetryAt(Date.now() + result.retry_after * 1000)
           setNow(Date.now())
@@ -195,7 +205,7 @@ export function PhoneAuthForm(props: PhoneAuthFormProps) {
           code,
         })
         if (!controller.signal.aborted && active.current) {
-          await props.onResult(result)
+          await props.onResult(result, smsAffiliateCode.current)
         }
       }
     },

@@ -18,12 +18,13 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { createFileRoute, redirect } from '@tanstack/react-router'
 
+import { saveAffiliateCode } from '@/features/auth/lib/storage'
 import { resolveAuthentication } from '@/lib/auth-session'
 import { useAuthStore } from '@/stores/auth-store'
 import { useLoginModalStore } from '@/stores/login-modal-store'
 
 export const Route = createFileRoute('/(auth)/sign-up')({
-  beforeLoad: async ({ preload }) => {
+  beforeLoad: async ({ preload, location }) => {
     await resolveAuthentication()
     const { auth } = useAuthStore.getState()
 
@@ -31,7 +32,11 @@ export const Route = createFileRoute('/(auth)/sign-up')({
     if (auth.user) {
       throw redirect({ to: '/dashboard' })
     }
-    if (!preload) useLoginModalStore.getState().open()
+    if (!preload) {
+      const aff = new URLSearchParams(location.searchStr).get('aff')
+      if (aff) saveAffiliateCode(aff)
+      useLoginModalStore.getState().open()
+    }
     throw redirect({ to: '/', replace: true })
   },
 })

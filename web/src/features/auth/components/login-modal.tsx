@@ -35,6 +35,7 @@ import { useAuthStore } from '@/stores/auth-store'
 import { useLoginModalStore } from '@/stores/login-modal-store'
 
 import { sanitizeAuthRedirect } from '../lib/auth-redirect'
+import { clearAffiliateCode, getAffiliateCode } from '../lib/storage'
 import { getPhoneCaptcha, phoneAuthRequest } from '../phone-api'
 import {
   isLoginChallenge,
@@ -63,6 +64,9 @@ function LoginModalContent() {
   const [wechatCode, setWeChatCode] = useState('')
   const [error, setError] = useState('')
   const [agreed, setAgreed] = useState(false)
+  const bindingAffiliateCode = useRef(
+    initialBindToken ? getAffiliateCode() : ''
+  )
   const initialSID = useRef(useAuthStore.getState().auth.session?.sid).current
   const active = useRef(true)
   const request = useRef<AbortController | null>(null)
@@ -93,7 +97,7 @@ function LoginModalContent() {
     }
   }, [cancel])
 
-  const onResult = async (result: unknown) => {
+  const onResult = async (result: unknown, affiliateCode = '') => {
     if (
       !active.current ||
       useAuthStore.getState().auth.session?.sid !== initialSID
@@ -108,6 +112,7 @@ function LoginModalContent() {
       'bind_token' in result &&
       typeof result.bind_token === 'string'
     ) {
+      bindingAffiliateCode.current = affiliateCode
       setBindToken(result.bind_token)
       setTab('wechat')
       return
@@ -129,6 +134,7 @@ function LoginModalContent() {
       window.location.origin
     )
     applyAuthBundle(bundle)
+    clearAffiliateCode(affiliateCode)
     useLoginModalStore.getState().close()
     await router.invalidate()
     if (redirectTo) await navigate({ href: redirectTo, replace: true })
@@ -140,14 +146,15 @@ function LoginModalContent() {
       request.current?.abort()
       const controller = new AbortController()
       request.current = controller
+      const affiliateCode = getAffiliateCode()
       const captcha = await getPhoneCaptcha(controller.signal)
       const result = await phoneAuthRequest<unknown>(
         '/api/oauth/wechat',
-        { code: wechatCode.trim() },
+        { code: wechatCode.trim(), aff: affiliateCode || undefined },
         captcha.browser_token,
         controller.signal
       )
-      if (!controller.signal.aborted) await onResult(result)
+      if (!controller.signal.aborted) await onResult(result, affiliateCode)
     },
     onError: (failure) => {
       markServerErrorHandled(failure)
@@ -208,6 +215,7 @@ function LoginModalContent() {
           <TabsContent value='wechat'>
             {bindToken ? (
               <PhoneAuthForm
+                affiliateCode={bindingAffiliateCode.current}
                 bindToken={bindToken}
                 enabled={phoneEnabled && enabled}
                 onResult={onResult}

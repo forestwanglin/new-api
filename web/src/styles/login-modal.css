@@ -7,6 +7,19 @@
 }
 .login-modal[data-slot='dialog-content'] {
   --blue: #2563eb;
+  --blue-text: #2563eb;
+  --submit-text: #fff;
+  --surface: #fff;
+  --soft: #f1f5f9;
+  --muted-text: #64748b;
+  --placeholder: #78889b;
+  --hover: #f3f7ff;
+  --hover-line: #b8cced;
+  --hover-text: #1d4ed8;
+  --close-hover: #e7edf6;
+  --error-surface: #fef2f2;
+  --error-line: #fecaca;
+  --error-text: #b91c1c;
   --line: #e8ebf0;
   --tx: #0f172a;
   --tx2: #475569;
@@ -16,7 +29,7 @@
   max-height: 88vh;
   border-radius: 14px;
   padding: 24px;
-  background: #fff;
+  background: var(--surface);
   color: var(--tx);
   box-shadow: 0 30px 70px -30px rgba(15, 23, 42, 0.5);
   border: 0;
@@ -53,8 +66,8 @@
   height: 34px;
   border: 0;
   border-radius: 8px;
-  background: #f1f5f9;
-  color: #64748b;
+  background: var(--soft);
+  color: var(--muted-text);
   font-size: 25px;
   padding: 0;
   box-shadow: none;
@@ -71,7 +84,7 @@
   padding: 4px;
   margin-top: 20px;
   border-radius: 10px;
-  background: #f1f5f9;
+  background: var(--soft);
 }
 .login-modal .auth-tabs [role='tab'] {
   flex: 1;
@@ -80,7 +93,7 @@
   padding: 10px 4px;
   border: 0;
   background: transparent;
-  color: #64748b;
+  color: var(--muted-text);
   border-radius: 7px;
   font-size: 14px;
   line-height: 1.5;
@@ -89,8 +102,8 @@
   white-space: nowrap;
 }
 .login-modal .auth-tabs [role='tab'][aria-selected='true'] {
-  background: #fff;
-  color: var(--blue);
+  background: var(--surface);
+  color: var(--blue-text);
   font-weight: 600;
   box-shadow: 0 1px 4px #0f172a12;
 }
@@ -138,7 +151,7 @@
   border: 1px solid var(--line);
   border-radius: 9px;
   padding: 12px;
-  background: #fff;
+  background: var(--surface);
   color: var(--tx);
   font: inherit;
   font-size: 15px;
@@ -179,14 +192,14 @@
   flex-shrink: 0;
   font-size: 14px;
   padding: 10px 12px;
-  border: 1px solid #dce2ea;
-  background: #fff;
+  border: 1px solid var(--line);
+  background: var(--surface);
   color: var(--tx);
   box-shadow: none;
 }
 .login-modal .auth-code-row button:hover {
-  background: #f5f7fa;
-  border-color: #c3cbd8;
+  background: var(--soft);
+  border-color: var(--hover-line);
 }
 .login-modal .auth-code-row .auth-captcha {
   padding: 4px;
@@ -205,7 +218,7 @@
   min-height: 46px;
   border: 0;
   background: var(--blue);
-  color: #fff;
+  color: var(--submit-text);
   box-shadow: 0 3px 8px -4px #2563eb66;
 }
 .login-modal .auth-submit:hover {
@@ -219,10 +232,10 @@
 .login-modal .auth-error {
   padding: 10px 12px;
   margin-top: 14px;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
+  background: var(--error-surface);
+  border: 1px solid var(--error-line);
   border-radius: 8px;
-  color: #b91c1c;
+  color: var(--error-text);
   font-size: 14px;
   line-height: 1.5;
 }
@@ -251,7 +264,7 @@
 .login-modal[data-slot='dialog-content'] {
   border-radius: 16px;
   box-shadow:
-    inset 0 0 0 1px #e5eaf2,
+    inset 0 0 0 1px var(--line),
     0 24px 80px -24px #0f172a55;
   font-family:
     -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
@@ -275,16 +288,16 @@
   border-radius: 10px;
 }
 .login-modal .auth-code-row button {
-  border-color: #d7e0eb;
+  border-color: var(--line);
 }
 .login-modal .auth-code-row button:not(:disabled):hover {
-  background: #f3f7ff;
-  border-color: #b8cced;
-  color: #1d4ed8;
+  background: var(--hover);
+  border-color: var(--hover-line);
+  color: var(--hover-text);
 }
 .login-modal .auth-close:hover {
-  background: #e7edf6;
-  color: #0f172a;
+  background: var(--close-hover);
+  color: var(--tx);
 }
 .login-modal button:disabled {
   box-shadow: none;
@@ -311,9 +324,34 @@
   box-shadow: 0 0 0 3px #2563eb17;
 }
 .login-modal input::placeholder {
-  color: #78889b;
+  color: var(--placeholder);
   opacity: 1;
 }
 .login-modal .auth-helper {
   font-size: 14px;
+}
+
+/* Follow the app theme for portal-mounted dialog content as well as form controls. */
+.dark .login-modal[data-slot='dialog-content'] {
+  --blue: var(--primary);
+  --blue-text: var(--secondary-foreground);
+  --submit-text: var(--primary-foreground);
+  --surface: var(--card);
+  --soft: var(--muted);
+  --line: var(--border);
+  --tx: var(--foreground);
+  --tx2: var(--muted-foreground);
+  --tx3: var(--muted-foreground);
+  --muted-text: var(--muted-foreground);
+  --placeholder: var(--muted-foreground);
+  --hover: var(--accent);
+  --hover-line: var(--ring);
+  --hover-text: var(--accent-foreground);
+  --close-hover: var(--accent);
+  --error-surface: color-mix(in oklch, var(--destructive) 12%, var(--card));
+  --error-line: color-mix(in oklch, var(--destructive) 40%, var(--border));
+  --error-text: var(--destructive);
+}
+.dark .login-modal .auth-submit:not(:disabled):hover {
+  background: color-mix(in oklch, var(--blue) 85%, black);
 }

@@ -13,6 +13,7 @@ import (
 	"math/big"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -38,10 +39,11 @@ var (
 )
 
 type phoneFlowPayload struct {
-	Phone       string `json:"phone,omitempty"`
-	Digest      string `json:"digest,omitempty"`
-	BindFlowID  int64  `json:"bind_flow_id,omitempty"`
-	AuthVersion int64  `json:"auth_version,omitempty"`
+	Phone         string `json:"phone,omitempty"`
+	AffiliateCode string `json:"affiliate_code,omitempty"`
+	Digest        string `json:"digest,omitempty"`
+	BindFlowID    int64  `json:"bind_flow_id,omitempty"`
+	AuthVersion   int64  `json:"auth_version,omitempty"`
 }
 
 func phoneCodeDigest(code string) string {
@@ -115,7 +117,7 @@ func readPhoneFlow(token, purpose, browser string) (*model.AuthFlow, phoneFlowPa
 	return flow, payload, nil
 }
 
-func VerifyPhoneImage(token, answer, phone, bindToken, browser string) (string, error) {
+func VerifyPhoneImage(token, answer, phone, bindToken, browser, affiliateCode string) (string, error) {
 	if !mainlandPhonePattern.MatchString(phone) {
 		return "", common.NewMessage("Enter a valid mainland China phone number")
 	}
@@ -140,7 +142,11 @@ func VerifyPhoneImage(token, answer, phone, bindToken, browser string) (string, 
 	if _, err := model.ConsumeAuthFlow(token, model.AuthFlowMatch{Purpose: phoneImagePurpose, SessionId: browser}); err != nil {
 		return "", ErrPhoneVerification
 	}
-	permit, _, err := createPhoneFlow(phoneSendPurpose, browser, phoneFlowPayload{Phone: phone, BindFlowID: bindID}, 2*time.Minute)
+	affiliateCode = strings.TrimSpace(affiliateCode)
+	if len(affiliateCode) > 32 || bindID != 0 {
+		affiliateCode = ""
+	}
+	permit, _, err := createPhoneFlow(phoneSendPurpose, browser, phoneFlowPayload{Phone: phone, BindFlowID: bindID, AffiliateCode: affiliateCode}, 2*time.Minute)
 	return permit, err
 }
 
@@ -291,8 +297,12 @@ func CompletePhoneLogin(token, code, browser string) (*model.User, error) {
 		if _, err := rand.Read(random); err != nil {
 			return err
 		}
-		user = model.User{Username: "p_" + base64.RawURLEncoding.EncodeToString(random), DisplayName: "Phone User", Role: common.RoleCommonUser, Status: common.UserStatusEnabled, AuthVersion: 1}
-		if err := user.InsertWithTx(tx, 0); err != nil {
+		inviterID, err := ResolveAffiliateInviter(tx, payload.AffiliateCode)
+		if err != nil {
+			return err
+		}
+		user = model.User{Username: "p_" + base64.RawURLEncoding.EncodeToString(random), DisplayName: "Phone User", Role: common.RoleCommonUser, Status: common.UserStatusEnabled, AuthVersion: 1, InviterId: inviterID}
+		if err := user.InsertWithTx(tx, inviterID); err != nil {
 			return err
 		}
 		if err := model.ClaimExternalIdentityWithTx(tx, "phone", payload.Phone, user.Id); err != nil {
@@ -305,7 +315,7 @@ func CompletePhoneLogin(token, code, browser string) (*model.User, error) {
 		return nil, err
 	}
 	if created {
-		user.FinishInsert(0)
+		user.FinishInsert(user.InviterId)
 	}
 	return &user, nil
 }
@@ -322,4 +332,20 @@ func readWeChatPhoneFlowByID(id int64, browser string) (*model.AuthFlow, phoneFl
 		return nil, payload, ErrPhoneVerification
 	}
 	return &flow, payload, nil
+}
+
+// ResolveAffiliateInviter resolves optional registration metadata against the
+// caller's database/transaction. Unknown codes do not block registration, but
+// storage failures must not silently discard a valid invitation.
+func ResolveAffiliateInviter(db *gorm.DB, code string) (int, error) {
+	code = strings.TrimSpace(code)
+	if code == "" || len(code) > 32 {
+		return 0, nil
+	}
+	var inviter model.User
+	err := db.Select("id").Where("aff_code = ?", code).First(&inviter).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return 0, nil
+	}
+	return inviter.Id, err
 }

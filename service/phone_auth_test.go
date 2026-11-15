@@ -20,18 +20,18 @@ func TestPhoneCaptchaRequiresCorrectBrowserAndSingleUse(t *testing.T) {
 	setupAuthSessionTestDB(t)
 	token, _, err := createPhoneFlow(phoneImagePurpose, "browser-a", phoneFlowPayload{Digest: phoneCodeDigest("12345")}, time.Minute)
 	require.NoError(t, err)
-	_, err = VerifyPhoneImage(token, "12345", "13800138000", "", "browser-b")
+	_, err = VerifyPhoneImage(token, "12345", "13800138000", "", "browser-b", "")
 	require.Error(t, err)
-	_, err = VerifyPhoneImage(token, "54321", "13800138000", "", "browser-a")
+	_, err = VerifyPhoneImage(token, "54321", "13800138000", "", "browser-a", "")
 	require.Error(t, err)
-	_, err = VerifyPhoneImage(token, "12345", "13800138000", "", "browser-a")
+	_, err = VerifyPhoneImage(token, "12345", "13800138000", "", "browser-a", "")
 	require.Error(t, err)
 	token, _, err = createPhoneFlow(phoneImagePurpose, "browser-a", phoneFlowPayload{Digest: phoneCodeDigest("12345")}, time.Minute)
 	require.NoError(t, err)
-	permit, err := VerifyPhoneImage(token, "12345", "13800138000", "", "browser-a")
+	permit, err := VerifyPhoneImage(token, "12345", "13800138000", "", "browser-a", "")
 	require.NoError(t, err)
 	require.NotEmpty(t, permit)
-	_, err = VerifyPhoneImage(token, "12345", "13800138000", "", "browser-a")
+	_, err = VerifyPhoneImage(token, "12345", "13800138000", "", "browser-a", "")
 	require.Error(t, err)
 	flow, err := model.GetAuthFlow(permit, model.AuthFlowMatch{Purpose: phoneSendPurpose, SessionId: "browser-a"})
 	require.NoError(t, err)
@@ -177,7 +177,7 @@ func TestPhoneExpiredFlowsAndSendPermitBypass(t *testing.T) {
 		require.NoError(t, model.DB.Model(&model.AuthFlow{}).Where("purpose = ?", purpose).Update("expires_at", time.Now().Add(-time.Second)).Error)
 		switch purpose {
 		case phoneImagePurpose:
-			_, err = VerifyPhoneImage(token, "12345", "13800138000", "", "browser")
+			_, err = VerifyPhoneImage(token, "12345", "13800138000", "", "browser", "")
 		case phoneSendPurpose:
 			_, err = SendPhoneSMS(token, "browser", "192.0.2.1")
 		case phoneSMSPurpose:

@@ -51,13 +51,6 @@ function RootComponent() {
   // Load system configuration (logo, system name, etc.) from backend
   useSystemConfig({ autoLoad: true })
 
-  useEffect(() => {
-    const aff = new URLSearchParams(window.location.search).get('aff')?.trim()
-    if (aff) {
-      saveAffiliateCode(aff)
-    }
-  }, [])
-
   useEffect(
     () =>
       useAuthStore.subscribe((state, previousState) => {
@@ -117,7 +110,7 @@ export const Route = createRootRouteWithContext<{
   queryClient: QueryClient
 }>()({
   // 应用初始化与路由解析前统一校验会话
-  beforeLoad: async ({ location }) => {
+  beforeLoad: async ({ location, preload }) => {
     const legacyTarget = resolveLegacyRoute(location.href)
     if (legacyTarget) {
       throw redirect({ href: legacyTarget, replace: true })
@@ -149,6 +142,16 @@ export const Route = createRootRouteWithContext<{
       }
     } else {
       await authBootstrap
+    }
+    // Preserve affiliate links to other pages, before any child can redirect.
+    // The sign-up entry owns its own guest-only capture and modal behavior.
+    if (
+      !preload &&
+      !useAuthStore.getState().auth.user &&
+      pathname !== '/sign-up'
+    ) {
+      const aff = new URLSearchParams(location.searchStr).get('aff')
+      if (aff) saveAffiliateCode(aff)
     }
   },
   component: RootComponent,
