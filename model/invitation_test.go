@@ -1,7 +1,6 @@
 package model
 
 import (
-	"fmt"
 	"math"
 	"os"
 	"path/filepath"
@@ -86,6 +85,74 @@ func TestInvitationDomainDatabaseMatrix(t *testing.T) {
 	}
 }
 
+func TestInvitationCampaignTimeValidation(t *testing.T) {
+	for _, dialect := range []string{"sqlite", "mysql", "postgres"} {
+		t.Run(dialect, func(t *testing.T) {
+			db := invitationDomainTestDB(t, dialect)
+			require.NoError(t, migrateInvitations(db))
+			pt := PointType{Code: "TIME_TEST", Name: "Time test"}
+			require.NoError(t, db.Create(&pt).Error)
+			require.NoError(t, db.Create(&PointModelRule{PointTypeId: pt.Id, MatchType: PointMatchPattern, MatchValue: "*", Enabled: true}).Error)
+			now := time.Now().UnixMilli()
+			in := InvitationCampaignInput{Code: "past-start", Period: 1, Name: "Past start", StartsAt: now - 7200000, EndsAt: now + 3600000, RewardPointTypeId: pt.Id, Visible: true, Tiers: []InvitationTierInput{{MinEffectiveFriends: 0, RateBps: 500}}}
+			draft, err := CreateInvitationCampaign(in, 1)
+			require.NoError(t, err)
+			published, err := PublishInvitationCampaign(draft.Id, draft.Version, 1)
+			require.NoError(t, err)
+			require.Equal(t, "active", published.Status)
+			require.Equal(t, in.StartsAt, published.StartsAt)
+			var publishedVersion InvitationCampaignVersion
+			require.NoError(t, db.Where("campaign_id = ? AND version = ?", draft.Id, draft.Version).First(&publishedVersion).Error)
+			var activation InvitationCampaignActivation
+			require.NoError(t, db.Where("version_id = ?", publishedVersion.Id).First(&activation).Error)
+			require.GreaterOrEqual(t, activation.EffectiveFrom, now)
+			active, err := activeInvitationVersion(db, now-1)
+			require.NoError(t, err)
+			require.Nil(t, active, "publication must not retroactively activate the campaign")
+
+			// Past configured dates do not bypass an active campaign's overlap.
+			next := in
+			next.Code = "next-past-start"
+			nextDraft, err := CreateInvitationCampaign(next, 1)
+			require.NoError(t, err)
+			_, err = PublishInvitationCampaign(nextDraft.Id, nextDraft.Version, 1)
+			require.ErrorIs(t, err, ErrInvitationOverlap)
+			_, err = EndInvitationCampaign(draft.Id, draft.Version, 1)
+			require.NoError(t, err)
+			// The same configured dates are valid once the prior activation ends.
+			published, err = PublishInvitationCampaign(nextDraft.Id, nextDraft.Version, 1)
+			require.NoError(t, err)
+			require.Equal(t, "active", published.Status)
+
+			expired := in
+			expired.Code = "expired"
+			expired.EndsAt = now
+			_, err = CreateInvitationCampaign(expired, 1)
+			require.EqualError(t, err, "invitation campaign end time has passed")
+			_, err = UpdateInvitationCampaign(nextDraft.Id, nextDraft.Version, 1, expired)
+			require.EqualError(t, err, "invitation campaign end time has passed")
+			stored, err := GetInvitationCampaign(nextDraft.Id)
+			require.NoError(t, err)
+			require.Equal(t, nextDraft.Version, stored.Version)
+			require.Equal(t, in.EndsAt, stored.EndsAt)
+
+			// A valid saved draft can expire before the operator publishes it.
+			in.Code = "expires-before-publish"
+			stale, err := CreateInvitationCampaign(in, 1)
+			require.NoError(t, err)
+			require.NoError(t, db.Model(&InvitationCampaignVersion{}).Where("campaign_id = ?", stale.Id).Update("ends_at", now).Error)
+			var auditsBefore, auditsAfter, activations int64
+			require.NoError(t, db.Model(&InvitationAuditLog{}).Count(&auditsBefore).Error)
+			_, err = PublishInvitationCampaign(stale.Id, stale.Version, 1)
+			require.EqualError(t, err, "invitation campaign end time has passed")
+			require.NoError(t, db.Model(&InvitationCampaignActivation{}).Count(&activations).Error)
+			require.EqualValues(t, 2, activations)
+			require.NoError(t, db.Model(&InvitationAuditLog{}).Count(&auditsAfter).Error)
+			require.Equal(t, auditsBefore, auditsAfter)
+		})
+	}
+}
+
 func invitationDomainCampaignCases(t *testing.T, db *gorm.DB) {
 	t.Helper()
 	pt := PointType{Code: "INV_TEST", Name: "Test"}
@@ -93,25 +160,6 @@ func invitationDomainCampaignCases(t *testing.T, db *gorm.DB) {
 	require.NoError(t, db.Create(&PointModelRule{PointTypeId: pt.Id, MatchType: PointMatchPattern, MatchValue: "*", Enabled: true}).Error)
 	now := time.Now().UnixMilli()
 	in := InvitationCampaignInput{Code: "summer", Period: 1, Name: "Summer", StartsAt: now + 3600000, EndsAt: now + 7200000, RewardPointTypeId: pt.Id, Visible: true, Tiers: []InvitationTierInput{{MinEffectiveFriends: 0, RateBps: 500}, {MinEffectiveFriends: 3, RateBps: 700}}}
-	for _, expired := range []bool{false, true} {
-		past := in
-		past.Code = fmt.Sprintf("past-%t", expired)
-		past.StartsAt = now - 7200000
-		if expired {
-			past.EndsAt = now - 3600000
-		}
-		draft, err := CreateInvitationCampaign(past, 1)
-		require.NoError(t, err)
-		var auditBefore int64
-		require.NoError(t, db.Model(&InvitationAuditLog{}).Count(&auditBefore).Error)
-		_, err = PublishInvitationCampaign(draft.Id, draft.Version, 1)
-		require.EqualError(t, err, "invitation campaign start time has passed")
-		var activations, auditAfter int64
-		require.NoError(t, db.Model(&InvitationCampaignActivation{}).Count(&activations).Error)
-		require.Zero(t, activations)
-		require.NoError(t, db.Model(&InvitationAuditLog{}).Count(&auditAfter).Error)
-		require.Equal(t, auditBefore, auditAfter)
-	}
 	for _, invalid := range []InvitationCampaignInput{{Code: "bad"}, {Code: "bad", Period: 1, Name: "Bad", StartsAt: in.StartsAt, EndsAt: in.EndsAt, RewardPointTypeId: pt.Id, FreezeDays: 366, Tiers: in.Tiers}} {
 		_, err := CreateInvitationCampaign(invalid, 1)
 		require.ErrorIs(t, err, ErrInvitationInvalid)

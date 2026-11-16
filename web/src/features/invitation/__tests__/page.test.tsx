@@ -103,54 +103,74 @@ function login() {
     },
   })
 }
-it('past-start draft displays its dates and explains why publication requires editing', async () => {
-  vi.mocked(api.get).mockImplementation(async (url) => ({
-    data: {
-      success: true,
-      data:
-        url === '/api/points/types'
-          ? []
-          : {
-              ...empty,
-              total: '1',
-              items: [
-                {
-                  id: '1',
-                  code: 'past',
-                  period: 1,
-                  name: 'Past campaign',
-                  description: '',
-                  starts_at: '1',
-                  ends_at: '2',
-                  reward_point_type_id: '1',
-                  reward_point_type: {
+it.each([
+  { endsAt: '2', expired: true },
+  { endsAt: '4102444800000', expired: false },
+])(
+  'past-start draft with end $endsAt warns only when expired=$expired',
+  async ({ endsAt, expired }) => {
+    vi.mocked(api.get).mockImplementation(async (url) => ({
+      data: {
+        success: true,
+        data:
+          url === '/api/points/types'
+            ? []
+            : {
+                ...empty,
+                total: '1',
+                items: [
+                  {
                     id: '1',
-                    code: 'GENERAL',
-                    name: 'General',
+                    code: 'past',
+                    period: 1,
+                    name: 'Past campaign',
+                    description: '',
+                    starts_at: '1',
+                    ends_at: endsAt,
+                    reward_point_type_id: '1',
+                    reward_point_type: {
+                      id: '1',
+                      code: 'GENERAL',
+                      name: 'General',
+                    },
+                    freeze_days: 7,
+                    tiers: [],
+                    rules_text: '',
+                    visible: true,
+                    status: 'draft',
+                    version: '1',
                   },
-                  freeze_days: 7,
-                  tiers: [],
-                  rules_text: '',
-                  visible: true,
-                  status: 'draft',
-                  version: '1',
-                },
-              ],
-            },
-    },
+                ],
+              },
+      },
+    }))
+    mount(<InvitationCampaignAdmin />)
+    await screen.findByText(
+      `${new Date(1).toLocaleString()} – ${new Date(Number(endsAt)).toLocaleString()}`
+    )
+    const warning = screen.queryByText(
+      'Campaign end time has passed. Set a future end time.'
+    )
+    if (expired) {
+      expect(warning).toBeVisible()
+    } else {
+      expect(warning).not.toBeInTheDocument()
+    }
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeEnabled()
+  }
+)
+it('visibility checkbox has a label and toggles with pointer and keyboard', async () => {
+  vi.mocked(api.get).mockImplementation(async (url) => ({
+    data: { success: true, data: url === '/api/points/types' ? [] : empty },
   }))
   mount(<InvitationCampaignAdmin />)
-  expect(
-    await screen.findByText(
-      'Campaign start time has passed. Edit the campaign dates before publishing.'
-    )
-  ).toBeVisible()
-  expect(
-    screen.getByText(
-      `${new Date(1).toLocaleString()} – ${new Date(2).toLocaleString()}`
-    )
-  ).toBeVisible()
-  expect(screen.getByRole('button', { name: 'Edit' })).toBeEnabled()
+  const checkbox = screen.getByRole('checkbox', { name: 'Visible' })
+  expect(checkbox).toBeChecked()
+  await userEvent.click(screen.getByText('Visible'))
+  expect(checkbox).not.toBeChecked()
+  checkbox.focus()
+  await userEvent.keyboard('[Space]')
+  expect(checkbox).toBeChecked()
 })
 it('anonymous confirm opens login and never binds on login failure or cancellation', async () => {
   mount(<InvitationPage initialInvitation='forest' />)

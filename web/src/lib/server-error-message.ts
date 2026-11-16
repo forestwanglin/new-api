@@ -27,6 +27,7 @@ const serverErrorMessageKeys = {
   INVALID_INVITATION: 'Invalid invitation parameters',
   CAMPAIGN_START_PASSED:
     'Campaign start time has passed. Edit the campaign dates before publishing.',
+  CAMPAIGN_END_PASSED: 'Campaign end time has passed. Set a future end time.',
   INVITATION_NOT_FOUND: 'Invitation not found',
   INVITATION_CONFLICT: 'Invitation version conflict',
   ALREADY_BOUND: 'An inviter has already been bound',

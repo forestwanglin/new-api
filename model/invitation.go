@@ -14,6 +14,7 @@ import (
 var (
 	ErrInvitationInvalid        = errors.New("invalid invitation")
 	ErrInvitationStartPassed    = errors.New("invitation campaign start time has passed")
+	ErrInvitationEndPassed      = errors.New("invitation campaign end time has passed")
 	ErrInvitationNotFound       = errors.New("invitation not found")
 	ErrInvitationConflict       = errors.New("invitation version conflict")
 	ErrInvitationAlreadyBound   = errors.New("invitation already bound")
@@ -324,6 +325,9 @@ func CreateInvitationCampaign(in InvitationCampaignInput, op int64) (*Invitation
 	}
 	var out InvitationCampaignView
 	err := invitationTransaction(time.Now().UnixMilli, func(tx *gorm.DB, now int64) error {
+		if in.EndsAt <= now {
+			return ErrInvitationEndPassed
+		}
 		if err := validateInvitationPointType(tx, in.RewardPointTypeId, false); err != nil {
 			return err
 		}
@@ -377,6 +381,9 @@ func UpdateInvitationCampaign(id, version, op int64, in InvitationCampaignInput)
 	}
 	var out InvitationCampaignView
 	err := invitationTransaction(time.Now().UnixMilli, func(tx *gorm.DB, now int64) error {
+		if in.EndsAt <= now {
+			return ErrInvitationEndPassed
+		}
 		var c InvitationCampaign
 		if err := tx.First(&c, id).Error; err != nil {
 			return ErrInvitationNotFound
@@ -427,9 +434,10 @@ func PublishInvitationCampaign(id, version, op int64) (*InvitationCampaignView, 
 		if err := tx.Where("campaign_id = ? AND version = ?", id, version).First(&v).Error; err != nil {
 			return err
 		}
-		if v.StartsAt < now {
-			return ErrInvitationStartPassed
+		if v.EndsAt <= now {
+			return ErrInvitationEndPassed
 		}
+		effectiveFrom := max(v.StartsAt, now)
 		if err := validateInvitationPointType(tx, v.RewardPointTypeId, true); err != nil {
 			return err
 		}
@@ -449,11 +457,11 @@ func PublishInvitationCampaign(id, version, op int64) (*InvitationCampaignView, 
 			if a.EndedAt != nil {
 				end = min(end, *a.EndedAt)
 			}
-			if v.StartsAt < end && a.EffectiveFrom < v.EndsAt {
+			if effectiveFrom < end && a.EffectiveFrom < v.EndsAt {
 				return ErrInvitationOverlap
 			}
 		}
-		if err := tx.Create(&InvitationCampaignActivation{VersionId: v.Id, EffectiveFrom: v.StartsAt}).Error; err != nil {
+		if err := tx.Create(&InvitationCampaignActivation{VersionId: v.Id, EffectiveFrom: effectiveFrom}).Error; err != nil {
 			return err
 		}
 		if err := tx.Model(&c).Update("current_version_id", v.Id).Error; err != nil {

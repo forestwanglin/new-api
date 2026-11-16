@@ -6,6 +6,7 @@ import { ErrorState } from '@/components/error-state'
 import { SectionPageLayout } from '@/components/layout'
 import { LoadingState } from '@/components/loading-state'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { getPointTypes } from '@/features/points/api'
 import { getServerErrorMessage } from '@/lib/server-error-message'
@@ -151,13 +152,9 @@ export function InvitationCampaignAdmin() {
                   </option>
                 ))}
               </select>
-              <label>
-                <input
-                  type='checkbox'
-                  checked={visible}
-                  onChange={(e) => setVisible(e.target.checked)}
-                />
-                {t('Visible')}
+              <label className='flex items-center gap-2'>
+                <Checkbox checked={visible} onCheckedChange={setVisible} />
+                <span>{t('Visible')}</span>
               </label>
               <label>
                 {t('Starts at')}
@@ -292,14 +289,13 @@ export function InvitationCampaignAdmin() {
                     {new Date(Number(c.starts_at)).toLocaleString()} –{' '}
                     {new Date(Number(c.ends_at)).toLocaleString()}
                   </span>
-                  {c.status === 'draft' &&
-                    Number(c.starts_at) <= Date.now() && (
-                      <span className='text-destructive mt-1 block text-sm'>
-                        {t(
-                          'Campaign start time has passed. Edit the campaign dates before publishing.'
-                        )}
-                      </span>
-                    )}
+                  {c.status === 'draft' && Number(c.ends_at) <= Date.now() && (
+                    <span className='text-destructive mt-1 block text-sm'>
+                      {t(
+                        'Campaign end time has passed. Set a future end time.'
+                      )}
+                    </span>
+                  )}
                 </span>
                 <div className='flex gap-2'>
                   <Button

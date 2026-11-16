@@ -12,9 +12,9 @@ import (
 func TestInvitationPublishTimeError(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-	invitationError(c, model.ErrInvitationStartPassed)
-	require.Contains(t, w.Body.String(), `"code":"CAMPAIGN_START_PASSED"`)
-	require.Contains(t, w.Body.String(), "Campaign start time has passed. Edit the campaign dates before publishing.")
+	invitationError(c, model.ErrInvitationEndPassed)
+	require.Contains(t, w.Body.String(), `"code":"CAMPAIGN_END_PASSED"`)
+	require.Contains(t, w.Body.String(), "Campaign end time has passed. Set a future end time.")
 }
 
 func TestInvitationRequestBoundaries(t *testing.T) {
