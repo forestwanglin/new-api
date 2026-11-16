@@ -109,10 +109,9 @@ it('reuses public navigation styling and keeps the console header in document fl
     'aria-current',
     'page'
   )
-  expect(screen.getByRole('button', { name: 'Search' })).toHaveClass(
-    'sm:w-8',
-    'lg:w-8',
-    'xl:w-64'
+  expect(screen.getByRole('button', { name: 'Search' })).toHaveClass('size-8')
+  expect(screen.getByRole('button', { name: 'Search' })).not.toHaveTextContent(
+    'Search'
   )
   expect(screen.getByRole('banner')).toHaveClass('sticky', 'shrink-0')
   expect(screen.getByRole('banner')).not.toHaveClass('fixed')

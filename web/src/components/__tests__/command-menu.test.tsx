@@ -68,7 +68,11 @@ afterEach(() => {
   window.localStorage.clear()
 })
 
-async function searchEntriesFor(role: number, sidebarModulesAdmin = '') {
+async function searchEntriesFor(
+  role: number,
+  sidebarModulesAdmin = '',
+  iconOnly = false
+) {
   useAuthStore.getState().auth.setUser({ id: 1, username: 'alice', role })
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -80,7 +84,7 @@ async function searchEntriesFor(role: number, sidebarModulesAdmin = '') {
     routeTree: createRootRoute({
       component: () => (
         <SearchProvider>
-          <Search />
+          <Search iconOnly={iconOnly} />
           <CommandMenu />
         </SearchProvider>
       ),
@@ -100,7 +104,7 @@ async function searchEntriesFor(role: number, sidebarModulesAdmin = '') {
 }
 
 test('regular users only find their own console pages in search', async () => {
-  const entries = await searchEntriesFor(ROLE.USER)
+  const entries = await searchEntriesFor(ROLE.USER, '', true)
 
   expect(entries).toEqual(
     expect.arrayContaining([
