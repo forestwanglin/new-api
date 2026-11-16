@@ -17,7 +17,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { Link, useRouterState } from '@tanstack/react-router'
-import { Menu } from 'lucide-react'
+import { Gift, Menu } from 'lucide-react'
+
+import '@/styles/invitation-navigation.css'
 import { useCallback, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -217,10 +219,22 @@ export function PublicHeader(props: PublicHeaderProps) {
                         isActive
                           ? 'bg-accent text-foreground font-semibold'
                           : 'text-muted-foreground hover:text-foreground',
+                        link.href === '/invite' && 'invitation-nav-item',
                         link.disabled && 'pointer-events-none opacity-50'
                       )}
                     >
+                      {link.href === '/invite' && (
+                        <Gift
+                          className='invitation-nav-gift'
+                          aria-hidden='true'
+                        />
+                      )}
                       {t(link.title)}
+                      {link.href === '/invite' && (
+                        <span className='invitation-nav-badge'>
+                          {t('Earn points')}
+                        </span>
+                      )}
                     </Link>
                   )
                 }))}
@@ -287,6 +301,7 @@ export function PublicHeader(props: PublicHeaderProps) {
                         variant='ghost'
                         className={cn(
                           'justify-start',
+                          link.href === '/invite' && 'invitation-nav-item',
                           !link.external &&
                             pathname ===
                               (link.href.replace(/\/+$/, '') || '/') &&
@@ -321,7 +336,18 @@ export function PublicHeader(props: PublicHeaderProps) {
                           )
                         }
                       >
+                        {link.href === '/invite' && (
+                          <Gift
+                            className='invitation-nav-gift'
+                            aria-hidden='true'
+                          />
+                        )}
                         {t(link.title)}
+                        {link.href === '/invite' && (
+                          <span className='invitation-nav-badge'>
+                            {t('Earn points')}
+                          </span>
+                        )}
                       </Button>
                     ))}
                   </nav>

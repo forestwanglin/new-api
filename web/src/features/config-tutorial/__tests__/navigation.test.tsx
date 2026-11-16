@@ -39,10 +39,10 @@ it('adds public invitation and tutorial after subscription while preserving exte
   const links = result.current
   expect(
     links[links.findIndex((link) => link.href === '/subscription') + 1]
+  ).toEqual({ title: 'Configuration tutorial', href: '/tutorial' })
+  expect(
+    links[links.findIndex((link) => link.href === '/tutorial') + 1]
   ).toEqual({ title: 'Invite friends', href: '/invite' })
-  expect(links[links.findIndex((link) => link.href === '/invite') + 1]).toEqual(
-    { title: 'Configuration tutorial', href: '/tutorial' }
-  )
   expect(
     links.find((link) => link.href === 'https://docs.example.com')
   ).toEqual({ title: 'Docs', href: 'https://docs.example.com', external: true })

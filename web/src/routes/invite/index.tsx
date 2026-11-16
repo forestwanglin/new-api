@@ -18,7 +18,7 @@ function InviteRoute() {
   const search = Route.useSearch()
   const [supportOpen, setSupportOpen] = useState(false)
   return (
-    <PublicLayout>
+    <PublicLayout showMainContainer={false}>
       <InvitationPage initialInvitation={search.aff ?? search.ref} />
       <SubscriptionsCustomFooter onContact={() => setSupportOpen(true)} />
       <SupportDialog open={supportOpen} onOpenChange={setSupportOpen} />

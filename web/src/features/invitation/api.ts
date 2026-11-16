@@ -93,9 +93,10 @@ export async function getCurrentCampaign() {
   const r = await api.get('/api/invitation/campaigns/current')
   return campaignSchema.nullable().parse(requireServerSuccess(r.data).data)
 }
-export async function getCampaigns(page = 1) {
+export async function getCampaigns(page = 1, signal?: AbortSignal) {
   const r = await api.get('/api/invitation/campaigns', {
     params: { p: page, page_size: 20 },
+    signal,
   })
   return pageSchema(campaignSchema).parse(requireServerSuccess(r.data).data)
 }
@@ -229,4 +230,45 @@ export async function reverseReward(
     { points, request_id: requestId, reason }
   )
   requireServerSuccess(r.data)
+}
+
+/** Public endpoint is ordered by ID, so read every page before choosing the latest starts. */
+export async function getLatestCampaigns(context?: { signal?: AbortSignal }) {
+  const first = await getCampaigns(1, context?.signal)
+  if (
+    first.page !== 1 ||
+    first.page_size <= 0 ||
+    first.items.length > first.page_size
+  ) {
+    throw new Error('Incomplete invitation campaign list')
+  }
+  const items = [...first.items]
+  let page = first.page
+  let response = first
+  while (BigInt(page) * BigInt(response.page_size) < BigInt(response.total)) {
+    response = await getCampaigns(++page, context?.signal)
+    if (
+      response.page !== page ||
+      response.page_size !== first.page_size ||
+      response.total !== first.total ||
+      response.items.length === 0
+    ) {
+      throw new Error('Incomplete invitation campaign list')
+    }
+    items.push(...response.items)
+  }
+  if (
+    BigInt(items.length) !== BigInt(first.total) ||
+    new Set(items.map((item) => item.id)).size !== items.length
+  ) {
+    throw new Error('Incomplete invitation campaign list')
+  }
+  items.sort((a, b) => {
+    const starts = BigInt(b.starts_at) - BigInt(a.starts_at)
+    if (starts !== 0n) return starts > 0n ? 1 : -1
+    const ids = BigInt(b.id) - BigInt(a.id)
+    if (ids === 0n) return 0
+    return ids > 0n ? 1 : -1
+  })
+  return { total: response.total, items: items.slice(0, 10) }
 }

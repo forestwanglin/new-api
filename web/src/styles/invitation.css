@@ -1,0 +1,909 @@
+/* Invitation layout follows the supplied ZYY-AI demo; isolated from other pages. */
+.invitation-page,
+.iv-activity-modal {
+  --tx: #0f172a;
+  --tx2: #475569;
+  --tx3: #64748b;
+  --line: #e8ebf0;
+  --line2: #d6dde7;
+  --blue: #2563eb;
+  color: var(--tx);
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Microsoft YaHei', sans-serif;
+  font-size: 15px;
+  line-height: 1.62;
+}
+.invitation-page {
+  padding-top: 64px;
+  background: #fff;
+}
+.invite-wrap {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 34px 28px 56px;
+}
+.iv-page-head {
+  margin-bottom: 22px;
+}
+.iv-page-head h1 {
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.45;
+  margin: 0 0 8px;
+  letter-spacing: -0.5px;
+}
+.iv-page-head p {
+  color: var(--tx3);
+  font-size: 15px;
+  max-width: 660px;
+  margin: 0;
+}
+.iv-activity,
+.iv-card {
+  border-radius: 14px;
+}
+.iv-card {
+  padding: 24px;
+  border: 1px solid var(--line);
+  background: #fff;
+  margin-bottom: 20px;
+}
+.iv-card h2 {
+  font-size: 17px;
+  line-height: 1.5;
+  font-weight: 650;
+  margin: 0 0 12px;
+}
+.iv-card-sub {
+  color: var(--tx3);
+  font-size: 14px;
+  margin: 0 0 16px;
+}
+.invitation-page .iv-primary {
+  background: #2563eb;
+  color: white;
+  border: 0;
+  border-radius: 9px;
+  padding: 10px 18px;
+  height: auto;
+  min-height: 42px;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.62;
+  box-shadow: 0 2px 6px -2px #2563eb4d;
+  white-space: normal;
+}
+.invitation-page .iv-primary:hover {
+  background: #1d4ed8;
+}
+.iv-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 20px;
+  background: #eef2f7;
+  color: #52657f;
+  padding: 3px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.iv-status::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.iv-status.iv-active {
+  color: #15803d;
+  background: #edfbf1;
+}
+.iv-eyebrow {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0052d9;
+}
+.invitation-page .iv-activity {
+  --iv-columns: minmax(0, 1fr) minmax(250px, 0.48fr);
+  background: #fff;
+  border: 1px solid #dce5f2;
+  padding: 0;
+  overflow: hidden;
+  box-shadow: 0 5px 24px -16px #26436b33;
+}
+.invitation-page .iv-hero {
+  display: grid;
+  grid-template-columns: var(--iv-columns);
+  gap: 28px;
+  padding: 28px 30px;
+  background: linear-gradient(115deg, #f4f8ff, #fff 82%);
+  align-items: center;
+}
+.invitation-page .iv-campaign-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.invitation-page .iv-activity h2 {
+  font-size: 26px;
+  line-height: 1.5;
+  margin: 12px 0 6px;
+  letter-spacing: -0.4px;
+}
+.invitation-page .iv-rate-highlight {
+  color: #0052d9;
+  white-space: nowrap;
+}
+.invitation-page .iv-hero-note {
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--tx2);
+  margin: 0;
+}
+.invitation-page .iv-reward-split {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 20px;
+}
+.invitation-page .iv-tier {
+  --tier-color: #668bbd;
+  --tier-height: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  padding: 14px 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  text-align: center;
+}
+.invitation-page .iv-tier:nth-child(2) {
+  --tier-color: #3c7edb;
+  --tier-height: 12px;
+}
+.invitation-page .iv-tier:nth-child(3) {
+  --tier-color: #0052d9;
+  --tier-height: 18px;
+}
+.invitation-page .iv-tier-people {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #52657f;
+  white-space: nowrap;
+}
+.invitation-page .iv-tier-rate {
+  font-size: 28px;
+  line-height: 1.5;
+  font-weight: 700;
+  color: var(--tier-color);
+  font-variant-numeric: tabular-nums;
+  margin-top: 3px;
+}
+.invitation-page .iv-tier-meter {
+  display: flex;
+  align-items: flex-end;
+  width: 100%;
+  height: 18px;
+  margin-top: 8px;
+}
+.invitation-page .iv-tier-meter i {
+  display: block;
+  width: 100%;
+  height: var(--tier-height);
+  background: var(--tier-color);
+  border-radius: 3px;
+}
+@media (max-width: 420px) {
+  .invitation-page .iv-reward-split {
+    gap: 7px;
+  }
+  .invitation-page .iv-tier {
+    padding: 12px 5px 9px;
+  }
+  .invitation-page .iv-tier-rate {
+    font-size: 25px;
+  }
+}
+.invitation-page .iv-share-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  padding: 20px 22px;
+  background: #fff;
+  border: 1px solid #d5e1f3;
+  border-radius: 12px;
+  box-shadow:
+    inset 0 3px 0 #0052d9,
+    0 8px 24px -12px #234b8840;
+}
+.invitation-page .iv-share-footer .iv-primary {
+  width: 100%;
+  min-height: 42px;
+}
+.invitation-page .iv-share-info {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--tx2);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.invitation-page .iv-share-info b {
+  font-size: 16px;
+  letter-spacing: 1px;
+  color: var(--tx);
+}
+.invitation-page .iv-link-preview {
+  font-size: 13px;
+  color: var(--tx3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.invitation-page .iv-overview {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  margin: 20px 0;
+  padding: 20px 0;
+}
+.invitation-page .iv-overview > div {
+  padding: 0 24px;
+  min-width: 0;
+  border-left: 1px solid var(--line);
+}
+.invitation-page .iv-overview > div:first-child {
+  border-left: 0;
+}
+.invitation-page .iv-overview span {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--tx2);
+  display: block;
+}
+.invitation-page .iv-overview strong {
+  display: block;
+  font-size: 27px;
+  line-height: 1.6;
+  color: var(--tx);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.invitation-page .iv-overview small {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--tx3);
+}
+.invitation-page .iv-history {
+  scroll-margin-top: 84px;
+}
+.invitation-page .iv-referrer {
+  background: #fafbfd;
+  border-color: #e6ebf2;
+}
+.iv-activity-modal .iv-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.iv-activity-modal .iv-list-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin: 18px 0 12px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--tx3);
+}
+.iv-activity-modal .iv-list-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 14px;
+  line-height: 1.6;
+  text-align: left;
+}
+.iv-activity-modal .iv-list-table th {
+  padding: 12px 16px;
+  background: #f7f9fc;
+  color: var(--tx3);
+  font-weight: 500;
+  border-bottom: 1px solid var(--line);
+}
+.iv-activity-modal .iv-list-table td {
+  padding: 18px 16px;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--line);
+  color: var(--tx2);
+  overflow-wrap: anywhere;
+}
+.iv-activity-modal .iv-list-table th:nth-child(1) {
+  width: 32%;
+}
+.iv-activity-modal .iv-list-table th:nth-child(2) {
+  width: 28%;
+}
+.iv-activity-modal .iv-list-table th:nth-child(3) {
+  width: 26%;
+}
+.iv-activity-modal .iv-list-table th:nth-child(4) {
+  width: 14%;
+}
+.iv-activity-modal .iv-list-name {
+  display: block;
+  font-size: 16px;
+  line-height: 1.6;
+  font-weight: 600;
+  color: var(--tx);
+}
+.iv-activity-modal .iv-list-period {
+  display: inline-flex;
+  align-items: center;
+  margin-bottom: 10px;
+  padding: 4px 12px;
+  border: 1px solid #bdd2f5;
+  border-radius: 6px;
+  background: #e8f1ff;
+  color: #0052d9;
+  font-size: 18px;
+  line-height: 1.5;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.iv-activity-modal .iv-list-title-rate {
+  display: block;
+  margin-top: 3px;
+  color: #0052d9;
+  font-size: 16px;
+  line-height: 1.6;
+  font-weight: 650;
+}
+.iv-activity-modal .iv-list-dates {
+  font-variant-numeric: tabular-nums;
+}
+.iv-activity-modal .iv-list-dates time {
+  display: block;
+}
+.iv-activity-modal .iv-list-dates time + time {
+  margin-top: 2px;
+}
+.iv-activity-modal .iv-list-dates time + time::before {
+  content: '至 ';
+  color: var(--tx3);
+}
+.iv-activity-modal .iv-list-tiers {
+  display: grid;
+  gap: 6px;
+}
+.iv-activity-modal .iv-list-tier {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 9px;
+  border-radius: 5px;
+  background: #f6f8fc;
+}
+.iv-activity-modal .iv-list-tier:nth-child(2) {
+  background: #eef4ff;
+}
+.iv-activity-modal .iv-list-tier:nth-child(3) {
+  background: #e4eeff;
+}
+.iv-activity-modal .iv-list-tier span {
+  font-size: 14px;
+  color: var(--tx2);
+  white-space: nowrap;
+}
+.iv-activity-modal .iv-list-tier strong {
+  font-size: 18px;
+  line-height: 1.5;
+  color: #0052d9;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.iv-activity-modal .iv-list-footnote {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--tx3);
+  margin: 14px 0 0;
+}
+.invitation-page .iv-history-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 16px 0;
+}
+.invitation-page [role='tabpanel'][hidden] {
+  display: none;
+}
+/* 我的邀请人：补录入口。未绑定时是输入框 + 确认按钮，绑定后换成只读结论行。 */
+.invitation-page .iv-ref-form {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.invitation-page .iv-ref-form input {
+  flex: 1 1 260px;
+  min-width: 0;
+  height: 38px;
+  box-sizing: border-box;
+  border: 1px solid var(--line2);
+  border-radius: 9px;
+  padding: 0 12px;
+  background: #fff;
+  color: var(--tx);
+  font: inherit;
+  font-size: 14.5px;
+}
+.invitation-page .iv-ref-form input:focus {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px #2563eb1a;
+}
+.invitation-page .iv-ref-form .iv-primary {
+  flex-shrink: 0;
+}
+.invitation-page .iv-ref-done {
+  display: flex;
+  align-items: center;
+  gap: 10px 14px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  border: 1px solid #d4e3f8;
+  border-radius: 10px;
+  background: #f8fbff;
+}
+.invitation-page .iv-ref-code {
+  font-family: 'SF Mono', Menlo, monospace;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--tx);
+  letter-spacing: 0.4px;
+}
+.invitation-page .iv-stages {
+  padding: 26px 30px 28px;
+  border-top: 1px solid #e5ebf4;
+}
+.invitation-page .iv-progress-layout {
+  display: grid;
+  grid-template-columns: var(--iv-columns);
+  gap: 28px;
+  align-items: start;
+}
+.invitation-page .iv-stage-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.invitation-page .iv-stages h3 {
+  font-size: 20px;
+  line-height: 1.5;
+  margin: 6px 0;
+}
+.invitation-page .iv-stage-heading > strong {
+  font-size: 24px;
+  color: #0052d9;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+.invitation-page .iv-stage-heading small {
+  display: block;
+  font-size: 13px;
+  color: var(--tx2);
+  font-weight: 400;
+}
+.invitation-page .iv-stages progress {
+  display: block;
+  width: 100%;
+  height: 8px;
+  border: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  accent-color: #0052d9;
+  margin: 18px 0 14px;
+}
+.invitation-page .iv-stages progress::-webkit-progress-bar {
+  background: #e7edf6;
+}
+.invitation-page .iv-stages progress::-webkit-progress-value {
+  background: #4079e4;
+  border-radius: 8px;
+}
+.invitation-page .iv-group-reward {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 18px 20px;
+  background: #f5f8fd;
+  border: 1px solid #e4ebf5;
+  border-radius: 10px;
+  gap: 6px;
+}
+.invitation-page .iv-group-reward span {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--tx2);
+}
+.invitation-page .iv-group-reward strong {
+  font-size: 30px;
+  line-height: 1.4;
+  color: #2457a5;
+  font-variant-numeric: tabular-nums;
+}
+.invitation-page .iv-group-reward small {
+  font-size: 14px;
+  color: var(--tx2);
+  margin-left: 6px;
+}
+.invitation-page .iv-task-note {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--tx2);
+  margin: 12px 0 0;
+}
+.invitation-page .iv-rules-section {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #e8edf4;
+}
+.invitation-page .iv-activity .iv-rules-section h4 {
+  font-size: 15px;
+  line-height: 1.6;
+  margin: 0 0 10px;
+  color: var(--tx);
+}
+.invitation-page .iv-activity .iv-task-rules {
+  margin: 0;
+  padding-left: 22px;
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--tx2);
+}
+.invitation-page .iv-activity .iv-task-rules li {
+  padding: 5px 0 5px 3px;
+}
+.invitation-page .iv-activity .iv-task-rules strong {
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--tx);
+}
+.invitation-page .iv-activity .iv-task-rules p {
+  display: inline;
+  margin: 0 0 0 8px;
+  font-size: 14px;
+  line-height: 1.75;
+}
+.invitation-page .iv-campaign-meta {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.invitation-page .iv-period {
+  font-weight: 600;
+  color: #2457a5;
+}
+.invitation-page .iv-campaign-date {
+  display: flex;
+  align-items: baseline;
+  gap: 4px 8px;
+  flex-wrap: wrap;
+  border-top: 1px solid #dce5f2;
+  padding-top: 16px;
+  margin: 20px 0 0;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--tx2);
+}
+.invitation-page .iv-campaign-date .iv-date-label {
+  font-weight: 600;
+  color: var(--tx);
+  white-space: nowrap;
+}
+.invitation-page .iv-campaign-date .iv-date-range {
+  display: flex;
+  align-items: baseline;
+  gap: 4px 6px;
+  flex-wrap: wrap;
+  font-variant-numeric: tabular-nums;
+}
+.invitation-page .iv-campaign-date time {
+  white-space: nowrap;
+}
+.invitation-page .iv-hero-note .iv-point-badge {
+  display: inline-block;
+  margin: 0 0 8px;
+  padding: 4px 12px;
+  border: 1px solid #cadcff;
+  border-radius: 6px;
+  background: #edf4ff;
+  color: #0052d9;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.6;
+}
+.invitation-page .iv-link-action {
+  border: 0;
+  background: transparent;
+  color: #315d9f;
+  font-size: 14px;
+  line-height: 1.6;
+  cursor: pointer;
+  padding: 5px 0;
+}
+.invitation-page .iv-link-action:hover {
+  color: #0052d9;
+  text-decoration: underline;
+}
+.invitation-page .iv-reward-split {
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+}
+.invitation-page .iv-hero h2 {
+  font-weight: 700;
+}
+.invitation-page .iv-overview {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.invitation-page .iv-stages h3 {
+  font-weight: 650;
+}
+.invitation-page .iv-task-rules {
+  list-style: decimal;
+}
+.invitation-page .iv-rules-section h4 {
+  font-weight: 600;
+}
+.invitation-page .iv-rules-key {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--tx2);
+  margin: 0 0 6px;
+}
+.invitation-page .iv-additional-rules {
+  margin-top: 16px;
+  font-size: 14px;
+  color: var(--tx2);
+}
+.invitation-page .iv-hero-note p {
+  margin: 0;
+}
+.invitation-page .iv-campaign-date strong {
+  color: var(--tx);
+  font-weight: 600;
+}
+.invitation-page .iv-referrer {
+  background: #fafbfd;
+  border-color: #e6ebf2;
+}
+.invitation-page .iv-ref-message {
+  margin-top: 9px;
+  font-size: 13.5px;
+  color: var(--tx2);
+}
+.invitation-page .iv-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 2px;
+  width: 100%;
+  padding: 0;
+  justify-content: flex-start;
+  height: auto;
+}
+.invitation-page .iv-tabs [role='tab'] {
+  flex: 0 1 auto;
+  padding: 11px 3px;
+  margin-right: 26px;
+  font-size: 15px;
+  color: var(--tx3);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  border-radius: 0;
+  font-weight: 500;
+  background: transparent;
+  height: auto;
+}
+.invitation-page .iv-tabs [role='tab'][aria-selected='true'] {
+  color: var(--blue);
+  border-bottom-color: var(--blue);
+  font-weight: 700;
+}
+.invitation-page .iv-tabs [role='tab']::after {
+  display: none;
+}
+.invitation-page .iv-order-table {
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.invitation-page .iv-order-table th {
+  padding: 10px 12px;
+  background: #f7f9fc;
+  color: var(--tx3);
+  font-weight: 500;
+}
+.invitation-page .iv-order-table td {
+  padding: 14px 12px;
+  color: var(--tx2);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.invitation-page .iv-order-table small {
+  display: block;
+  font-size: 12.5px;
+  color: var(--tx3);
+}
+.invitation-page .iv-empty,
+.iv-activity-modal .iv-empty {
+  padding: 22px;
+  color: var(--tx3);
+  font-size: 14px;
+  text-align: center;
+}
+.iv-activity-modal {
+  width: calc(100vw - 40px);
+  max-width: 1040px;
+  padding: clamp(18px, 3vw, 28px);
+  border-radius: 16px;
+  gap: 0;
+  background: #fff;
+}
+.iv-activity-modal .iv-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  font-size: 22px;
+  font-weight: 650;
+}
+.iv-activity-modal .iv-list-meta {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin: 18px 0 12px;
+  font-size: 14px;
+  color: var(--tx3);
+}
+.iv-activity-modal .iv-list-table {
+  min-width: 690px;
+}
+.iv-activity-modal .iv-list-table :is(th, td) {
+  white-space: normal;
+}
+.iv-activity-modal .iv-list-table .iv-list-period {
+  font-size: 18px;
+  font-weight: 700;
+}
+.iv-activity-modal .iv-list-table .iv-list-name {
+  font-size: 16px;
+  font-weight: 600;
+}
+.iv-activity-modal .iv-list-table .iv-list-title-rate {
+  font-size: 16px;
+  font-weight: 650;
+}
+.iv-activity-modal .iv-list-table .iv-list-tier strong {
+  font-size: 18px;
+  font-weight: 650;
+}
+.iv-activity-modal .iv-list-table .iv-list-dates time {
+  display: inline;
+}
+.iv-activity-modal .iv-list-table .iv-list-dates time:first-child {
+  display: block;
+}
+.iv-activity-modal .iv-list-table .iv-list-dates time + time::before {
+  content: none;
+}
+.invitation-page :is(button, a, input):focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 3px;
+}
+@media (max-width: 820px) {
+  .invitation-page .iv-hero {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    padding: 22px 20px;
+  }
+  .invitation-page .iv-activity .iv-stages {
+    padding: 22px 20px;
+  }
+  .invitation-page .iv-stages .iv-progress-layout {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+  .invitation-page .iv-overview {
+    grid-template-columns: 1fr;
+    padding: 0;
+  }
+  .invitation-page .iv-overview > div {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+    padding: 16px 20px;
+  }
+  .invitation-page .iv-overview > div:first-child {
+    border-top: 0;
+  }
+  .invitation-page .iv-activity h2 {
+    font-size: 23px;
+  }
+  .invitation-page .iv-activity .iv-rules-section .iv-task-rules p {
+    display: block;
+    margin-left: 0;
+  }
+}
+@media (max-width: 600px) {
+  .invite-wrap {
+    padding: 22px 16px 40px;
+  }
+  .iv-page-head h1 {
+    font-size: 25px;
+  }
+  .iv-card {
+    padding: 20px;
+  }
+  .iv-activity-modal {
+    width: calc(100vw - 24px);
+  }
+}
+.dark .invitation-page,
+.dark .iv-activity-modal {
+  --tx: #e2e8f0;
+  --tx2: #c0ccdf;
+  --tx3: #a4b4cc;
+  --line: #334155;
+  --line2: #475569;
+  background: #111827;
+}
+.dark .invitation-page :is(.iv-hero, .iv-card, .iv-overview, .iv-share-footer),
+.dark .iv-activity-modal {
+  background: #182231;
+  border-color: #334155;
+}
+.dark .invitation-page :is(.iv-group-reward, .iv-ref-done),
+.dark .iv-activity-modal .iv-list-tier {
+  background: #23324a;
+  border-color: #405475;
+}
+.dark .invitation-page .iv-order-table th,
+.dark .iv-activity-modal .iv-list-table th {
+  background: #23324a;
+}
+@media (prefers-reduced-motion: reduce) {
+  .invitation-page *,
+  .iv-activity-modal * {
+    transition: none;
+    animation: none;
+  }
+}
+
+.iv-activity-modal .iv-list-summary {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--tx2);
+}

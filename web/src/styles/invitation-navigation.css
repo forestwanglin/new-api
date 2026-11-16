@@ -1,0 +1,74 @@
+header .invitation-nav-item {
+  color: #b45309;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: 14px;
+  padding-left: 18px;
+  border-left: 1px solid #d6dde7;
+  overflow: visible;
+  white-space: nowrap;
+}
+header .invitation-nav-item:hover {
+  background: #fff8ec;
+  color: #8a3d06;
+}
+header .invitation-nav-item[aria-current='page'] {
+  background: #eef2f7;
+  color: #0f172a;
+}
+.invitation-nav-gift {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  color: #d97706;
+}
+.invitation-nav-item:hover .invitation-nav-gift {
+  color: #b45309;
+}
+.invitation-nav-item[aria-current='page'] .invitation-nav-gift {
+  color: #64748b;
+}
+.invitation-nav-badge {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #b45309;
+  background: #fff4e5;
+  border: 1px solid #f2d3a3;
+  border-radius: 20px;
+  padding: 1px 8px;
+  line-height: 1.4;
+  letter-spacing: 0.2px;
+}
+.invitation-nav-item:hover .invitation-nav-badge {
+  background: #ffe9c9;
+  border-color: #e8bf85;
+  color: #8a3d06;
+}
+.invitation-nav-item[aria-current='page'] .invitation-nav-badge {
+  background: #fff4e5;
+  border-color: #f2d3a3;
+}
+[data-slot='sheet-content'] .invitation-nav-item {
+  color: #b45309;
+  display: flex;
+  gap: 7px;
+}
+[data-slot='sheet-content'] .invitation-nav-item[aria-current='page'] {
+  background: #eef2f7;
+  color: #0f172a;
+}
+.dark header .invitation-nav-item[aria-current='page'] {
+  background: #273349;
+  color: #edf2fa;
+}
+.dark header .invitation-nav-item {
+  color: #fbbf70;
+  border-color: #475569;
+}
+@media (prefers-reduced-motion: reduce) {
+  .invitation-nav-item {
+    transition: none;
+  }
+}

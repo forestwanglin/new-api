@@ -2,12 +2,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import '@/styles/invitation.css'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Dialog } from '@/components/dialog'
 import { ErrorState } from '@/components/error-state'
-import { SectionPageLayout } from '@/components/layout'
 import { LoadingState } from '@/components/loading-state'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 import {
   getServerErrorMessage,
   getServerErrorSources,
@@ -15,24 +17,23 @@ import {
 import { useAuthStore } from '@/stores/auth-store'
 import { useLoginModalStore } from '@/stores/login-modal-store'
 
+import { ActivityDialog } from './activity-dialog'
 import {
   bindInvitation,
   getBinding,
-  getCampaigns,
   getCurrentCampaign,
-  getFriends,
   getLink,
   getRewards,
   getSummary,
   formatPoints,
-  formatMoneyMinor,
 } from './api'
+import { CampaignPanel } from './campaign-panel'
 import {
   clearBindingIntent,
   readBindingIntent,
   saveBindingIntent,
 } from './intent'
-import { PageControls } from './page-controls'
+import { RewardHistory } from './reward-history'
 
 export function InvitationPage({
   initialInvitation = '',
@@ -50,16 +51,11 @@ export function InvitationPage({
   const [input, setInput] = useState(
     () => readBindingIntent() || initialInvitation
   )
-  const [friendsPage, setFriendsPage] = useState(1)
   const [rewardsPage, setRewardsPage] = useState(1)
-  const [campaignsPage, setCampaignsPage] = useState(1)
+  const [activitiesOpen, setActivitiesOpen] = useState(false)
   const [boundDialog, setBoundDialog] = useState(false)
   const [confirmDialog, setConfirmDialog] = useState(false)
   const [message, setMessage] = useState('')
-  const campaigns = useQuery({
-    queryKey: ['invitation', 'campaigns', campaignsPage],
-    queryFn: () => getCampaigns(campaignsPage),
-  })
   const campaign = useQuery({
     queryKey: ['invitation', 'campaign'],
     queryFn: getCurrentCampaign,
@@ -77,11 +73,6 @@ export function InvitationPage({
   const summary = useQuery({
     queryKey: ['invitation', 'summary', user?.id],
     queryFn: getSummary,
-    enabled: fullAuth,
-  })
-  const friends = useQuery({
-    queryKey: ['invitation', 'friends', user?.id, friendsPage],
-    queryFn: () => getFriends(friendsPage),
     enabled: fullAuth,
   })
   const rewards = useQuery({
@@ -144,7 +135,6 @@ export function InvitationPage({
       setMessage('')
       setBoundDialog(false)
       setConfirmDialog(false)
-      setFriendsPage(1)
       setRewardsPage(1)
     }
     previousUser.current = user?.id
@@ -156,290 +146,218 @@ export function InvitationPage({
     }
     previousLoginOpen.current = loginOpen
   }, [user?.id, fullAuth, loginOpen])
-  const privateQueries = [link, binding, summary, friends, rewards]
+  const privateQueries = [link, binding, summary]
+  const copy = useCopyToClipboard()
+  const loginForInvite = () => {
+    if (input.trim()) saveBindingIntent(input.trim())
+    useLoginModalStore.getState().open({ redirectTo: '/invite' })
+  }
   return (
-    <SectionPageLayout variant='user'>
-      <SectionPageLayout.Title>{t('Invite friends')}</SectionPageLayout.Title>
-      <SectionPageLayout.Content>
-        <div className='mx-auto flex w-full max-w-5xl flex-col gap-5'>
-          {campaign.isPending && <LoadingState />}
-          {campaign.isError && (
-            <ErrorState
-              description={t('Unable to load invitation campaign')}
-              onRetry={() => void campaign.refetch()}
-            />
-          )}
-          {campaign.isSuccess && !campaign.data && (
-            <p>{t('No active invitation campaign')}</p>
-          )}
-          {campaign.data && (
-            <section className='rounded-lg border p-5'>
-              <h2 className='text-xl font-semibold'>{campaign.data.name}</h2>
-              <p className='whitespace-pre-wrap'>{campaign.data.description}</p>
-              <p>
-                {t('Freeze period')}: {campaign.data.freeze_days} {t('days')} ·{' '}
-                {campaign.data.reward_point_type.name}
-              </p>
-              <div className='mt-3 flex flex-wrap gap-2'>
-                {campaign.data.tiers.map((tier) => (
-                  <span
-                    key={tier.min_effective_friends}
-                    className='rounded border px-2 py-1'
-                  >
-                    {tier.min_effective_friends}+ {t('friends')}:{' '}
-                    {(tier.rate_bps / 100).toFixed(2)}%
-                  </span>
-                ))}
-              </div>
-              <p className='mt-3 whitespace-pre-wrap'>
-                {campaign.data.rules_text}
-              </p>
-            </section>
-          )}
-          <p className='text-muted-foreground text-sm'>
+    <main className='invitation-page'>
+      <div className='invite-wrap'>
+        <div className='iv-page-head'>
+          <h1>{t('Invite friends and earn points')}</h1>
+          <p>
             {t(
-              'Only invitation rewards are frozen; purchased subscription points are available immediately.'
+              'Share useful models with friends. View subscription rewards and invitation progress here.'
             )}
           </p>
-          <Dialog
-            open={confirmDialog}
-            onOpenChange={setConfirmDialog}
-            title={t('Confirm permanent inviter binding')}
-          >
-            <p>{t('Binding is permanent and cannot be changed or removed.')}</p>
-            <p className='break-all'>{input}</p>
-            <Button
-              disabled={bind.isPending}
-              onClick={() =>
-                bind.mutate({
-                  invitation: input.trim(),
-                  requestId: crypto.randomUUID(),
-                  viewer: user?.id ?? 0,
-                })
-              }
-            >
-              {t('Bind permanently')}
-            </Button>
-          </Dialog>
-          <Dialog
-            open={boundDialog}
-            onOpenChange={setBoundDialog}
-            title={t('Bound inviter')}
-          >
-            <p>{t('You have already bound an inviter')}</p>
-          </Dialog>
-          <section className='rounded-lg border p-5'>
-            <h2 className='font-semibold'>{t('Bind inviter')}</h2>
-            <div className='mt-3 flex flex-col gap-2 sm:flex-row'>
-              <Input
-                aria-label={t('Paste invitation link')}
-                maxLength={2048}
-                readOnly={binding.data?.bound === true}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder={t('Paste invitation link')}
-              />
-              <Button
-                onClick={confirm}
-                disabled={
-                  bind.isPending ||
-                  (!input.trim() && !binding.data?.bound) ||
-                  (fullAuth && !binding.isSuccess)
-                }
-              >
-                {t('Confirm binding')}
-              </Button>
-            </div>
-            {binding.data?.bound && (
-              <p className='mt-2 text-sm'>
-                {t('Bound inviter')}: {binding.data.inviter_label}
-              </p>
-            )}
-            {message && (
-              <p className='mt-2' role='status'>
-                {message}
-              </p>
-            )}
-          </section>
-          {fullAuth && (
-            <>
-              {privateQueries.some((q) => q.isPending) && <LoadingState />}
-              {privateQueries.some((q) => q.isError) && (
-                <ErrorState
-                  onRetry={() => {
-                    for (const q of privateQueries) void q.refetch()
-                  }}
-                />
-              )}
-              <section className='rounded-lg border p-5'>
-                <h2 className='font-semibold'>{t('My invitation link')}</h2>
-                <p className='break-all'>{link.data?.url}</p>
-                <p>{link.data?.code}</p>
+        </div>
+        {campaign.isPending && <LoadingState />}
+        {campaign.isError && (
+          <ErrorState
+            description={t('Unable to load invitation campaign')}
+            onRetry={() => void campaign.refetch()}
+          />
+        )}
+        {campaign.isSuccess && (
+          <CampaignPanel
+            campaign={campaign.data}
+            authenticated={fullAuth}
+            summaryPending={summary.isPending}
+            summary={fullAuth ? summary.data : undefined}
+            onActivities={() => setActivitiesOpen(true)}
+            share={
+              <>
                 <Button
-                  disabled={!link.data}
+                  className='iv-primary'
+                  disabled={fullAuth && !link.data}
                   onClick={() => {
-                    if (link.data) {
-                      void navigator.clipboard.writeText(link.data.url).then(
-                        () => setMessage(t('Invitation link copied')),
-                        () => setMessage(t('Unable to copy invitation link'))
-                      )
-                    }
+                    if (fullAuth && link.data) {
+                      void copy.copyToClipboard(link.data.url)
+                    } else loginForInvite()
                   }}
                 >
-                  {t('Copy invitation link')}
+                  {fullAuth
+                    ? t(
+                        copy.copiedText === link.data?.url
+                          ? 'Invitation link copied'
+                          : 'Copy invitation link and invite friends'
+                      )
+                    : t('Sign in to get your invitation link')}
                 </Button>
-                {summary.data && (
-                  <>
-                    <p className='mt-3'>
-                      {t('Bound friends')}:{' '}
-                      {formatPoints(summary.data.bound_friends)} ·{' '}
-                      {t('Effective friends')}:{' '}
-                      {formatPoints(summary.data.effective_friends)} ·{' '}
-                      {t('Pending friends')}:{' '}
-                      {formatPoints(summary.data.pending_friends)} ·{' '}
-                      {t('Current rate')}:{' '}
-                      {summary.data.current_rate_bps == null
-                        ? '-'
-                        : `${summary.data.current_rate_bps / 100}%`}
-                    </p>
-                    {summary.data.next_threshold != null && (
-                      <p>
-                        {t('Next tier at {{count}} effective friends', {
-                          count: summary.data.next_threshold,
-                        })}
-                        {' · '}
-                        {t('Friends needed for next tier')}:{' '}
-                        {formatPoints(
-                          (BigInt(summary.data.next_threshold) -
-                            BigInt(summary.data.effective_friends) >
-                          0n
-                            ? BigInt(summary.data.next_threshold) -
-                              BigInt(summary.data.effective_friends)
-                            : 0n
-                          ).toString()
-                        )}
-                      </p>
-                    )}
-                    {summary.data.next_threshold === null &&
-                      summary.data.current_rate_bps !== null && (
-                        <p>{t('Highest reward tier reached')}</p>
-                      )}
-                    {summary.data.balances.map((b) => (
-                      <p key={b.point_type_id}>
-                        {b.name}: {formatPoints(b.released_total)}{' '}
-                        {t('released')}, {formatPoints(b.frozen_points)}{' '}
-                        {t('frozen')}, {formatPoints(b.processing_points)}{' '}
-                        {t('Processing')} · {t('Total pending')}:{' '}
-                        {formatPoints(b.pending_total)} · {t('Cancelled')}:{' '}
-                        {formatPoints(b.cancelled_total)} · {t('Reversed')}:{' '}
-                        {formatPoints(b.reversed_total)}
-                      </p>
-                    ))}
-                  </>
+                <div className='iv-share-info'>
+                  {fullAuth ? (
+                    <>
+                      {t('My invitation code')} <b>{link.data?.code}</b>
+                      <br />
+                      {t('Friends can also enter it when registering.')}
+                    </>
+                  ) : (
+                    t(
+                      'Friends register with your link or code to establish an invitation relationship.'
+                    )
+                  )}
+                </div>
+                {fullAuth && link.data && (
+                  <div className='iv-link-preview' title={link.data.url}>
+                    {link.data.url}
+                  </div>
                 )}
-              </section>
-              <section className='rounded-lg border p-5'>
-                <h2 className='font-semibold'>{t('Friends')}</h2>
-                {friends.isSuccess &&
-                  (friends.data.items.length ? (
-                    friends.data.items.map((f) => (
-                      <div className='border-b py-2' key={f.invitee_id}>
-                        <p>
-                          {f.label} · {t(f.status)}
-                        </p>
-                        <p className='text-muted-foreground text-sm'>
-                          {t('Bound at')}: {formatTime(f.bound_at)} ·{' '}
-                          {t('Qualified at')}: {formatTime(f.qualified_at)}
-                        </p>
+              </>
+            }
+          />
+        )}
+        {fullAuth && (
+          <>
+            {privateQueries.some((query) => query.isPending) && (
+              <LoadingState />
+            )}
+            {privateQueries.some((query) => query.isError) && (
+              <ErrorState
+                onRetry={() => {
+                  for (const query of privateQueries) void query.refetch()
+                }}
+              />
+            )}
+            {summary.data && (
+              <div
+                className='iv-overview'
+                aria-label={t('My invitation reward overview')}
+              >
+                <div>
+                  <span>{t('Cumulative released rewards')}</span>
+                  {summary.data.balances.length ? (
+                    summary.data.balances.map((balance) => (
+                      <div key={balance.point_type_id}>
+                        <strong>{formatPoints(balance.released_total)}</strong>
+                        <small>{balance.name}</small>
                       </div>
                     ))
                   ) : (
-                    <p>{t('No invited friends yet')}</p>
-                  ))}
-                <PageControls
-                  page={friendsPage}
-                  total={friends.data?.total ?? '0'}
-                  onChange={setFriendsPage}
-                />
-              </section>
-              <section className='rounded-lg border p-5'>
-                <h2 className='font-semibold'>{t('Reward history')}</h2>
-                {rewards.isSuccess &&
-                  (rewards.data.items.length ? (
-                    rewards.data.items.map((r) => (
-                      <article key={r.id} className='space-y-1 border-b py-3'>
-                        <p>
-                          {r.order_label} · {r.invitee_label} ·{' '}
-                          {r.campaign_name} · v{r.campaign_version}
-                        </p>
-                        <p>
-                          {r.point_type.name}: {formatPoints(r.original_points)}{' '}
-                          · {t(r.status)}
-                        </p>
-                        <p>
-                          {t('Net paid')}: ¥
-                          {formatMoneyMinor(r.net_paid_amount_minor)} ·{' '}
-                          {r.rate_bps / 100}%
-                        </p>
-                        <p>
-                          {t('Processing')}: {formatPoints(r.processing_points)}{' '}
-                          · {t('Frozen')}: {formatPoints(r.frozen_points)} ·{' '}
-                          {t('Released invitation points')}:{' '}
-                          {formatPoints(r.released_points)} · {t('Cancelled')}:{' '}
-                          {formatPoints(r.cancelled_points)} · {t('Reversed')}:{' '}
-                          {formatPoints(r.reversed_points)}
-                        </p>
-                        <p className='text-muted-foreground text-sm'>
-                          {t('Paid at')}: {formatTime(r.paid_at)} ·{' '}
-                          {t('Release at')}: {formatTime(r.release_at)}
-                        </p>
-                      </article>
+                    <strong>0</strong>
+                  )}
+                  <small>
+                    {t(
+                      'Includes previously spent rewards; see wallet for available points'
+                    )}
+                  </small>
+                </div>
+                <div>
+                  <span>{t('Pending rewards')}</span>
+                  {summary.data.balances.length ? (
+                    summary.data.balances.map((balance) => (
+                      <div key={balance.point_type_id}>
+                        <strong>{formatPoints(balance.pending_total)}</strong>
+                        <small>{balance.name}</small>
+                      </div>
                     ))
                   ) : (
-                    <p>{t('No rewards yet')}</p>
-                  ))}
-                <PageControls
-                  page={rewardsPage}
-                  total={rewards.data?.total ?? '0'}
-                  onChange={setRewardsPage}
-                />
-              </section>
-            </>
-          )}
-          <section className='rounded-lg border p-5'>
-            <h2 className='font-semibold'>{t('Campaign history')}</h2>
-            {campaigns.isPending && <LoadingState />}
-            {campaigns.isError && (
-              <ErrorState onRetry={() => void campaigns.refetch()} />
+                    <strong>0</strong>
+                  )}
+                  <small>
+                    {t('Available after each order’s release is confirmed')}
+                  </small>
+                </div>
+              </div>
             )}
-            {campaigns.isSuccess &&
-              (campaigns.data.items.length ? (
-                campaigns.data.items.map((c) => (
-                  <details key={c.id} className='border-b py-3'>
-                    <summary>
-                      {c.name} · {t(c.status)}
-                    </summary>
-                    <p className='whitespace-pre-wrap'>{c.description}</p>
-                    <p>
-                      {formatTime(c.starts_at)} — {formatTime(c.ends_at)}
-                    </p>
-                    <p className='whitespace-pre-wrap'>{c.rules_text}</p>
-                  </details>
-                ))
-              ) : (
-                <p>{t('No invitation campaigns')}</p>
-              ))}
-            <PageControls
-              page={campaignsPage}
-              total={campaigns.data?.total ?? '0'}
-              onChange={setCampaignsPage}
+            <RewardHistory
+              data={rewards.data}
+              summary={summary.data}
+              pending={rewards.isPending}
+              error={rewards.isError}
+              onRetry={() => void rewards.refetch()}
+              page={rewardsPage}
+              onPageChange={setRewardsPage}
             />
-          </section>
-        </div>
-      </SectionPageLayout.Content>
-    </SectionPageLayout>
+            <section className='iv-card iv-referrer'>
+              <h2>{t('My inviter')}</h2>
+              <p className='iv-card-sub'>
+                {t(
+                  'If you did not enter an invitation code during registration, you can add one here once. Binding is permanent and cannot be changed or removed.'
+                )}
+              </p>
+              {binding.data?.bound ? (
+                <div className='iv-ref-done'>
+                  <strong>
+                    {t('Bound inviter')}: {binding.data.inviter_label}
+                  </strong>
+                  <span className='iv-ref-code'>
+                    {binding.data.inviter_code}
+                  </span>
+                  <Button variant='outline' onClick={confirm}>
+                    {t('View binding')}
+                  </Button>
+                </div>
+              ) : (
+                <div className='iv-ref-form'>
+                  <Input
+                    aria-label={t('Paste invitation link')}
+                    maxLength={2048}
+                    value={input}
+                    onChange={(event) => setInput(event.target.value)}
+                    placeholder={t('Paste invitation link or invitation code')}
+                  />
+                  <Button
+                    className='iv-primary'
+                    onClick={confirm}
+                    disabled={
+                      bind.isPending || !input.trim() || !binding.isSuccess
+                    }
+                  >
+                    {t('Confirm binding')}
+                  </Button>
+                </div>
+              )}
+              {message && (
+                <p className='iv-ref-message' role='status'>
+                  {message}
+                </p>
+              )}
+            </section>
+          </>
+        )}
+      </div>
+      <ConfirmDialog
+        open={confirmDialog}
+        onOpenChange={setConfirmDialog}
+        title={t('Confirm permanent inviter binding')}
+        desc={
+          <>
+            {t('Binding is permanent and cannot be changed or removed.')}
+            <p className='break-all'>{input}</p>
+          </>
+        }
+        confirmText={t('Bind permanently')}
+        isLoading={bind.isPending}
+        handleConfirm={() => {
+          if (fullAuth) {
+            bind.mutate({
+              invitation: input.trim(),
+              requestId: crypto.randomUUID(),
+              viewer: user?.id ?? 0,
+            })
+          }
+        }}
+      />
+      <Dialog
+        open={boundDialog}
+        onOpenChange={setBoundDialog}
+        title={t('Bound inviter')}
+      >
+        <p>{t('You have already bound an inviter')}</p>
+      </Dialog>
+      <ActivityDialog open={activitiesOpen} onOpenChange={setActivitiesOpen} />
+    </main>
   )
-}
-function formatTime(value: string | null) {
-  return value == null ? '—' : new Date(Number(value)).toLocaleString()
 }

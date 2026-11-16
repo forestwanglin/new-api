@@ -153,9 +153,13 @@ it('past-start draft displays its dates and explains why publication requires ed
   expect(screen.getByRole('button', { name: 'Edit' })).toBeEnabled()
 })
 it('anonymous confirm opens login and never binds on login failure or cancellation', async () => {
-  mount()
-  await userEvent.type(screen.getByRole('textbox'), 'forest')
-  await userEvent.click(screen.getByRole('button', { name: 'Confirm binding' }))
+  mount(<InvitationPage initialInvitation='forest' />)
+  expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+  await userEvent.click(
+    await screen.findByRole('button', {
+      name: 'Sign in to get your invitation link',
+    })
+  )
   expect(useLoginModalStore.getState().isOpen).toBe(true)
   expect(readBindingIntent()).toBe('forest')
   expect(api.post).not.toHaveBeenCalled()
@@ -164,9 +168,13 @@ it('anonymous confirm opens login and never binds on login failure or cancellati
   expect(api.post).not.toHaveBeenCalled()
 })
 it('requires explicit confirmation after complete authentication', async () => {
-  mount()
-  await userEvent.type(screen.getByRole('textbox'), 'forest')
-  await userEvent.click(screen.getByRole('button', { name: 'Confirm binding' }))
+  mount(<InvitationPage initialInvitation='forest' />)
+  expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+  await userEvent.click(
+    await screen.findByRole('button', {
+      name: 'Sign in to get your invitation link',
+    })
+  )
   act(() => login())
   await waitFor(() =>
     expect(
@@ -194,18 +202,19 @@ it('does not use a partial MFA identity to bind and shows existing binding dialo
       .getState()
       .auth.setUser({ id: 1, username: 'partial', role: 1 })
   )
-  mount()
-  await userEvent.type(screen.getByRole('textbox'), 'forest')
-  await userEvent.click(screen.getByRole('button', { name: 'Confirm binding' }))
+  mount(<InvitationPage initialInvitation='forest' />)
+  expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+  await userEvent.click(
+    await screen.findByRole('button', {
+      name: 'Sign in to get your invitation link',
+    })
+  )
   expect(api.post).not.toHaveBeenCalled()
   bound = true
   act(() => login())
-  await waitFor(() =>
-    expect(
-      screen.getByRole('button', { name: 'Confirm binding' })
-    ).toBeEnabled()
+  await userEvent.click(
+    await screen.findByRole('button', { name: 'View binding' })
   )
-  await userEvent.click(screen.getByRole('button', { name: 'Confirm binding' }))
   expect(await screen.findByRole('dialog')).toHaveTextContent(
     'You have already bound an inviter'
   )
@@ -252,13 +261,10 @@ it('already-bound account without a URL code can open its binding dialog', async
   bound = true
   login()
   mount()
-  await waitFor(() =>
-    expect(
-      screen.getByRole('button', { name: 'Confirm binding' })
-    ).toBeEnabled()
-  )
-  expect(screen.getByRole('textbox')).toHaveAttribute('readonly')
-  await userEvent.click(screen.getByRole('button', { name: 'Confirm binding' }))
+  const view = await screen.findByRole('button', { name: 'View binding' })
+  expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+  expect(screen.getAllByText('forest').length).toBeGreaterThan(0)
+  await userEvent.click(view)
   expect(await screen.findByRole('dialog')).toHaveTextContent(
     'You have already bound an inviter'
   )

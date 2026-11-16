@@ -243,3 +243,23 @@ it('never shows the system version control beside branding even for administrato
     screen.queryByRole('button', { name: /System updates, current version:/ })
   ).not.toBeInTheDocument()
 })
+
+it('renders the invitation gift and badge with selected and unselected navigation states', async () => {
+  const links = [
+    { title: 'Configuration tutorial', href: '/config-tutorial' },
+    { title: 'Invite friends', href: '/invite' },
+  ]
+  const first = await renderHeader({ navLinks: links }, {}, '/invite')
+  const invite = await screen.findByRole('link', { name: /Invite friends/ })
+  expect(invite).toHaveClass('invitation-nav-item')
+  expect(invite).toHaveAttribute('aria-current', 'page')
+  expect(invite.querySelector('.invitation-nav-gift')).not.toBeNull()
+  expect(within(invite).getByText('Earn points')).toHaveClass(
+    'invitation-nav-badge'
+  )
+  first.unmount()
+  await renderHeader({ navLinks: links }, {}, '/config-tutorial')
+  expect(
+    await screen.findByRole('link', { name: /Invite friends/ })
+  ).not.toHaveAttribute('aria-current')
+})
