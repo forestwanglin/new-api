@@ -67,16 +67,6 @@ function WalletStatistics(props: { wallet: PointWallet }) {
         : t('Not available yet'),
       description: t('Available for eligible GPT model calls'),
     },
-    {
-      title: t('GPT-specific points · Pending release'),
-      value:
-        props.wallet.pending_gpt_points === null
-          ? t('Not available yet')
-          : formatNumber(BigInt(props.wallet.pending_gpt_points), locale),
-      description: t(
-        'Pending referral rewards are not available yet and are excluded from the available total'
-      ),
-    },
   ]
   return (
     <section className='wallet-stats' aria-label={t('Wallet statistics')}>
@@ -90,6 +80,27 @@ function WalletStatistics(props: { wallet: PointWallet }) {
           <p>{card.description}</p>
         </div>
       ))}
+      <div className='account-card wallet-stat'>
+        <h2>{t('Invitation rewards pending release')}</h2>
+        {props.wallet.pending_invitation_rewards.map((reward) => (
+          <div key={reward.point_type_id}>
+            <span className='text-muted-foreground block text-xs break-words'>
+              {reward.name || reward.code || reward.point_type_id}
+            </span>
+            <div className='wallet-stat-number'>
+              {formatNumber(BigInt(reward.pending_points), locale)}
+            </div>
+          </div>
+        ))}
+        {props.wallet.pending_invitation_rewards.length === 0 && (
+          <div className='wallet-stat-number'>0</div>
+        )}
+        <p>
+          {t(
+            'Pending invitation rewards are excluded from available points until release.'
+          )}
+        </p>
+      </div>
     </section>
   )
 }
@@ -134,9 +145,11 @@ export function PointsWallet() {
                 </p>
               </div>
               <PointsWalletDetails wallet={query.data} />
+              <InvitationPendingRewards
+                rewards={query.data.pending_invitation_rewards}
+              />
             </>
           )}
-          <InvitationPendingRewards />
           <PointsWalletRules />
         </div>
       </SectionPageLayout.Content>

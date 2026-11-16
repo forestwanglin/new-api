@@ -40,7 +40,7 @@ func TestPointWalletAndOrdersDatabaseMatrix(t *testing.T) {
 			sqlDB, err := db.DB()
 			require.NoError(t, err)
 			t.Cleanup(func() { require.NoError(t, sqlDB.Close()) })
-			tables := []any{&PointLedger{}, &PointTransaction{}, &PointAccount{}, &PointType{}, &CustomSubscriptionOrder{}}
+			tables := []any{&PointLedger{}, &PointTransaction{}, &PointAccount{}, &PointType{}, &CustomSubscriptionOrder{}, &InvitationReward{}}
 			for _, table := range tables {
 				require.False(t, db.Migrator().HasTable(table), "requires an empty isolated database")
 			}
@@ -77,7 +77,9 @@ func TestPointWalletAndOrdersDatabaseMatrix(t *testing.T) {
 			assert.Equal(t, "GPT", wallet.Balances[1].Code)
 			assert.Equal(t, "9007199254740993", wallet.Balances[2].AvailablePoints)
 			assert.Equal(t, "12", wallet.Balances[2].FrozenPoints)
-			assert.Nil(t, wallet.PendingGPTPoints)
+			require.NotNil(t, wallet.PendingGPTPoints)
+			assert.Equal(t, "0", *wallet.PendingGPTPoints)
+			assert.Empty(t, wallet.PendingInvitationRewards)
 			require.Len(t, wallet.SourceSummaries, 3)
 			assert.Equal(t, PointWalletSourceSummary{PointTypeID: "1", PointTypeCode: PointTypeGeneral, PointTypeName: "General", BizType: "custom_subscription", IncreasedPoints: "18446744073709551614", DecreasedPoints: "9223372036854775808", NetPoints: "9223372036854775806"}, wallet.SourceSummaries[0])
 			assert.Equal(t, "0", wallet.SourceSummaries[1].NetPoints)
@@ -86,7 +88,7 @@ func TestPointWalletAndOrdersDatabaseMatrix(t *testing.T) {
 			encoded, err := common.Marshal(wallet)
 			require.NoError(t, err)
 			assert.Contains(t, string(encoded), `"available_points":"9007199254740993"`)
-			assert.Contains(t, string(encoded), `"pending_gpt_points":null`)
+			assert.Contains(t, string(encoded), `"pending_gpt_points":"0"`)
 			assert.NotContains(t, string(encoded), "event_key")
 			empty, err := GetPointWallet(3)
 			require.NoError(t, err)
@@ -108,6 +110,46 @@ func TestPointWalletAndOrdersDatabaseMatrix(t *testing.T) {
 			assert.Equal(t, accounts, storedAccounts, "wallet reads must preserve account balances")
 			assert.Equal(t, txns, storedTransactions, "wallet reads must preserve transaction metadata")
 			assert.Equal(t, ledger, storedLedger, "wallet reads must preserve ledger snapshots")
+
+			rewards := []InvitationReward{
+				{Id: 1, OrderId: 11, InviterId: 1, PointTypeId: 1, PointTypeCode: "GENERAL", PointTypeName: "Old general", ProcessingPoints: 9007199254740993, Status: InvitationRewardCaptured},
+				{Id: 2, OrderId: 12, InviterId: 1, PointTypeId: 1, PointTypeCode: "GENERAL", FrozenPoints: math.MaxInt64, Status: InvitationRewardFrozen},
+				{Id: 3, OrderId: 13, InviterId: 1, PointTypeId: 1, PointTypeCode: "GENERAL", FrozenPoints: math.MaxInt64, Status: InvitationRewardFrozen},
+				{Id: 4, OrderId: 14, InviterId: 1, PointTypeId: 2, PointTypeCode: "GPT", PointTypeName: "Old GPT", ProcessingPoints: 3, FrozenPoints: 7, CancelledPoints: 5, Status: InvitationRewardFrozen},
+				{Id: 5, OrderId: 15, InviterId: 1, PointTypeId: 99, PointTypeCode: "HISTORIC", PointTypeName: "Historical type", FrozenPoints: 8, Status: InvitationRewardFrozen},
+				{Id: 6, OrderId: 16, InviterId: 1, PointTypeId: 2, PointTypeCode: "GPT", ReleasedPoints: 500, ReversedPoints: 40, Status: InvitationRewardReleased},
+				{Id: 7, OrderId: 17, InviterId: 2, PointTypeId: 2, PointTypeCode: "GPT", ProcessingPoints: 999, Status: InvitationRewardCaptured},
+				{Id: 8, OrderId: 18, InviterId: 1, PointTypeId: 3, PointTypeCode: "FUTURE", CancelledPoints: 20, Status: InvitationRewardCancelled},
+			}
+			require.NoError(t, db.Create(&rewards).Error)
+			wallet, err = GetPointWallet(1)
+			require.NoError(t, err)
+			require.Len(t, wallet.PendingInvitationRewards, 3)
+			assert.Equal(t, PointWalletPendingReward{PointTypeID: "1", Code: "GENERAL", Name: "General", ProcessingPoints: "9007199254740993", FrozenPoints: "18446744073709551614", PendingPoints: "18455751272964292607"}, wallet.PendingInvitationRewards[0])
+			assert.Equal(t, PointWalletPendingReward{PointTypeID: "2", Code: "GPT", Name: "GPT", ProcessingPoints: "3", FrozenPoints: "7", PendingPoints: "10"}, wallet.PendingInvitationRewards[1])
+			assert.Equal(t, PointWalletPendingReward{PointTypeID: "99", Code: "HISTORIC", Name: "Historical type", ProcessingPoints: "0", FrozenPoints: "8", PendingPoints: "8"}, wallet.PendingInvitationRewards[2])
+			assert.Equal(t, "10", *wallet.PendingGPTPoints)
+			assert.Equal(t, "9007199254740993", wallet.Balances[2].AvailablePoints, "pending rewards must not change available accounts")
+			var afterRewards []InvitationReward
+			require.NoError(t, db.Order("id").Find(&afterRewards).Error)
+			assert.Equal(t, rewards, afterRewards, "wallet reads must not reconcile or mutate rewards")
+			// A refund reduces only the still-pending amount; a later release removes it.
+			require.NoError(t, db.Model(&InvitationReward{}).Where("id = ?", 4).Updates(map[string]any{"processing_points": 0, "frozen_points": 4, "cancelled_points": 11}).Error)
+			wallet, err = GetPointWallet(1)
+			require.NoError(t, err)
+			assert.Equal(t, "4", *wallet.PendingGPTPoints)
+			require.NoError(t, db.Model(&InvitationReward{}).Where("id = ?", 4).Updates(map[string]any{"frozen_points": 0, "released_points": 4, "status": InvitationRewardReleased}).Error)
+			wallet, err = GetPointWallet(1)
+			require.NoError(t, err)
+			assert.Equal(t, "0", *wallet.PendingGPTPoints)
+			require.Len(t, wallet.PendingInvitationRewards, 2)
+			empty, err = GetPointWallet(3)
+			require.NoError(t, err)
+			assert.Empty(t, empty.PendingInvitationRewards)
+			require.NoError(t, db.Model(&InvitationReward{}).Where("id = ?", 8).Update("processing_points", -1).Error)
+			_, err = GetPointWallet(1)
+			require.Error(t, err, "invalid reward amounts must not display a fabricated balance")
+			require.NoError(t, db.Model(&InvitationReward{}).Where("id = ?", 8).Update("processing_points", 0).Error)
 
 			paidAt := int64(9007199254740993)
 			orders := []CustomSubscriptionOrder{{Id: 1, UserId: 1, TradeNo: "older", PlanId: 4, PlanVersion: 1, PlanSnapshot: `{"Title":"Purchased title","provider_secret":"hidden"}`, BillingCycle: "month", AmountPaidMinor: 9007199254740993, PaidPoints: math.MaxInt64, Status: "success", CreatedAt: 1000, PaidAt: &paidAt, ProviderPayload: "secret-provider-payload"}, {Id: 2, UserId: 1, TradeNo: "same-time-first", PlanId: 5, PlanVersion: 2, PlanSnapshot: "bad-history", Status: "pending", CreatedAt: 2000}, {Id: 3, UserId: 1, TradeNo: "same-time-last", PlanId: 6, PlanVersion: 3, Status: "expired", CreatedAt: 2000}, {Id: 4, UserId: 2, TradeNo: "other-user", Status: "success", CreatedAt: 3000}}
@@ -140,6 +182,10 @@ func TestPointWalletAndOrdersDatabaseMatrix(t *testing.T) {
 			var after []CustomSubscriptionOrder
 			require.NoError(t, db.Order("id").Find(&after).Error)
 			assert.Equal(t, orders, after, "listing must not mutate orders")
+			require.NoError(t, db.Migrator().DropTable(&InvitationReward{}))
+			_, err = GetPointWallet(1)
+			require.Error(t, err, "reward query failure must not become successful zero")
+			require.NoError(t, db.AutoMigrate(&InvitationReward{}))
 			require.NoError(t, db.Migrator().DropTable(&PointLedger{}))
 			_, err = GetPointWallet(1)
 			require.Error(t, err, "query errors must not fabricate empty balances")

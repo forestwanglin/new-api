@@ -25,12 +25,43 @@ import {
 } from '@tanstack/react-router'
 import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import i18next from 'i18next'
 import { afterEach, expect, it, vi } from 'vitest'
 
+import en from '@/i18n/locales/en.json'
+import fr from '@/i18n/locales/fr.json'
+import ja from '@/i18n/locales/ja.json'
+import ru from '@/i18n/locales/ru.json'
+import viLocale from '@/i18n/locales/vi.json'
+import zhTW from '@/i18n/locales/zh-TW.json'
+import zh from '@/i18n/locales/zh.json'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 
 import { PointsWallet } from '..'
+
+it('resolves wallet translations through the real i18next resource namespace', async () => {
+  const i18n = i18next.createInstance()
+  const resources = { en, zh, 'zh-TW': zhTW, fr, ru, ja, vi: viLocale }
+  await i18n.init({ lng: 'zh', fallbackLng: false, resources })
+  const keys = [
+    'Invitation reward details',
+    'Administrator adjustment',
+    'Model calls',
+    'Current available and frozen balances come from your points accounts.',
+    'Pending invitation rewards are excluded from available points until release.',
+    'Processing and frozen invitation rewards become available only after release.',
+    'Invitation rewards',
+  ] as const
+  for (const [language, resource] of Object.entries(resources)) {
+    const t = i18n.getFixedT(language)
+    for (const key of keys) {
+      expect(i18n.exists(key, { lng: language })).toBe(true)
+      expect(t(key)).toBe(resource.translation[key])
+    }
+  }
+  expect(i18n.t('Invitation reward details')).toBe('邀请奖励明细')
+})
 
 vi.mock('@/components/layout', () => ({
   SectionPageLayout: Object.assign(
@@ -65,7 +96,7 @@ async function renderWallet() {
     </QueryClientProvider>
   )
 }
-it('shows exact available totals, separates frozen points and marks unsupported pending amounts unavailable', async () => {
+it('shows exact available totals, separates frozen points and shows actual zero pending rewards', async () => {
   vi.spyOn(api, 'get').mockImplementation(async (url) => ({
     data: {
       success: true,
@@ -88,7 +119,8 @@ it('shows exact available totals, separates frozen points and marks unsupported 
                   frozen_points: '0',
                 },
               ],
-              pending_gpt_points: null,
+              pending_gpt_points: '0',
+              pending_invitation_rewards: [],
               source_summaries: [],
             }
           : {
@@ -114,7 +146,17 @@ it('shows exact available totals, separates frozen points and marks unsupported 
   expect(await screen.findByText('9,007,199,254,741,003')).toBeVisible()
   const stats = screen.getByRole('region', { name: 'Wallet statistics' })
   expect(within(stats).getByText('9,007,199,254,740,993')).toBeVisible()
-  expect(within(stats).getByText('Not available yet')).toBeVisible()
+  expect(within(stats).queryByText('Not available yet')).not.toBeInTheDocument()
+  expect(within(stats).getByText('0')).toBeVisible()
+  expect(
+    screen.queryByRole('columnheader', { name: 'Remaining points by source' })
+  ).not.toBeInTheDocument()
+  expect(screen.getByText('No rewards yet')).toBeVisible()
+  expect(
+    vi
+      .mocked(api.get)
+      .mock.calls.some(([url]) => url === '/api/invitation/self/summary')
+  ).toBe(false)
   expect(screen.getByRole('link', { name: 'View more' })).toHaveAttribute(
     'href',
     '/point-ledger'
@@ -143,7 +185,8 @@ it('renders cumulative source movements above int64 without treating them as a r
         url === '/api/points/wallet/self'
           ? {
               balances: [],
-              pending_gpt_points: null,
+              pending_gpt_points: '0',
+              pending_invitation_rewards: [],
               source_summaries: [
                 {
                   point_type_id: '1',
@@ -173,7 +216,12 @@ it('opens database configured rule content from its accessible disclosure', asyn
       success: true,
       data:
         url === '/api/points/wallet/self'
-          ? { balances: [], pending_gpt_points: null, source_summaries: [] }
+          ? {
+              balances: [],
+              pending_gpt_points: '0',
+              pending_invitation_rewards: [],
+              source_summaries: [],
+            }
           : {
               items: [
                 {
@@ -216,7 +264,17 @@ it('removes the previous viewer balances while loading another viewer account', 
                   frozen_points: '0',
                 },
               ],
-              pending_gpt_points: null,
+              pending_gpt_points: '0',
+              pending_invitation_rewards: [
+                {
+                  point_type_id: '2',
+                  code: 'GPT',
+                  name: 'Private reward',
+                  processing_points: '67',
+                  frozen_points: '8',
+                  pending_points: '75',
+                },
+              ],
               source_summaries: [],
             }
           : { items: [] },
@@ -224,11 +282,13 @@ it('removes the previous viewer balances while loading another viewer account', 
   }))
   await renderWallet()
   expect((await screen.findAllByText('12,345')).length).toBeGreaterThan(0)
+  expect(screen.getAllByText('Private reward')).toHaveLength(2)
   vi.mocked(api.get).mockImplementation(() => new Promise(() => {}))
   await act(async () =>
     useAuthStore.getState().auth.setUser({ id: 2, username: 'other', role: 1 })
   )
   expect(screen.queryByText('12,345')).not.toBeInTheDocument()
+  expect(screen.queryByText('Private reward')).not.toBeInTheDocument()
 })
 
 it('marks missing point types and the combined total unavailable while preserving confirmed zero accounts', async () => {
@@ -247,7 +307,8 @@ it('marks missing point types and the combined total unavailable while preservin
                   frozen_points: '0',
                 },
               ],
-              pending_gpt_points: null,
+              pending_gpt_points: '0',
+              pending_invitation_rewards: [],
               source_summaries: [],
             }
           : { items: [] },
@@ -267,5 +328,95 @@ it('marks missing point types and the combined total unavailable while preservin
     if (!card) throw new Error(`${title} card is missing`)
     expect(within(card).getByText('Not available yet')).toBeVisible()
     expect(within(card).queryByText('0')).not.toBeInTheDocument()
+  }
+})
+
+it('shows typed pending rewards without adding them to available totals and labels known sources', async () => {
+  vi.spyOn(api, 'get').mockImplementation(async (url) => ({
+    data: {
+      success: true,
+      data:
+        url === '/api/points/wallet/self'
+          ? {
+              balances: [
+                {
+                  point_type_id: '1',
+                  code: 'GENERAL',
+                  name: 'General',
+                  available_points: '50',
+                  frozen_points: '12',
+                },
+                {
+                  point_type_id: '2',
+                  code: 'GPT',
+                  name: 'GPT',
+                  available_points: '10',
+                  frozen_points: '0',
+                },
+              ],
+              pending_gpt_points: '7',
+              pending_invitation_rewards: [
+                {
+                  point_type_id: '1',
+                  code: 'GENERAL',
+                  name: 'General',
+                  processing_points: '9007199254740993',
+                  frozen_points: '2',
+                  pending_points: '9007199254740995',
+                },
+                {
+                  point_type_id: '2',
+                  code: 'GPT',
+                  name: 'GPT',
+                  processing_points: '3',
+                  frozen_points: '4',
+                  pending_points: '7',
+                },
+                {
+                  point_type_id: '9',
+                  code: 'CUSTOM',
+                  name: 'Custom reward',
+                  processing_points: '0',
+                  frozen_points: '8',
+                  pending_points: '8',
+                },
+              ],
+              source_summaries: [
+                'CUSTOM_SUBSCRIPTION',
+                'INVITATION_REWARD',
+                'ADMIN_ADJUST',
+                'MODEL_CALL',
+              ].map((biz_type, i) => ({
+                point_type_id: String(i + 1),
+                point_type_code: 'GENERAL',
+                point_type_name: 'General',
+                biz_type,
+                increased_points: '10',
+                decreased_points: '1',
+                net_points: '9',
+              })),
+            }
+          : { items: [] },
+    },
+  }))
+  await renderWallet()
+  const stats = await screen.findByRole('region', { name: 'Wallet statistics' })
+  expect(within(stats).getByText('60')).toBeVisible()
+  expect(within(stats).getByText('9,007,199,254,740,995')).toBeVisible()
+  const rewards = screen.getByRole('region', {
+    name: 'Invitation reward details',
+  })
+  expect(within(rewards).getByText('Custom reward')).toBeVisible()
+  expect(
+    within(rewards).getByText('Processing: 9,007,199,254,740,993')
+  ).toBeVisible()
+  expect(within(rewards).getByText('Frozen: 4')).toBeVisible()
+  for (const source of [
+    'Subscription',
+    'Invitation rewards',
+    'Administrator adjustment',
+    'Model calls',
+  ]) {
+    expect(screen.getByText(source)).toBeVisible()
   }
 })

@@ -33,6 +33,13 @@ import type { PointWallet } from './api'
 export function PointsWalletDetails(props: { wallet: PointWallet }) {
   const { t, i18n } = useTranslation()
   const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
+  const sourceLabels = new Map([
+    ['custom_subscription', t('Subscription')],
+    ['CUSTOM_SUBSCRIPTION', t('Subscription')],
+    ['INVITATION_REWARD', t('Invitation rewards')],
+    ['ADMIN_ADJUST', t('Administrator adjustment')],
+    ['MODEL_CALL', t('Model calls')],
+  ])
   const balanceColumns: StaticDataTableColumn<
     PointWallet['balances'][number]
   >[] = [
@@ -51,11 +58,6 @@ export function PointsWalletDetails(props: { wallet: PointWallet }) {
       header: t('Frozen points'),
       cell: (row) => formatNumber(BigInt(row.frozen_points), locale),
     },
-    {
-      id: 'source',
-      header: t('Remaining points by source'),
-      cell: () => t('Not available yet'),
-    },
   ]
   const sourceColumns: StaticDataTableColumn<
     PointWallet['source_summaries'][number]
@@ -69,10 +71,7 @@ export function PointsWalletDetails(props: { wallet: PointWallet }) {
     {
       id: 'source',
       header: t('Source'),
-      cell: (row) =>
-        row.biz_type === 'custom_subscription'
-          ? t('Subscription')
-          : row.biz_type,
+      cell: (row) => sourceLabels.get(row.biz_type) || row.biz_type,
     },
     {
       id: 'increased',
@@ -104,7 +103,7 @@ export function PointsWalletDetails(props: { wallet: PointWallet }) {
       </div>
       <p>
         {t(
-          'Current available and frozen balances come from your points accounts. Source-specific remaining balances are not available yet.'
+          'Current available and frozen balances come from your points accounts.'
         )}
       </p>
       <StaticDataTable

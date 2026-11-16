@@ -8016,6 +8016,13 @@
     "Unable to load invitation summary": "Impossible de charger les statistiques d'invitation",
     "Scan the QR code to follow the official account and reply with “<keyword>验证码</keyword>” to receive your verification code.": "Scannez le code QR pour suivre le compte officiel et répondez par « <keyword>验证码</keyword> » pour recevoir votre code de vérification.",
     "Verify your phone {{phone}} before binding WeChat.": "Vérifiez votre téléphone {{phone}} avant de lier WeChat.",
-    "Unable to load verification methods. Close this dialog and try again.": "Impossible de charger les méthodes de vérification. Fermez cette fenêtre et réessayez."
+    "Unable to load verification methods. Close this dialog and try again.": "Impossible de charger les méthodes de vérification. Fermez cette fenêtre et réessayez.",
+    "Invitation reward details": "Détails des récompenses de parrainage",
+    "Administrator adjustment": "Ajustement administrateur",
+    "Model calls": "Appels de modèles",
+    "Current available and frozen balances come from your points accounts.": "Les soldes disponibles et gelés proviennent de vos comptes de points.",
+    "Pending invitation rewards are excluded from available points until release.": "Les récompenses de parrainage en attente sont exclues des points disponibles avant leur libération.",
+    "Processing and frozen invitation rewards become available only after release.": "Les récompenses en traitement et gelées ne sont disponibles qu’après leur libération.",
+    "Invitation rewards": "Récompenses de parrainage"
   }
 }

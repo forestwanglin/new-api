@@ -1031,6 +1031,14 @@
 - 验证：新增桌面/移动普通用户、管理员隐藏费用及超级管理员全部/本人范围可见回归，先红后绿；`bun run test src/features/usage-logs` 最近一次 27 文件/473 用例全部通过；`bun run typecheck`（1618 文件/2 项目）、三个改动 TSX 文件的定向 oxlint/oxfmt、`git diff --check` 通过。
 - 风险与未覆盖：本次是列表展示控制，API 原始费用字段、详情弹窗、统计和导出契约不变；未做浏览器人工验证及生产发布。既有 detail-preview 本地化价格用例曾超时，独立未修改 HEAD 的完整测试文件亦复现，最近模块全量通过；全库 lint 仍有无关既有错误，改动文件定向检查通过。
 
+### Z065 积分钱包接入真实邀请待发奖励
+
+- 需求与行为：钱包取消 GPT 待发固定 null 展示，按实际通用/GPT/其他积分类型显示待发邀请奖励及处理中、冻结中细分；待发不计入可用总额。删除无法准确还原的“按来源剩余积分”占位列，保留真实来源累计增减和净变动，翻译已知业务来源。
+- 实现：扩展 `model/point_wallet_query.go` 的既有 session-only 钱包响应，新增 `pending_invitation_rewards`，兼容 `pending_gpt_points` 返回真实字符串（无奖励为 0）。直接按当前 inviter 查询 reward，math/big 精确汇总 processing/frozen，保留缺失目录的历史类型快照；不调用会修正资格的邀请 summary，不用账户冻结替代邀请待发，查询失败不伪造零。前端钱包 API/统计/明细与 `invitation/pending.tsx` 共用同一响应，避免独立重复读取。无 schema、依赖、配置、积分扣减或返奖规则变更。
+- 验证：隔离 SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 16.16 的 `TestPointWalletAndOrdersDatabaseMatrix` 通过，覆盖多类型、用户隔离、>2^53 和 >int64 聚合、退款/取消/释放、历史类型、读无写入、坏数据及失败拒绝；相关 model/controller、router 定向测试、Go build 通过。前端钱包/邀请 5 文件32用例、typecheck（1618文件/2项目）、改动范围 lint/format、生产 build 通过；新增真实七语言 i18next 资源测试。
+- 风险与未覆盖：浏览器未登录，仅验证受保护钱包触发登录拦截，未完成登录后桌面/移动端及明暗视觉验收；没有写入真实测试资产或进行真实支付。本机 Docker 后端已重建，健康检查正常、匿名钱包401。回滚前后端代码即可，无数据迁移。来源累计变动仍不能代表某一来源剩余余额。
+- 上游升级关注：`model/point_wallet_query{,_test}.go`、`router/point_ledger_test.go`、前端 points-wallet、invitation/pending 与七 locale 的 DTO/展示契约；规范同步至 `.trellis/spec/new-api/backend/points-wallet.md`。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，

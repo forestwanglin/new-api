@@ -34,6 +34,16 @@ const walletSchema = z.object({
     })
   ),
   pending_gpt_points: integer.nullable(),
+  pending_invitation_rewards: z.array(
+    z.object({
+      point_type_id: integer,
+      code: z.string(),
+      name: z.string(),
+      processing_points: integer,
+      frozen_points: integer,
+      pending_points: integer,
+    })
+  ),
   source_summaries: z.array(
     z.object({
       point_type_id: integer,

@@ -8017,6 +8017,13 @@
     "Unable to load invitation summary": "加载邀请统计失败",
     "Scan the QR code to follow the official account and reply with “<keyword>验证码</keyword>” to receive your verification code.": "扫描二维码关注官方账号，回复“<keyword>验证码</keyword>”以接收您的验证码。",
     "Verify your phone {{phone}} before binding WeChat.": "绑定微信前，请验证手机号 {{phone}}。",
-    "Unable to load verification methods. Close this dialog and try again.": "无法加载验证方式，请关闭弹窗后重试。"
+    "Unable to load verification methods. Close this dialog and try again.": "无法加载验证方式，请关闭弹窗后重试。",
+    "Invitation reward details": "邀请奖励明细",
+    "Administrator adjustment": "管理员调账",
+    "Model calls": "模型调用",
+    "Current available and frozen balances come from your points accounts.": "可用及冻结余额来自您的积分账户。",
+    "Pending invitation rewards are excluded from available points until release.": "待发放邀请奖励在释放前不计入可用积分。",
+    "Processing and frozen invitation rewards become available only after release.": "处理中的邀请奖励及冻结奖励，只有释放后才可使用。",
+    "Invitation rewards": "邀请奖励"
   }
 }

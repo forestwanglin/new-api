@@ -26,20 +26,31 @@ type PointWalletSourceSummary struct {
 	NetPoints       string `json:"net_points"`
 }
 
+type PointWalletPendingReward struct {
+	PointTypeID      string `json:"point_type_id"`
+	Code             string `json:"code"`
+	Name             string `json:"name"`
+	ProcessingPoints string `json:"processing_points"`
+	FrozenPoints     string `json:"frozen_points"`
+	PendingPoints    string `json:"pending_points"`
+}
+
 type PointWallet struct {
-	Balances         []PointWalletBalance       `json:"balances"`
-	PendingGPTPoints *string                    `json:"pending_gpt_points"`
-	SourceSummaries  []PointWalletSourceSummary `json:"source_summaries"`
+	PendingInvitationRewards []PointWalletPendingReward `json:"pending_invitation_rewards"`
+	Balances                 []PointWalletBalance       `json:"balances"`
+	PendingGPTPoints         *string                    `json:"pending_gpt_points"`
+	SourceSummaries          []PointWalletSourceSummary `json:"source_summaries"`
 }
 
 // GetPointWallet reads current accounts and cumulative ledger movements. Source
-// movements cannot identify which source's points remain unspent. Referral
-// pending rewards have no authoritative read model yet and remain unavailable.
+// movements cannot identify which source's points remain unspent. Invitation
+// pending amounts come only from current reward processing and frozen amounts.
 func GetPointWallet(userID int64) (*PointWallet, error) {
 	if userID <= 0 {
 		return nil, errors.New("invalid point wallet owner")
 	}
-	wallet := &PointWallet{Balances: []PointWalletBalance{}, SourceSummaries: []PointWalletSourceSummary{}}
+	pendingGPT := "0"
+	wallet := &PointWallet{Balances: []PointWalletBalance{}, SourceSummaries: []PointWalletSourceSummary{}, PendingInvitationRewards: []PointWalletPendingReward{}, PendingGPTPoints: &pendingGPT}
 	var balances []struct {
 		ID              int64
 		Code            string
@@ -59,6 +70,56 @@ func GetPointWallet(userID int64) (*PointWallet, error) {
 			AvailablePoints: strconv.FormatInt(balance.AvailablePoints, 10), FrozenPoints: strconv.FormatInt(balance.FrozenPoints, 10),
 		})
 	}
+	// This read intentionally avoids GetInvitationSummary: qualification
+	// reconciliation belongs to the invitation flow, not the wallet projection.
+	var rewards []struct {
+		PointTypeId      int64
+		Code             string
+		Name             string
+		ProcessingPoints int64
+		FrozenPoints     int64
+	}
+	if err := DB.Table("invitation_rewards AS reward").
+		Select("reward.point_type_id, COALESCE(pt.code, reward.point_type_code) AS code, COALESCE(pt.name, reward.point_type_name) AS name, reward.processing_points, reward.frozen_points").
+		Joins("LEFT JOIN point_types AS pt ON pt.id = reward.point_type_id").
+		Where("reward.inviter_id = ? AND (reward.processing_points <> 0 OR reward.frozen_points <> 0)", userID).
+		Order("reward.point_type_id ASC, reward.id ASC").Scan(&rewards).Error; err != nil {
+		return nil, err
+	}
+	type pendingTotal struct {
+		item       PointWalletPendingReward
+		processing big.Int
+		frozen     big.Int
+	}
+	pendingTotals := map[int64]*pendingTotal{}
+	pendingIDs := []int64{}
+	for _, reward := range rewards {
+		if reward.ProcessingPoints < 0 || reward.FrozenPoints < 0 {
+			return nil, errors.New("invalid pending invitation points")
+		}
+		total := pendingTotals[reward.PointTypeId]
+		if total == nil {
+			total = &pendingTotal{item: PointWalletPendingReward{PointTypeID: strconv.FormatInt(reward.PointTypeId, 10), Code: reward.Code, Name: reward.Name}}
+			pendingTotals[reward.PointTypeId] = total
+			pendingIDs = append(pendingIDs, reward.PointTypeId)
+		}
+		total.processing.Add(&total.processing, big.NewInt(reward.ProcessingPoints))
+		total.frozen.Add(&total.frozen, big.NewInt(reward.FrozenPoints))
+	}
+	var gptTotal big.Int
+	for _, id := range pendingIDs {
+		total := pendingTotals[id]
+		var pending big.Int
+		pending.Add(&total.processing, &total.frozen)
+		total.item.ProcessingPoints = total.processing.String()
+		total.item.FrozenPoints = total.frozen.String()
+		total.item.PendingPoints = pending.String()
+		wallet.PendingInvitationRewards = append(wallet.PendingInvitationRewards, total.item)
+		if total.item.Code == PointTypeGPT {
+			gptTotal.Add(&gptTotal, &pending)
+		}
+	}
+	pendingGPT = gptTotal.String()
 	rows, err := DB.Table("point_ledger AS ledger").
 		Select("account.point_type_id, COALESCE(pt.code, ''), COALESCE(pt.name, ''), txn.biz_type, ledger.available_delta, ledger.frozen_delta").
 		Joins("JOIN point_accounts AS account ON account.id = ledger.account_id").

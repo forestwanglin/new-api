@@ -8018,6 +8018,13 @@
     "Unable to load invitation summary": "Не удалось загрузить статистику приглашений",
     "Scan the QR code to follow the official account and reply with “<keyword>验证码</keyword>” to receive your verification code.": "Отсканируйте QR-код, откройте официальный аккаунт и ответьте «<keyword>验证码</keyword>», чтобы получить код подтверждения.",
     "Verify your phone {{phone}} before binding WeChat.": "Подтвердите телефон {{phone}} перед привязкой WeChat.",
-    "Unable to load verification methods. Close this dialog and try again.": "Не удалось загрузить способы проверки. Закройте окно и повторите попытку."
+    "Unable to load verification methods. Close this dialog and try again.": "Не удалось загрузить способы проверки. Закройте окно и повторите попытку.",
+    "Invitation reward details": "Сведения о наградах за приглашения",
+    "Administrator adjustment": "Корректировка администратора",
+    "Model calls": "Вызовы моделей",
+    "Current available and frozen balances come from your points accounts.": "Доступные и замороженные остатки взяты с ваших счетов баллов.",
+    "Pending invitation rewards are excluded from available points until release.": "Ожидающие награды за приглашения не входят в доступные баллы до разблокировки.",
+    "Processing and frozen invitation rewards become available only after release.": "Обрабатываемые и замороженные награды становятся доступны только после разблокировки.",
+    "Invitation rewards": "Награды за приглашения"
   }
 }

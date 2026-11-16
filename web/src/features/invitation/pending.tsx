@@ -1,42 +1,41 @@
-import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 
-import { ErrorState } from '@/components/error-state'
-import { LoadingState } from '@/components/loading-state'
-import { useAuthStore } from '@/stores/auth-store'
+import type { PointWallet } from '@/features/points-wallet/api'
+import { toIntlLocale } from '@/i18n/languages'
+import { formatNumber } from '@/lib/format'
 
-import { getSummary, formatPoints } from './api'
-
-export function InvitationPendingRewards() {
-  const { t } = useTranslation()
-  const userId = useAuthStore((s) => s.auth.user?.id)
-  const q = useQuery({
-    queryKey: ['invitation', 'summary', userId],
-    queryFn: getSummary,
-    enabled: !!userId,
-  })
+export function InvitationPendingRewards(props: {
+  rewards: PointWallet['pending_invitation_rewards']
+}) {
+  const { t, i18n } = useTranslation()
+  const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
   return (
-    <section className='account-card p-5'>
+    <section
+      className='account-card p-5'
+      aria-label={t('Invitation reward details')}
+    >
       <h2>{t('Invitation rewards pending release')}</h2>
-      {q.isPending && <LoadingState />}
-      {q.isError && <ErrorState onRetry={() => void q.refetch()} />}
       <div className='flex flex-wrap gap-4'>
-        {q.data?.balances.map((b) => (
-          <div key={b.point_type_id}>
-            <strong>{b.name}</strong>
+        {props.rewards.map((reward) => (
+          <div key={reward.point_type_id} className='min-w-0 break-words'>
+            <strong>
+              {reward.name || reward.code || reward.point_type_id}
+            </strong>
             <p>
-              {t('Processing')}: {formatPoints(b.processing_points)}
+              {t('Processing')}:{' '}
+              {formatNumber(BigInt(reward.processing_points), locale)}
             </p>
             <p>
-              {t('Frozen')}: {formatPoints(b.frozen_points)}
+              {t('Frozen')}:{' '}
+              {formatNumber(BigInt(reward.frozen_points), locale)}
             </p>
           </div>
         ))}
       </div>
-      {q.data?.balances.length === 0 && <p>{t('No rewards yet')}</p>}
+      {props.rewards.length === 0 && <p>{t('No rewards yet')}</p>}
       <p>
         {t(
-          'Only invitation rewards are frozen; purchased subscription points are available immediately.'
+          'Processing and frozen invitation rewards become available only after release.'
         )}
       </p>
     </section>

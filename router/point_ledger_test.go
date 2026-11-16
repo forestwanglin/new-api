@@ -28,7 +28,7 @@ func TestPointLedgerAPI(t *testing.T) {
 	sqlDB, err := db.DB()
 	require.NoError(t, err)
 	sqlDB.SetMaxOpenConns(1)
-	require.NoError(t, db.AutoMigrate(&model.PointType{}, &model.PointAccount{}, &model.PointTransaction{}, &model.PointLedger{}, &model.User{}, &model.UserSession{}, &model.UserAccessToken{}, &model.AuditLog{}, &model.Option{}))
+	require.NoError(t, db.AutoMigrate(&model.PointType{}, &model.PointAccount{}, &model.PointTransaction{}, &model.PointLedger{}, &model.InvitationReward{}, &model.User{}, &model.UserSession{}, &model.UserAccessToken{}, &model.AuditLog{}, &model.Option{}))
 	oldDB, oldLogDB, oldType, oldRedis, oldSecret := model.DB, model.LOG_DB, common.MainDatabaseType(), common.RedisEnabled, common.SessionSecret
 	model.DB, model.LOG_DB = db, db
 	common.SetMainDatabaseType(common.DatabaseTypeSQLite)
@@ -99,7 +99,8 @@ func TestPointLedgerAPI(t *testing.T) {
 		if tc.success {
 			assert.Contains(t, string(response.Data), `"balances":[]`)
 			assert.Contains(t, string(response.Data), `"source_summaries":[]`)
-			assert.Contains(t, string(response.Data), `"pending_gpt_points":null`)
+			assert.Contains(t, string(response.Data), `"pending_gpt_points":"0"`)
+			assert.Contains(t, string(response.Data), `"pending_invitation_rewards":[]`)
 			assert.Contains(t, w.Header().Get("Cache-Control"), "no-store")
 		}
 	}
