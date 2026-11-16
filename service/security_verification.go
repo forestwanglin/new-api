@@ -21,6 +21,7 @@ const (
 	VerificationMethodPassword           = "password"
 	VerificationMethodOAuth              = "oauth"
 	VerificationMethodSession            = "session"
+	VerificationMethodSMS                = "sms"
 	VerificationScopeChannelKeyRead      = "channel.key.read"
 	VerificationScopePasskeyRegister     = "passkey.register"
 	VerificationScopePasskeyDelete       = "passkey.delete"
@@ -516,13 +517,35 @@ func ConsumeOperationProof(raw string, identity AuthIdentity, operation Verifica
 	if err := ValidateStepUpIdentity(identity); err != nil {
 		return nil, err
 	}
-	if _, err := RequireVerificationMethod(identity, binding.Scope, claims.Method); err != nil {
+	if claims.Method == VerificationMethodSMS {
+		if _, err := requireWeChatBindingSMS(identity, operation); err != nil {
+			return nil, err
+		}
+	} else if _, err := RequireVerificationMethod(identity, binding.Scope, claims.Method); err != nil {
 		return nil, err
+	} else if isWeChatBindingOperation(operation) {
+		status, err := GetWeChatBindingVerification(identity)
+		if err != nil {
+			return nil, err
+		}
+		if status.SMSRequired {
+			return nil, ErrProofMethod
+		}
 	}
 	flow, err := model.ConsumeAuthFlowWithAction(claims.ID, model.AuthFlowMatch{
 		Purpose: model.AuthFlowPurposeSecurityProof, UserId: identity.UserID, SessionId: identity.SessionID,
-	}, func(tx *gorm.DB, _ *model.AuthFlow) error {
-		return model.ValidateAuthSessionWithTx(tx, identity)
+	}, func(tx *gorm.DB, flow *model.AuthFlow) error {
+		if err := model.ValidateAuthSessionWithTx(tx, identity); err != nil {
+			return err
+		}
+		if claims.Method == VerificationMethodSMS {
+			var payload weChatBindingSMSPayload
+			if common.UnmarshalJsonStr(flow.Payload, &payload) != nil {
+				return ErrProofMethod
+			}
+			return validateBindingPhoneWithTx(tx, identity, payload.Phone)
+		}
+		return nil
 	})
 	switch {
 	case errors.Is(err, model.ErrAuthFlowConsumed):

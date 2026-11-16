@@ -8013,6 +8013,9 @@
     "{{start}}—{{end}} friends": "{{start}}—{{end}} bạn",
     "Current activity rewards up to {{rate}}:": "Thưởng tối đa của chương trình này: {{rate}}:",
     "When friend {{threshold}} is first paid, {{previous}} effective friends earn {{before}}. After qualification, subsequent payments earn {{after}}.": "Khi người bạn thứ {{threshold}} thanh toán lần đầu, có {{previous}} bạn hợp lệ nên nhận tỷ lệ {{before}}. Sau khi xác nhận đủ điều kiện, các thanh toán tiếp theo nhận {{after}}.",
-    "Unable to load invitation summary": "Không thể tải thống kê lời mời"
+    "Unable to load invitation summary": "Không thể tải thống kê lời mời",
+    "Scan the QR code to follow the official account and reply with “<keyword>验证码</keyword>” to receive your verification code.": "Quét mã QR để theo dõi tài khoản chính thức, trả lời « <keyword>验证码</keyword> » để nhận mã xác minh.",
+    "Verify your phone {{phone}} before binding WeChat.": "Xác minh số điện thoại {{phone}} trước khi liên kết WeChat.",
+    "Unable to load verification methods. Close this dialog and try again.": "Không thể tải phương thức xác minh. Đóng hộp thoại và thử lại."
   }
 }

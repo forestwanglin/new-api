@@ -44,6 +44,7 @@ import {
 } from '../secure-verification'
 import { LegalConsent } from './legal-consent'
 import { PhoneAuthForm } from './phone-auth-form'
+import { WeChatVerificationHint } from './wechat-verification-hint'
 
 import '@/styles/login-modal.css'
 
@@ -240,9 +241,7 @@ function LoginModalContent() {
                   </p>
                 )}
                 <p className='auth-qr-status'>
-                  {t(
-                    'Scan with WeChat and enter the official account verification code'
-                  )}
+                  <WeChatVerificationHint />
                 </p>
                 <Label htmlFor='modal-wechat-code'>
                   {t('WeChat verification code')}

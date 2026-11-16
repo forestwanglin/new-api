@@ -378,11 +378,55 @@ func createMiddlewareScopedToken(t *testing.T, userID int, expiresAt int64, scop
 }
 
 func middlewareBearerRequest(router *gin.Engine, path, token string) *httptest.ResponseRecorder {
-	request := httptest.NewRequest(http.MethodGet, path, nil)
+	return middlewareBearerMethodRequest(router, http.MethodGet, path, token)
+}
+
+func middlewareBearerMethodRequest(router *gin.Engine, method, path, token string) *httptest.ResponseRecorder {
+	request := httptest.NewRequest(method, path, nil)
 	request.Header.Set("Authorization", "Bearer "+token)
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)
 	return response
+}
+
+func TestUserAuthWeChatBindingSMSRoutesRequireSession(t *testing.T) {
+	setupDashboardAuthMiddlewareTest(t)
+	user := createMiddlewarePATUser(t, "wechat-sms-route-user", "wechat-sms-route-legacy")
+	bundle, err := service.CreateLoginSession(user.Id, "password", "127.0.0.1", "wechat-sms-route-test")
+	require.NoError(t, err)
+	pat, _ := createMiddlewareScopedToken(t, user.Id, 0, "account_security:write")
+
+	router := gin.New()
+	handler := func(c *gin.Context) { c.Status(http.StatusNoContent) }
+	router.GET("/api/oauth/wechat/bind/verification", UserAuth(), handler)
+	router.POST("/api/oauth/wechat/bind/sms/send", UserAuth(), handler)
+	router.POST("/api/oauth/wechat/bind/sms/verify", UserAuth(), handler)
+
+	for _, route := range []struct {
+		method string
+		path   string
+	}{
+		{http.MethodGet, "/api/oauth/wechat/bind/verification"},
+		{http.MethodPost, "/api/oauth/wechat/bind/sms/send"},
+		{http.MethodPost, "/api/oauth/wechat/bind/sms/verify"},
+	} {
+		t.Run(route.method+" "+route.path, func(t *testing.T) {
+			for _, credential := range []struct {
+				name  string
+				token string
+				code  int
+			}{
+				{"scoped PAT", pat, http.StatusForbidden},
+				{"legacy PAT", "wechat-sms-route-legacy", http.StatusForbidden},
+				{"login session", bundle.AccessToken, http.StatusNoContent},
+			} {
+				t.Run(credential.name, func(t *testing.T) {
+					response := middlewareBearerMethodRequest(router, route.method, route.path, credential.token)
+					assert.Equal(t, credential.code, response.Code, response.Body.String())
+				})
+			}
+		})
+	}
 }
 
 func TestUserAuthAppliesAccessTokenRouteRules(t *testing.T) {

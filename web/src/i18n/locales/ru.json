@@ -8015,6 +8015,9 @@
     "{{start}}—{{end}} friends": "{{start}}—{{end}} друзей",
     "Current activity rewards up to {{rate}}:": "Максимальная награда текущей акции: {{rate}}:",
     "When friend {{threshold}} is first paid, {{previous}} effective friends earn {{before}}. After qualification, subsequent payments earn {{after}}.": "При первой оплате друга № {{threshold}} учитывается {{previous}} подтверждённых друзей, ставка — {{before}}. После подтверждения последующие оплаты дают {{after}}.",
-    "Unable to load invitation summary": "Не удалось загрузить статистику приглашений"
+    "Unable to load invitation summary": "Не удалось загрузить статистику приглашений",
+    "Scan the QR code to follow the official account and reply with “<keyword>验证码</keyword>” to receive your verification code.": "Отсканируйте QR-код, откройте официальный аккаунт и ответьте «<keyword>验证码</keyword>», чтобы получить код подтверждения.",
+    "Verify your phone {{phone}} before binding WeChat.": "Подтвердите телефон {{phone}} перед привязкой WeChat.",
+    "Unable to load verification methods. Close this dialog and try again.": "Не удалось загрузить способы проверки. Закройте окно и повторите попытку."
   }
 }

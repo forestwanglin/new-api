@@ -39,6 +39,11 @@ func writeSecurityOperationError(c *gin.Context, err error) {
 	var code, message string
 	var protocolError *protocol.Error
 	switch {
+	case errors.Is(err, service.ErrPhoneRateLimit):
+		status = http.StatusTooManyRequests
+		code, message = "PHONE_SMS_RATE_LIMITED", service.ErrPhoneRateLimit.Error()
+	case errors.Is(err, service.ErrBindingSMSDelivery):
+		code, message = "PHONE_SMS_DELIVERY_FAILED", service.ErrBindingSMSDelivery.Error()
 	case errors.Is(err, passkeysvc.ErrRPIDUnavailable):
 		code, message = "PASSKEY_RP_ID_UNAVAILABLE", "This Passkey domain is not available on this website. Use its original website or another verification method."
 	case errors.Is(err, system_setting.ErrPasskeyRPIDInvalid):

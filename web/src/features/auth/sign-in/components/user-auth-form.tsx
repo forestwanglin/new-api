@@ -42,6 +42,7 @@ import { Label } from '@/components/ui/label'
 import { login, wechatLoginByCode } from '@/features/auth/api'
 import { LegalConsent } from '@/features/auth/components/legal-consent'
 import { OAuthProviders } from '@/features/auth/components/oauth-providers'
+import { WeChatVerificationHint } from '@/features/auth/components/wechat-verification-hint'
 import { loginFormSchema } from '@/features/auth/constants'
 import { useAuthRedirect } from '@/features/auth/hooks/use-auth-redirect'
 import { useTurnstile } from '@/features/auth/hooks/use-turnstile'
@@ -434,9 +435,7 @@ export function UserAuthForm({
           open={isWeChatDialogOpen}
           onOpenChange={handleWeChatDialogChange}
           title={t('WeChat sign in')}
-          description={t(
-            'Scan the QR code to follow the official account and reply with “验证码” to receive your verification code.'
-          )}
+          description={<WeChatVerificationHint />}
           contentClassName='max-w-sm'
           headerClassName='text-left'
           contentHeight='auto'

@@ -8014,6 +8014,9 @@
     "{{start}}—{{end}} friends": "{{start}}—{{end}}人",
     "Current activity rewards up to {{rate}}:": "本期最高奖励 {{rate}}：",
     "When friend {{threshold}} is first paid, {{previous}} effective friends earn {{before}}. After qualification, subsequent payments earn {{after}}.": "第 {{threshold}} 位好友首次付款时，已有 {{previous}} 位有效好友，按 {{before}} 奖励；资格确认后，后续付款按 {{after}} 奖励。",
-    "Unable to load invitation summary": "加载邀请统计失败"
+    "Unable to load invitation summary": "加载邀请统计失败",
+    "Scan the QR code to follow the official account and reply with “<keyword>验证码</keyword>” to receive your verification code.": "扫描二维码关注官方账号，回复“<keyword>验证码</keyword>”以接收您的验证码。",
+    "Verify your phone {{phone}} before binding WeChat.": "绑定微信前，请验证手机号 {{phone}}。",
+    "Unable to load verification methods. Close this dialog and try again.": "无法加载验证方式，请关闭弹窗后重试。"
   }
 }

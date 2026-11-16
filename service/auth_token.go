@@ -124,6 +124,10 @@ func ParseDashboardAccessToken(raw string) (identity AuthIdentity, internal bool
 }
 
 func IssueSecurityProof(identity AuthIdentity, method string, binding VerificationBinding) (string, int64, error) {
+	return issueSecurityProof(identity, method, binding, "")
+}
+
+func issueSecurityProof(identity AuthIdentity, method string, binding VerificationBinding, payload string) (string, int64, error) {
 	method = strings.TrimSpace(method)
 	if identity.UserID <= 0 || identity.SessionID == "" || identity.UserAuthVersion <= 0 || identity.SessionVersion <= 0 || method == "" || binding.Scope == "" || binding.ContextHash == "" {
 		return "", 0, ErrAuthTokenInvalid
@@ -132,7 +136,7 @@ func IssueSecurityProof(identity AuthIdentity, method string, binding Verificati
 	expiresAt := now.Add(SecurityProofTTL).Truncate(time.Second)
 	proofID, _, err := model.CreateAuthFlow(model.AuthFlowCreate{
 		Purpose: model.AuthFlowPurposeSecurityProof, UserId: identity.UserID,
-		SessionId: identity.SessionID, ExpiresAt: expiresAt,
+		SessionId: identity.SessionID, ExpiresAt: expiresAt, Payload: payload,
 	})
 	if err != nil {
 		return "", 0, err

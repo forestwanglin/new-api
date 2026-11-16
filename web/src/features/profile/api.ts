@@ -31,6 +31,7 @@ import type {
   CheckinResponse,
   AccountSecurityResult,
   EmailBindingFlow,
+  WeChatBindingVerification,
 } from './types'
 
 // ============================================================================
@@ -184,6 +185,55 @@ export function bindEmail(
     api.post(
       '/api/oauth/email/bind',
       { flow_token: flowToken, new_code: newCode, old_code: oldCode },
+      {
+        ...authRequestOptions,
+        singleUseAuthorization: true,
+        signal,
+      }
+    )
+  )
+}
+
+export function getWeChatBindingVerification(
+  signal: AbortSignal
+): Promise<WeChatBindingVerification> {
+  return authResult(
+    api.get('/api/oauth/wechat/bind/verification', {
+      ...authRequestOptions,
+      signal,
+      disableDuplicate: true,
+    })
+  )
+}
+
+export function sendWeChatBindingSMS(code: string, signal: AbortSignal) {
+  return authResult<{ sms_token: string; retry_after: number }>(
+    api.post(
+      '/api/oauth/wechat/bind/sms/send',
+      { code },
+      {
+        ...authRequestOptions,
+        singleUseAuthorization: true,
+        signal,
+      }
+    )
+  )
+}
+
+export function verifyWeChatBindingSMS(
+  code: string,
+  smsToken: string,
+  smsCode: string,
+  signal: AbortSignal
+) {
+  return authResult<{ proof_token: string }>(
+    api.post(
+      '/api/oauth/wechat/bind/sms/verify',
+      {
+        code,
+        sms_token: smsToken,
+        sms_code: smsCode,
+      },
       {
         ...authRequestOptions,
         singleUseAuthorization: true,

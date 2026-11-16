@@ -8014,6 +8014,9 @@
     "{{start}}—{{end}} friends": "{{start}}—{{end}} friends",
     "Current activity rewards up to {{rate}}:": "Current activity rewards up to {{rate}}:",
     "When friend {{threshold}} is first paid, {{previous}} effective friends earn {{before}}. After qualification, subsequent payments earn {{after}}.": "When friend {{threshold}} is first paid, {{previous}} effective friends earn {{before}}. After qualification, subsequent payments earn {{after}}.",
-    "Unable to load invitation summary": "Unable to load invitation summary"
+    "Unable to load invitation summary": "Unable to load invitation summary",
+    "Scan the QR code to follow the official account and reply with “<keyword>验证码</keyword>” to receive your verification code.": "Scan the QR code to follow the official account and send the message “<keyword>验证码</keyword>” to receive your verification code.",
+    "Verify your phone {{phone}} before binding WeChat.": "Verify your phone {{phone}} before binding WeChat.",
+    "Unable to load verification methods. Close this dialog and try again.": "Unable to load verification methods. Close this dialog and try again."
   }
 }

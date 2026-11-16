@@ -8013,6 +8013,9 @@
     "{{start}}—{{end}} friends": "{{start}} à {{end}} amis",
     "Current activity rewards up to {{rate}}:": "Récompense maximale de la campagne : {{rate}} :",
     "When friend {{threshold}} is first paid, {{previous}} effective friends earn {{before}}. After qualification, subsequent payments earn {{after}}.": "Au premier paiement de l'ami n° {{threshold}}, les {{previous}} amis éligibles donnent droit à {{before}}. Après validation, les paiements suivants donnent droit à {{after}}.",
-    "Unable to load invitation summary": "Impossible de charger les statistiques d'invitation"
+    "Unable to load invitation summary": "Impossible de charger les statistiques d'invitation",
+    "Scan the QR code to follow the official account and reply with “<keyword>验证码</keyword>” to receive your verification code.": "Scannez le code QR pour suivre le compte officiel et répondez par « <keyword>验证码</keyword> » pour recevoir votre code de vérification.",
+    "Verify your phone {{phone}} before binding WeChat.": "Vérifiez votre téléphone {{phone}} avant de lier WeChat.",
+    "Unable to load verification methods. Close this dialog and try again.": "Impossible de charger les méthodes de vérification. Fermez cette fenêtre et réessayez."
   }
 }

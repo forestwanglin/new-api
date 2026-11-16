@@ -8013,6 +8013,9 @@
     "{{start}}—{{end}} friends": "{{start}}〜{{end}}人",
     "Current activity rewards up to {{rate}}:": "今回の最大報酬率：{{rate}}：",
     "When friend {{threshold}} is first paid, {{previous}} effective friends earn {{before}}. After qualification, subsequent payments earn {{after}}.": "{{threshold}}人目の友達の初回支払い時に、有効な友達が{{previous}}人なら報酬率は{{before}}です。資格確認後の支払いには{{after}}が適用されます。",
-    "Unable to load invitation summary": "招待統計を読み込めませんでした"
+    "Unable to load invitation summary": "招待統計を読み込めませんでした",
+    "Scan the QR code to follow the official account and reply with “<keyword>验证码</keyword>” to receive your verification code.": "公式アカウントのQRコードを読み取り、「<keyword>验证码</keyword>」と返信して認証コードを受け取ってください。",
+    "Verify your phone {{phone}} before binding WeChat.": "WeChatを連携する前に電話番号 {{phone}} を確認してください。",
+    "Unable to load verification methods. Close this dialog and try again.": "認証方法を読み込めませんでした。ダイアログを閉じて再試行してください。"
   }
 }

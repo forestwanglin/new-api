@@ -1014,6 +1014,13 @@
 - 风险与未覆盖：未部署生产，未执行真实支付渠道退款或真实短信/微信认证；全量基线失败未由本功能扩大处理范围。阶梯请求在 HTTP 边界严格拒绝 `null`、缺失和未知字段，避免配置被静默归一化。
 - 2026-11-16 日期与控件调整：允许过去的开始时间；创建、编辑、发布均要求结束时间严格晚于当前时间，并保留结束晚于开始的约束。过期返回 `CAMPAIGN_END_PASSED` 及明确提示，管理列表仅提示结束过期的草稿。实际生效从 `max(starts_at, 发布时间)` 开始，按实际有效区间检查重叠，避免追溯影响历史订单。“可见”使用既有 `Checkbox`，默认值保持 true，支持标签点击和空格切换。影响 `model/controller` 邀请模块及对应测试、前端邀请表单、错误码映射与中英文文案；涉及既有上游文件 `web/src/lib/server-error-message.ts` 与 locale 文件，升级时复核。扩展 Z062 的活动发布行为，无新增配置、依赖或部署脚本变更。验证：邀请 Go 定向测试（SQLite）与前端邀请模块/错误映射、typecheck 通过；MySQL/PostgreSQL 因未配置隔离 DSN 未验证，未执行真实支付。
 
+### Z063 已登录账号绑定微信的短信二次验证
+
+- 行为：已绑定手机号且未启用 2FA/Passkey 的用户，通过当前手机号短信验证后绑定微信；保留强因子与无手机号账号的原验证流程。微信占用检查继续生效。登录弹窗及旧登录/注册入口仅将提示中的“验证码”显示为红色加粗，明暗主题均无背景。
+- 实现与上游差异：新增 `service/wechat_binding_sms.go` 及三个 session-only 绑定验证接口，调整 `controller/wechat.go`、安全证明签发/消费、router 与 PAT 规则；前端调整 profile API/类型、微信绑定对话框、共享提示组件和七种 locale。短信 purpose 独立，绑定用户、session、auth version、手机号和确切微信操作，单次消费并复查手机号/强因子，密码证明不能绕过短信。升级时复核上述既有文件；无 schema、依赖、配置或部署脚本变更，沿用阿里云短信配置。
+- 验证：Go service/controller/middleware 中 Security/Phone/WeChat 定向测试及 build 通过；绑定短信矩阵覆盖 SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 16.16，包括错误/过期/重放、跨会话/操作、手机号变化、占用、MFA、并发与撤销。前端 auth/security 29 文件/208 用例、typecheck（1618 文件/2 项目）、受影响文件 lint/format 通过；Chrome 观察明暗主题的红色粗体、无背景。
+- 风险与边界：未发送真实短信或绑定真实微信，供应商 HTTP 在测试中替换。既有 router 覆盖测试仍有六条公共接口缺失豁免，全量前端 lint 有既有错误；本次接口规则和改动文件检查通过。安全审查参考 OWASP Authentication、Session Management、MFA、OAuth 与 CSRF Cheat Sheets，不宣称全站合规。回滚需同步前后端，无数据迁移。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
@@ -1022,6 +1029,7 @@
 
 | 区域 | 文件 | 关联条目 |
 |---|---|---|
+| 微信绑定二次验证 | `controller/wechat.go`、安全证明 service、`router/api-router.go`、`middleware/access_token_routes.go`、认证入口、微信绑定对话框与七种 locale | Z063 |
 | 邀请入口及认证归因 | `controller/wechat.go`、`web/src/routes/{__root.tsx,(auth)/sign-up.tsx}`；与 fork 自有手机/微信认证扩展联动 | Z061 |
 | 邀请活动与订阅返奖 | `controller/user.go`、`model/{main,user,custom_subscription,custom_subscription_payment,custom_subscription_runtime}.go`、`router/api-router.go`、`middleware/access_token_routes.go`、`main.go`、钱包/导航 hooks、七种 locale、`web/src/routeTree.gen.ts` | Z062 |
 | 积分调账业务日志 | `controller/audit.go`、`web/src/features/usage-logs/lib/format.ts`、使用日志详情弹窗、审计详情构建/弹窗、七种 locale | Z060 |

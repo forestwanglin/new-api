@@ -141,6 +141,11 @@ export interface AccountSecurityResult {
   notification_warning?: boolean
 }
 
+export interface WeChatBindingVerification {
+  sms_required: boolean
+  phone_masked?: string
+}
+
 export interface EmailBindingFlow extends AccountSecurityResult {
   flow_token: string
   email: string

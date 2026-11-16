@@ -32,7 +32,8 @@ vi.mock('@tanstack/react-router', () => ({
   useRouter: () => ({ invalidate: vi.fn() }),
   useNavigate: () => vi.fn(),
 }))
-vi.mock('react-i18next', () => ({
+vi.mock('react-i18next', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('react-i18next')>()),
   useTranslation: () => ({ t: (s: string) => s }),
 }))
 vi.mock('@/hooks/use-status', () => ({

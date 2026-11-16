@@ -194,6 +194,92 @@ type wechatBindRequest struct {
 	Aff  string `json:"aff"`
 }
 
+type wechatBindingSMSRequest struct {
+	Code     string `json:"code"`
+	SMSToken string `json:"sms_token,omitempty"`
+	SMSCode  string `json:"sms_code,omitempty"`
+}
+
+func wechatBindingOperation(code string) (service.VerificationOperation, error) {
+	context, err := common.Marshal(service.AccountBindingContext{Provider: "wechat", Code: strings.TrimSpace(code)})
+	if err != nil {
+		return service.VerificationOperation{}, err
+	}
+	return service.VerificationOperation{Scope: service.VerificationScopeAccountBind, Context: context}, nil
+}
+
+func GetWeChatBindingVerification(c *gin.Context) {
+	identity, ok := middleware.GetStepUpIdentity(c)
+	if !ok {
+		writeSecurityOperationError(c, service.ErrAuthTokenInvalid)
+		return
+	}
+	result, err := service.GetWeChatBindingVerification(identity)
+	if err != nil {
+		writeSecurityOperationError(c, err)
+		return
+	}
+	common.ApiSuccess(c, result)
+}
+
+func SendWeChatBindingSMS(c *gin.Context) {
+	identity, ok := middleware.GetStepUpIdentity(c)
+	if !ok {
+		writeSecurityOperationError(c, service.ErrAuthTokenInvalid)
+		return
+	}
+	succeeded := false
+	defer func() {
+		recordUserSecurityAudit(c, identity.UserID, "user.binding_sms_send", map[string]any{"provider": "wechat", "success": succeeded})
+	}()
+	var request wechatBindingSMSRequest
+	if err := common.DecodeJson(c.Request.Body, &request); err != nil || strings.TrimSpace(request.Code) == "" {
+		common.ApiErrorT(c, "Invalid request")
+		return
+	}
+	operation, err := wechatBindingOperation(request.Code)
+	if err != nil {
+		writeSecurityOperationError(c, err)
+		return
+	}
+	token, err := service.SendWeChatBindingSMS(identity, operation, c.ClientIP())
+	if err != nil {
+		writeSecurityOperationError(c, err)
+		return
+	}
+	succeeded = true
+	common.ApiSuccess(c, gin.H{"sms_token": token, "retry_after": 90})
+}
+
+func VerifyWeChatBindingSMS(c *gin.Context) {
+	identity, ok := middleware.GetStepUpIdentity(c)
+	if !ok {
+		writeSecurityOperationError(c, service.ErrAuthTokenInvalid)
+		return
+	}
+	succeeded := false
+	defer func() {
+		recordUserSecurityAudit(c, identity.UserID, "user.security_verify", map[string]any{"method": "sms", "scope": service.VerificationScopeAccountBind, "success": succeeded})
+	}()
+	var request wechatBindingSMSRequest
+	if err := common.DecodeJson(c.Request.Body, &request); err != nil {
+		common.ApiErrorT(c, "Invalid request")
+		return
+	}
+	operation, err := wechatBindingOperation(request.Code)
+	if err != nil {
+		writeSecurityOperationError(c, err)
+		return
+	}
+	proof, err := service.VerifyWeChatBindingSMS(identity, operation, request.SMSToken, request.SMSCode)
+	if err != nil {
+		writeSecurityOperationError(c, err)
+		return
+	}
+	succeeded = true
+	common.ApiSuccess(c, proof)
+}
+
 func WeChatBind(c *gin.Context) {
 	identity, ok := middleware.GetStepUpIdentity(c)
 	if !ok {

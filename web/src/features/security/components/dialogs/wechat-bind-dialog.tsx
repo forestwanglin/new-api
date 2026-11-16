@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -34,9 +34,18 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Spinner } from '@/components/ui/spinner'
 import { SecureVerificationDialog } from '@/features/auth/secure-verification'
-import { bindWeChat } from '@/features/profile/api'
+import {
+  bindWeChat,
+  getWeChatBindingVerification,
+  sendWeChatBindingSMS,
+  verifyWeChatBindingSMS,
+} from '@/features/profile/api'
+import type { WeChatBindingVerification } from '@/features/profile/types'
+import { useCountdown } from '@/hooks/use-countdown'
+import { handleServerError } from '@/lib/handle-server-error'
 
 import { useAccountSecurity } from '../../hooks/use-account-security'
 
@@ -58,12 +67,39 @@ interface WeChatBindDialogProps {
 export function WeChatBindDialog(props: WeChatBindDialogProps) {
   const { t } = useTranslation()
   const security = useAccountSecurity()
+  const [verification, setVerification] =
+    useState<WeChatBindingVerification | null>(null)
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [smsToken, setSMSToken] = useState('')
+  const [smsCode, setSMSCode] = useState('')
+  const resend = useCountdown({ initialSeconds: 90 })
+  const resetResend = resend.reset
   const form = useForm<z.infer<typeof wechatBindingSchema>>({
     resolver: zodResolver(wechatBindingSchema),
     defaultValues: { code: '' },
   })
   const reset = form.reset
   const cancel = security.cancel
+  useEffect(() => {
+    setVerification(null)
+    setLoadFailed(false)
+    setSMSToken('')
+    setSMSCode('')
+    resetResend()
+    if (!props.open) return
+    const controller = new AbortController()
+    void getWeChatBindingVerification(controller.signal)
+      .then((result) => {
+        if (!controller.signal.aborted) setVerification(result)
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) {
+          setLoadFailed(true)
+          handleServerError(error)
+        }
+      })
+    return () => controller.abort()
+  }, [props.open, security.sessionKey, resetResend])
   useEffect(() => {
     reset({ code: '' })
   }, [reset, security.sessionKey])
@@ -81,15 +117,39 @@ export function WeChatBindDialog(props: WeChatBindDialogProps) {
     }
     props.onOpenChange(open)
   }
-  const submit = async (values: z.infer<typeof wechatBindingSchema>) => {
+  const sendSMS = async () => {
+    if (!(await form.trigger('code'))) return
     const result = await security.run(async (signal) => {
-      const proof = await security.verify(
-        {
-          scope: 'account.binding.bind',
-          context: { provider: 'wechat', code: values.code },
-        },
+      const sent = await sendWeChatBindingSMS(
+        form.getValues('code').trim(),
         signal
       )
+      return { ...sent, notification_warning: false }
+    })
+    if (result) {
+      setSMSToken(result.sms_token)
+      setSMSCode('')
+      resend.start(result.retry_after)
+    }
+  }
+  const submit = async (values: z.infer<typeof wechatBindingSchema>) => {
+    if (
+      !verification ||
+      (verification.sms_required && (!smsToken || !/^\d{6}$/.test(smsCode)))
+    ) {
+      return
+    }
+    const result = await security.run(async (signal) => {
+      const proof = verification.sms_required
+        ? (await verifyWeChatBindingSMS(values.code, smsToken, smsCode, signal))
+            .proof_token
+        : await security.verify(
+            {
+              scope: 'account.binding.bind',
+              context: { provider: 'wechat', code: values.code },
+            },
+            signal
+          )
       return bindWeChat(values.code, proof, signal)
     })
     if (!result) return
@@ -117,7 +177,12 @@ export function WeChatBindDialog(props: WeChatBindDialogProps) {
             <Button
               type='submit'
               form='wechat-bind-form'
-              disabled={security.pending}
+              disabled={
+                security.pending ||
+                !verification ||
+                (verification.sms_required &&
+                  (!smsToken || !/^\d{6}$/.test(smsCode)))
+              }
             >
               {security.pending && <Spinner data-icon='inline-start' />}
               {t('Bind')}
@@ -131,6 +196,15 @@ export function WeChatBindDialog(props: WeChatBindDialogProps) {
             onSubmit={form.handleSubmit(submit)}
             className='space-y-4'
           >
+            {!verification && (
+              <p role='status' className='text-muted-foreground text-sm'>
+                {t(
+                  loadFailed
+                    ? 'Unable to load verification methods. Close this dialog and try again.'
+                    : 'Loading verification methods...'
+                )}
+              </p>
+            )}
             {props.qrCodeUrl ? (
               <div className='flex justify-center'>
                 <img
@@ -149,10 +223,15 @@ export function WeChatBindDialog(props: WeChatBindDialogProps) {
               name='code'
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t('Verification code')}</FormLabel>
+                  <FormLabel>{t('WeChat verification code')}</FormLabel>
                   <FormControl>
                     <Input
                       {...field}
+                      onChange={(event) => {
+                        field.onChange(event)
+                        setSMSToken('')
+                        setSMSCode('')
+                      }}
                       placeholder={t('Enter the verification code')}
                       autoComplete='one-time-code'
                       disabled={security.pending}
@@ -163,6 +242,49 @@ export function WeChatBindDialog(props: WeChatBindDialogProps) {
                 </FormItem>
               )}
             />
+            {verification?.sms_required && (
+              <div className='space-y-2'>
+                <p className='text-muted-foreground text-sm'>
+                  {t('Verify your phone {{phone}} before binding WeChat.', {
+                    phone: verification.phone_masked,
+                  })}
+                </p>
+                <Label htmlFor='wechat-bind-sms-code'>
+                  {t('SMS verification code')}
+                </Label>
+                <div className='flex items-center gap-2'>
+                  <Input
+                    id='wechat-bind-sms-code'
+                    value={smsCode}
+                    onChange={(event) =>
+                      setSMSCode(
+                        event.target.value.replaceAll(/\D/g, '').slice(0, 6)
+                      )
+                    }
+                    inputMode='numeric'
+                    autoComplete='one-time-code'
+                    maxLength={6}
+                    disabled={security.pending || !smsToken}
+                  />
+                  <Button
+                    type='button'
+                    variant='outline'
+                    onClick={() => void sendSMS()}
+                    disabled={
+                      security.pending ||
+                      resend.isActive ||
+                      !form.watch('code').trim()
+                    }
+                  >
+                    {resend.isActive
+                      ? t('Resend in {{seconds}}s', {
+                          seconds: resend.secondsLeft,
+                        })
+                      : t('Send code')}
+                  </Button>
+                </div>
+              </div>
+            )}
           </form>
         </Form>
       </Dialog>
