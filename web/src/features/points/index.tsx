@@ -26,7 +26,6 @@ import { ErrorState } from '@/components/error-state'
 import { SectionPageLayout } from '@/components/layout'
 import { LoadingState } from '@/components/loading-state'
 import { Button } from '@/components/ui/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toIntlLocale } from '@/i18n/languages'
 import { formatNumber } from '@/lib/format'
 import { getServerErrorMessage } from '@/lib/server-error-message'
@@ -101,28 +100,19 @@ export function Points() {
         {t('Points management')}
       </SectionPageLayout.Title>
       <SectionPageLayout.Content>
-        <Tabs defaultValue='configuration' className='h-full min-h-0'>
-          <TabsList className='mb-4 shrink-0'>
-            <TabsTrigger value='configuration'>
-              {t('Point configuration')}
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent value='configuration'>
-            <p className='text-muted-foreground mb-4 text-sm'>
-              {t(
-                'Point types are maintained through scripts or the database. Manage their supported models here.'
-              )}
-            </p>
-            {content}
-            {selectedType && (
-              <PointRulesDialog
-                key={selectedType.id}
-                pointType={selectedType}
-                onClose={() => setSelectedType(null)}
-              />
-            )}
-          </TabsContent>
-        </Tabs>
+        <p className='text-muted-foreground mb-4 text-sm'>
+          {t(
+            'Point types are maintained through scripts or the database. Manage their supported models here.'
+          )}
+        </p>
+        {content}
+        {selectedType && (
+          <PointRulesDialog
+            key={selectedType.id}
+            pointType={selectedType}
+            onClose={() => setSelectedType(null)}
+          />
+        )}
       </SectionPageLayout.Content>
     </SectionPageLayout>
   )

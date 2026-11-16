@@ -40,7 +40,7 @@ function setup() {
 }
 
 describe('points management entry', () => {
-  it('keeps configuration in points management without a ledger tab or ledger request', async () => {
+  it('shows point type configuration directly without tabs or ledger requests', async () => {
     const get = vi.spyOn(api, 'get').mockResolvedValue({
       data: { success: true, data: [] },
     })
@@ -49,9 +49,8 @@ describe('points management entry', () => {
     expect(
       screen.getByRole('heading', { name: 'Points management' })
     ).toBeVisible()
-    expect(
-      screen.queryByRole('tab', { name: 'Point Ledger' })
-    ).not.toBeInTheDocument()
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument()
     expect(get).toHaveBeenCalledTimes(1)
     expect(get).toHaveBeenCalledWith('/api/points/types')
   })

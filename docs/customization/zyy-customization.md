@@ -1079,6 +1079,17 @@
 - 验证：先红后绿覆盖深色选中文字、导航/管理页入口、超管筛选及重置、权限降级与用户切换隔离；`bun run test src/styles/__tests__/login-modal-theme.test.ts src/features/auth/components/__tests__/login-modal.test.tsx src/features/point-ledger src/features/points src/hooks/__tests__/points-sidebar.test.tsx` 10 文件/76 用例通过（含原有固定页脚分页与每页条数回归）；`bun run typecheck` 1621 文件/2 项目无类型错误，涉及前端文件 oxlint/oxfmt、生产 `bun run build` 通过。检查阶段补齐菜单设置同名文案，并新增对应开关标签回归（1 文件/1 用例，先红后绿通过）；保留 `admin.points` 配置键。Chrome 本地深色页面实际检查微信与手机选中态：文字 `lab(95.94 0 0)`、背景 `lab(17.06 0 0)`，截图确认浅色可读；未触发认证或短信行为。
 - 风险与未覆盖：未执行已登录超管的真实浏览器验收，此路径由组件交互测试验证；后端与数据库未修改，未运行数据库矩阵或全量前端测试。
 
+
+### Z070 积分管理直接展示配置列表
+
+- 需求与原因：移除流水入口后，只剩一个积分配置 Tab，进入管理页应直接展示积分类型列表。
+- 变更内容：删除 `/points` 页的 Tabs 容器和“积分配置”标签，列表、说明、加载/错误/空状态及模型规则弹窗直接由原页面承载。
+- 影响面：fork 自有文件 `web/src/features/points/index.tsx`、`web/src/features/points/__tests__/ledger.test.tsx`；上游自有文件无。
+- 与上游差异：简化 fork 积分配置页布局，复用原有表格与规则弹窗。
+- 开关与默认值：无新增配置，进入页面即加载积分类型配置列表；路由和请求契约保持不变。
+- 验证：先红后绿验证页面无 tablist/tab 且默认查询积分类型；`bun run test src/features/points` 6 文件/32 用例通过，typecheck 1621 文件/2 项目、两个 TSX 文件的 oxlint/oxfmt、生产构建及 `git diff --check` 通过。
+- 风险与未覆盖：未执行已登录控制台的真实浏览器验收；未修改后端、数据库和公共 Tabs 组件。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
