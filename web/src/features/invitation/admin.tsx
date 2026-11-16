@@ -117,7 +117,9 @@ export function InvitationCampaignAdmin() {
               <Input
                 type='number'
                 aria-label={t('Campaign period')}
-                placeholder={t('Campaign period (e.g. 1 for the first campaign)')}
+                placeholder={t(
+                  'Campaign period (e.g. 1 for the first campaign)'
+                )}
                 value={period}
                 onChange={(e) => setPeriod(e.target.value)}
               />
@@ -286,6 +288,18 @@ export function InvitationCampaignAdmin() {
                 <span>
                   {c.name} · {t(c.status)} · {c.freeze_days}
                   {t(' days')}
+                  <span className='text-muted-foreground ml-2 text-sm'>
+                    {new Date(Number(c.starts_at)).toLocaleString()} –{' '}
+                    {new Date(Number(c.ends_at)).toLocaleString()}
+                  </span>
+                  {c.status === 'draft' &&
+                    Number(c.starts_at) <= Date.now() && (
+                      <span className='text-destructive mt-1 block text-sm'>
+                        {t(
+                          'Campaign start time has passed. Edit the campaign dates before publishing.'
+                        )}
+                      </span>
+                    )}
                 </span>
                 <div className='flex gap-2'>
                   <Button

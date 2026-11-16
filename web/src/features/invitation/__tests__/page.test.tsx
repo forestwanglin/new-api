@@ -103,6 +103,55 @@ function login() {
     },
   })
 }
+it('past-start draft displays its dates and explains why publication requires editing', async () => {
+  vi.mocked(api.get).mockImplementation(async (url) => ({
+    data: {
+      success: true,
+      data:
+        url === '/api/points/types'
+          ? []
+          : {
+              ...empty,
+              total: '1',
+              items: [
+                {
+                  id: '1',
+                  code: 'past',
+                  period: 1,
+                  name: 'Past campaign',
+                  description: '',
+                  starts_at: '1',
+                  ends_at: '2',
+                  reward_point_type_id: '1',
+                  reward_point_type: {
+                    id: '1',
+                    code: 'GENERAL',
+                    name: 'General',
+                  },
+                  freeze_days: 7,
+                  tiers: [],
+                  rules_text: '',
+                  visible: true,
+                  status: 'draft',
+                  version: '1',
+                },
+              ],
+            },
+    },
+  }))
+  mount(<InvitationCampaignAdmin />)
+  expect(
+    await screen.findByText(
+      'Campaign start time has passed. Edit the campaign dates before publishing.'
+    )
+  ).toBeVisible()
+  expect(
+    screen.getByText(
+      `${new Date(1).toLocaleString()} – ${new Date(2).toLocaleString()}`
+    )
+  ).toBeVisible()
+  expect(screen.getByRole('button', { name: 'Edit' })).toBeEnabled()
+})
 it('anonymous confirm opens login and never binds on login failure or cancellation', async () => {
   mount()
   await userEvent.type(screen.getByRole('textbox'), 'forest')

@@ -13,6 +13,7 @@ import (
 
 var (
 	ErrInvitationInvalid        = errors.New("invalid invitation")
+	ErrInvitationStartPassed    = errors.New("invitation campaign start time has passed")
 	ErrInvitationNotFound       = errors.New("invitation not found")
 	ErrInvitationConflict       = errors.New("invitation version conflict")
 	ErrInvitationAlreadyBound   = errors.New("invitation already bound")
@@ -427,7 +428,7 @@ func PublishInvitationCampaign(id, version, op int64) (*InvitationCampaignView, 
 			return err
 		}
 		if v.StartsAt < now {
-			return ErrInvitationInvalid
+			return ErrInvitationStartPassed
 		}
 		if err := validateInvitationPointType(tx, v.RewardPointTypeId, true); err != nil {
 			return err

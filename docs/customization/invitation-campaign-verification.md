@@ -10,6 +10,7 @@
 - Frontend invitation/navigation tests: 11 tests passed; typecheck passed for 1,608 files; invitation scoped lint and protected-header-safe format checks passed; production build passed.
 - Isolated Chrome: anonymous binding opens the shared login dialog; Escape/cancel returns without binding; 390x844 viewport renders the public campaign and binding controls without overlap.
 - Refund zero-rounding regression matrix: frozen reward reduced to zero and refunded again, acknowledged zero reward refunded, and pre-acknowledgement refund; SQLite 3.50.4, MySQL 8.4.13, PostgreSQL 16.16 all passed.
+- Publish-date feedback regression: past-start/expired drafts return `CAMPAIGN_START_PASSED` without activation/audit writes; future publication remains covered. Focused model/controller/router invitation tests passed (SQLite); frontend invitation/error-message tests passed (17 cases), typecheck and scoped lint passed; production build passed. Chrome reproduced the original expired 2026-11-01..02 draft and verified the new date/reminder display. No campaign dates were changed or successfully published during this check.
 
 ## Known baseline limits
 

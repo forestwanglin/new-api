@@ -7892,6 +7892,7 @@
     "Invitation campaign periods overlap": "Thời gian chiến dịch bị trùng",
     "Reverse released reward": "Hoàn trả thưởng đã giải phóng",
     "Invalid invitation parameters": "Tham số lời mời không hợp lệ",
+    "Campaign start time has passed. Edit the campaign dates before publishing.": "Thời gian bắt đầu chiến dịch đã qua. Hãy chỉnh sửa ngày của chiến dịch trước khi xuất bản.",
     "Invitation not found": "Không tìm thấy lời mời",
     "You cannot invite yourself": "Không thể tự mời chính mình",
     "No invitation campaigns": "Chưa có chiến dịch",

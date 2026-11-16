@@ -1,12 +1,21 @@
 package controller
 
 import (
+	"github.com/QuantumNous/new-api/model"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 	"net/http/httptest"
 	"strings"
 	"testing"
 )
+
+func TestInvitationPublishTimeError(t *testing.T) {
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	invitationError(c, model.ErrInvitationStartPassed)
+	require.Contains(t, w.Body.String(), `"code":"CAMPAIGN_START_PASSED"`)
+	require.Contains(t, w.Body.String(), "Campaign start time has passed. Edit the campaign dates before publishing.")
+}
 
 func TestInvitationRequestBoundaries(t *testing.T) {
 	for _, query := range []string{"p=0", "p=1&p=2", "page_size=101", "user_id=2", "p=9223372036854775807&page_size=100", "bad=%ZZ", "bad=1;ignored=2"} {

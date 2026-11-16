@@ -7892,6 +7892,7 @@
     "Invitation campaign periods overlap": "邀請活動時間重疊",
     "Reverse released reward": "沖正已釋放獎勵",
     "Invalid invitation parameters": "邀請參數無效",
+    "Campaign start time has passed. Edit the campaign dates before publishing.": "活動開始時間已過，請修改活動日期後再發布。",
     "Invitation not found": "邀請不存在",
     "You cannot invite yourself": "無法綁定自己",
     "No invitation campaigns": "尚無邀請活動",

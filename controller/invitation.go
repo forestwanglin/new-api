@@ -26,6 +26,7 @@ func invitationError(c *gin.Context, err error) {
 		code, message string
 	}{
 		{model.ErrInvitationInvalid, "INVALID_INVITATION", "Invalid invitation parameters"},
+		{model.ErrInvitationStartPassed, "CAMPAIGN_START_PASSED", "Campaign start time has passed. Edit the campaign dates before publishing."},
 		{model.ErrInvitationNotFound, "INVITATION_NOT_FOUND", "Invitation not found"},
 		{model.ErrInvitationConflict, "INVITATION_CONFLICT", "Invitation version conflict"},
 		{model.ErrInvitationAlreadyBound, "ALREADY_BOUND", "An inviter has already been bound"},

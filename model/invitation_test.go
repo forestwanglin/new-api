@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"math"
 	"os"
 	"path/filepath"
@@ -92,6 +93,25 @@ func invitationDomainCampaignCases(t *testing.T, db *gorm.DB) {
 	require.NoError(t, db.Create(&PointModelRule{PointTypeId: pt.Id, MatchType: PointMatchPattern, MatchValue: "*", Enabled: true}).Error)
 	now := time.Now().UnixMilli()
 	in := InvitationCampaignInput{Code: "summer", Period: 1, Name: "Summer", StartsAt: now + 3600000, EndsAt: now + 7200000, RewardPointTypeId: pt.Id, Visible: true, Tiers: []InvitationTierInput{{MinEffectiveFriends: 0, RateBps: 500}, {MinEffectiveFriends: 3, RateBps: 700}}}
+	for _, expired := range []bool{false, true} {
+		past := in
+		past.Code = fmt.Sprintf("past-%t", expired)
+		past.StartsAt = now - 7200000
+		if expired {
+			past.EndsAt = now - 3600000
+		}
+		draft, err := CreateInvitationCampaign(past, 1)
+		require.NoError(t, err)
+		var auditBefore int64
+		require.NoError(t, db.Model(&InvitationAuditLog{}).Count(&auditBefore).Error)
+		_, err = PublishInvitationCampaign(draft.Id, draft.Version, 1)
+		require.EqualError(t, err, "invitation campaign start time has passed")
+		var activations, auditAfter int64
+		require.NoError(t, db.Model(&InvitationCampaignActivation{}).Count(&activations).Error)
+		require.Zero(t, activations)
+		require.NoError(t, db.Model(&InvitationAuditLog{}).Count(&auditAfter).Error)
+		require.Equal(t, auditBefore, auditAfter)
+	}
 	for _, invalid := range []InvitationCampaignInput{{Code: "bad"}, {Code: "bad", Period: 1, Name: "Bad", StartsAt: in.StartsAt, EndsAt: in.EndsAt, RewardPointTypeId: pt.Id, FreezeDays: 366, Tiers: in.Tiers}} {
 		_, err := CreateInvitationCampaign(invalid, 1)
 		require.ErrorIs(t, err, ErrInvitationInvalid)

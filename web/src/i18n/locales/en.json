@@ -7892,6 +7892,7 @@
     "Invitation campaign periods overlap": "Invitation campaign periods overlap",
     "Reverse released reward": "Reverse released reward",
     "Invalid invitation parameters": "Invalid invitation parameters",
+    "Campaign start time has passed. Edit the campaign dates before publishing.": "Campaign start time has passed. Edit the campaign dates before publishing.",
     "Invitation not found": "Invitation not found",
     "You cannot invite yourself": "You cannot invite yourself",
     "No invitation campaigns": "No invitation campaigns",

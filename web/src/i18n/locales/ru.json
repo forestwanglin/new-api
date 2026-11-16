@@ -7894,6 +7894,7 @@
     "Invitation campaign periods overlap": "Периоды кампаний пересекаются",
     "Reverse released reward": "Сторнировать выданную награду",
     "Invalid invitation parameters": "Неверные параметры приглашения",
+    "Campaign start time has passed. Edit the campaign dates before publishing.": "Время начала кампании уже прошло. Измените даты кампании перед публикацией.",
     "Invitation not found": "Приглашение не найдено",
     "You cannot invite yourself": "Нельзя пригласить себя",
     "No invitation campaigns": "Кампаний пока нет",

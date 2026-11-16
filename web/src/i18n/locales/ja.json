@@ -7892,6 +7892,7 @@
     "Invitation campaign periods overlap": "キャンペーン期間が重複しています",
     "Reverse released reward": "解除済み報酬を取り消す",
     "Invalid invitation parameters": "招待パラメーターが無効です",
+    "Campaign start time has passed. Edit the campaign dates before publishing.": "キャンペーン開始時刻を過ぎています。日付を編集してから公開してください。",
     "Invitation not found": "招待が見つかりません",
     "You cannot invite yourself": "自分自身を招待できません",
     "No invitation campaigns": "キャンペーンはありません",

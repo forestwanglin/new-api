@@ -25,6 +25,8 @@ export const safeServerErrorMessage = Symbol('safeServerErrorMessage')
 const serverErrorMessageKeys = {
   INVITATION_FAILED: 'Failed to process invitation',
   INVALID_INVITATION: 'Invalid invitation parameters',
+  CAMPAIGN_START_PASSED:
+    'Campaign start time has passed. Edit the campaign dates before publishing.',
   INVITATION_NOT_FOUND: 'Invitation not found',
   INVITATION_CONFLICT: 'Invitation version conflict',
   ALREADY_BOUND: 'An inviter has already been bound',

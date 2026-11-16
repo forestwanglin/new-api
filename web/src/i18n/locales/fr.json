@@ -7892,6 +7892,7 @@
     "Invitation campaign periods overlap": "Les périodes des campagnes se chevauchent",
     "Reverse released reward": "Annuler une récompense débloquée",
     "Invalid invitation parameters": "Paramètres d’invitation invalides",
+    "Campaign start time has passed. Edit the campaign dates before publishing.": "L’heure de début de la campagne est dépassée. Modifiez les dates avant de publier.",
     "Invitation not found": "Invitation introuvable",
     "You cannot invite yourself": "Vous ne pouvez pas vous inviter",
     "No invitation campaigns": "Aucune campagne",
