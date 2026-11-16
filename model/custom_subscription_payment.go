@@ -161,45 +161,53 @@ func SettleCustomSubscriptionPayment(input CustomSubscriptionPaymentInput) (bool
 	}
 	already := false
 	var order CustomSubscriptionOrder
-	err := customSubscriptionTransaction(owner.UserId, func() int64 { return time.Now().UnixMilli() }, func(s *customSubscriptionSchedule) error {
-		if err := lockForUpdate(s.tx).First(&order, owner.Id).Error; err != nil {
-			return err
-		}
-		if order.UserId != owner.UserId || order.TradeNo != input.TradeNo || order.PaymentProvider != PaymentProviderEpay || order.PaymentMethod != input.PaymentMethod || order.Currency != "CNY" || order.AmountDueMinor != input.AmountMinor || order.TopUpId == nil || *order.TopUpId != payment.Id || order.QuotaToCredit <= 0 || order.QuotaToCredit > common.MaxWalletQuota {
-			return ErrCustomSubscriptionPaymentMismatch
-		}
-		var topup TopUp
-		if err := lockForUpdate(s.tx).First(&topup, *order.TopUpId).Error; err != nil {
-			return err
-		}
-		if topup.BusinessType != "custom_subscription" || topup.TradeNo != order.TradeNo || int64(topup.UserId) != order.UserId || topup.PaymentProvider != PaymentProviderEpay || topup.PaymentMethod != order.PaymentMethod {
-			return ErrCustomSubscriptionPaymentMismatch
-		}
-		if order.Status == common.TopUpStatusSuccess {
-			if topup.Status != common.TopUpStatusSuccess || order.ProviderTradeNo == nil || *order.ProviderTradeNo != input.ProviderTradeNo || order.PointTransactionId == nil || order.FulfillmentStatus != CustomSubscriptionFulfillmentComplete {
-				return ErrCustomSubscriptionStateInvalid
+	err := invitationTransaction(func() int64 { return time.Now().UnixMilli() }, func(tx *gorm.DB, now int64) error {
+		return customSubscriptionTransactionTx(tx, owner.UserId, func() int64 { return now }, func(s *customSubscriptionSchedule) error {
+			if err := lockForUpdate(s.tx).First(&order, owner.Id).Error; err != nil {
+				return err
 			}
-			already = true
-			return nil
-		}
-		if (order.Status != common.TopUpStatusPending && order.Status != common.TopUpStatusExpired) || (topup.Status != common.TopUpStatusPending && topup.Status != common.TopUpStatusExpired) || order.PointTransactionId != nil || order.FulfilledAt != nil {
-			return ErrCustomSubscriptionOrderInvalid
-		}
-		if err := creditTopUpQuota(s.tx, topup.UserId, int(order.QuotaToCredit), nil); err != nil {
-			return err
-		}
-		transactionID, err := creditCustomSubscriptionPoints(s.tx, &order, s.now)
-		if err != nil {
-			return err
-		}
-		if err := s.tx.Model(&TopUp{}).Where("id = ?", topup.Id).Updates(map[string]any{"status": common.TopUpStatusSuccess, "complete_time": s.now / 1000}).Error; err != nil {
-			return err
-		}
-		if err := s.tx.Model(&CustomSubscriptionOrder{}).Where("id = ?", order.Id).Updates(map[string]any{"status": common.TopUpStatusSuccess, "amount_paid_minor": input.AmountMinor, "paid_at": s.now, "provider_trade_no": input.ProviderTradeNo, "provider_payload": input.ProviderPayload, "point_transaction_id": transactionID, "updated_at": s.now}).Error; err != nil {
-			return err
-		}
-		_, err = s.fulfillOrder(order.Id)
-		return err
+			if order.UserId != owner.UserId || order.TradeNo != input.TradeNo || order.PaymentProvider != PaymentProviderEpay || order.PaymentMethod != input.PaymentMethod || order.Currency != "CNY" || order.AmountDueMinor != input.AmountMinor || order.TopUpId == nil || *order.TopUpId != payment.Id || order.QuotaToCredit <= 0 || order.QuotaToCredit > common.MaxWalletQuota {
+				return ErrCustomSubscriptionPaymentMismatch
+			}
+			var topup TopUp
+			if err := lockForUpdate(s.tx).First(&topup, *order.TopUpId).Error; err != nil {
+				return err
+			}
+			if topup.BusinessType != "custom_subscription" || topup.TradeNo != order.TradeNo || int64(topup.UserId) != order.UserId || topup.PaymentProvider != PaymentProviderEpay || topup.PaymentMethod != order.PaymentMethod {
+				return ErrCustomSubscriptionPaymentMismatch
+			}
+			if order.Status == common.TopUpStatusSuccess {
+				if topup.Status != common.TopUpStatusSuccess || order.ProviderTradeNo == nil || *order.ProviderTradeNo != input.ProviderTradeNo || order.PointTransactionId == nil || order.FulfillmentStatus != CustomSubscriptionFulfillmentComplete {
+					return ErrCustomSubscriptionStateInvalid
+				}
+				already = true
+				return nil
+			}
+			if (order.Status != common.TopUpStatusPending && order.Status != common.TopUpStatusExpired) || (topup.Status != common.TopUpStatusPending && topup.Status != common.TopUpStatusExpired) || order.PointTransactionId != nil || order.FulfilledAt != nil {
+				return ErrCustomSubscriptionOrderInvalid
+			}
+			if err := creditTopUpQuota(s.tx, topup.UserId, int(order.QuotaToCredit), nil); err != nil {
+				return err
+			}
+			transactionID, err := creditCustomSubscriptionPoints(s.tx, &order, s.now)
+			if err != nil {
+				return err
+			}
+			if err := s.tx.Model(&TopUp{}).Where("id = ?", topup.Id).Updates(map[string]any{"status": common.TopUpStatusSuccess, "complete_time": s.now / 1000}).Error; err != nil {
+				return err
+			}
+			if err := s.tx.Model(&CustomSubscriptionOrder{}).Where("id = ?", order.Id).Updates(map[string]any{"status": common.TopUpStatusSuccess, "amount_paid_minor": input.AmountMinor, "paid_at": s.now, "provider_trade_no": input.ProviderTradeNo, "provider_payload": input.ProviderPayload, "point_transaction_id": transactionID, "updated_at": s.now}).Error; err != nil {
+				return err
+			}
+			_, err = s.fulfillOrder(order.Id)
+			if err != nil {
+				return err
+			}
+			order.AmountPaidMinor = input.AmountMinor
+			order.PaidAt = &s.now
+			order.Status = common.TopUpStatusSuccess
+			return captureInvitationReward(s.tx, &order, s.now)
+		})
 	})
 	if err == nil && !already {
 		syncCreditUserQuotaCache(int(order.UserId), int(order.QuotaToCredit), common.LogText("epay topup"))

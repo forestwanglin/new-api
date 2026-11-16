@@ -23,6 +23,18 @@ import i18next from 'i18next'
 export const safeServerErrorMessage = Symbol('safeServerErrorMessage')
 
 const serverErrorMessageKeys = {
+  INVITATION_FAILED: 'Failed to process invitation',
+  INVALID_INVITATION: 'Invalid invitation parameters',
+  INVITATION_NOT_FOUND: 'Invitation not found',
+  INVITATION_CONFLICT: 'Invitation version conflict',
+  ALREADY_BOUND: 'An inviter has already been bound',
+  SELF_INVITATION: 'You cannot invite yourself',
+  INVITATION_CYCLE: 'Invitation relationship would create a cycle',
+  CAMPAIGN_OVERLAP: 'Invitation campaign periods overlap',
+  INVALID_POINT_TYPE: 'Invalid invitation reward point type',
+  REFUND_CONFLICT: 'Invitation refund conflicts with the current order',
+  REVIEW_REQUIRED: 'Invitation reward requires manual review',
+
   TELEGRAM_OAUTH_NOT_CONFIGURED:
     'Telegram OAuth is not configured or enabled. Please contact your administrator.',
   TELEGRAM_OAUTH_CONFLICT:

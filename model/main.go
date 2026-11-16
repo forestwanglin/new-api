@@ -398,6 +398,9 @@ func migrateDB() error {
 	if err := migratePoints(DB); err != nil {
 		return err
 	}
+	if err := migrateInvitations(DB); err != nil {
+		return err
+	}
 	if err := InitializeUserAuthVersions(); err != nil {
 		return err
 	}

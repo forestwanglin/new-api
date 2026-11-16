@@ -103,38 +103,43 @@ func customSubscriptionTransaction(userID int64, clock func() int64, action func
 		return ErrCustomSubscriptionStateInvalid
 	}
 	return DB.Transaction(func(tx *gorm.DB) error {
-		state := CustomUserSubscriptionState{UserId: userID}
-		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&state).Error; err != nil {
-			return err
-		}
-		result := tx.Model(&CustomUserSubscriptionState{}).Where("user_id = ? AND version < ?", userID, int64(math.MaxInt64)).UpdateColumn("version", gorm.Expr("version + 1"))
-		if result.Error != nil {
-			return result.Error
-		}
-		if result.RowsAffected != 1 {
-			return ErrCustomSubscriptionStateInvalid
-		}
-		if err := lockForUpdate(tx).Where("user_id = ?", userID).First(&state).Error; err != nil {
-			return err
-		}
-		now := max(clock(), state.ReconciledAt)
-		if now <= 0 {
-			return ErrCustomSubscriptionTimeInvalid
-		}
-		schedule := customSubscriptionSchedule{tx: tx, state: state, now: now}
-		if err := tx.Where("user_id = ? AND status IN ?", userID, []string{"active", "paused"}).Order("priority DESC, purchased_at ASC, id ASC").Find(&schedule.subscriptions).Error; err != nil {
-			return err
-		}
-		if err := schedule.reconcile(); err != nil {
-			return err
-		}
-		if action != nil {
-			if err := action(&schedule); err != nil {
-				return err
-			}
-		}
-		return tx.Model(&CustomUserSubscriptionState{}).Where("user_id = ?", userID).Updates(map[string]any{"active_subscription_id": schedule.state.ActiveSubscriptionId, "reconciled_at": now, "updated_at": now}).Error
+		return customSubscriptionTransactionTx(tx, userID, clock, action)
 	})
+}
+
+func customSubscriptionTransactionTx(tx *gorm.DB, userID int64, clock func() int64, action func(*customSubscriptionSchedule) error) error {
+
+	state := CustomUserSubscriptionState{UserId: userID}
+	if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&state).Error; err != nil {
+		return err
+	}
+	result := tx.Model(&CustomUserSubscriptionState{}).Where("user_id = ? AND version < ?", userID, int64(math.MaxInt64)).UpdateColumn("version", gorm.Expr("version + 1"))
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return ErrCustomSubscriptionStateInvalid
+	}
+	if err := lockForUpdate(tx).Where("user_id = ?", userID).First(&state).Error; err != nil {
+		return err
+	}
+	now := max(clock(), state.ReconciledAt)
+	if now <= 0 {
+		return ErrCustomSubscriptionTimeInvalid
+	}
+	schedule := customSubscriptionSchedule{tx: tx, state: state, now: now}
+	if err := tx.Where("user_id = ? AND status IN ?", userID, []string{"active", "paused"}).Order("priority DESC, purchased_at ASC, id ASC").Find(&schedule.subscriptions).Error; err != nil {
+		return err
+	}
+	if err := schedule.reconcile(); err != nil {
+		return err
+	}
+	if action != nil {
+		if err := action(&schedule); err != nil {
+			return err
+		}
+	}
+	return tx.Model(&CustomUserSubscriptionState{}).Where("user_id = ?", userID).Updates(map[string]any{"active_subscription_id": schedule.state.ActiveSubscriptionId, "reconciled_at": now, "updated_at": now}).Error
 }
 
 func (s *customSubscriptionSchedule) activeIndex() (int, error) {

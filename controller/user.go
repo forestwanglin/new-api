@@ -460,8 +460,14 @@ func GetAffCode(c *gin.Context) {
 		return
 	}
 	if user.AffCode == "" {
-		user.AffCode = common.GetRandomString(4)
-		if err := user.Update(false); err != nil {
+		code := common.GetRandomString(16)
+		result := model.DB.Model(&model.User{}).Where("id = ? AND (aff_code = ? OR aff_code IS NULL)", id, "").Update("aff_code", code)
+		if result.Error != nil {
+			common.ApiError(c, result.Error)
+			return
+		}
+		user, err = model.GetUserById(id, true)
+		if err != nil {
 			common.ApiError(c, err)
 			return
 		}

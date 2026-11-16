@@ -5,11 +5,13 @@ import (
 	"math"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 func TestCustomSubscriptionPaymentDatabaseMatrix(t *testing.T) {
@@ -20,10 +22,11 @@ func TestCustomSubscriptionPaymentDatabaseMatrix(t *testing.T) {
 				require.False(t, db.Migrator().HasTable(table))
 			}
 			t.Cleanup(func() {
-				require.NoError(t, db.Migrator().DropTable(&PointLedger{}, &PointFreeze{}, &PointTransaction{}, &PointAccount{}, &PointModelRule{}, &PointType{}, &TopUp{}, &User{}))
+				require.NoError(t, db.Migrator().DropTable(&InvitationRewardReversal{}, &InvitationRefundOperation{}, &InvitationRewardEvent{}, &InvitationReward{}, &InvitationAuditLog{}, &InvitationQualification{}, &InvitationBinding{}, &InvitationCampaignTier{}, &InvitationCampaignActivation{}, &InvitationCampaignVersion{}, &InvitationCampaign{}, &InvitationControl{}, &PointLedger{}, &PointFreeze{}, &PointTransaction{}, &PointAccount{}, &PointModelRule{}, &PointType{}, &TopUp{}, &User{}))
 			})
 			require.NoError(t, db.AutoMigrate(&User{}, &TopUp{}))
 			require.NoError(t, migratePoints(db))
+			require.NoError(t, migrateInvitations(db))
 			require.NoError(t, migrateCustomSubscriptions(db))
 			require.NoError(t, migrateCustomSubscriptions(db))
 
@@ -365,6 +368,212 @@ func TestCustomSubscriptionPaymentDatabaseMatrix(t *testing.T) {
 				require.NoError(t, db.First(&topup, *order.TopUpId).Error)
 				assert.Equal(t, common.TopUpStatusPending, topup.Status)
 			})
+			t.Run("invalid_legacy_binding_does_not_break_buyer_payment", func(t *testing.T) {
+				now := time.Now().UnixMilli()
+				version := InvitationCampaignVersion{CampaignId: 3, Version: 1, StartsAt: now - 10000, EndsAt: now + 86400000, RewardPointTypeId: types[0].Id, FreezeDays: 7, Name: "Invalid legacy"}
+				require.NoError(t, db.Create(&version).Error)
+				activation := InvitationCampaignActivation{VersionId: version.Id, EffectiveFrom: now - 10000}
+				require.NoError(t, db.Create(&activation).Error)
+				require.NoError(t, db.Create(&InvitationCampaignTier{VersionId: version.Id, RateBps: 500}).Error)
+				defer func() { require.NoError(t, db.Delete(&activation).Error) }()
+				for i, kind := range []string{"missing_inviter", "disabled_inviter", "multi_hop_cycle"} {
+					t.Run(kind, func(t *testing.T) {
+						buyerID := int64(610 + i*10)
+						inviterID := buyerID + 1
+						order := newCheckout(buyerID, fmt.Sprintf("legacy-bad-%d", buyerID))
+						bound := now - 1000
+						require.NoError(t, db.Model(&User{}).Where("id = ?", buyerID).Updates(map[string]any{"status": common.UserStatusEnabled, "inviter_id": inviterID}).Error)
+						if kind != "missing_inviter" {
+							status := common.UserStatusEnabled
+							if kind == "disabled_inviter" {
+								status = common.UserStatusDisabled
+							}
+							inviter := User{Id: int(inviterID), Username: fmt.Sprintf("legacy-inviter-%d", inviterID), AffCode: fmt.Sprintf("legacy-aff-%d", inviterID), Status: status}
+							require.NoError(t, db.Create(&inviter).Error)
+							if kind == "multi_hop_cycle" {
+								ancestor := User{Id: int(buyerID + 2), Username: fmt.Sprintf("ancestor-%d", buyerID), AffCode: fmt.Sprintf("ancestor-aff-%d", buyerID), Status: common.UserStatusEnabled, Role: common.RoleCommonUser, InviterId: int(buyerID)}
+								require.NoError(t, db.Create(&ancestor).Error)
+								require.NoError(t, db.Model(&inviter).Update("inviter_id", ancestor.Id).Error)
+							}
+						}
+						require.NoError(t, db.Create(&InvitationBinding{InviteeId: buyerID, InviterId: inviterID, BoundAt: &bound, Source: "legacy"}).Error)
+						_, err := SettleCustomSubscriptionPayment(inputFor(order))
+						require.NoError(t, err)
+						require.NoError(t, db.First(order, order.Id).Error)
+						require.Equal(t, common.TopUpStatusSuccess, order.Status)
+						require.NotNil(t, order.InvitationCaptureResult)
+						require.Equal(t, "excluded_invalid_binding", *order.InvitationCaptureResult)
+						var account PointAccount
+						require.NoError(t, db.Where("user_id = ? AND point_type_id = ?", buyerID, types[0].Id).First(&account).Error)
+						require.EqualValues(t, 29000, account.AvailablePoints)
+						var rewards, qualifications int64
+						require.NoError(t, db.Model(&InvitationReward{}).Where("order_id = ?", order.Id).Count(&rewards).Error)
+						require.Zero(t, rewards)
+						require.NoError(t, db.Model(&InvitationQualification{}).Where("invitee_id = ?", buyerID).Count(&qualifications).Error)
+						require.Zero(t, qualifications)
+						already, err := SettleCustomSubscriptionPayment(inputFor(order))
+						require.NoError(t, err)
+						require.True(t, already)
+					})
+				}
+			})
+
+			t.Run("invitation_event_failure_rolls_back_buyer_settlement", func(t *testing.T) {
+				now := time.Now().UnixMilli()
+				inviter := User{Id: 511, Username: "inviter-511", AffCode: "aff-511"}
+				require.NoError(t, db.Create(&inviter).Error)
+				version := InvitationCampaignVersion{CampaignId: 2, Version: 1, StartsAt: now - 10000, EndsAt: now + 86400000, RewardPointTypeId: types[0].Id, FreezeDays: 7, Name: "Rollback"}
+				require.NoError(t, db.Create(&version).Error)
+				activation := InvitationCampaignActivation{VersionId: version.Id, EffectiveFrom: now - 10000}
+				require.NoError(t, db.Create(&activation).Error)
+				require.NoError(t, db.Create(&InvitationCampaignTier{VersionId: version.Id, RateBps: 500}).Error)
+				order := newCheckout(510, "invite-order-510")
+				bound := now - 1000
+				require.NoError(t, db.Create(&InvitationBinding{InviteeId: 510, InviterId: 511, BoundAt: &bound}).Error)
+				require.NoError(t, db.Callback().Create().Before("gorm:create").Register("test:invitation_event_failure", func(tx *gorm.DB) {
+					if tx.Statement.Table == "invitation_reward_events" {
+						tx.AddError(fmt.Errorf("injected durable event failure"))
+					}
+				}))
+				_, err := SettleCustomSubscriptionPayment(inputFor(order))
+				require.ErrorContains(t, err, "injected durable event failure")
+				require.NoError(t, db.Callback().Create().Remove("test:invitation_event_failure"))
+				var user User
+				require.NoError(t, db.First(&user, 510).Error)
+				require.EqualValues(t, 7, user.Quota)
+				require.NoError(t, db.First(order, order.Id).Error)
+				require.Equal(t, common.TopUpStatusPending, order.Status)
+				require.Nil(t, order.InvitationCaptureVersion)
+				for _, table := range []any{&InvitationReward{}, &PointTransaction{}, &CustomUserSubscription{}} {
+					var count int64
+					q := db.Model(table)
+					switch table.(type) {
+					case *InvitationReward:
+						q = q.Where("order_id = ?", order.Id)
+					default:
+						q = q.Where("user_id = ?", 510)
+					}
+					require.NoError(t, q.Count(&count).Error)
+					require.Zero(t, count)
+				}
+				require.NoError(t, db.Delete(&activation).Error)
+			})
+
+			t.Run("invitation_capture_refund_freeze_release_and_review", func(t *testing.T) {
+				now := time.Now().UnixMilli()
+				inviter := User{Id: 501, Username: "inviter-501", AffCode: "aff-501"}
+				require.NoError(t, db.Create(&inviter).Error)
+				version := InvitationCampaignVersion{CampaignId: 1, Version: 1, StartsAt: now - 10000, EndsAt: now + 86400000, RewardPointTypeId: types[1].Id, FreezeDays: 7, Name: "Campaign snapshot"}
+				require.NoError(t, db.Create(&version).Error)
+				require.NoError(t, db.Create(&InvitationCampaignActivation{VersionId: version.Id, EffectiveFrom: now - 10000}).Error)
+				require.NoError(t, db.Create(&InvitationCampaignTier{VersionId: version.Id, MinEffectiveFriends: 0, RateBps: 700}).Error)
+				order := newCheckout(500, "invite-order-500")
+				bound := now - 1000
+				require.NoError(t, db.Create(&InvitationBinding{InviteeId: 500, InviterId: 501, BoundAt: &bound, Source: "explicit", InviterCode: "aff-501"}).Error)
+				_, err := SettleCustomSubscriptionPayment(inputFor(order))
+				require.NoError(t, err)
+				var reward InvitationReward
+				require.NoError(t, db.Where("order_id = ?", order.Id).First(&reward).Error)
+				require.EqualValues(t, 2099, reward.ProcessingPoints)
+				require.EqualValues(t, 0, reward.FrozenPoints)
+				var buyer PointAccount
+				require.NoError(t, db.Where("user_id = ? AND point_type_id = ?", 500, types[0].Id).First(&buyer).Error)
+				require.EqualValues(t, 29000, buyer.AvailablePoints)
+				require.Zero(t, buyer.FrozenPoints)
+				// Refund before the capture event is consumed: worker must reread net target.
+				refund, err := PrepareInvitationRefund(order.Id, 1, 999, "refund-before-credit")
+				require.NoError(t, err)
+				_, err = CompleteInvitationRefund(order.Id, refund.Id, 1, 999, "epay", "refund-500-a")
+				require.NoError(t, err)
+				_, err = processInvitationRewardsAt(100, now+10000)
+				require.NoError(t, err)
+				require.NoError(t, db.First(&reward, reward.Id).Error)
+				require.EqualValues(t, 1400, reward.FrozenPoints)
+				require.EqualValues(t, 699, reward.CancelledPoints)
+				var account PointAccount
+				require.NoError(t, db.Where("user_id = ? AND point_type_id = ?", 501, types[1].Id).First(&account).Error)
+				require.Zero(t, account.AvailablePoints)
+				require.EqualValues(t, 1400, account.FrozenPoints)
+				// Foreign freezes and signed debt must survive reward release.
+				require.NoError(t, db.Model(&account).Updates(map[string]any{"available_points": -1500, "frozen_points": 1410}).Error)
+				foreign := PointFreeze{AccountId: account.Id, TransactionId: 1, OriginalPoints: 10, RemainingPoints: 10, ReasonCode: "ADMIN", Status: PointFreezeActive}
+				require.NoError(t, db.Create(&foreign).Error)
+				hold, err := PrepareInvitationRefund(order.Id, 1, 100, "refund-hold")
+				require.NoError(t, err)
+				_, err = processInvitationRewardsAt(100, reward.ReleaseAt+1)
+				require.NoError(t, err)
+				require.NoError(t, db.First(&reward, reward.Id).Error)
+				require.Equal(t, InvitationRewardFrozen, reward.Status)
+				_, err = CancelInvitationRefund(order.Id, hold.Id, 1)
+				require.NoError(t, err)
+				_, err = processInvitationRewardsAt(100, reward.ReleaseAt+1)
+				require.NoError(t, err)
+				require.NoError(t, db.First(&account, account.Id).Error)
+				require.EqualValues(t, -100, account.AvailablePoints)
+				require.EqualValues(t, 10, account.FrozenPoints)
+				require.NoError(t, db.First(&foreign, foreign.Id).Error)
+				require.EqualValues(t, 10, foreign.RemainingPoints)
+				// Replays create no additional ledger; released refund requires explicit reversal.
+				_, err = processInvitationRewardsAt(100, reward.ReleaseAt+2)
+				require.NoError(t, err)
+				refund2, err := PrepareInvitationRefund(order.Id, 1, 1000, "refund-after-release")
+				require.NoError(t, err)
+				_, err = CompleteInvitationRefund(order.Id, refund2.Id, 1, 1000, "epay", "refund-500-b")
+				require.NoError(t, err)
+				require.NoError(t, db.First(&reward, reward.Id).Error)
+				require.EqualValues(t, 700, reward.ReviewDuePoints)
+				require.Equal(t, InvitationRewardReview, reward.Status)
+				_, err = ReverseInvitationReward(reward.Id, 1, 700, "reverse-500", "Verified cash refund")
+				require.NoError(t, err)
+				_, err = ReverseInvitationReward(reward.Id, 1, 700, "reverse-500", "Verified cash refund")
+				require.NoError(t, err)
+				require.NoError(t, db.First(&account, account.Id).Error)
+				require.EqualValues(t, -800, account.AvailablePoints)
+				require.EqualValues(t, 10, account.FrozenPoints)
+				require.NoError(t, db.First(&reward, reward.Id).Error)
+				require.EqualValues(t, 700, reward.ReversedPoints)
+				require.Zero(t, reward.ReviewDuePoints)
+				summary, err := GetInvitationSummary(501)
+				require.NoError(t, err)
+				require.Len(t, summary.Balances, 1)
+				require.Equal(t, "700", summary.Balances[0].ReversedTotal)
+				page, err := ListInvitationRewards(501, false, 1, 20)
+				require.NoError(t, err)
+				require.Len(t, page.Items, 1)
+				require.Equal(t, "Campaign snapshot", page.Items[0].CampaignName)
+				var audits []InvitationAuditLog
+				require.NoError(t, db.Where("entity_type = ? AND entity_id IN ?", "refund", []int64{refund.Id, hold.Id, refund2.Id}).Order("id ASC").Find(&audits).Error)
+				require.Len(t, audits, 6)
+				require.Equal(t, "refund_prepare", audits[0].Action)
+				require.Equal(t, "refund_complete", audits[1].Action)
+				require.Equal(t, "refund_cancel", audits[3].Action)
+				for _, audit := range audits {
+					require.EqualValues(t, 1, audit.OperatorId)
+					require.Positive(t, audit.CreatedAt)
+				}
+
+				// A held earliest reward must not starve later due releases in bounded batches.
+				orderA := CustomSubscriptionOrder{TradeNo: "held-starvation-a", UserId: 500, Status: common.TopUpStatusSuccess, AmountPaidMinor: 10000, RefundStatus: "none"}
+				orderB := CustomSubscriptionOrder{TradeNo: "held-starvation-b", UserId: 500, Status: common.TopUpStatusSuccess, AmountPaidMinor: 10000, RefundStatus: "none"}
+				require.NoError(t, db.Create(&orderA).Error)
+				require.NoError(t, db.Create(&orderB).Error)
+				a := InvitationReward{OrderId: orderA.Id, InviterId: 501, InviteeId: 500, PointTypeId: types[1].Id, OriginalPoints: 100, ProcessingPoints: 100, Status: InvitationRewardCaptured, ReleaseAt: now - 2}
+				b := InvitationReward{OrderId: orderB.Id, InviterId: 501, InviteeId: 500, PointTypeId: types[1].Id, OriginalPoints: 100, ProcessingPoints: 100, Status: InvitationRewardCaptured, ReleaseAt: now - 1}
+				require.NoError(t, db.Create(&a).Error)
+				require.NoError(t, db.Create(&b).Error)
+				require.NoError(t, db.Create(&InvitationRewardEvent{RewardId: a.Id, Status: "PENDING"}).Error)
+				require.NoError(t, db.Create(&InvitationRewardEvent{RewardId: b.Id, Status: "PENDING"}).Error)
+				_, err = PrepareInvitationRefund(orderA.Id, 1, 100, "held-starvation")
+				require.NoError(t, err)
+				_, err = processInvitationRewardsAt(1, now+10000)
+				require.NoError(t, err)
+				_, err = processInvitationRewardsAt(1, now+10000)
+				require.NoError(t, err)
+				require.NoError(t, db.First(&b, b.Id).Error)
+				require.Equal(t, InvitationRewardReleased, b.Status)
+
+			})
+
 		})
 	}
 }

@@ -1003,6 +1003,16 @@
 - 验证：新增回归先红后绿；前端受影响 25 文件/185 用例、typecheck（1596 文件/2 项目）、修改文件 lint/format、生产构建通过；Go build/vet 通过。`go test ./controller ./service -run 'Test(Phone|WeChat)AffiliateAttribution|TestPhone' -count=1` 在 SQLite 3.50.4 通过；真实 MySQL 8.4.13、PostgreSQL 16.16 以 `TEST_SECURITY_DIALECT=mysql/postgres`、对应 `TEST_MYSQL_DSN/TEST_POSTGRES_DSN` 执行 `go test ./controller -run 'Test(Phone|WeChat)AffiliateAttribution|TestPhoneController' -count=1 -v` 通过，覆盖新/老用户、无效邀请码、查询失败、绑定/MFA 及认证 proof 回归。前端全量 279 文件/3014 用例通过，唯一失败为既有 detail-preview 本地化价格用例 20 秒超时，单独运行同样超时（Z057 已确认基线）；Go controller/service 全量仅既有 `TestOpenAIChatSamplingCompatibility` 四个子用例失败，使用原 HEAD 文件 overlay 同样复现。隔离 Chrome 验证邀请保存/弹窗/导航、明暗切换、OpenAI 筛选和 390×844 移动端。
 - 风险与未覆盖：仅隔离测试数据库写入；未执行真实微信/短信注册、推送或部署。微信用户沿用现有“创建账号后绑定手机”时序，邀请在首次创建时确定；本地邀请不是认证凭据。
 
+### Z062 可配置邀请活动、订阅返奖冻结与后台处理
+
+- 需求与原因：将演示页邀请好友能力接入生产，支持管理员按活动期配置奖励积分类型、实付金额百分比、统一阶梯和冻结周期；仅覆盖自定义订阅购买/续订，避免普通充值及旧版订阅进入返奖。
+- 变更内容：新增公开 `/invite`、管理员活动/奖励/退款处理页面及对应 API；用户一次性绑定邀请人，匿名确认打开共享登录弹窗，登录后再次确认永久绑定，已绑定显示提示。支付成功在同一事务保存奖励快照与 CAPTURED 事件，后台任务幂等入账并冻结邀请人奖励，默认冻结 7 天；购买者订阅积分立即可用。有效好友按独立 7×24 小时资格统计，阶梯按每期活动统一配置。退款会重算未释放冻结奖励，已释放部分进入人工冲回审计。
+- 影响面：新增 `controller/invitation*.go`、`model/invitation*.go`、`service/invitation_task.go`、邀请路由测试及 `web/src/features/invitation/`、邀请路由和多语言文案；修改 `model/{main,user,custom_subscription,custom_subscription_payment,custom_subscription_runtime}.go`、`controller/user.go`、`router/api-router.go`、`middleware/access_token_routes.go`、`main.go`、钱包/导航 hooks、七种 locale 及生成路由。**上游自有文件**：上述修改文件中除新增邀请模块外的既有 model/controller/router/middleware/main/web 文件，升级时需优先复核。
+- 与上游差异：替代旧 AffQuota/AffCount 作为新活动事实来源，扩展自定义订阅结算为邀请奖励快照、冻结账本、释放 worker、退款/冲回审计；不改变旧充值和旧订阅返奖边界。
+- 开关与默认值：无新增运行时开关；`freeze_days` 默认 7，允许 1–365；阶梯 `rate_bps` 为 0–10000，活动时间为 `[starts_at, ends_at)`，积分类型必须来自现有 point_types。活动草稿不生效，绑定不可覆盖。
+- 验证：邀请边界、控制器/路由、model/service 定向测试通过；SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 16.16 fresh/legacy 双次迁移和支付/退款/冻结/释放矩阵通过；前端邀请测试、typecheck、范围 lint/format、生产构建通过；隔离 Chrome 验证匿名登录弹窗取消、邀请页及 390×844 移动布局。全量后端仍复现既有 OpenAI 采样兼容与 PAT 路由目录失败；前端全量 281 文件 / 3028 用例通过，仅既有 detail-preview 本地化价格用例超时；新增导航顺序回归已同步。详见 [验证记录](invitation-campaign-verification.md)。
+- 风险与未覆盖：未部署生产，未执行真实支付渠道退款或真实短信/微信认证；全量基线失败未由本功能扩大处理范围。阶梯请求在 HTTP 边界严格拒绝 `null`、缺失和未知字段，避免配置被静默归一化。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
@@ -1012,6 +1022,7 @@
 | 区域 | 文件 | 关联条目 |
 |---|---|---|
 | 邀请入口及认证归因 | `controller/wechat.go`、`web/src/routes/{__root.tsx,(auth)/sign-up.tsx}`；与 fork 自有手机/微信认证扩展联动 | Z061 |
+| 邀请活动与订阅返奖 | `controller/user.go`、`model/{main,user,custom_subscription,custom_subscription_payment,custom_subscription_runtime}.go`、`router/api-router.go`、`middleware/access_token_routes.go`、`main.go`、钱包/导航 hooks、七种 locale、`web/src/routeTree.gen.ts` | Z062 |
 | 积分调账业务日志 | `controller/audit.go`、`web/src/features/usage-logs/lib/format.ts`、使用日志详情弹窗、审计详情构建/弹窗、七种 locale | Z060 |
 | 管理员积分调账 | `router/api-router.go`、`middleware/access_token_routes.go`、用户API/类型/编辑抽屉/既有测试、七种locale | Z058 |
 | 模型积分准入与结算 | `model/{token,quota_reserve,log,task,midjourney}.go`、`controller/{token,relay,midjourney,plugin_protocol}.go`、`relay/{request_billing,relay_task,mjproxy_handler,common/relay_info}.go`、`service/{billing_session,quota,midjourney,task_billing,task_polling,task_billing_reconcile,violation_fee,relay_error}.go` 及测试；使用日志/任务/绘图 schema 和列、账号/移动菜单、侧栏/维护设置、七种 locale 及相关测试 | Z057 |

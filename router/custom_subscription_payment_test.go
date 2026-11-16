@@ -29,6 +29,8 @@ func TestCustomSubscriptionPayment(t *testing.T) {
 	require.NoError(t, err)
 	sqlDB.SetMaxOpenConns(1)
 	require.NoError(t, db.AutoMigrate(&model.CustomSubscriptionPlan{}, &model.CustomSubscriptionOrder{}, &model.CustomUserSubscription{}, &model.CustomUserSubscriptionState{}, &model.CustomSubscriptionEvent{}, &model.TopUp{}, &model.PointType{}, &model.PointAccount{}, &model.PointTransaction{}, &model.PointLedger{}, &model.User{}, &model.UserSession{}, &model.UserAccessToken{}, &model.AuditLog{}, &model.Option{}))
+	require.NoError(t, db.AutoMigrate(&model.InvitationControl{}, &model.InvitationBinding{}, &model.InvitationCampaign{}, &model.InvitationCampaignVersion{}, &model.InvitationCampaignActivation{}, &model.InvitationCampaignTier{}, &model.InvitationQualification{}, &model.InvitationReward{}, &model.InvitationRewardEvent{}, &model.InvitationRefundOperation{}))
+	require.NoError(t, db.Create(&model.InvitationControl{Id: 1}).Error)
 	oldDB, oldLogDB, oldType, oldRedis, oldSecret := model.DB, model.LOG_DB, common.MainDatabaseType(), common.RedisEnabled, common.SessionSecret
 	oldPayAddress, oldID, oldKey, oldCallback, oldServer, oldPrice := operation_setting.PayAddress, operation_setting.EpayId, operation_setting.EpayKey, operation_setting.CustomCallbackAddress, system_setting.ServerAddress, operation_setting.Price
 	oldMethods := operation_setting.PayMethods

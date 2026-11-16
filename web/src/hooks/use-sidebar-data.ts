@@ -159,6 +159,11 @@ export function useSidebarData(badges: SidebarBadges = {}): SidebarData {
             icon: Coins,
           },
           {
+            title: t('Invitation campaigns'),
+            url: '/invitation-campaigns',
+            icon: Users,
+          },
+          {
             title: t('Redemption Codes'),
             url: '/redemption-codes',
             icon: Ticket,

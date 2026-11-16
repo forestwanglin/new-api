@@ -1,6 +1,6 @@
 # 邀请好友活动详细设计
 
-日期：2026-11-16。状态：待用户评审，尚未实施。
+日期：2026-11-16。状态：已实施并完成定向验证。
 
 ## 1. 目标、范围与已确认决策
 
@@ -22,7 +22,7 @@
 | --- | --- |
 | 桌面及移动端邀请入口 | 公共 `/invite` 页面，接入现有公共/登录后顶栏；不加载演示页整段脚本 |
 | 当前活动卡 | 名称、期数、时间、状态、奖励积分类型、阶梯、冻结时间均读后台配置 |
-| 全部活动 | 弹窗展示未开始/进行中/已结束，真实分页，默认10条；无活动展示真实空状态 |
+| 全部活动 | 页面可展开历史活动展示未开始/进行中/已结束，真实分页，默认20条；无活动展示真实空状态 |
 | 分享链接和邀请码 | 登录后使用真实 AffCode；复制反馈、失败提示；未登录打开共享登录弹窗 |
 | 奖励概览 | 按积分类型展示累计到账、待释放、已取消；另列已绑定、待有效和有效好友人数 |
 | 阶梯进度 | 当前有效人数、当前比例、下一档还差人数；最高档显示已达最高档 |
@@ -208,18 +208,18 @@ sequenceDiagram
 | GET /api/invitation/self/binding | session；本人绑定状态及脱敏邀请人 |
 | POST /api/invitation/self/binding | session+限流+CSRF；{invitation,request_id}，不可变绑定 |
 | GET /api/invitation/self/friends | session；本人直接好友分页，可展开受限订单投影 |
-| GET /api/invitation/self/rewards | session；本人奖励分页、活动/状态/积分类型筛选 |
+| GET /api/invitation/self/rewards | session；本人奖励分页，返回每条活动/状态/积分类型快照 |
 | GET/POST /api/invitation/admin/campaigns | session admin；列表/创建草稿 |
-| GET/PUT /api/invitation/admin/campaigns/:id | session admin；详情/expected_version更新 |
+| GET/PUT /api/invitation/admin/campaigns/:id | session admin；详情/version更新 |
 | POST /api/invitation/admin/campaigns/:id/publish 或 /end | session admin；不可变版本发布/提前结束 |
 | GET /api/invitation/admin/rewards | session admin；异常、待释放及审计 |
 | POST /api/invitation/admin/orders/:id/refunds | session admin；创建prepare资源，request_id幂等，非现金退款执行器 |
 | POST /api/invitation/admin/orders/:id/refunds/:refund_id/complete 或 /cancel | session admin；确认已核实的渠道结果/取消hold，验证订单及退款归属 |
 | POST /api/invitation/admin/rewards/:id/reversal | session admin；已释放奖励人工冲回，request_id、理由、证据引用 |
 
-上述均为拟新增路由，实施前登记PAT路由目录及管理员策略，不能声称已存在。summary返回每种point_type_id的released_total、pending_total、processing_points、cancelled_total、reversed_total；到期时间以release_at为准，客户端不能自行支付时间+固定7天。
+上述路由已实现并登记PAT目录及管理员策略。summary返回每种point_type_id的released_total、pending_total、processing_points、cancelled_total、reversed_total；到期时间以release_at为准，客户端不能自行支付时间+固定7天。
 
-错误码建议INVALID_INVITATION、SELF_INVITATION、INVITATION_CYCLE、ALREADY_BOUND、CAMPAIGN_VERSION_CONFLICT、CAMPAIGN_OVERLAP、POINT_TYPE_UNAVAILABLE、REFUND_CONFLICT、REWARD_REVIEW_REQUIRED。数据库故障返回安全错误及内部诊断，不能伪造成功或零统计。
+实现错误码为INVALID_INVITATION、INVITATION_NOT_FOUND、SELF_INVITATION、INVITATION_CYCLE、ALREADY_BOUND、INVITATION_CONFLICT、CAMPAIGN_OVERLAP、INVALID_POINT_TYPE、REFUND_CONFLICT、REVIEW_REQUIRED。数据库故障返回安全错误及内部诊断，不能伪造成功或零统计。
 
 ## 10. 兼容、迁移与运维
 
@@ -233,7 +233,7 @@ sequenceDiagram
 
 ## 11. 设计审阅与验证验收
 
-2026-11-16完成独立builder审阅；已补齐同tx原语、人工续订入口、激活区间与经济版本分离、CAPTURED退款重读、退款prepare/complete/cancel、金额不变量及候选订单稳定排序。以下检查是实施要求，并非本轮已执行的业务测试。
+2026-11-16完成独立builder审阅；已补齐同tx原语、人工续订入口、激活区间与经济版本分离、CAPTURED退款重读、退款prepare/complete/cancel、金额不变量及候选订单稳定排序。以下为设计验收目标；实际执行范围、通过情况及未覆盖项见[验证记录](invitation-campaign-verification.md)，不能将全部目标等同于已执行测试。
 
 1. 精确计算覆盖分、0积分、最大金额、超过2^53、溢出、重复及分次退款；5000/7000/10000示例一致。
 2. 绑定覆盖匿名登录成功/取消/MFA/手机绑定、已有用户补绑、同码重放、异码竞争、自邀、循环、非法链接、已有历史关系、账号切换、预加载无写。
@@ -245,4 +245,13 @@ sequenceDiagram
 8. 三种真实数据库执行迁移及并发矩阵，记录精确版本和结果。没有实例就报告阻塞，不能以SQLite测试代替全部数据库兼容。
 9. 前端Vitest交互及精确数字、错误/空态、七语言；typecheck/lint/build；Chrome验证桌面/移动端及登录恢复、键盘操作、分页、长邀请码和多积分类型。
 
-本文件仅说明拟实现能力；未执行迁移、真实支付或业务测试，不作数据库兼容和安全合规已验证声明。
+实现已通过SQLite、MySQL、PostgreSQL隔离迁移及订阅支付/返奖矩阵；未部署生产或执行真实渠道支付，未做全系统安全合规审计。
+
+
+## 12. 实施补充
+
+- 活动更新/发布/结束的并发令牌字段实际为 `version`；响应额外返回 `published_version:string|null`，即使保存新草稿也能结束仍生效的旧版本。
+- 公开历史和好友/奖励列表均使用页面分页，每页20条；好友列表展示身份与生效时间，订单、净实付及释放时间集中在奖励记录中展示。
+- 新模块入口：用户 `/invite`，管理员 `/invitation-campaigns`。奖励类型来自现有积分管理，不内置虚构GPT活动。
+- 退款接口只登记和核验渠道事实；后台不执行渠道退款。冲回通过专用幂等操作保存理由和审计。
+- worker每30秒处理一次，启动立即处理，单批100；失败持久化退避重试。全局control锁串行化相关变更，上线前仍需按实际并发量压测，尚未提供独立监控看板。

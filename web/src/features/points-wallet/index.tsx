@@ -22,6 +22,7 @@ import { useTranslation } from 'react-i18next'
 import { ErrorState } from '@/components/error-state'
 import { SectionPageLayout } from '@/components/layout'
 import { LoadingState } from '@/components/loading-state'
+import { InvitationPendingRewards } from '@/features/invitation/pending'
 import { toIntlLocale } from '@/i18n/languages'
 import { formatNumber } from '@/lib/format'
 import { getServerErrorMessage } from '@/lib/server-error-message'
@@ -135,6 +136,7 @@ export function PointsWallet() {
               <PointsWalletDetails wallet={query.data} />
             </>
           )}
+          <InvitationPendingRewards />
           <PointsWalletRules />
         </div>
       </SectionPageLayout.Content>

@@ -29,6 +29,7 @@ import { Route as errors503RouteImport } from './routes/(errors)/503'
 import { Route as AuthenticatedChat2linkRouteImport } from './routes/_authenticated/chat2link'
 import { Route as AuthenticatedSystemSettingsRouteRouteImport } from './routes/_authenticated/system-settings/route'
 import { Route as AboutIndexRouteImport } from './routes/about/index'
+import { Route as InviteIndexRouteImport } from './routes/invite/index'
 import { Route as ModelIndexRouteImport } from './routes/model/index'
 import { Route as OauthProviderRouteImport } from './routes/oauth/$provider'
 import { Route as PricingIndexRouteImport } from './routes/pricing/index'
@@ -43,6 +44,7 @@ import { Route as AuthenticatedCustomSubscriptionsIndexRouteImport } from './rou
 import { Route as AuthenticatedDashboardIndexRouteImport } from './routes/_authenticated/dashboard/index'
 import { Route as AuthenticatedDashboardSectionRouteImport } from './routes/_authenticated/dashboard/$section'
 import { Route as AuthenticatedErrorsErrorRouteImport } from './routes/_authenticated/errors/$error'
+import { Route as AuthenticatedInvitationCampaignsIndexRouteImport } from './routes/_authenticated/invitation-campaigns/index'
 import { Route as AuthenticatedKeysIndexRouteImport } from './routes/_authenticated/keys/index'
 import { Route as AuthenticatedModelsIndexRouteImport } from './routes/_authenticated/models/index'
 import { Route as AuthenticatedModelsSectionRouteImport } from './routes/_authenticated/models/$section'
@@ -181,6 +183,11 @@ const AboutIndexRoute = AboutIndexRouteImport.update({
   path: '/about/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InviteIndexRoute = InviteIndexRouteImport.update({
+  id: '/invite/',
+  path: '/invite/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ModelIndexRoute = ModelIndexRouteImport.update({
   id: '/model/',
   path: '/model/',
@@ -254,6 +261,12 @@ const AuthenticatedErrorsErrorRoute =
   AuthenticatedErrorsErrorRouteImport.update({
     id: '/errors/$error',
     path: '/errors/$error',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedInvitationCampaignsIndexRoute =
+  AuthenticatedInvitationCampaignsIndexRouteImport.update({
+    id: '/invitation-campaigns/',
+    path: '/invitation-campaigns/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedKeysIndexRoute = AuthenticatedKeysIndexRouteImport.update({
@@ -502,6 +515,7 @@ export interface FileRoutesByFullPath {
   '/chat2link': typeof AuthenticatedChat2linkRoute
   '/oauth/$provider': typeof OauthProviderRoute
   '/about/': typeof AboutIndexRoute
+  '/invite/': typeof InviteIndexRoute
   '/model/': typeof ModelIndexRoute
   '/pricing/': typeof PricingIndexRoute
   '/rankings/': typeof RankingsIndexRoute
@@ -518,6 +532,7 @@ export interface FileRoutesByFullPath {
   '/channels/': typeof AuthenticatedChannelsIndexRoute
   '/custom-subscriptions/': typeof AuthenticatedCustomSubscriptionsIndexRoute
   '/dashboard/': typeof AuthenticatedDashboardIndexRoute
+  '/invitation-campaigns/': typeof AuthenticatedInvitationCampaignsIndexRoute
   '/keys/': typeof AuthenticatedKeysIndexRoute
   '/models/': typeof AuthenticatedModelsIndexRoute
   '/my-subscription/': typeof AuthenticatedMySubscriptionIndexRoute
@@ -573,6 +588,7 @@ export interface FileRoutesByTo {
   '/chat2link': typeof AuthenticatedChat2linkRoute
   '/oauth/$provider': typeof OauthProviderRoute
   '/about': typeof AboutIndexRoute
+  '/invite': typeof InviteIndexRoute
   '/model': typeof ModelIndexRoute
   '/pricing': typeof PricingIndexRoute
   '/rankings': typeof RankingsIndexRoute
@@ -589,6 +605,7 @@ export interface FileRoutesByTo {
   '/channels': typeof AuthenticatedChannelsIndexRoute
   '/custom-subscriptions': typeof AuthenticatedCustomSubscriptionsIndexRoute
   '/dashboard': typeof AuthenticatedDashboardIndexRoute
+  '/invitation-campaigns': typeof AuthenticatedInvitationCampaignsIndexRoute
   '/keys': typeof AuthenticatedKeysIndexRoute
   '/models': typeof AuthenticatedModelsIndexRoute
   '/my-subscription': typeof AuthenticatedMySubscriptionIndexRoute
@@ -648,6 +665,7 @@ export interface FileRoutesById {
   '/_authenticated/chat2link': typeof AuthenticatedChat2linkRoute
   '/oauth/$provider': typeof OauthProviderRoute
   '/about/': typeof AboutIndexRoute
+  '/invite/': typeof InviteIndexRoute
   '/model/': typeof ModelIndexRoute
   '/pricing/': typeof PricingIndexRoute
   '/rankings/': typeof RankingsIndexRoute
@@ -664,6 +682,7 @@ export interface FileRoutesById {
   '/_authenticated/channels/': typeof AuthenticatedChannelsIndexRoute
   '/_authenticated/custom-subscriptions/': typeof AuthenticatedCustomSubscriptionsIndexRoute
   '/_authenticated/dashboard/': typeof AuthenticatedDashboardIndexRoute
+  '/_authenticated/invitation-campaigns/': typeof AuthenticatedInvitationCampaignsIndexRoute
   '/_authenticated/keys/': typeof AuthenticatedKeysIndexRoute
   '/_authenticated/models/': typeof AuthenticatedModelsIndexRoute
   '/_authenticated/my-subscription/': typeof AuthenticatedMySubscriptionIndexRoute
@@ -722,6 +741,7 @@ export interface FileRouteTypes {
     | '/chat2link'
     | '/oauth/$provider'
     | '/about/'
+    | '/invite/'
     | '/model/'
     | '/pricing/'
     | '/rankings/'
@@ -738,6 +758,7 @@ export interface FileRouteTypes {
     | '/channels/'
     | '/custom-subscriptions/'
     | '/dashboard/'
+    | '/invitation-campaigns/'
     | '/keys/'
     | '/models/'
     | '/my-subscription/'
@@ -793,6 +814,7 @@ export interface FileRouteTypes {
     | '/chat2link'
     | '/oauth/$provider'
     | '/about'
+    | '/invite'
     | '/model'
     | '/pricing'
     | '/rankings'
@@ -809,6 +831,7 @@ export interface FileRouteTypes {
     | '/channels'
     | '/custom-subscriptions'
     | '/dashboard'
+    | '/invitation-campaigns'
     | '/keys'
     | '/models'
     | '/my-subscription'
@@ -867,6 +890,7 @@ export interface FileRouteTypes {
     | '/_authenticated/chat2link'
     | '/oauth/$provider'
     | '/about/'
+    | '/invite/'
     | '/model/'
     | '/pricing/'
     | '/rankings/'
@@ -883,6 +907,7 @@ export interface FileRouteTypes {
     | '/_authenticated/channels/'
     | '/_authenticated/custom-subscriptions/'
     | '/_authenticated/dashboard/'
+    | '/_authenticated/invitation-campaigns/'
     | '/_authenticated/keys/'
     | '/_authenticated/models/'
     | '/_authenticated/my-subscription/'
@@ -933,6 +958,7 @@ export interface RootRouteChildren {
   errors503Route: typeof errors503Route
   OauthProviderRoute: typeof OauthProviderRoute
   AboutIndexRoute: typeof AboutIndexRoute
+  InviteIndexRoute: typeof InviteIndexRoute
   ModelIndexRoute: typeof ModelIndexRoute
   PricingIndexRoute: typeof PricingIndexRoute
   RankingsIndexRoute: typeof RankingsIndexRoute
@@ -1084,6 +1110,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AboutIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/invite/': {
+      id: '/invite/'
+      path: '/invite'
+      fullPath: '/invite/'
+      preLoaderRoute: typeof InviteIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/model/': {
       id: '/model/'
       path: '/model'
@@ -1180,6 +1213,13 @@ declare module '@tanstack/react-router' {
       path: '/errors/$error'
       fullPath: '/errors/$error'
       preLoaderRoute: typeof AuthenticatedErrorsErrorRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/invitation-campaigns/': {
+      id: '/_authenticated/invitation-campaigns/'
+      path: '/invitation-campaigns'
+      fullPath: '/invitation-campaigns/'
+      preLoaderRoute: typeof AuthenticatedInvitationCampaignsIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/keys/': {
@@ -1552,6 +1592,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedChannelsIndexRoute: typeof AuthenticatedChannelsIndexRoute
   AuthenticatedCustomSubscriptionsIndexRoute: typeof AuthenticatedCustomSubscriptionsIndexRoute
   AuthenticatedDashboardIndexRoute: typeof AuthenticatedDashboardIndexRoute
+  AuthenticatedInvitationCampaignsIndexRoute: typeof AuthenticatedInvitationCampaignsIndexRoute
   AuthenticatedKeysIndexRoute: typeof AuthenticatedKeysIndexRoute
   AuthenticatedModelsIndexRoute: typeof AuthenticatedModelsIndexRoute
   AuthenticatedMySubscriptionIndexRoute: typeof AuthenticatedMySubscriptionIndexRoute
@@ -1585,6 +1626,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedCustomSubscriptionsIndexRoute:
     AuthenticatedCustomSubscriptionsIndexRoute,
   AuthenticatedDashboardIndexRoute: AuthenticatedDashboardIndexRoute,
+  AuthenticatedInvitationCampaignsIndexRoute:
+    AuthenticatedInvitationCampaignsIndexRoute,
   AuthenticatedKeysIndexRoute: AuthenticatedKeysIndexRoute,
   AuthenticatedModelsIndexRoute: AuthenticatedModelsIndexRoute,
   AuthenticatedMySubscriptionIndexRoute: AuthenticatedMySubscriptionIndexRoute,
@@ -1622,6 +1665,7 @@ const rootRouteChildren: RootRouteChildren = {
   errors503Route: errors503Route,
   OauthProviderRoute: OauthProviderRoute,
   AboutIndexRoute: AboutIndexRoute,
+  InviteIndexRoute: InviteIndexRoute,
   ModelIndexRoute: ModelIndexRoute,
   PricingIndexRoute: PricingIndexRoute,
   RankingsIndexRoute: RankingsIndexRoute,

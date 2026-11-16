@@ -35,47 +35,49 @@ type CustomSubscriptionPlan struct {
 	UpdatedAt            int64  `gorm:"type:bigint;autoUpdateTime:milli"`
 }
 type CustomSubscriptionOrder struct {
-	TopUpId              *int    `gorm:"uniqueIndex:idx_cso_topup"`
-	CheckoutRequestId    *string `gorm:"type:varchar(64);uniqueIndex:idx_cso_checkout,priority:2"`
-	QuotaToCredit        int64   `gorm:"type:bigint;not null;default:0"`
-	Id                   int64   `gorm:"primaryKey"`
-	TradeNo              string  `gorm:"type:varchar(64);not null;uniqueIndex:idx_cso_trade"`
-	UserId               int64   `gorm:"type:bigint;not null;index:idx_cso_user_time,priority:1;uniqueIndex:idx_cso_checkout,priority:1"`
-	PlanId               int64   `gorm:"type:bigint;not null;index:idx_cso_plan"`
-	PlanVersion          int64   `gorm:"type:bigint;not null"`
-	PlanSnapshot         string  `gorm:"type:text;not null"`
-	TierCode             string  `gorm:"type:varchar(32);not null"`
-	TierRank             int     `gorm:"not null"`
-	Priority             int     `gorm:"not null;default:0"`
-	BillingCycle         string  `gorm:"type:varchar(16);not null"`
-	DurationMonths       int     `gorm:"not null"`
-	Currency             string  `gorm:"type:varchar(8);not null"`
-	PaidPoints           int64   `gorm:"type:bigint;not null;default:0"`
-	PaidPointTypeId      int64   `gorm:"type:bigint;not null"`
-	BonusPoints          int64   `gorm:"type:bigint;not null;default:0"`
-	BonusPointTypeId     *int64  `gorm:"type:bigint"`
-	AutoRenewBonusBps    int     `gorm:"not null"`
-	AutoBonusPointTypeId *int64  `gorm:"type:bigint"`
-	OrderType            string  `gorm:"type:varchar(32);not null"`
-	AmountDueMinor       int64   `gorm:"type:bigint;not null;default:0"`
-	AmountPaidMinor      int64   `gorm:"type:bigint;not null;default:0"`
-	AutoBonusPoints      int64   `gorm:"type:bigint;not null;default:0"`
-	PaymentMethod        string  `gorm:"type:varchar(32);not null"`
-	PaymentProvider      string  `gorm:"type:varchar(32);not null;uniqueIndex:idx_cso_provider,priority:1"`
-	ProviderTradeNo      *string `gorm:"type:varchar(128);uniqueIndex:idx_cso_provider,priority:2"`
-	RenewalAgreementId   *int64  `gorm:"type:bigint;uniqueIndex:idx_cso_renewal,priority:1"`
-	RenewalDueAt         *int64  `gorm:"type:bigint;uniqueIndex:idx_cso_renewal,priority:2"`
-	Status               string  `gorm:"type:varchar(32);not null;index:idx_cso_status_expiry,priority:1"`
-	FulfillmentStatus    string  `gorm:"type:varchar(32);not null;index:idx_cso_fulfill_time,priority:1"`
-	PointTransactionId   *int64  `gorm:"type:bigint;uniqueIndex:idx_cso_transaction"`
-	RefundedAmountMinor  int64   `gorm:"type:bigint;not null;default:0"`
-	RefundStatus         string  `gorm:"type:varchar(32);not null"`
-	ProviderPayload      string  `gorm:"type:text"`
-	ExpiresAt            *int64  `gorm:"type:bigint;index:idx_cso_status_expiry,priority:2"`
-	PaidAt               *int64  `gorm:"type:bigint"`
-	FulfilledAt          *int64  `gorm:"type:bigint"`
-	CreatedAt            int64   `gorm:"type:bigint;autoCreateTime:milli;index:idx_cso_user_time,priority:2"`
-	UpdatedAt            int64   `gorm:"type:bigint;autoUpdateTime:milli;index:idx_cso_fulfill_time,priority:2"`
+	InvitationCaptureVersion *int64  `gorm:"type:bigint"`
+	InvitationCaptureResult  *string `gorm:"type:varchar(32)"`
+	TopUpId                  *int    `gorm:"uniqueIndex:idx_cso_topup"`
+	CheckoutRequestId        *string `gorm:"type:varchar(64);uniqueIndex:idx_cso_checkout,priority:2"`
+	QuotaToCredit            int64   `gorm:"type:bigint;not null;default:0"`
+	Id                       int64   `gorm:"primaryKey"`
+	TradeNo                  string  `gorm:"type:varchar(64);not null;uniqueIndex:idx_cso_trade"`
+	UserId                   int64   `gorm:"type:bigint;not null;index:idx_cso_user_time,priority:1;uniqueIndex:idx_cso_checkout,priority:1"`
+	PlanId                   int64   `gorm:"type:bigint;not null;index:idx_cso_plan"`
+	PlanVersion              int64   `gorm:"type:bigint;not null"`
+	PlanSnapshot             string  `gorm:"type:text;not null"`
+	TierCode                 string  `gorm:"type:varchar(32);not null"`
+	TierRank                 int     `gorm:"not null"`
+	Priority                 int     `gorm:"not null;default:0"`
+	BillingCycle             string  `gorm:"type:varchar(16);not null"`
+	DurationMonths           int     `gorm:"not null"`
+	Currency                 string  `gorm:"type:varchar(8);not null"`
+	PaidPoints               int64   `gorm:"type:bigint;not null;default:0"`
+	PaidPointTypeId          int64   `gorm:"type:bigint;not null"`
+	BonusPoints              int64   `gorm:"type:bigint;not null;default:0"`
+	BonusPointTypeId         *int64  `gorm:"type:bigint"`
+	AutoRenewBonusBps        int     `gorm:"not null"`
+	AutoBonusPointTypeId     *int64  `gorm:"type:bigint"`
+	OrderType                string  `gorm:"type:varchar(32);not null"`
+	AmountDueMinor           int64   `gorm:"type:bigint;not null;default:0"`
+	AmountPaidMinor          int64   `gorm:"type:bigint;not null;default:0"`
+	AutoBonusPoints          int64   `gorm:"type:bigint;not null;default:0"`
+	PaymentMethod            string  `gorm:"type:varchar(32);not null"`
+	PaymentProvider          string  `gorm:"type:varchar(32);not null;uniqueIndex:idx_cso_provider,priority:1"`
+	ProviderTradeNo          *string `gorm:"type:varchar(128);uniqueIndex:idx_cso_provider,priority:2"`
+	RenewalAgreementId       *int64  `gorm:"type:bigint;uniqueIndex:idx_cso_renewal,priority:1"`
+	RenewalDueAt             *int64  `gorm:"type:bigint;uniqueIndex:idx_cso_renewal,priority:2"`
+	Status                   string  `gorm:"type:varchar(32);not null;index:idx_cso_status_expiry,priority:1"`
+	FulfillmentStatus        string  `gorm:"type:varchar(32);not null;index:idx_cso_fulfill_time,priority:1"`
+	PointTransactionId       *int64  `gorm:"type:bigint;uniqueIndex:idx_cso_transaction"`
+	RefundedAmountMinor      int64   `gorm:"type:bigint;not null;default:0"`
+	RefundStatus             string  `gorm:"type:varchar(32);not null"`
+	ProviderPayload          string  `gorm:"type:text"`
+	ExpiresAt                *int64  `gorm:"type:bigint;index:idx_cso_status_expiry,priority:2"`
+	PaidAt                   *int64  `gorm:"type:bigint"`
+	FulfilledAt              *int64  `gorm:"type:bigint"`
+	CreatedAt                int64   `gorm:"type:bigint;autoCreateTime:milli;index:idx_cso_user_time,priority:2"`
+	UpdatedAt                int64   `gorm:"type:bigint;autoUpdateTime:milli;index:idx_cso_fulfill_time,priority:2"`
 }
 
 var (
