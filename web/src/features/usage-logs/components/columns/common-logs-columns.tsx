@@ -50,7 +50,9 @@ import type { BillingUsageSchema } from '@/features/pricing/types'
 import { getUserAvatarFallback, getUserAvatarStyle } from '@/lib/avatar'
 import { formatBillingCurrencyFromUSD } from '@/lib/currency'
 import { formatLogQuota, formatTimestampToDate } from '@/lib/format'
+import { ROLE } from '@/lib/roles'
 import { cn } from '@/lib/utils'
+import { useAuthStore } from '@/stores/auth-store'
 import { useSystemConfigStore } from '@/stores/system-config-store'
 
 import { LOG_TYPE_ALL_VALUE } from '../../constants'
@@ -355,6 +357,9 @@ export function useCommonLogsColumns(
   showBillingSource = false
 ): ColumnDef<UsageLog>[] {
   const { t } = useTranslation()
+  const canViewCost = useAuthStore(
+    (state) => state.auth.user?.role === ROLE.SUPER_ADMIN
+  )
   const currency = useSystemConfigStore((state) => state.config.currency)
   return useMemo(() => {
     const columns: ColumnDef<UsageLog>[] = [
@@ -772,24 +777,28 @@ export function useCommonLogsColumns(
           )
         },
       },
-      {
-        accessorKey: 'quota',
-        header: t('Cost'),
-        cell: ({ row }) => {
-          const log = row.original
-          if (!isDisplayableLogType(log.type)) return null
+      ...(canViewCost
+        ? ([
+            {
+              accessorKey: 'quota',
+              header: t('Cost'),
+              cell: ({ row }) => {
+                const log = row.original
+                if (!isDisplayableLogType(log.type)) return null
 
-          const quota = row.getValue('quota') as number
-          const other = parseLogOther(log.other)
-          return (
-            <LogCostDisplay
-              quota={quota}
-              other={other}
-              showBillingSource={showBillingSource}
-            />
-          )
-        },
-      },
+                const quota = row.getValue('quota') as number
+                const other = parseLogOther(log.other)
+                return (
+                  <LogCostDisplay
+                    quota={quota}
+                    other={other}
+                    showBillingSource={showBillingSource}
+                  />
+                )
+              },
+            },
+          ] satisfies ColumnDef<UsageLog>[])
+        : []),
 
       {
         id: 'consumed_points',
@@ -914,5 +923,5 @@ export function useCommonLogsColumns(
     return columns
     // Log formatters read currency settings from the store.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [t, isAdmin, isRoot, showBillingSource, currency])
+  }, [t, isAdmin, isRoot, canViewCost, showBillingSource, currency])
 }

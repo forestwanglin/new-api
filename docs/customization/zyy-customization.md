@@ -1021,6 +1021,16 @@
 - 验证：Go service/controller/middleware 中 Security/Phone/WeChat 定向测试及 build 通过；绑定短信矩阵覆盖 SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 16.16，包括错误/过期/重放、跨会话/操作、手机号变化、占用、MFA、并发与撤销。前端 auth/security 29 文件/208 用例、typecheck（1618 文件/2 项目）、受影响文件 lint/format 通过；Chrome 观察明暗主题的红色粗体、无背景。
 - 风险与边界：未发送真实短信或绑定真实微信，供应商 HTTP 在测试中替换。既有 router 覆盖测试仍有六条公共接口缺失豁免，全量前端 lint 有既有错误；本次接口规则和改动文件检查通过。安全审查参考 OWASP Authentication、Session Management、MFA、OAuth 与 CSRF Cheat Sheets，不宣称全站合规。回滚需同步前后端，无数据迁移。
 
+### Z064 使用日志费用列仅超级管理员可见
+
+- 需求与原因：使用日志列表只向超级管理员展示费用，普通用户与管理员隐藏费用列数据。
+- 变更内容：按当前账号 `ROLE.SUPER_ADMIN` 构造普通使用日志的 `quota` 列；桌面表头、单元格、列选择和移动卡片同步隐藏。超级管理员在全部/仅本人范围均保留费用与原有计费来源标记，消费积分继续正常展示。
+- 影响面：**上游自有文件** `web/src/features/usage-logs/components/columns/common-logs-columns.tsx`；更新既有 `components/__tests__/{billing-source-visibility,points-billing}.test.tsx`。升级时复核角色条件与列顺序；不新增依赖、配置或部署变更。
+- 与上游差异：上游费用列向所有可查看日志的账号提供，本定制仅在超级管理员账号下定义该列，沿用共享表格和移动卡片的可见列机制。
+- 开关与默认值：无新增开关；以当前认证账号 role 严格等于 100 为准，不依赖查看范围或本地列显隐偏好。
+- 验证：新增桌面/移动普通用户、管理员隐藏费用及超级管理员全部/本人范围可见回归，先红后绿；`bun run test src/features/usage-logs` 最近一次 27 文件/473 用例全部通过；`bun run typecheck`（1618 文件/2 项目）、三个改动 TSX 文件的定向 oxlint/oxfmt、`git diff --check` 通过。
+- 风险与未覆盖：本次是列表展示控制，API 原始费用字段、详情弹窗、统计和导出契约不变；未做浏览器人工验证及生产发布。既有 detail-preview 本地化价格用例曾超时，独立未修改 HEAD 的完整测试文件亦复现，最近模块全量通过；全库 lint 仍有无关既有错误，改动文件定向检查通过。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
@@ -1029,6 +1039,7 @@
 
 | 区域 | 文件 | 关联条目 |
 |---|---|---|
+| 使用日志费用可见性 | `web/src/features/usage-logs/components/columns/common-logs-columns.tsx` | Z064 |
 | 微信绑定二次验证 | `controller/wechat.go`、安全证明 service、`router/api-router.go`、`middleware/access_token_routes.go`、认证入口、微信绑定对话框与七种 locale | Z063 |
 | 邀请入口及认证归因 | `controller/wechat.go`、`web/src/routes/{__root.tsx,(auth)/sign-up.tsx}`；与 fork 自有手机/微信认证扩展联动 | Z061 |
 | 邀请活动与订阅返奖 | `controller/user.go`、`model/{main,user,custom_subscription,custom_subscription_payment,custom_subscription_runtime}.go`、`router/api-router.go`、`middleware/access_token_routes.go`、`main.go`、钱包/导航 hooks、七种 locale、`web/src/routeTree.gen.ts` | Z062 |

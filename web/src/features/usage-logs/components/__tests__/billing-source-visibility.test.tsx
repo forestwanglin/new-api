@@ -56,7 +56,15 @@ async function renderLogs(props: {
   role: number
   enabledPlans: boolean[]
   activeSubscription: boolean
+  mobile?: boolean
 }) {
+  if (props.mobile) {
+    const matchMedia = window.matchMedia.bind(window)
+    vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({
+      ...matchMedia(query),
+      matches: query === '(max-width: 640px)' || matchMedia(query).matches,
+    }))
+  }
   useAuthStore
     .getState()
     .auth.setUser({ id: 1, username: 'tester', role: props.role })
@@ -116,7 +124,7 @@ async function renderLogs(props: {
       </UsageLogsProvider>
     </QueryClientProvider>
   )
-  await screen.findAllByText('$0.01')
+  await screen.findByRole('button', { name: 'Switch scope' })
   await waitFor(() => expect(client.isFetching()).toBe(0))
   return client
 }
@@ -132,7 +140,7 @@ test.each([{ enabledPlans: [] }, { enabledPlans: [false] }])(
   'hides the wallet icon in admin view when no plan is enabled but keeps the subscription marker ($enabledPlans)',
   async ({ enabledPlans }) => {
     await renderLogs({
-      role: ROLE.ADMIN,
+      role: ROLE.SUPER_ADMIN,
       enabledPlans,
       activeSubscription: true,
     })
@@ -146,7 +154,7 @@ test.each([{ enabledPlans: [] }, { enabledPlans: [false] }])(
 
 test('shows both source icons in admin view when any system plan is enabled', async () => {
   await renderLogs({
-    role: ROLE.ADMIN,
+    role: ROLE.SUPER_ADMIN,
     enabledPlans: [false, true],
     activeSubscription: false,
   })
@@ -155,32 +163,54 @@ test('shows both source icons in admin view when any system plan is enabled', as
   expect(screen.getByRole('img', { name: 'Subscription' })).toBeVisible()
 })
 
-test('keeps the subscription marker on a subscription-billed log for a user with only expired subscriptions', async () => {
-  await renderLogs({
-    role: ROLE.USER,
-    enabledPlans: [true],
-    activeSubscription: false,
-  })
+test.each([
+  { role: ROLE.USER, mobile: false },
+  { role: ROLE.ADMIN, mobile: false },
+  { role: ROLE.USER, mobile: true },
+  { role: ROLE.ADMIN, mobile: true },
+])(
+  'hides cost headers, values and source markers for role $role (mobile: $mobile)',
+  async ({ role, mobile }) => {
+    await renderLogs({
+      role,
+      mobile,
+      enabledPlans: [true],
+      activeSubscription: true,
+    })
+    expect(
+      screen.queryByRole('columnheader', { name: 'Cost' })
+    ).not.toBeInTheDocument()
+    expect(screen.queryAllByText('$0.01')).toHaveLength(0)
+    expect(
+      screen.queryByRole('img', { name: 'Wallet' })
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('img', { name: 'Subscription' })
+    ).not.toBeInTheDocument()
+  }
+)
 
-  expect(screen.queryByRole('img', { name: 'Wallet' })).not.toBeInTheDocument()
-  expect(screen.getByRole('img', { name: 'Subscription' })).toBeVisible()
-})
-
-test('shows both source icons for a user with an active subscription', async () => {
-  await renderLogs({
-    role: ROLE.USER,
-    enabledPlans: [],
-    activeSubscription: true,
-  })
-
-  expect(screen.getByRole('img', { name: 'Wallet' })).toBeVisible()
-  expect(screen.getByRole('img', { name: 'Subscription' })).toBeVisible()
-})
+test.each([false, true])(
+  'shows cost to a super administrator in all and self scope (mobile: %s)',
+  async (mobile) => {
+    const user = userEvent.setup()
+    const client = await renderLogs({
+      role: ROLE.SUPER_ADMIN,
+      enabledPlans: [true],
+      activeSubscription: true,
+      mobile,
+    })
+    expect(await screen.findAllByText('$0.01')).toHaveLength(2)
+    await user.click(screen.getByRole('button', { name: 'Switch scope' }))
+    await waitFor(() => expect(client.isFetching()).toBe(0))
+    expect(await screen.findAllByText('$0.01')).toHaveLength(2)
+  }
+)
 
 test('uses personal subscriptions when an admin switches to only-self view', async () => {
   const user = userEvent.setup()
   const client = await renderLogs({
-    role: ROLE.ADMIN,
+    role: ROLE.SUPER_ADMIN,
     enabledPlans: [true],
     activeSubscription: false,
   })

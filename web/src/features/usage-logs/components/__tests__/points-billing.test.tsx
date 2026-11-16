@@ -26,7 +26,7 @@ import userEvent from '@testing-library/user-event'
 import { createInstance } from 'i18next'
 import { useMemo } from 'react'
 import { I18nextProvider } from 'react-i18next'
-import { expect, it } from 'vitest'
+import { afterEach, expect, it } from 'vitest'
 
 import { toIntlLocale } from '@/i18n/languages'
 import en from '@/i18n/locales/en.json'
@@ -37,6 +37,8 @@ import vi from '@/i18n/locales/vi.json'
 import zhTW from '@/i18n/locales/zh-TW.json'
 import zh from '@/i18n/locales/zh.json'
 import { formatNumber } from '@/lib/format'
+import { ROLE } from '@/lib/roles'
+import { useAuthStore } from '@/stores/auth-store'
 
 import { usageLogSchema } from '../../data/schema'
 import { useCommonLogsColumns } from '../columns/common-logs-columns'
@@ -118,19 +120,30 @@ function view(billing?: unknown) {
   )
 }
 
-it('puts consumed points immediately after cost and preserves every split integer', async () => {
-  await i18n.changeLanguage('en')
-  view(committed)
-  const order = within(screen.getByRole('list', { name: 'Column order' }))
-    .getAllByRole('listitem')
-    .map((item) => item.textContent)
-  expect(order[order.indexOf('quota') + 1]).toBe('consumed_points')
-  const cell = screen.getByTestId('points')
-  expect(within(cell).getByText('9,007,199,254,740,993')).toBeVisible()
-  expect(within(cell).getByText('7')).toBeVisible()
-  expect(within(cell).getByText('GPT points')).toBeVisible()
-  expect(within(cell).getByText('General points')).toBeVisible()
+afterEach(() => {
+  useAuthStore.setState(useAuthStore.getInitialState(), true)
 })
+
+it.each([ROLE.USER, ROLE.SUPER_ADMIN])(
+  'keeps consumed points after the permitted usage columns and preserves split integers for role %s',
+  async (role) => {
+    useAuthStore.getState().auth.setUser({ id: 1, username: 'tester', role })
+    await i18n.changeLanguage('en')
+    view(committed)
+    const order = within(screen.getByRole('list', { name: 'Column order' }))
+      .getAllByRole('listitem')
+      .map((item) => item.textContent)
+    const precedingColumn =
+      role === ROLE.SUPER_ADMIN ? 'quota' : 'prompt_tokens'
+    expect(order[order.indexOf(precedingColumn) + 1]).toBe('consumed_points')
+    expect(order.includes('quota')).toBe(role === ROLE.SUPER_ADMIN)
+    const cell = screen.getByTestId('points')
+    expect(within(cell).getByText('9,007,199,254,740,993')).toBeVisible()
+    expect(within(cell).getByText('7')).toBeVisible()
+    expect(within(cell).getByText('GPT points')).toBeVisible()
+    expect(within(cell).getByText('General points')).toBeVisible()
+  }
+)
 it.each([
   ['historic', undefined, '—'],
   ['zero', { ...committed, total_points: '0', items: [] }, '0'],
