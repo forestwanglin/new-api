@@ -239,9 +239,7 @@ export function InvitationCampaignAdmin() {
               <p>{t('100 basis points = 1%')}</p>
               <p>
                 {t('Reward preview for CNY 100')}:{' '}
-                {tiers
-                  .map(formatInvitationTierPreview)
-                  .join(' / ')}
+                {tiers.map(formatInvitationTierPreview).join(' / ')}
               </p>
               <Button
                 variant='outline'
@@ -361,7 +359,7 @@ export function InvitationCampaignAdmin() {
   )
 }
 
-export function isValidInvitationTier(tier: {
+function isValidInvitationTier(tier: {
   min_effective_friends: number
   rate_bps: number
 }) {
@@ -374,7 +372,7 @@ export function isValidInvitationTier(tier: {
   )
 }
 
-export function formatInvitationTierPreview(tier: {
+function formatInvitationTierPreview(tier: {
   min_effective_friends: number
   rate_bps: number
 }) {

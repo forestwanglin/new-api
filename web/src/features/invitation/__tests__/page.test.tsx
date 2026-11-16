@@ -1,5 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -9,6 +16,7 @@ import { useAuthStore } from '@/stores/auth-store'
 import { useLoginModalStore } from '@/stores/login-modal-store'
 
 import { InvitationPage } from '..'
+import { InvitationCampaignAdmin } from '../admin'
 import { readBindingIntent } from '../intent'
 
 vi.mock('@/components/layout', () => ({
@@ -69,14 +77,12 @@ afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
 })
-function mount() {
+function mount(page: ReactNode = <InvitationPage />) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   })
   return render(
-    <QueryClientProvider client={client}>
-      <InvitationPage />
-    </QueryClientProvider>
+    <QueryClientProvider client={client}>{page}</QueryClientProvider>
   )
 }
 function login() {
@@ -207,5 +213,42 @@ it('already-bound account without a URL code can open its binding dialog', async
   expect(await screen.findByRole('dialog')).toHaveTextContent(
     'You have already bound an inviter'
   )
+  expect(api.post).not.toHaveBeenCalled()
+})
+
+it('invalid tier input keeps the admin preview usable and prevents saving', async () => {
+  vi.mocked(api.get).mockImplementation(async (url) => ({
+    data: {
+      success: true,
+      data:
+        url === '/api/points/types'
+          ? [{ id: 1, name: 'General', code: 'general' }]
+          : empty,
+    },
+  }))
+  mount(<InvitationCampaignAdmin />)
+  await userEvent.type(screen.getByLabelText('Campaign code'), 'test')
+  await userEvent.type(screen.getByLabelText('Campaign name'), 'Test campaign')
+  await userEvent.selectOptions(screen.getByLabelText('Reward point type'), '1')
+  fireEvent.change(screen.getByLabelText('Starts at'), {
+    target: { value: '2026-11-16T00:00' },
+  })
+  fireEvent.change(screen.getByLabelText('Ends at'), {
+    target: { value: '2026-12-16T00:00' },
+  })
+  const rate = screen.getAllByLabelText('Reward basis points')[0]
+  expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+  for (const invalid of ['500.5', '10001', '-1']) {
+    fireEvent.change(rate, { target: { value: invalid } })
+    expect(screen.getByText(/Reward preview for CNY 100/)).toHaveTextContent(
+      '0+: -'
+    )
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+  }
+  fireEvent.change(rate, { target: { value: '700' } })
+  expect(screen.getByText(/Reward preview for CNY 100/)).toHaveTextContent(
+    '0+: 7000'
+  )
+  expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
   expect(api.post).not.toHaveBeenCalled()
 })
