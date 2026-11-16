@@ -104,6 +104,7 @@
     "Point model rule not found": "积分模型规则不存在",
     "Point model rule already exists": "积分模型规则已存在",
     "Failed to manage point model rules": "积分模型规则管理失败",
+    "Points management": "积分管理",
     "Points": "积分",
     "Point type code": "积分类型代码",
     "Consumption priority": "消费优先级",

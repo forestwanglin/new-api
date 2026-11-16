@@ -154,7 +154,7 @@ export function useSidebarData(badges: SidebarBadges = {}): SidebarData {
             icon: Users,
           },
           {
-            title: t('Points'),
+            title: t('Points management'),
             url: '/points',
             icon: Coins,
           },

@@ -104,6 +104,7 @@
     "Point model rule not found": "積分模型規則不存在",
     "Point model rule already exists": "積分模型規則已存在",
     "Failed to manage point model rules": "積分模型規則管理失敗",
+    "Points management": "積分管理",
     "Points": "積分",
     "Point type code": "積分類型代碼",
     "Consumption priority": "消費優先順序",

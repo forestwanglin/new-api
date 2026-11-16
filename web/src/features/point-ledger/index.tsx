@@ -34,6 +34,7 @@ import { LoadingState } from '@/components/loading-state'
 import { Button } from '@/components/ui/button'
 import { toIntlLocale } from '@/i18n/languages'
 import { formatNumber, formatTimestampToDate } from '@/lib/format'
+import { ROLE } from '@/lib/roles'
 import { getServerErrorMessage } from '@/lib/server-error-message'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -196,12 +197,13 @@ export function PointLedger(props: { scope: PointLedgerScope }) {
 
 export function PointLedgerPage() {
   const { t } = useTranslation()
-  const userId = useAuthStore((state) => state.auth.user?.id)
+  const user = useAuthStore((state) => state.auth.user)
+  const scope = user?.role === ROLE.SUPER_ADMIN ? 'admin' : 'self'
   return (
     <SectionPageLayout fixedContent>
       <SectionPageLayout.Title>{t('Point Ledger')}</SectionPageLayout.Title>
       <SectionPageLayout.Content>
-        <PointLedger key={userId} scope='self' />
+        <PointLedger key={`${user?.id}:${scope}`} scope={scope} />
       </SectionPageLayout.Content>
     </SectionPageLayout>
   )

@@ -334,7 +334,7 @@
 /* Follow the app theme for portal-mounted dialog content as well as form controls. */
 .dark .login-modal[data-slot='dialog-content'] {
   --blue: var(--primary);
-  --blue-text: var(--secondary-foreground);
+  --blue-text: var(--foreground);
   --submit-text: var(--primary-foreground);
   --surface: var(--card);
   --soft: var(--muted);

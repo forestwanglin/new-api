@@ -1069,6 +1069,16 @@
 - **验证**：`go test ./model -run 'TestAdminUserPhoneDatabaseMatrix|TestSearchUsersSortsBeforePagination|TestGetAllUsersSortsBeforePagination' -count=1 -v` 使用隔离数据库 SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 16.16 全部通过；覆盖完整/部分号码、provider 隔离、旧字段、组合筛选、排序分页、积分及序列化边界。`cd web && bun run test src/features/users`：9 文件 / 77 用例通过；`bun check -b`：1,620 文件无类型错误；改动 TS/TSX 的 `oxlint`、`oxfmt --check`、`go test ./controller -run '^$'` 编译检查及 `bun run build` 通过。
 - **风险与未覆盖**：每个管理员列表请求新增一次当前页手机号批量查询；未验证生产环境、最低支持数据库版本和真实浏览器页面，未改动认证及绑定流程。
 
+### Z069 积分管理入口统一与登录选中态深色修正
+
+- 需求与原因：登录方式选中态在部分深色主题下会使用深色文字；积分配置与流水入口重复，超管需要在常规流水中跨用户检索。
+- 变更内容：登录弹窗深色 `--blue-text` 改用表面前景色 `--foreground`；控制台菜单与管理页改为“积分管理”，移除管理页流水 Tab；常规 `/point-ledger` 按超管角色查询全量并展示用户 ID 精确筛选，其他角色仍只查询本人。复用既有管理查询、用户列和筛选组件，按当前用户 ID 与 self/admin 范围重挂载，避免身份或权限切换残留筛选、分页和跨用户记录。
+- 影响面：fork 自有文件 `web/src/styles/login-modal.css`、`web/src/styles/__tests__/login-modal-theme.test.ts`、`web/src/features/point-ledger/index.tsx` 及其查询测试、`web/src/features/points/index.tsx` 及入口测试、`web/src/hooks/__tests__/points-sidebar.test.tsx`、`web/src/features/system-settings/maintenance/__tests__/sidebar-modules-section.test.tsx`；**上游自有文件**：`web/src/hooks/use-sidebar-data.ts`、`web/src/features/system-settings/maintenance/sidebar-modules-section.tsx`、`web/src/i18n/locales/{en,zh,zh-TW,fr,ru,ja,vi}.json`。升级时复核菜单文案与七语言合并。
+- 与上游差异：扩展 fork 积分查询与配置的入口组织；修复 fork 登录弹窗选中态语义颜色，不改公共 Tabs、不改变认证流程。
+- 开关与默认值：URL 与菜单开关键保持不变；超管默认所有用户，可通过用户 ID 筛选；普通管理员及用户默认本人。后端现有 AdminAuth 授权范围、数据库和记账逻辑保持不变。
+- 验证：先红后绿覆盖深色选中文字、导航/管理页入口、超管筛选及重置、权限降级与用户切换隔离；`bun run test src/styles/__tests__/login-modal-theme.test.ts src/features/auth/components/__tests__/login-modal.test.tsx src/features/point-ledger src/features/points src/hooks/__tests__/points-sidebar.test.tsx` 10 文件/76 用例通过（含原有固定页脚分页与每页条数回归）；`bun run typecheck` 1621 文件/2 项目无类型错误，涉及前端文件 oxlint/oxfmt、生产 `bun run build` 通过。检查阶段补齐菜单设置同名文案，并新增对应开关标签回归（1 文件/1 用例，先红后绿通过）；保留 `admin.points` 配置键。Chrome 本地深色页面实际检查微信与手机选中态：文字 `lab(95.94 0 0)`、背景 `lab(17.06 0 0)`，截图确认浅色可读；未触发认证或短信行为。
+- 风险与未覆盖：未执行已登录超管的真实浏览器验收，此路径由组件交互测试验证；后端与数据库未修改，未运行数据库矩阵或全量前端测试。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，

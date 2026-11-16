@@ -104,6 +104,7 @@
     "Point model rule not found": "Règle de modèle introuvable",
     "Point model rule already exists": "Cette règle de modèle existe déjà",
     "Failed to manage point model rules": "Échec de la gestion des règles de modèles",
+    "Points management": "Gestion des points",
     "Points": "Points",
     "Point type code": "Code du type de points",
     "Consumption priority": "Priorité de consommation",

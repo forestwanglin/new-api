@@ -27,7 +27,6 @@ import { SectionPageLayout } from '@/components/layout'
 import { LoadingState } from '@/components/loading-state'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { PointLedger } from '@/features/point-ledger'
 import { toIntlLocale } from '@/i18n/languages'
 import { formatNumber } from '@/lib/format'
 import { getServerErrorMessage } from '@/lib/server-error-message'
@@ -98,14 +97,15 @@ export function Points() {
 
   return (
     <SectionPageLayout fixedContent>
-      <SectionPageLayout.Title>{t('Points')}</SectionPageLayout.Title>
+      <SectionPageLayout.Title>
+        {t('Points management')}
+      </SectionPageLayout.Title>
       <SectionPageLayout.Content>
         <Tabs defaultValue='configuration' className='h-full min-h-0'>
           <TabsList className='mb-4 shrink-0'>
             <TabsTrigger value='configuration'>
               {t('Point configuration')}
             </TabsTrigger>
-            <TabsTrigger value='ledger'>{t('Point Ledger')}</TabsTrigger>
           </TabsList>
           <TabsContent value='configuration'>
             <p className='text-muted-foreground mb-4 text-sm'>
@@ -121,9 +121,6 @@ export function Points() {
                 onClose={() => setSelectedType(null)}
               />
             )}
-          </TabsContent>
-          <TabsContent value='ledger' className='min-h-0'>
-            <PointLedger scope='admin' />
           </TabsContent>
         </Tabs>
       </SectionPageLayout.Content>

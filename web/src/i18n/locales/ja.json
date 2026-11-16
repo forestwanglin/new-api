@@ -104,6 +104,7 @@
     "Point model rule not found": "ポイントモデルルールが見つかりません",
     "Point model rule already exists": "ポイントモデルルールは既に存在します",
     "Failed to manage point model rules": "ポイントモデルルールの管理に失敗しました",
+    "Points management": "ポイント管理",
     "Points": "ポイント",
     "Point type code": "ポイント種別コード",
     "Consumption priority": "消費優先度",

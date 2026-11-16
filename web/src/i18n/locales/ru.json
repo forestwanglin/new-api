@@ -104,6 +104,7 @@
     "Point model rule not found": "Правило модели не найдено",
     "Point model rule already exists": "Правило модели уже существует",
     "Failed to manage point model rules": "Не удалось изменить правила моделей",
+    "Points management": "Управление баллами",
     "Points": "Баллы",
     "Point type code": "Код типа баллов",
     "Consumption priority": "Приоритет списания",

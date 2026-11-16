@@ -88,3 +88,12 @@ it('keeps white submit text in light mode and follows the primary contrast token
     getComputedStyle(dialog).getPropertyValue('--submit-text').trim()
   ).toBe('#fff')
 })
+
+it('uses the surface foreground for selected dark login tabs even when secondary text is dark', () => {
+  document.documentElement.classList.add('dark')
+  dialog.style.setProperty('--secondary-foreground', '#000')
+  dialog.style.setProperty('--foreground', '#f5f5f5')
+  expect(getComputedStyle(dialog).getPropertyValue('--blue-text').trim()).toBe(
+    'var(--foreground)'
+  )
+})

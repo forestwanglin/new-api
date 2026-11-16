@@ -42,7 +42,7 @@ import zh from '@/i18n/locales/zh.json'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 
-import { PointLedger } from '..'
+import { PointLedger, PointLedgerPage as LedgerPage } from '..'
 import { getPointLedger } from '../api'
 import type {
   PointLedgerItem,
@@ -397,3 +397,144 @@ it.each([
     expect(words['Start time']).toBe(start)
   }
 )
+
+describe('general point ledger role scope', () => {
+  function setupPage(role: number) {
+    useAuthStore.getState().auth.setUser({ id: 1, username: 'viewer', role })
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    render(
+      <QueryClientProvider client={client}>
+        <LedgerPage />
+      </QueryClientProvider>
+    )
+  }
+
+  it('shows all users for super administrators and filters then resets the user ID', async () => {
+    const get = vi.spyOn(api, 'get').mockResolvedValue(
+      response({
+        ...page,
+        items: [{ ...row, username: 'other-user', user_id: '2' }],
+      })
+    )
+    setupPage(100)
+    expect(await screen.findByText('other-user (2)')).toBeVisible()
+    expect(get).toHaveBeenLastCalledWith('/api/points/ledger', {
+      params: { p: 1, page_size: 20 },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Go to next page' }))
+    await waitFor(() =>
+      expect(get).toHaveBeenLastCalledWith('/api/points/ledger', {
+        params: { p: 2, page_size: 20 },
+      })
+    )
+    fireEvent.change(screen.getByLabelText('User ID'), {
+      target: { value: '2' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }))
+    await waitFor(() =>
+      expect(get).toHaveBeenLastCalledWith('/api/points/ledger', {
+        params: { p: 1, page_size: 20, user_id: '2' },
+      })
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Reset' }))
+    await waitFor(() =>
+      expect(get).toHaveBeenLastCalledWith('/api/points/ledger', {
+        params: { p: 1, page_size: 20 },
+      })
+    )
+    expect(screen.getByLabelText('User ID')).toHaveValue('')
+  })
+
+  it.each([1, 10])(
+    'keeps non-root role %s on personal history without a user selector',
+    async (role) => {
+      const get = vi.spyOn(api, 'get').mockResolvedValue(response(page))
+      setupPage(role)
+      await screen.findByText('FUTURE_ACTION')
+      expect(get).toHaveBeenLastCalledWith('/api/points/ledger/self', {
+        params: { p: 1, page_size: 20 },
+      })
+      expect(screen.queryByLabelText('User ID')).not.toBeInTheDocument()
+    }
+  )
+
+  it('clears user filters and pagination when another super administrator signs in', async () => {
+    const get = vi.spyOn(api, 'get').mockResolvedValue(response(page))
+    setupPage(100)
+    await screen.findByText('FUTURE_ACTION')
+    fireEvent.change(screen.getByLabelText('User ID'), {
+      target: { value: '2' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }))
+    await waitFor(() =>
+      expect(get).toHaveBeenLastCalledWith('/api/points/ledger', {
+        params: { p: 1, page_size: 20, user_id: '2' },
+      })
+    )
+    await screen.findByText('FUTURE_ACTION')
+    fireEvent.click(screen.getByRole('button', { name: 'Go to next page' }))
+    await waitFor(() =>
+      expect(get).toHaveBeenLastCalledWith('/api/points/ledger', {
+        params: { p: 2, page_size: 20, user_id: '2' },
+      })
+    )
+    act(() =>
+      useAuthStore
+        .getState()
+        .auth.setUser({ id: 3, username: 'next-viewer', role: 100 })
+    )
+    expect(screen.getByLabelText('User ID')).toHaveValue('')
+    await waitFor(() =>
+      expect(get).toHaveBeenLastCalledWith('/api/points/ledger', {
+        params: { p: 1, page_size: 20 },
+      })
+    )
+  })
+
+  it('clears cross-user data and filters when the same viewer loses super administrator access', async () => {
+    let resolveSelf: ((value: ReturnType<typeof response>) => void) | undefined
+    const get = vi.spyOn(api, 'get').mockImplementation(async (url) => {
+      if (url === '/api/points/ledger/self') {
+        return new Promise((resolve) => {
+          resolveSelf = resolve
+        })
+      }
+      return response(page)
+    })
+    setupPage(100)
+    await screen.findByText('FUTURE_ACTION')
+    fireEvent.change(screen.getByLabelText('User ID'), {
+      target: { value: '2' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }))
+    await waitFor(() =>
+      expect(get).toHaveBeenLastCalledWith('/api/points/ledger', {
+        params: { p: 1, page_size: 20, user_id: '2' },
+      })
+    )
+    act(() =>
+      useAuthStore
+        .getState()
+        .auth.setUser({ id: 1, username: 'viewer', role: 10 })
+    )
+    expect(screen.queryByText('FUTURE_ACTION')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('User ID')).not.toBeInTheDocument()
+    await waitFor(() =>
+      expect(get).toHaveBeenLastCalledWith('/api/points/ledger/self', {
+        params: { p: 1, page_size: 20 },
+      })
+    )
+    await act(async () =>
+      resolveSelf?.(response({ ...page, total: 0, items: [] }))
+    )
+    expect(await screen.findByText('No point ledger entries')).toBeVisible()
+    act(() =>
+      useAuthStore
+        .getState()
+        .auth.setUser({ id: 1, username: 'viewer', role: 100 })
+    )
+    expect(await screen.findByLabelText('User ID')).toHaveValue('')
+  })
+})

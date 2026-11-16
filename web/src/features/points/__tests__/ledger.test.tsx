@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { api } from '@/lib/api'
@@ -39,20 +39,20 @@ function setup() {
   )
 }
 
-describe('administrator point ledger', () => {
-  it('opens the ledger tab without replacing existing points configuration', async () => {
-    vi.spyOn(api, 'get').mockImplementation(async (url) => ({
-      data: {
-        success: true,
-        data:
-          url === '/api/points/types'
-            ? []
-            : { page: 1, page_size: 20, total: 0, items: [], point_types: [] },
-      },
-    }))
+describe('points management entry', () => {
+  it('keeps configuration in points management without a ledger tab or ledger request', async () => {
+    const get = vi.spyOn(api, 'get').mockResolvedValue({
+      data: { success: true, data: [] },
+    })
     setup()
     expect(await screen.findByText('No point types configured')).toBeVisible()
-    fireEvent.click(screen.getByRole('tab', { name: 'Point Ledger' }))
-    expect(await screen.findByText('No point ledger entries')).toBeVisible()
+    expect(
+      screen.getByRole('heading', { name: 'Points management' })
+    ).toBeVisible()
+    expect(
+      screen.queryByRole('tab', { name: 'Point Ledger' })
+    ).not.toBeInTheDocument()
+    expect(get).toHaveBeenCalledTimes(1)
+    expect(get).toHaveBeenCalledWith('/api/points/types')
   })
 })
