@@ -117,6 +117,7 @@ export function InvitationCampaignAdmin() {
               <Input
                 type='number'
                 aria-label={t('Campaign period')}
+                placeholder={t('Campaign period (e.g. 1 for the first campaign)')}
                 value={period}
                 onChange={(e) => setPeriod(e.target.value)}
               />
