@@ -1010,7 +1010,7 @@
 - 影响面：新增 `controller/invitation*.go`、`model/invitation*.go`、`service/invitation_task.go`、邀请路由测试及 `web/src/features/invitation/`、邀请路由和多语言文案；修改 `model/{main,user,custom_subscription,custom_subscription_payment,custom_subscription_runtime}.go`、`controller/user.go`、`router/api-router.go`、`middleware/access_token_routes.go`、`main.go`、钱包/导航 hooks、七种 locale 及生成路由。**上游自有文件**：上述修改文件中除新增邀请模块外的既有 model/controller/router/middleware/main/web 文件，升级时需优先复核。
 - 与上游差异：替代旧 AffQuota/AffCount 作为新活动事实来源，扩展自定义订阅结算为邀请奖励快照、冻结账本、释放 worker、退款/冲回审计；不改变旧充值和旧订阅返奖边界。
 - 开关与默认值：无新增运行时开关；`freeze_days` 默认 7，允许 1–365；阶梯 `rate_bps` 为 0–10000，活动时间为 `[starts_at, ends_at)`，积分类型必须来自现有 point_types。活动草稿不生效，绑定不可覆盖。
-- 验证：邀请边界、控制器/路由、model/service 定向测试通过；SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 16.16 fresh/legacy 双次迁移和支付/退款/冻结/释放矩阵通过；前端邀请测试、typecheck、范围 lint/format、生产构建通过；隔离 Chrome 验证匿名登录弹窗取消、邀请页及 390×844 移动布局。全量后端仍复现既有 OpenAI 采样兼容与 PAT 路由目录失败；前端全量 281 文件 / 3028 用例通过，仅既有 detail-preview 本地化价格用例超时；新增导航顺序回归已同步。详见 [验证记录](invitation-campaign-verification.md)。
+- 验证：邀请边界、控制器/路由、model/service 定向测试通过；SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 16.16 fresh/legacy 双次迁移和支付/退款/冻结/释放矩阵通过，并覆盖冻结奖励退款舍入到零后再次退款、零奖励事件确认前后退款；前端邀请测试、typecheck、范围 lint/format、生产构建通过；隔离 Chrome 验证匿名登录弹窗取消、邀请页及 390×844 移动布局。全量后端仍复现既有 OpenAI 采样兼容与 PAT 路由目录失败；前端全量 281 文件 / 3028 用例通过，仅既有 detail-preview 本地化价格用例超时；新增导航顺序回归已同步。详见 [验证记录](invitation-campaign-verification.md)。
 - 风险与未覆盖：未部署生产，未执行真实支付渠道退款或真实短信/微信认证；全量基线失败未由本功能扩大处理范围。阶梯请求在 HTTP 边界严格拒绝 `null`、缺失和未知字段，避免配置被静默归一化。
 
 ## 5. 上游自有文件改动清单（升级冲突重点关注）

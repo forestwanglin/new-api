@@ -114,14 +114,20 @@ func CompleteInvitationRefund(orderID, refundID, operatorID, amountMinor int64, 
 			}
 			cancelled := reward.OriginalPoints - target
 			switch reward.Status {
-			case InvitationRewardCaptured, InvitationRewardCancelled:
+			case InvitationRewardCaptured:
 				if reward.FreezeId != nil {
 					return ErrInvitationConflict
 				}
 				reward.CancelledPoints = cancelled
 				reward.ProcessingPoints = target
-				// Keep CAPTURED until its durable event is acknowledged, including zero targets.
-				reward.Status = InvitationRewardCaptured
+				// The pending durable event still needs acknowledgment at zero target.
+			case InvitationRewardCancelled:
+				// Further cash refunds can leave an already cancelled target at zero.
+				// Keep the closed freeze and completed event as historical evidence.
+				if target != 0 || reward.ProcessingPoints != 0 || reward.FrozenPoints != 0 || reward.ReleasedPoints != 0 || reward.CancelledPoints != reward.OriginalPoints {
+					return ErrInvitationConflict
+				}
+
 			case InvitationRewardFrozen:
 				delta := cancelled - reward.CancelledPoints
 				if delta < 0 || delta > reward.FrozenPoints {
