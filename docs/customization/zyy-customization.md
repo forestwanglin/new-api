@@ -1049,6 +1049,16 @@
 - 验证：补充手机注册用户名及邀请页深色样式回归测试；提交前执行 Go 手机认证定向测试、邀请页样式测试、前端 typecheck、定向 lint/format 和 `git diff --check`。
 - 风险与未覆盖：用户名生成沿用微信注册现有的最大用户 ID 加一规则，未修改数据库字段或历史数据；未执行真实浏览器发布环境验收。
 
+### Z067 积分流水分页控件与每页条数
+
+- 需求与原因：积分流水列表需要与审计日志一致，支持分页导航和每页条数切换，避免长流水列表只能依赖固定页大小浏览。
+- 变更内容：复用审计日志使用的 `DataTablePagination` 与 `PageFooterPortal`，将分页移至固定页脚，流水表格独立滚动；个人页和管理员积分流水 Tab 均适配固定高度。切换 `page_size` 时回到第 1 页，普通翻页保持当前每页条数。
+- 影响面：fork 自有文件 `web/src/features/point-ledger/index.tsx`、`web/src/features/point-ledger/__tests__/queries.test.tsx`、`web/src/features/points/index.tsx`；上游自有文件无。升级时复核固定高度、页脚 portal 和分页状态。
+- 与上游差异：补齐积分流水列表与审计日志相同的每页条数切换语义和分页边界行为，不改变后端接口参数或查询契约。
+- 开关与默认值：沿用共享控件的每页条数选项，默认 20；切换条数始终回到第 1 页。
+- 验证：先红后绿覆盖固定页脚控件、从后续页切换每页条数回到首页及继续翻页；`bun run test src/features/point-ledger src/features/points` 7 文件/51 用例、`bun run typecheck`（1619 文件/2 项目）、三个改动 TSX 文件的 oxlint/oxfmt、生产 `bun run build` 通过；未修改后端和数据库。
+- 风险与未覆盖：前端全量 `bun run test` 3064 用例通过，`usage-logs/components/__tests__/detail-preview.test.tsx` 的 `task log prices use localized unit labels from pricing metadata` 超时，在隔离未修改 HEAD 的同一完整测试文件复现。未执行真实浏览器人工验收；分页数据仍遵循现有 offset 分页语义。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，

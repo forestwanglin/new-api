@@ -29,6 +29,7 @@ import {
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { SectionPageLayout } from '@/components/layout'
+import { PageFooterPortal } from '@/components/layout/components/page-footer'
 import { LoadingState } from '@/components/loading-state'
 import { Button } from '@/components/ui/button'
 import { toIntlLocale } from '@/i18n/languages'
@@ -71,7 +72,15 @@ export function PointLedger(props: { scope: PointLedgerScope }) {
     manualPagination: true,
     totalCount: query.data?.total ?? 0,
     pagination,
-    onPaginationChange: setPagination,
+    onPaginationChange: (updater) => {
+      setPagination((previous) => {
+        const next = typeof updater === 'function' ? updater(previous) : updater
+        return {
+          ...next,
+          pageIndex: next.pageSize === previous.pageSize ? next.pageIndex : 0,
+        }
+      })
+    },
   })
   const columns: StaticDataTableColumn<PointLedgerItem>[] = [
     {
@@ -149,30 +158,34 @@ export function PointLedger(props: { scope: PointLedgerScope }) {
   } else {
     content = (
       <>
-        <StaticDataTable
-          tableClassName='min-w-[1100px]'
-          data={rows}
-          getRowKey={(row) => row.id}
-          columns={columns}
-          emptyContent={<EmptyState title={t('No point ledger entries')} />}
-        />
-        <div className='mt-3'>
-          <DataTablePagination table={table} />
+        <div className='min-h-0 flex-1 overflow-auto'>
+          <StaticDataTable
+            tableClassName='min-w-[1100px]'
+            data={rows}
+            getRowKey={(row) => row.id}
+            columns={columns}
+            emptyContent={<EmptyState title={t('No point ledger entries')} />}
+          />
         </div>
+        <PageFooterPortal>
+          <DataTablePagination table={table} />
+        </PageFooterPortal>
       </>
     )
   }
   return (
-    <div className='min-w-0'>
-      <LedgerFilters
-        admin={props.scope === 'admin'}
-        types={query.data?.point_types ?? []}
-        onApply={(value) => {
-          setFilters(value)
-          setPagination((current) => ({ ...current, pageIndex: 0 }))
-          setSelectedId(null)
-        }}
-      />
+    <div className='flex h-full min-h-0 min-w-0 flex-col'>
+      <div className='shrink-0'>
+        <LedgerFilters
+          admin={props.scope === 'admin'}
+          types={query.data?.point_types ?? []}
+          onApply={(value) => {
+            setFilters(value)
+            setPagination((current) => ({ ...current, pageIndex: 0 }))
+            setSelectedId(null)
+          }}
+        />
+      </div>
       {content}
       {selected && (
         <LedgerDetails item={selected} onClose={() => setSelectedId(null)} />

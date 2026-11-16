@@ -30,6 +30,8 @@ import { createInstance } from 'i18next'
 import { I18nextProvider } from 'react-i18next'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { SectionPageLayout } from '@/components/layout'
+import { PageFooterProvider } from '@/components/layout/components/page-footer'
 import en from '@/i18n/locales/en.json'
 import fr from '@/i18n/locales/fr.json'
 import ja from '@/i18n/locales/ja.json'
@@ -88,7 +90,11 @@ function setup(scope: PointLedgerScope = 'self') {
   })
   render(
     <QueryClientProvider client={client}>
-      <PointLedger scope={scope} />
+      <SectionPageLayout fixedContent>
+        <SectionPageLayout.Content>
+          <PointLedger scope={scope} />
+        </SectionPageLayout.Content>
+      </SectionPageLayout>
     </QueryClientProvider>
   )
   return client
@@ -141,6 +147,61 @@ describe('point ledger queries', () => {
       'Invalid point ledger filters'
     )
     expect(get).toHaveBeenCalledTimes(count)
+  })
+  it('keeps page size and navigation in the page footer outside the scrolling rows', async () => {
+    vi.spyOn(api, 'get').mockResolvedValue(response(page))
+    useAuthStore.getState().auth.setUser({ id: 1, username: 'first', role: 1 })
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    const footer = document.createElement('div')
+    document.body.append(footer)
+    try {
+      render(
+        <PageFooterProvider container={footer}>
+          <QueryClientProvider client={client}>
+            <PointLedger scope='self' />
+          </QueryClientProvider>
+        </PageFooterProvider>
+      )
+      await screen.findByText('FUTURE_ACTION')
+      expect(within(footer).getByRole('combobox')).toBeVisible()
+      expect(
+        within(footer).getByRole('button', { name: 'Go to next page' })
+      ).toBeEnabled()
+    } finally {
+      footer.remove()
+      client.clear()
+    }
+  })
+  it('returns to the first page when changing page size from a later page', async () => {
+    const get = vi
+      .spyOn(api, 'get')
+      .mockResolvedValue(response({ ...page, total: 120 }))
+    const user = userEvent.setup()
+    setup()
+    await screen.findByText('FUTURE_ACTION')
+    await user.click(screen.getByRole('button', { name: 'Go to last page' }))
+    await waitFor(() =>
+      expect(get).toHaveBeenLastCalledWith('/api/points/ledger/self', {
+        params: { p: 6, page_size: 20 },
+      })
+    )
+    await screen.findByText('FUTURE_ACTION')
+    await user.click(screen.getByRole('combobox', { name: '' }))
+    await user.click(await screen.findByRole('option', { name: '50' }))
+    await waitFor(() =>
+      expect(get).toHaveBeenLastCalledWith('/api/points/ledger/self', {
+        params: { p: 1, page_size: 50 },
+      })
+    )
+    await screen.findByText('FUTURE_ACTION')
+    await user.click(screen.getByRole('button', { name: 'Go to next page' }))
+    await waitFor(() =>
+      expect(get).toHaveBeenLastCalledWith('/api/points/ledger/self', {
+        params: { p: 2, page_size: 50 },
+      })
+    )
   })
   it('applies chip filters only after search and clears them on reset', async () => {
     const get = vi.spyOn(api, 'get').mockResolvedValue(response(page))

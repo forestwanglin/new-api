@@ -100,8 +100,8 @@ export function Points() {
     <SectionPageLayout fixedContent>
       <SectionPageLayout.Title>{t('Points')}</SectionPageLayout.Title>
       <SectionPageLayout.Content>
-        <Tabs defaultValue='configuration'>
-          <TabsList className='mb-4'>
+        <Tabs defaultValue='configuration' className='h-full min-h-0'>
+          <TabsList className='mb-4 shrink-0'>
             <TabsTrigger value='configuration'>
               {t('Point configuration')}
             </TabsTrigger>
@@ -122,7 +122,7 @@ export function Points() {
               />
             )}
           </TabsContent>
-          <TabsContent value='ledger'>
+          <TabsContent value='ledger' className='min-h-0'>
             <PointLedger scope='admin' />
           </TabsContent>
         </Tabs>
