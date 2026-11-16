@@ -459,8 +459,8 @@ func SearchUsers(keyword string, group string, role *int, status *int, startIdx 
 	query := tx.Unscoped().Model(&User{})
 
 	// 构建搜索条件
-	likeCondition := "username LIKE ? OR email LIKE ? OR display_name LIKE ?"
-	likeArgs := []any{"%" + keyword + "%", "%" + keyword + "%", "%" + keyword + "%"}
+	likeCondition := "username LIKE ? OR email LIKE ? OR display_name LIKE ? OR id IN (SELECT user_id FROM external_identity_claims WHERE provider = ? AND subject = ?)"
+	likeArgs := []any{"%" + keyword + "%", "%" + keyword + "%", "%" + keyword + "%", ExternalIdentityProviderPhone, keyword}
 
 	// 尝试将关键字转换为整数ID
 	keywordInt, err := strconv.Atoi(keyword)

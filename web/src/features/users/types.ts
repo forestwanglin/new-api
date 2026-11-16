@@ -64,6 +64,7 @@ export type AdjustUserPointsPayload = {
 export const userSchema = z.object({
   id: z.number(),
   username: z.string(),
+  phone: z.string().optional(),
   display_name: z.string(),
   password: z.string().optional(),
   github_id: z.string().optional(),

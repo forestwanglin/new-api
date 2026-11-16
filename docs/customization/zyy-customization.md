@@ -1059,6 +1059,16 @@
 - 验证：先红后绿覆盖固定页脚控件、从后续页切换每页条数回到首页及继续翻页；`bun run test src/features/point-ledger src/features/points` 7 文件/51 用例、`bun run typecheck`（1619 文件/2 项目）、三个改动 TSX 文件的 oxlint/oxfmt、生产 `bun run build` 通过；未修改后端和数据库。
 - 风险与未覆盖：前端全量 `bun run test` 3064 用例通过，`usage-logs/components/__tests__/detail-preview.test.tsx` 的 `task log prices use localized unit labels from pricing metadata` 超时，在隔离未修改 HEAD 的同一完整测试文件复现。未执行真实浏览器人工验收；分页数据仍遵循现有 offset 分页语义。
 
+### Z068 管理员用户列表手机号展示与精确搜索
+
+- **需求与原因**：控制台管理员需要直接查看用户已绑定的手机号，并使用完整手机号定位用户。
+- **变更内容**：用户名后增加手机号列，未绑定显示 `-`；列表与搜索响应按当前页批量读取 `external_identity_claims(provider=phone)`，现有搜索增加 subject 等值匹配，保留 ID/用户名/姓名/邮箱、筛选及分页语义；同步七语种搜索提示。
+- **影响面**：新增 `model/user_admin_list.go`、`model/user_admin_list_test.go`、`web/src/features/users/components/__tests__/phone-search.test.tsx`；**上游自有文件**：`model/user.go`、`controller/user.go`、`web/src/features/users/types.ts`、`web/src/features/users/components/users-columns.tsx`、`users-table.tsx` 与七语种 locale JSON，升级时需保留管理员 DTO 接入及精确搜索条件。
+- **与上游差异**：扩展管理员用户表的展示和现有 keyword 查询；不向共享 User 模型、个人资料或登录响应添加手机号。
+- **开关与默认值**：无新增配置、依赖或数据库迁移；仅授权管理员列表接口提供 phone 字符串，未绑定为空字符串。
+- **验证**：`go test ./model -run 'TestAdminUserPhoneDatabaseMatrix|TestSearchUsersSortsBeforePagination|TestGetAllUsersSortsBeforePagination' -count=1 -v` 使用隔离数据库 SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 16.16 全部通过；覆盖完整/部分号码、provider 隔离、旧字段、组合筛选、排序分页、积分及序列化边界。`cd web && bun run test src/features/users`：9 文件 / 77 用例通过；`bun check -b`：1,620 文件无类型错误；改动 TS/TSX 的 `oxlint`、`oxfmt --check`、`go test ./controller -run '^$'` 编译检查及 `bun run build` 通过。
+- **风险与未覆盖**：每个管理员列表请求新增一次当前页手机号批量查询；未验证生产环境、最低支持数据库版本和真实浏览器页面，未改动认证及绑定流程。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
