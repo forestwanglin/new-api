@@ -58,6 +58,7 @@ func TestPhoneSMSRejectsGuessesReplayAndCrossBrowser(t *testing.T) {
 	result, err := CompletePhoneLogin(token, "123456", "browser-a")
 	require.NoError(t, err)
 	require.Equal(t, user.Id, result.Id)
+	require.Equal(t, user.Username, result.Username)
 	_, err = CompletePhoneLogin(token, "123456", "browser-a")
 	require.Error(t, err)
 	require.Equal(t, common.UserStatusEnabled, result.Status)
@@ -91,6 +92,7 @@ func TestPhoneWeChatBindingRejectsOtherOwnersAndCommitsBothProofs(t *testing.T) 
 	bound, err := CompletePhoneLogin(sms, "123456", "browser")
 	require.NoError(t, err)
 	require.Equal(t, user.Id, bound.Id)
+	require.Equal(t, user.Username, bound.Username)
 	owner, err := model.GetPhoneUserID("13900139000")
 	require.NoError(t, err)
 	require.Equal(t, user.Id, owner)
@@ -250,4 +252,18 @@ func TestPhoneNewRegistrationRespectsRegistrationSwitch(t *testing.T) {
 	owner, err := model.GetPhoneUserID("13800138000")
 	require.NoError(t, err)
 	require.Zero(t, owner)
+}
+
+func TestPhoneNewRegistrationUsesPhoneUsernamePrefix(t *testing.T) {
+	setupAuthSessionTestDB(t)
+	require.NoError(t, model.DB.AutoMigrate(&model.ExternalIdentityClaim{}))
+	token, _, err := createPhoneFlow(phoneSMSPurpose, "browser", phoneFlowPayload{Phone: "13800138000", Digest: phoneTestSMSHash(t, "123456")}, time.Minute)
+	require.NoError(t, err)
+	user, err := CompletePhoneLogin(token, "123456", "browser")
+	require.NoError(t, err)
+	require.Equal(t, "phone_2", user.Username)
+
+	var persisted model.User
+	require.NoError(t, model.DB.First(&persisted, user.Id).Error)
+	require.Equal(t, user.Username, persisted.Username)
 }

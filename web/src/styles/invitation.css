@@ -884,10 +884,26 @@
   background: #182231;
   border-color: #334155;
 }
+.dark .invitation-page .iv-activity,
+.dark .invitation-page .iv-activity .iv-stages,
+.dark .invitation-page .iv-activity .iv-rules-section {
+  background: #182231;
+  border-color: #334155;
+}
+.dark .invitation-page .iv-ref-form input {
+  background: #23324a;
+  border-color: #405475;
+  color: var(--tx);
+}
 .dark .invitation-page :is(.iv-group-reward, .iv-ref-done),
 .dark .iv-activity-modal .iv-list-tier {
   background: #23324a;
   border-color: #405475;
+}
+.dark .iv-activity-modal .iv-list-period {
+  background: #23324a;
+  border-color: #405475;
+  color: #bfdbfe;
 }
 .dark .invitation-page .iv-order-table th,
 .dark .iv-activity-modal .iv-list-table th {

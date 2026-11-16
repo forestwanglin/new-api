@@ -293,15 +293,15 @@ func CompletePhoneLogin(token, code, browser string) (*model.User, error) {
 		if !common.RegisterEnabled {
 			return common.NewMessage("New user registration has been disabled by administrator")
 		}
-		random := make([]byte, 9)
-		if _, err := rand.Read(random); err != nil {
-			return err
-		}
 		inviterID, err := ResolveAffiliateInviter(tx, payload.AffiliateCode)
 		if err != nil {
 			return err
 		}
-		user = model.User{Username: "p_" + base64.RawURLEncoding.EncodeToString(random), DisplayName: "Phone User", Role: common.RoleCommonUser, Status: common.UserStatusEnabled, AuthVersion: 1, InviterId: inviterID}
+		var latestUser model.User
+		if err := tx.Unscoped().Select("id").Last(&latestUser).Error; err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		user = model.User{Username: "phone_" + strconv.Itoa(latestUser.Id+1), DisplayName: "Phone User", Role: common.RoleCommonUser, Status: common.UserStatusEnabled, AuthVersion: 1, InviterId: inviterID}
 		if err := user.InsertWithTx(tx, inviterID); err != nil {
 			return err
 		}
