@@ -17,7 +17,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import {
-  Activity,
   Box,
   ClipboardList,
   Coins,
@@ -80,11 +79,6 @@ export function useSidebarData(badges: SidebarBadges = {}): SidebarData {
             icon: Rocket,
           },
           {
-            title: t('Overview'),
-            url: '/dashboard/overview',
-            icon: Activity,
-          },
-          {
             title: t('Dashboard'),
             url: '/dashboard/models',
             icon: LayoutDashboard,
@@ -127,11 +121,6 @@ export function useSidebarData(badges: SidebarBadges = {}): SidebarData {
             title: t('My subscription'),
             url: '/my-subscription',
             icon: CreditCard,
-          },
-          {
-            title: t('Profile'),
-            url: '/profile',
-            icon: User,
           },
           {
             title: t('Personal Profile'),

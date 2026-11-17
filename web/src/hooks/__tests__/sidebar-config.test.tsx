@@ -100,7 +100,7 @@ describe('onboarding sidebar placement', () => {
     const items = result.current.find((group) => group.id === 'general')?.items
     expect(items?.slice(0, 2).map((item) => item.title)).toEqual([
       'Getting started',
-      'Overview',
+      'Dashboard',
     ])
     expect(items?.[0]).toMatchObject({ url: '/onboarding' })
   })
@@ -122,7 +122,7 @@ describe('onboarding sidebar placement', () => {
 })
 
 describe('security sidebar visibility', () => {
-  it('old configurations show Security & Access immediately after Profile and keep API Keys', () => {
+  it('old configurations show Security & Access after Personal Profile and keep API Keys', () => {
     const { result } = sidebarFor(
       { personal: { enabled: true, personal: true, topup: true } },
       { personal: { enabled: true, personal: true } }
@@ -134,7 +134,6 @@ describe('security sidebar visibility', () => {
     ).toEqual([
       'Points wallet',
       'My subscription',
-      'Profile',
       'Personal Profile',
       'Security & Access',
     ])
@@ -441,5 +440,21 @@ describe('legacy wallet navigation retirement', () => {
       parseSidebarModulesAdmin('{"personal":{"enabled":true,"topup":true}}')
         .personal.topup
     ).toBeUndefined()
+  })
+})
+
+describe('retired console navigation entries', () => {
+  it('hides overview and the original profile even when saved settings enable them', () => {
+    const enabled = {
+      console: { enabled: true, detail: true },
+      personal: { enabled: true, personal: true },
+    }
+    const { result } = sidebarFor(enabled, enabled)
+    const urls = result.current
+      .flatMap((group) => group.items)
+      .map((item) => item.url)
+    expect(urls).not.toContain('/dashboard/overview')
+    expect(urls).not.toContain('/profile')
+    expect(urls).toContain('/personal-profile')
   })
 })

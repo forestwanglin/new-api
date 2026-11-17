@@ -1131,6 +1131,16 @@
 - 已知边界：实际扣减顺序仍由 `point_types.consume_priority`（大值优先，默认 `GENERAL`=100、`GPT`=10）与启用模型规则决定，代码未自动迁移存量优先级；本次文案按“GPT 专项优先”表述，需管理员将 `GPT` 类型优先级调到高于 `GENERAL` 才与文案一致，存量环境的 `wallet-usage` 规则正文需在规则管理中手工改写。
 - 验证：前端 wallet 模块用例、`bun run typecheck`、改动文件 oxlint/oxfmt、`git diff --check` 与生产构建结果见提交说明。
 
+### Z075 控制台菜单隐藏与顶部订阅国际化
+
+- 需求与原因：控制台不再展示“概览”和旧的“个人资料”入口，避免与现有页面导航重复；顶部“订阅”菜单需跟随界面语言切换。
+- 变更内容：移除侧栏 `/dashboard/overview` 与 `/profile` 菜单项，保留独立的 `/personal-profile`；顶部导航将写死的中文“订阅”改为使用 `Subscription` 翻译键，桌面与移动导航同步更新。
+- 影响面：`web/src/hooks/use-sidebar-data.ts`、`web/src/hooks/use-top-nav-links.ts`、侧栏/顶部导航测试及命令菜单测试。以上均为上游自有文件，升级时需复核。
+- 与上游差异：隐藏上游默认概览、旧个人资料侧栏项，并修复 fork 顶部订阅导航的固定中文文案。
+- 开关与默认值：无新增配置，菜单隐藏默认生效；翻译沿用现有七种前端 locale 的 `Subscription` 键。
+- 验证：侧栏、顶部导航与命令菜单定向 Vitest 通过；`bun check -b`、oxlint、oxfmt 和 `git diff --check` 通过。全量 Vitest 为 292 文件通过、1 文件失败（3100 用例通过、1 失败）；未修改的 `detail-preview.test.tsx` 中 `task log prices use localized unit labels from pricing metadata` 超时，单独运行该用例通过，未发现与本次导航改动的调用关系。
+- 风险与未覆盖：未进行真实浏览器登录态验收；个人资料下拉菜单和移动用户区仍保留 `/profile` 作为直接入口，按需求仅隐藏控制台侧栏菜单。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 

@@ -112,10 +112,12 @@ test('regular users only find their own console pages in search', async () => {
       'Usage Logs',
       'Points wallet',
       'My subscription',
-      'Profile',
+      'Personal Profile',
     ])
   )
   expect(entries).not.toContain('Wallet')
+  expect(entries).not.toContain('Profile')
+  expect(entries).not.toContain('Overview')
   for (const entry of [...adminEntries, ...superAdminEntries]) {
     expect(entries).not.toContain(entry)
   }
@@ -137,7 +139,7 @@ test('pages hidden in the sidebar settings stay out of search', async () => {
   )
 
   expect(entries).not.toContain('Wallet')
-  expect(entries).toContain('Profile')
+  expect(entries).toContain('Personal Profile')
 })
 
 test('saved true wallet preference cannot restore the retired command menu entry', async () => {

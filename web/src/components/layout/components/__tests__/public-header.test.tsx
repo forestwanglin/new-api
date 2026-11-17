@@ -24,10 +24,12 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router'
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { act, cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import i18next from 'i18next'
 import { afterEach, expect, it, vi } from 'vitest'
 
+import zh from '@/i18n/locales/zh.json'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 import { useLoginModalStore } from '@/stores/login-modal-store'
@@ -37,7 +39,8 @@ import { PublicHeader, type PublicHeaderProps } from '../public-header'
 
 const initialSystemConfig = useSystemConfigStore.getState()
 const clients: QueryClient[] = []
-afterEach(() => {
+afterEach(async () => {
+  await i18next.changeLanguage('en')
   cleanup()
   useAuthStore.getState().auth.reset()
   useLoginModalStore.getState().close()
@@ -205,7 +208,7 @@ it.each([
   ['/model', 'Models'],
   ['/model/', 'Models'],
   ['/tutorial/', 'Configuration tutorial'],
-  ['/subscription/', '订阅'],
+  ['/subscription/', 'Subscription'],
 ])('selects the current top menu at %s', async (pathname, name) => {
   await renderHeader({}, {}, pathname)
   const selected = screen.getByRole('link', { name })
@@ -262,4 +265,30 @@ it('renders the invitation gift and badge with selected and unselected navigatio
   expect(
     await screen.findByRole('link', { name: /Invite friends/ })
   ).not.toHaveAttribute('aria-current')
+})
+
+it('updates desktop and mobile subscription labels when the language changes', async () => {
+  i18next.addResourceBundle('zh', 'translation', zh.translation, true, true)
+  await renderHeader({}, {}, '/subscription')
+  expect(screen.getByRole('link', { name: 'Subscription' })).toHaveAttribute(
+    'href',
+    '/subscription'
+  )
+  await userEvent
+    .setup()
+    .click(screen.getByRole('button', { name: 'Toggle navigation menu' }))
+  await act(() => i18next.changeLanguage('zh'))
+  const links = await screen.findAllByRole('link', {
+    name: '订阅',
+    hidden: true,
+  })
+  expect(links).toHaveLength(2)
+  for (const link of links) {
+    expect(link).toHaveAttribute('href', '/subscription')
+    expect(link).toHaveAttribute('aria-current', 'page')
+  }
+  await act(() => i18next.changeLanguage('en'))
+  expect(
+    await screen.findAllByRole('link', { name: 'Subscription', hidden: true })
+  ).toHaveLength(2)
 })
