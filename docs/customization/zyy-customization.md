@@ -1119,7 +1119,18 @@
 - 验证：`bun check -b` 通过；个人资料、侧栏和原语言偏好 4 文件/55 用例通过，定向 lint/格式、生产构建、手机号路由 session-only 检查及 `git diff --check` 通过；controller/service PhoneChange 定向测试通过。真实 SQLite、MySQL 8.4.13、PostgreSQL 16.16 的 service PhoneChange 测试连续两次通过，覆盖占用回滚和并发唯一消费；开发后端 `make dev-api-rebuild` 成功。浏览器确认旧入口保留、头像键盘 tooltip、390px 响应式布局；Demo 对照为源码核对。
 - 风险与未覆盖：未发送真实短信；重建开发后端后需要重新登录，未完成登录态页面端到端更换。完整路由 catalog 检查仍有原有六条声明缺失，本次四条手机号路由已声明并独立验证。可执行契约见 `.trellis/spec/new-api/backend/personal-profile.md`。
 
+### Z074 积分钱包 GPT 专项积分优先文案
+
+- 需求与原因：后台积分钱包页的“GPT系列调用：先用通用积分，再用符合条件的GPT专项积分”与实际运营口径不符，改为“先用符合条件的GPT专项积分，再用通用积分”。本次仅改文案，不改变扣减行为。
+- 变更内容：钱包使用说明、通用积分卡片说明、七种语言资源同步改为“符合条件 GPT 专项积分优先、通用积分兜底”，通用积分卡片去掉“优先使用”表述；首次部署的钱包规则种子（`wallet-usage`）同步改写标题与正文。
+- 影响面：fork 自有文件 `web/src/features/points-wallet/index.tsx`、`model/point_wallet_rules_seed.json`、`c-dev/ZYY-AI-demo.html`；**上游自有文件**：七种 `web/src/i18n/locales/*.json`（仅替换两条键值）。升级时复核这两条键未被上游同名键覆盖。
+- 与上游差异：仅钱包页与规则种子文案；不涉及接口、模型规则、优先级、扣减顺序或数据结构。
+- 开关与默认值：无新增配置。钱包规则种子只在首次初始化时写入，重新初始化不会覆盖已有编辑或恢复已删除规则。
+- 已知边界：实际扣减顺序仍由 `point_types.consume_priority`（大值优先，默认 `GENERAL`=100、`GPT`=10）与启用模型规则决定，代码未自动迁移存量优先级；本次文案按“GPT 专项优先”表述，需管理员将 `GPT` 类型优先级调到高于 `GENERAL` 才与文案一致，存量环境的 `wallet-usage` 规则正文需在规则管理中手工改写。
+- 验证：前端 wallet 模块用例、`bun run typecheck`、改动文件 oxlint/oxfmt、`git diff --check` 与生产构建结果见提交说明。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
+
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
 确认定制没有被上游实现静默覆盖。清单按 `git diff main zyy --name-status` 的 `M` 记录整理

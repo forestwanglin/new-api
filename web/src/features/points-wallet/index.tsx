@@ -58,7 +58,7 @@ function WalletStatistics(props: { wallet: PointWallet }) {
       value: general
         ? formatNumber(BigInt(general.available_points), locale)
         : t('Not available yet'),
-      description: t('Applicable to all available models, used first'),
+      description: t('Applicable to all available models'),
     },
     {
       title: t('GPT-specific points'),
@@ -136,7 +136,7 @@ export function PointsWallet() {
                 <p>
                   <strong>{t('GPT model calls:')}</strong>{' '}
                   {t(
-                    'General points first, then eligible GPT-specific points.'
+                    'Eligible GPT-specific points first, then general points.'
                   )}
                 </p>
                 <p>
