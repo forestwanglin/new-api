@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -93,18 +94,18 @@ func TestPhoneChangeSMSUsesServerBindingAndVerifiedOldPhone(t *testing.T) {
 		codes = append(codes, template["code"])
 		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"Code":"OK"}`)), Header: http.Header{}}, nil
 	})}
-	_, err := SendPhoneChangeCode(identity, "new", "13900139000", "", "192.0.2.1")
+	_, err := sendPhoneChangeTestCode(t, identity, "new", "13900139000", "", "192.0.2.1")
 	require.Error(t, err)
 	require.Empty(t, phones)
-	token, err := SendPhoneChangeCode(identity, "old", "13700137000", "", "192.0.2.1")
+	token, err := sendPhoneChangeTestCode(t, identity, "old", "13700137000", "", "192.0.2.1")
 	require.NoError(t, err)
 	require.Equal(t, "13800138000", phones[0])
-	_, err = SendPhoneChangeCode(identity, "old", "", "", "192.0.2.1")
+	_, err = sendPhoneChangeTestCode(t, identity, "old", "", "", "192.0.2.1")
 	require.ErrorIs(t, err, ErrPhoneRateLimit)
 	require.Len(t, phones, 1)
 	verified, err := VerifyPhoneChangeCode(identity, "old", token, "", codes[0])
 	require.NoError(t, err)
-	token, err = SendPhoneChangeCode(identity, "new", "13900139000", verified, "192.0.2.1")
+	token, err = sendPhoneChangeTestCode(t, identity, "new", "13900139000", verified, "192.0.2.1")
 	require.NoError(t, err)
 	require.Equal(t, "13900139000", phones[1])
 	ready, err := VerifyPhoneChangeCode(identity, "new", token, "13900139000", codes[1])
@@ -195,6 +196,42 @@ func TestPhoneChangeDatabaseMatrix(t *testing.T) {
 				require.Error(t, db.Transaction(func(tx *gorm.DB) error { return validatePhoneChangeWithTx(tx, payload) }))
 			}
 			require.NoError(t, db.Create(&model.ExternalIdentityClaim{Provider: "phone", Subject: originalPhone, UserId: user.Id}).Error)
+			// Exercise the actual CAPTCHA attempt/consume transaction and SMS boundary
+			// concurrently on each database, not just the final phone claim.
+			t.Setenv("ALIYUN_SMS_ACCESS_KEY_ID", "test-key")
+			t.Setenv("ALIYUN_SMS_ACCESS_KEY_SECRET", "test-secret")
+			oldSettings := *system_setting.GetPhoneSettings()
+			*system_setting.GetPhoneSettings() = system_setting.PhoneSettings{Enabled: true, Region: "cn-hangzhou", SignName: "test", TemplateCode: "SMS_TEST"}
+			oldClient := http.DefaultClient
+			t.Cleanup(func() { *system_setting.GetPhoneSettings() = oldSettings; http.DefaultClient = oldClient })
+			var delivered atomic.Int32
+			http.DefaultClient = &http.Client{Transport: phoneSMSRoundTripper(func(r *http.Request) (*http.Response, error) {
+				delivered.Add(1)
+				return &http.Response{StatusCode: 200, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(`{"Code":"OK"}`))}, nil
+			})}
+			captcha := phoneChangeTestCaptcha(t, identity)
+			var captchaWG sync.WaitGroup
+			captchaResults := make(chan error, 2)
+			for range 2 {
+				captchaWG.Go(func() {
+					_, err := SendPhoneChangeCode(identity, "old", "", "", "192.0.2.30", captcha, "12345")
+					captchaResults <- err
+				})
+			}
+			captchaWG.Wait()
+			close(captchaResults)
+			captchaSuccesses := 0
+			for err := range captchaResults {
+				if err == nil {
+					captchaSuccesses++
+				}
+			}
+			require.Equal(t, 1, captchaSuccesses)
+			require.Equal(t, int32(1), delivered.Load())
+			require.NoError(t, db.Where("purpose = ?", "phone_cooldown").Delete(&model.AuthFlow{}).Error)
+			_, err = SendPhoneChangeCode(identity, "old", "", "", "192.0.2.30", captcha, "12345")
+			require.Error(t, err)
+			require.Equal(t, int32(1), delivered.Load())
 			occupied := model.ExternalIdentityClaim{Provider: "phone", Subject: occupiedPhone, UserId: user.Id + 10000}
 			require.NoError(t, db.Create(&occupied).Error)
 			t.Cleanup(func() { require.NoError(t, db.Unscoped().Delete(&occupied).Error) })
@@ -367,7 +404,7 @@ func TestPhoneBindingSMSRequiresInitialAuthorizationAndAllowsExplicitResend(t *t
 		code = template["code"]
 		return &http.Response{StatusCode: 200, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(`{"Code":"OK"}`))}, nil
 	})}
-	_, err := SendPhoneChangeCode(identity, "new", "13900139000", "", "192.0.2.1")
+	_, err := sendPhoneChangeTestCode(t, identity, "new", "13900139000", "", "192.0.2.1")
 	require.Error(t, err)
 	require.Zero(t, delivered)
 	proof, err := CompletePhoneBindingWeChat(identity, VerificationOperation{Scope: VerificationScopePhoneBinding}, "own-openid")
@@ -376,14 +413,14 @@ func TestPhoneBindingSMSRequiresInitialAuthorizationAndAllowsExplicitResend(t *t
 	require.NoError(t, err)
 	started, err := StartPhoneBinding(identity, authorization)
 	require.NoError(t, err)
-	first, err := SendPhoneChangeCode(identity, "new", "13900139000", started.Token, "192.0.2.1")
+	first, err := sendPhoneChangeTestCode(t, identity, "new", "13900139000", started.Token, "192.0.2.1")
 	require.NoError(t, err)
-	_, err = SendPhoneChangeCode(identity, "new", "13900139000", started.Token, "192.0.2.1")
+	_, err = sendPhoneChangeTestCode(t, identity, "new", "13900139000", started.Token, "192.0.2.1")
 	require.ErrorIs(t, err, ErrPhoneRateLimit)
 	require.Equal(t, 1, delivered)
 	// Clear only the elapsed-cooldown fixture; retain hourly and daily reservations.
 	require.NoError(t, model.DB.Where("purpose = ?", "phone_cooldown").Delete(&model.AuthFlow{}).Error)
-	second, err := SendPhoneChangeCode(identity, "new", "13900139000", started.Token, "192.0.2.1")
+	second, err := sendPhoneChangeTestCode(t, identity, "new", "13900139000", started.Token, "192.0.2.1")
 	require.NoError(t, err)
 	require.Equal(t, 2, delivered)
 	_, err = VerifyPhoneChangeCode(identity, "new", first, "13900139000", code)
@@ -394,4 +431,90 @@ func TestPhoneBindingSMSRequiresInitialAuthorizationAndAllowsExplicitResend(t *t
 	owner, err := model.GetPhoneUserID("13900139000")
 	require.NoError(t, err)
 	require.Equal(t, identity.UserID, owner)
+}
+
+// Use a fresh real image challenge for every existing SMS delivery scenario.
+func sendPhoneChangeTestCode(t *testing.T, identity AuthIdentity, step, phone, verifiedToken, ip string) (string, error) {
+	t.Helper()
+	token := phoneChangeTestCaptcha(t, identity)
+	return SendPhoneChangeCode(identity, step, phone, verifiedToken, ip, token, "12345")
+}
+
+func phoneChangeTestCaptcha(t *testing.T, identity AuthIdentity) string {
+	t.Helper()
+	token, image, err := NewPhoneChangeImage(identity)
+	require.NoError(t, err)
+	require.Contains(t, image, "data:image/png;base64,")
+	flow, payload, err := readPhoneChangeFlow(identity, token, phoneChangeImagePurpose)
+	require.NoError(t, err)
+	payload.Digest = phoneCodeDigest("12345")
+	encoded, err := common.Marshal(payload)
+	require.NoError(t, err)
+	require.NoError(t, model.DB.Model(flow).Update("payload", string(encoded)).Error)
+	return token
+}
+
+func TestPhoneChangeCaptchaRejectsInvalidChallengesBeforeSMS(t *testing.T) {
+	for _, scenario := range []string{"missing", "wrong answer", "expired", "other session", "other user", "auth version", "login purpose", "replayed", "success"} {
+		t.Run(scenario, func(t *testing.T) {
+			_, identity := setupPhoneChange(t)
+			useTestSessionSecret(t)
+			t.Setenv("ALIYUN_SMS_ACCESS_KEY_ID", "test-key")
+			t.Setenv("ALIYUN_SMS_ACCESS_KEY_SECRET", "test-secret")
+			oldSettings := *system_setting.GetPhoneSettings()
+			*system_setting.GetPhoneSettings() = system_setting.PhoneSettings{Enabled: true, Region: "cn-hangzhou", SignName: "test", TemplateCode: "SMS_TEST"}
+			oldClient := http.DefaultClient
+			t.Cleanup(func() { *system_setting.GetPhoneSettings() = oldSettings; http.DefaultClient = oldClient })
+			delivered := 0
+			http.DefaultClient = &http.Client{Transport: phoneSMSRoundTripper(func(r *http.Request) (*http.Response, error) {
+				delivered++
+				return &http.Response{StatusCode: 200, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(`{"Code":"OK"}`))}, nil
+			})}
+			token := phoneChangeTestCaptcha(t, identity)
+			answer := "12345"
+			switch scenario {
+			case "missing":
+				token = ""
+			case "wrong answer":
+				_, err := SendPhoneChangeCode(identity, "old", "", "", "192.0.2.1", token, "00000")
+				require.Error(t, err)
+			case "expired":
+				require.NoError(t, model.DB.Model(&model.AuthFlow{}).Where("purpose = ?", phoneChangeImagePurpose).Update("expires_at", time.Now().Add(-time.Second)).Error)
+			case "other session", "other user", "auth version":
+				flow, payload, err := readPhoneChangeFlow(identity, token, phoneChangeImagePurpose)
+				require.NoError(t, err)
+				switch scenario {
+				case "other session":
+					payload.Identity.SessionID = "another-session"
+				case "other user":
+					payload.Identity.UserID++
+				case "auth version":
+					payload.Identity.UserAuthVersion++
+				}
+				encoded, err := common.Marshal(payload)
+				require.NoError(t, err)
+				require.NoError(t, model.DB.Model(flow).Update("payload", string(encoded)).Error)
+			case "login purpose":
+				var err error
+				token, _, err = NewPhoneImage(identity.SessionID)
+				require.NoError(t, err)
+			case "replayed":
+				_, err := SendPhoneChangeCode(identity, "old", "", "", "192.0.2.1", token, answer)
+				require.NoError(t, err)
+				require.NoError(t, model.DB.Where("purpose = ?", "phone_cooldown").Delete(&model.AuthFlow{}).Error)
+			}
+			_, err := SendPhoneChangeCode(identity, "old", "", "", "192.0.2.1", token, answer)
+			if scenario == "success" {
+				require.NoError(t, err)
+				require.Equal(t, 1, delivered)
+			} else {
+				require.Error(t, err)
+				if scenario == "replayed" {
+					require.Equal(t, 1, delivered)
+				} else {
+					require.Zero(t, delivered)
+				}
+			}
+		})
+	}
 }

@@ -79,6 +79,11 @@ func NewPhoneImage(browser string) (string, string, error) {
 	if err != nil {
 		return "", "", err
 	}
+	image, err := renderPhoneImage(answer)
+	return token, image, err
+}
+
+func renderPhoneImage(answer string) (string, error) {
 	small := image.NewRGBA(image.Rect(0, 0, 55, 18))
 	draw.Draw(small, small.Bounds(), &image.Uniform{color.RGBA{241, 245, 249, 255}}, image.Point{}, draw.Src)
 	// Random noise and glyph offsets make the image independent of browser fonts.
@@ -100,9 +105,9 @@ func NewPhoneImage(browser string) (string, string, error) {
 	}
 	var out bytes.Buffer
 	if err := png.Encode(&out, large); err != nil {
-		return "", "", err
+		return "", err
 	}
-	return token, "data:image/png;base64," + base64.StdEncoding.EncodeToString(out.Bytes()), nil
+	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(out.Bytes()), nil
 }
 
 func readPhoneFlow(token, purpose, browser string) (*model.AuthFlow, phoneFlowPayload, error) {

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"crypto/subtle"
 	"errors"
 	"strings"
 	"time"
@@ -106,7 +107,7 @@ func validatePhoneChangeWithTx(tx *gorm.DB, payload phoneChangePayload) error {
 	return nil
 }
 
-func SendPhoneChangeCode(identity AuthIdentity, step, phone, verifiedToken, ip string) (string, error) {
+func SendPhoneChangeCode(identity AuthIdentity, step, phone, verifiedToken, ip, captchaToken, captchaAnswer string) (string, error) {
 	if !PhoneSMSConfigured() {
 		return "", ErrVerificationUnavailable
 	}
@@ -154,7 +155,17 @@ func SendPhoneChangeCode(identity AuthIdentity, step, phone, verifiedToken, ip s
 	} else {
 		return "", ErrVerificationFailed
 	}
-	err = model.DB.Transaction(func(tx *gorm.DB) error {
+	_, captcha, err := readPhoneChangeFlow(identity, captchaToken, phoneChangeImagePurpose)
+	if err != nil {
+		return "", ErrPhoneVerification
+	}
+	if err := model.AttemptAuthFlow(captchaToken, phoneChangeImagePurpose, 1); err != nil {
+		return "", ErrPhoneVerification
+	}
+	if subtle.ConstantTimeCompare([]byte(captcha.Digest), []byte(phoneCodeDigest(strings.TrimSpace(captchaAnswer)))) != 1 {
+		return "", ErrPhoneVerification
+	}
+	_, err = model.ConsumeAuthFlowWithAction(captchaToken, model.AuthFlowMatch{Purpose: phoneChangeImagePurpose, UserId: identity.UserID, SessionId: identity.SessionID}, func(tx *gorm.DB, _ *model.AuthFlow) error {
 		if err := validatePhoneChangeWithTx(tx, payload); err != nil {
 			return err
 		}

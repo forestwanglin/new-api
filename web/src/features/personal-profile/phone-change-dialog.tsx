@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -9,9 +10,11 @@ import { Label } from '@/components/ui/label'
 import { useAccountSecurity } from '@/features/security/hooks/use-account-security'
 import { SupportDialog } from '@/features/subscriptions-custom/support-dialog'
 import { useCountdown } from '@/hooks/use-countdown'
+import { getServerErrorMessage } from '@/lib/server-error-message'
 
 import {
   changePhone,
+  getPhoneChangeCaptcha,
   sendPhoneCode,
   verifyPhoneCode,
   type PhoneChangeStatus,
@@ -34,6 +37,7 @@ export function PhoneChangeDialog(props: Props) {
   )
   const [phone, setPhone] = useState('')
   const [code, setCode] = useState('')
+  const [captchaAnswer, setCaptchaAnswer] = useState('')
   const [smsToken, setSMSToken] = useState('')
   const [verificationToken, setVerificationToken] = useState('')
   const verificationExpiresAt = useRef(0)
@@ -43,6 +47,23 @@ export function PhoneChangeDialog(props: Props) {
   const codeRef = useRef<HTMLInputElement>(null)
   const phoneRef = useRef<HTMLInputElement>(null)
   const cancel = security.cancel
+  const captcha = useQuery({
+    queryKey: ['phone-change-captcha', security.sessionKey, step, props.open],
+    queryFn: ({ signal }) => getPhoneChangeCaptcha(signal),
+    enabled: props.open,
+    retry: false,
+    gcTime: 0,
+    refetchOnWindowFocus: false,
+  })
+  const refreshCaptcha = () => {
+    setCaptchaAnswer('')
+    void captcha.refetch()
+  }
+
+  useEffect(
+    () => setCaptchaAnswer(''),
+    [captcha.data?.challenge_token, step, props.open, security.sessionKey]
+  )
 
   useEffect(() => {
     setStep(props.status.bound ? 'old' : 'new')
@@ -92,12 +113,31 @@ export function PhoneChangeDialog(props: Props) {
     return true
   }
   const send = async () => {
-    if (resetExpiredVerification()) return
+    if (
+      resetExpiredVerification() ||
+      !captcha.data ||
+      captcha.isFetching ||
+      captcha.isError ||
+      !/^\d{5}$/.test(captchaAnswer)
+    ) {
+      return
+    }
     setExpired(false)
     const result = await security.run(async (signal) => {
-      return {
-        ...(await sendPhoneCode(step, phone, verificationToken, signal)),
-        notification_warning: false,
+      try {
+        return {
+          ...(await sendPhoneCode(
+            step,
+            phone,
+            verificationToken,
+            captcha.data.challenge_token,
+            captchaAnswer,
+            signal
+          )),
+          notification_warning: false,
+        }
+      } finally {
+        if (!signal.aborted) refreshCaptcha()
       }
     })
     if (!result) return
@@ -207,6 +247,52 @@ export function PhoneChangeDialog(props: Props) {
           />
         </div>
         <div className='pp-field'>
+          <Label className='pp-label' htmlFor='pp-change-image'>
+            {t('Image verification code')}
+          </Label>
+          <div className='pp-code-row'>
+            <Input
+              className='pp-input'
+              id='pp-change-image'
+              inputMode='numeric'
+              autoComplete='off'
+              maxLength={5}
+              placeholder={t('Enter image code')}
+              value={captchaAnswer}
+              disabled={security.pending || captcha.isFetching}
+              onChange={(event) =>
+                setCaptchaAnswer(
+                  event.target.value.replaceAll(/\D/g, '').slice(0, 5)
+                )
+              }
+            />
+            <Button
+              type='button'
+              variant='outline'
+              className='pp-button pp-outline pp-captcha'
+              aria-label={t('Refresh image code')}
+              disabled={security.pending || captcha.isFetching}
+              onClick={refreshCaptcha}
+            >
+              {captcha.data ? (
+                <img
+                  src={captcha.data.image}
+                  alt={t('Image verification code')}
+                  width={110}
+                  height={36}
+                />
+              ) : (
+                t('Refresh')
+              )}
+            </Button>
+          </div>
+          {captcha.error && (
+            <p className='pp-error' role='alert'>
+              {getServerErrorMessage(captcha.error)}
+            </p>
+          )}
+        </div>
+        <div className='pp-field'>
           <Label className='pp-label' htmlFor='pp-change-code'>
             {t('Verification code')}
           </Label>
@@ -242,6 +328,10 @@ export function PhoneChangeDialog(props: Props) {
                 variant='outline'
                 disabled={
                   security.pending ||
+                  captcha.isFetching ||
+                  captcha.isError ||
+                  !captcha.data ||
+                  !/^\d{5}$/.test(captchaAnswer) ||
                   resend.isActive ||
                   (step === 'new' && !/^1[3-9]\d{9}$/.test(phone))
                 }

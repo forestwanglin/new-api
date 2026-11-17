@@ -114,6 +114,7 @@ func SetApiRouter(router *gin.Engine) {
 				selfRoute.GET("/models", controller.GetUserModels)
 				selfRoute.PUT("/self", middleware.CriticalRateLimit(), middleware.DisableCache(), controller.UpdateSelf)
 				selfRoute.GET("/phone/change/status", controller.GetPhoneChangeStatus)
+				selfRoute.GET("/phone/change/captcha", middleware.CriticalRateLimit(), middleware.UserCriticalRateLimit("phone-change-captcha"), controller.GetPhoneChangeCaptcha)
 				selfRoute.POST("/phone/change/start", middleware.SessionCookieOriginGuard(), middleware.CriticalRateLimit(), middleware.UserCriticalRateLimit("phone-change"), controller.StartPhoneBinding)
 				selfRoute.POST("/phone/change/send", middleware.SessionCookieOriginGuard(), middleware.CriticalRateLimit(), middleware.UserCriticalRateLimit("phone-change"), controller.SendPhoneChangeCode)
 				selfRoute.POST("/phone/change/verify", middleware.SessionCookieOriginGuard(), middleware.CriticalRateLimit(), middleware.UserCriticalRateLimit("phone-change"), controller.VerifyPhoneChangeCode)

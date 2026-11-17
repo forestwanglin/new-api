@@ -35,6 +35,17 @@ beforeEach(() => {
   wechatEnabled = true
   useAuthStore.getState().auth.setUser(profile)
   vi.spyOn(api, 'get').mockImplementation(async (url) => {
+    if (url === '/api/user/phone/change/captcha') {
+      return {
+        data: {
+          success: true,
+          data: {
+            challenge_token: 'image-token',
+            image: 'data:image/png;base64,AA==',
+          },
+        },
+      }
+    }
     if (url === '/api/user/self') {
       return {
         data: {
@@ -252,6 +263,7 @@ it('completes first phone binding through the shared identity verification and r
       headers: { 'X-Security-Proof': 'initial-proof' },
     })
   )
+  await user.type(screen.getByLabelText('Image verification code'), '12345')
   await user.click(screen.getByRole('button', { name: 'Get code' }))
   await waitFor(() =>
     expect(
@@ -265,7 +277,13 @@ it('completes first phone binding through the shared identity verification and r
   )
   expect(post).toHaveBeenCalledWith(
     '/api/user/phone/change/send',
-    { step: 'new', phone: '13900139000', verification_token: 'binding-token' },
+    {
+      step: 'new',
+      phone: '13900139000',
+      verification_token: 'binding-token',
+      captcha_token: 'image-token',
+      captcha_answer: '12345',
+    },
     expect.objectContaining({ singleUseAuthorization: true })
   )
   expect(post).toHaveBeenCalledWith(

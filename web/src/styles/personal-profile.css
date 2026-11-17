@@ -291,3 +291,14 @@
     max-width: 100%;
   }
 }
+
+.personal-profile-phone-dialog .pp-code-row .pp-captcha {
+  padding: 0;
+  min-width: 110px;
+  overflow: hidden;
+}
+.personal-profile-phone-dialog .pp-captcha img {
+  display: block;
+  width: 110px;
+  height: 36px;
+}

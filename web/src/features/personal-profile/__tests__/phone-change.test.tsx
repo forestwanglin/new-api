@@ -24,7 +24,15 @@ function render(component: ReactElement) {
 }
 
 beforeEach(() => {
-  vi.spyOn(api, 'get').mockResolvedValue({ data: { success: true, data: {} } })
+  vi.spyOn(api, 'get').mockResolvedValue({
+    data: {
+      success: true,
+      data: {
+        challenge_token: 'image-token',
+        image: 'data:image/png;base64,AA==',
+      },
+    },
+  })
   useAuthStore
     .getState()
     .auth.setUser({ id: 1, username: 'phone-owner', role: 1 })
@@ -63,6 +71,13 @@ it.each(['send', 'submit'])(
         onSuccess={vi.fn()}
       />
     )
+    await waitFor(() =>
+      expect(screen.getByLabelText('Image verification code')).toBeEnabled()
+    )
+    await user.type(
+      await screen.findByLabelText('Image verification code'),
+      '12345'
+    )
     await user.click(await screen.findByRole('button', { name: 'Get code' }))
     await user.type(screen.getByLabelText('Verification code'), '123456')
     await user.click(screen.getByRole('button', { name: 'Next' }))
@@ -71,8 +86,18 @@ it.each(['send', 'submit'])(
       '13900139000'
     )
     if (action === 'submit') {
+      await waitFor(() =>
+        expect(screen.getByLabelText('Image verification code')).toBeEnabled()
+      )
+      await user.type(screen.getByLabelText('Image verification code'), '12345')
       await user.click(screen.getByRole('button', { name: 'Get code' }))
       await user.type(screen.getByLabelText('Verification code'), '654321')
+    }
+    if (action === 'send') {
+      await waitFor(() =>
+        expect(screen.getByLabelText('Image verification code')).toBeEnabled()
+      )
+      await user.type(screen.getByLabelText('Image verification code'), '12345')
     }
     const calls = post.mock.calls.length
     vi.useFakeTimers({ toFake: ['Date'] })
@@ -89,7 +114,7 @@ it.each(['send', 'submit'])(
     expect(screen.getByLabelText('Verification code')).toHaveValue('')
     expect(screen.getByLabelText('Verification code')).toHaveFocus()
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Get code' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Get code' })).toBeDisabled()
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Security verification has expired. Please verify again.'
     )
@@ -121,6 +146,10 @@ it('prevents changing the target number while SMS delivery is pending', async ()
   )
   const phone = await screen.findByLabelText('New phone number')
   await user.type(phone, '13900139000')
+  await waitFor(() =>
+    expect(screen.getByLabelText('Image verification code')).toBeEnabled()
+  )
+  await user.type(screen.getByLabelText('Image verification code'), '12345')
   await user.click(screen.getByRole('button', { name: 'Get code' }))
   expect(phone).toBeDisabled()
   finish({ data: { success: true, data: { token: 'sms', retry_after: 90 } } })
@@ -143,7 +172,15 @@ it('verifies both numbers and sends the old verification token with the new SMS'
         data: { success: true, data: { token: `${data.step}-verified` } },
       }
     }
-    return { data: { success: true, data: {} } }
+    return {
+      data: {
+        success: true,
+        data: {
+          challenge_token: 'image-token',
+          image: 'data:image/png;base64,AA==',
+        },
+      },
+    }
   })
   const onSuccess = vi.fn()
   const user = userEvent.setup()
@@ -162,6 +199,10 @@ it('verifies both numbers and sends the old verification token with the new SMS'
   expect(await screen.findByLabelText('Current phone number')).toHaveValue(
     '138****8000'
   )
+  await waitFor(() =>
+    expect(screen.getByLabelText('Image verification code')).toBeEnabled()
+  )
+  await user.type(screen.getByLabelText('Image verification code'), '12345')
   await user.click(screen.getByRole('button', { name: 'Get code' }))
   expect(
     await screen.findByRole('button', { name: 'Resend in 90s' })
@@ -172,10 +213,20 @@ it('verifies both numbers and sends the old verification token with the new SMS'
     await screen.findByLabelText('New phone number'),
     '13900139000'
   )
+  await waitFor(() =>
+    expect(screen.getByLabelText('Image verification code')).toBeEnabled()
+  )
+  await user.type(screen.getByLabelText('Image verification code'), '12345')
   await user.click(screen.getByRole('button', { name: 'Get code' }))
   expect(post).toHaveBeenCalledWith(
     '/api/user/phone/change/send',
-    { step: 'new', phone: '13900139000', verification_token: 'old-verified' },
+    {
+      step: 'new',
+      phone: '13900139000',
+      verification_token: 'old-verified',
+      captcha_token: 'image-token',
+      captcha_answer: '12345',
+    },
     expect.objectContaining({ singleUseAuthorization: true })
   )
   await user.type(screen.getByLabelText('Verification code'), '654321')
@@ -212,6 +263,10 @@ it('changing the new number clears its SMS authorization and entered code', asyn
     await screen.findByLabelText('New phone number'),
     '13900139000'
   )
+  await waitFor(() =>
+    expect(screen.getByLabelText('Image verification code')).toBeEnabled()
+  )
+  await user.type(screen.getByLabelText('Image verification code'), '12345')
   await user.click(screen.getByRole('button', { name: 'Get code' }))
   await user.type(screen.getByLabelText('Verification code'), '123456')
   expect(screen.getByRole('button', { name: 'Confirm binding' })).toBeEnabled()
@@ -244,6 +299,13 @@ it('shows failed SMS verification inline and keeps the old-phone step', async ()
       onSuccess={vi.fn()}
     />
   )
+  await waitFor(() =>
+    expect(screen.getByLabelText('Image verification code')).toBeEnabled()
+  )
+  await user.type(
+    await screen.findByLabelText('Image verification code'),
+    '12345'
+  )
   await user.click(await screen.findByRole('button', { name: 'Get code' }))
   await user.type(screen.getByLabelText('Verification code'), '000000')
   await user.click(screen.getByRole('button', { name: 'Next' }))
@@ -253,4 +315,151 @@ it('shows failed SMS verification inline and keeps the old-phone step', async ()
   expect(screen.getByLabelText('Current phone number')).toHaveValue(
     '138****8000'
   )
+})
+
+it('requires a fresh image answer for every SMS attempt, including failed delivery and retries', async () => {
+  let image = 0
+  const get = vi.mocked(api.get).mockImplementation(async (url) => ({
+    data: {
+      success: true,
+      data: {
+        challenge_token: `image-${url.endsWith('/captcha') ? ++image : image}`,
+        image: 'data:image/png;base64,AA==',
+      },
+    },
+  }))
+  const post = vi.spyOn(api, 'post').mockResolvedValue({
+    data: {
+      success: false,
+      message: 'Verification code is incorrect or has expired',
+    },
+  })
+  const user = userEvent.setup()
+  render(
+    <PhoneChangeDialog
+      open
+      status={{
+        bound: true,
+        phone_masked: '138****8000',
+        verification_required: false,
+      }}
+      onOpenChange={vi.fn()}
+      onSuccess={vi.fn()}
+    />
+  )
+  await waitFor(() =>
+    expect(screen.getByLabelText('Image verification code')).toBeEnabled()
+  )
+  const send = screen.getByRole('button', { name: 'Get code' })
+  expect(send).toBeDisabled()
+  expect(post).not.toHaveBeenCalled()
+  await user.type(screen.getByLabelText('Image verification code'), '12345')
+  await user.click(send)
+  await waitFor(() =>
+    expect(
+      get.mock.calls.filter(([url]) => url.endsWith('/captcha'))
+    ).toHaveLength(2)
+  )
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'Verification code is incorrect or has expired'
+  )
+  expect(screen.getByLabelText('Image verification code')).toHaveValue('')
+  expect(send).toBeDisabled()
+  await waitFor(() =>
+    expect(screen.getByLabelText('Image verification code')).toBeEnabled()
+  )
+  await user.type(screen.getByLabelText('Image verification code'), '54321')
+  await user.click(send)
+  expect(post).toHaveBeenLastCalledWith(
+    '/api/user/phone/change/send',
+    expect.objectContaining({
+      captcha_token: 'image-2',
+      captcha_answer: '54321',
+    }),
+    expect.anything()
+  )
+  await waitFor(() =>
+    expect(
+      get.mock.calls.filter(([url]) => url.endsWith('/captcha'))
+    ).toHaveLength(3)
+  )
+})
+
+it('allows image refresh after loading fails and does not send SMS without a valid challenge', async () => {
+  let failImage = true
+  vi.mocked(api.get).mockImplementation(async (url) => {
+    if (url.endsWith('/captcha') && failImage) {
+      return { data: { success: false, message: 'Image unavailable' } }
+    }
+    return {
+      data: {
+        success: true,
+        data: {
+          challenge_token: 'image-token',
+          image: 'data:image/png;base64,AA==',
+        },
+      },
+    }
+  })
+  const post = vi.spyOn(api, 'post')
+  const user = userEvent.setup()
+  render(
+    <PhoneChangeDialog
+      open
+      status={{
+        bound: true,
+        phone_masked: '138****8000',
+        verification_required: false,
+      }}
+      onOpenChange={vi.fn()}
+      onSuccess={vi.fn()}
+    />
+  )
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'Image unavailable'
+  )
+  expect(screen.getByRole('button', { name: 'Get code' })).toBeDisabled()
+  failImage = false
+  await user.click(screen.getByRole('button', { name: 'Refresh image code' }))
+  await waitFor(() =>
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  )
+  await user.type(screen.getByLabelText('Image verification code'), '12345')
+  expect(screen.getByRole('button', { name: 'Get code' })).toBeEnabled()
+  expect(post).not.toHaveBeenCalled()
+})
+
+it('blocks SMS when refreshing an existing image fails instead of reusing the old challenge', async () => {
+  const post = vi.spyOn(api, 'post')
+  const user = userEvent.setup()
+  render(
+    <PhoneChangeDialog
+      open
+      status={{
+        bound: true,
+        phone_masked: '138****8000',
+        verification_required: false,
+      }}
+      onOpenChange={vi.fn()}
+      onSuccess={vi.fn()}
+    />
+  )
+  await waitFor(() =>
+    expect(screen.getByLabelText('Image verification code')).toBeEnabled()
+  )
+  await user.type(screen.getByLabelText('Image verification code'), '12345')
+  expect(screen.getByRole('button', { name: 'Get code' })).toBeEnabled()
+  vi.mocked(api.get).mockResolvedValue({
+    data: { success: false, message: 'Image unavailable' },
+  })
+  await user.click(screen.getByRole('button', { name: 'Refresh image code' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'Image unavailable'
+  )
+  await user.type(screen.getByLabelText('Image verification code'), '54321')
+  expect(screen.getByRole('button', { name: 'Get code' })).toBeDisabled()
+  expect(
+    screen.getByRole('button', { name: 'Refresh image code' })
+  ).toBeEnabled()
+  expect(post).not.toHaveBeenCalled()
 })

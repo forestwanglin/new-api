@@ -11,11 +11,28 @@ import (
 )
 
 type phoneChangeRequest struct {
+	CaptchaToken      string `json:"captcha_token"`
+	CaptchaAnswer     string `json:"captcha_answer"`
 	Step              string `json:"step"`
 	Phone             string `json:"phone"`
 	Token             string `json:"token"`
 	VerificationToken string `json:"verification_token"`
 	Code              string `json:"code"`
+}
+
+func GetPhoneChangeCaptcha(c *gin.Context) {
+	setAuthNoStore(c)
+	identity, ok := middleware.GetSessionAuthIdentity(c)
+	if !ok {
+		writeSecurityOperationError(c, service.ErrAuthTokenInvalid)
+		return
+	}
+	token, image, err := service.NewPhoneChangeImage(identity)
+	if err != nil {
+		writePhoneChangeError(c, err)
+		return
+	}
+	common.ApiSuccess(c, gin.H{"challenge_token": token, "image": image})
 }
 
 func GetPhoneChangeStatus(c *gin.Context) {
@@ -61,7 +78,7 @@ func SendPhoneChangeCode(c *gin.Context) {
 		common.ApiErrorT(c, "Invalid parameters")
 		return
 	}
-	token, err := service.SendPhoneChangeCode(identity, request.Step, request.Phone, request.VerificationToken, c.ClientIP())
+	token, err := service.SendPhoneChangeCode(identity, request.Step, request.Phone, request.VerificationToken, c.ClientIP(), request.CaptchaToken, request.CaptchaAnswer)
 	if err != nil {
 		writePhoneChangeError(c, err)
 		return
@@ -117,6 +134,10 @@ func CompletePhoneChange(c *gin.Context) {
 }
 
 func writePhoneChangeError(c *gin.Context, err error) {
+	if errors.Is(err, service.ErrPhoneVerification) {
+		common.ApiErrorStatus(c, http.StatusOK, service.ErrPhoneVerification, gin.H{"code": "PHONE_CAPTCHA_INVALID"})
+		return
+	}
 	if errors.Is(err, service.ErrPhoneOwned) {
 		common.ApiErrorStatus(c, http.StatusConflict, service.ErrPhoneOwned, gin.H{"code": "PHONE_ALREADY_OWNED"})
 		return

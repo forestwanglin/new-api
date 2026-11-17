@@ -203,8 +203,8 @@ it('opens authentication immediately for restricted navigation and keeps its des
 })
 
 it.each([
-  ['/dashboard', 'Homepage'],
-  ['/dashboard/', 'Homepage'],
+  ['/onboarding', 'Homepage'],
+  ['/onboarding/', 'Homepage'],
   ['/model', 'Models'],
   ['/model/', 'Models'],
   ['/tutorial/', 'Configuration tutorial'],
@@ -291,4 +291,25 @@ it('updates desktop and mobile subscription labels when the language changes', a
   expect(
     await screen.findAllByRole('link', { name: 'Subscription', hidden: true })
   ).toHaveLength(2)
+})
+
+it('keeps the onboarding destination when anonymous users click Homepage on desktop or mobile', async () => {
+  await renderHeader()
+  const user = userEvent.setup()
+  await user.click(screen.getByRole('link', { name: 'Homepage' }))
+  expect(useLoginModalStore.getState().redirectTo).toBe('/onboarding')
+  useLoginModalStore.getState().close()
+  await user.click(
+    screen.getByRole('button', { name: 'Toggle navigation menu' })
+  )
+  const menu = await screen.findByRole('dialog', {
+    name: 'Toggle navigation menu',
+  })
+  const home = within(menu).getByRole('link', { name: 'Homepage' })
+  expect(home).toHaveAttribute('href', '/onboarding')
+  await user.click(home)
+  expect(useLoginModalStore.getState().redirectTo).toBe('/onboarding')
+  expect(
+    screen.queryByRole('dialog', { name: 'Toggle navigation menu' })
+  ).not.toBeInTheDocument()
 })

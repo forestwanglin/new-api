@@ -1152,6 +1152,13 @@
 - 收尾复验：隔离暂存副本个人资料 13 项测试、1,633 文件类型检查和生产构建通过；service/controller/router 手机号定向测试通过。完整 `go test ./service ./controller ./router ./middleware` 未全绿，router 的 `TestUserPointBalancesAPI` 因测试库缺少 `external_identity_claims` 表失败；本次未修改该测试或对应模型。
 - 参考：OWASP ASVS 5.0.0、Authentication/Session Management Cheat Sheets，覆盖本次相关的服务端校验、用途隔离、限流、防重放及会话控制；不声明完整 ASVS 合规。外部微信/短信服务通过测试替身验证，不代表真实投递验收。
 
+### Z077 手机号图片验证码与安全访问导航细节
+
+- 需求与行为：安全与访问的访问令牌面板透出与账户安全、登录设备一致的白色容器；两处共用手机号弹窗在首次绑定、旧号、新号及重发前都需要图片验证码；顶部「首页」进入新手引导 `/onboarding`。Logo、站点根目录和直接 `/dashboard` 路由保持原行为。
+- 实现边界：session-only GET `/api/user/phone/change/captcha` 返回 `challenge_token`、`image`；发送接口强制 `captcha_token`、`captcha_answer`。独立 `phone_change_image_v1` 用途、两分钟/一次尝试、用户/会话/auth version 绑定及事务单次消费；保留原身份授权、短信限流与会话旋转。图片 PNG 生成复用原手机登录能力，不复用匿名登录授权。
+- 兼容与风险：无新增依赖、配置或数据库迁移；新旧前后端接口不兼容，必须成套发布或回滚。未提供图片校验的旧客户端请求失败；不改变匿名手机登录及其他敏感操作策略。验证码是纵深防御，不能取代身份验证和限流。
+- 验证：相关前端 5 文件/46 用例、TypeCheck 1,637 文件/2 项目、定向 Oxlint/Oxfmt、生产构建及 diff 检查通过；后端 PhoneChange/PhoneBinding/PhoneCaptcha 定向回归通过，真实 SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 16.16 矩阵连续两次通过，含图片挑战并发消费仅一次投递。独立复核无阻断。浏览器确认首页进入新手引导、Logo 链接模型页、令牌背景透明透出白色容器；开发后端重建后登录态失效，未完成手机号弹窗实页端到端，未发送真实短信。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 
@@ -1161,6 +1168,7 @@
 
 | 区域 | 文件 | 关联条目 |
 |---|---|---|
+| 手机图片验证码和首页导航 | controller/service phone_change、共享手机图片渲染、router/api-router.go、middleware/access_token_routes.go、共用手机号弹窗、顶部导航与安全访问局部样式及相关测试 | Z077 |
 | 手机号首次绑定与更换验证策略 | controller phone_change/secure_verification、service phone_change/phone_binding_verification/security_verification、router/api-router.go、middleware/access_token_routes.go、个人资料流程、共享验证 API/类型及关联测试 | Z076 |
 | 独立个人资料与手机号更换 | `router/api-router.go`、`middleware/access_token_routes.go`、`service/security_verification.go`、语言偏好组件、侧栏数据与测试、生成路由和七种 locale | Z073 |
 | 新手引导功能复制 | sidebar data/config、个人/管理员菜单配置、邀请卡片、接入卡片、推荐操作、路由生成文件及七种 locale | Z072 |

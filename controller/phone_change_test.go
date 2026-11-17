@@ -24,6 +24,34 @@ func (transport phoneChangeSMSRoundTripper) RoundTrip(request *http.Request) (*h
 
 func phoneChangeControllerToken(t *testing.T, identity service.AuthIdentity, path, body string, handler gin.HandlerFunc) string {
 	t.Helper()
+	if strings.HasSuffix(path, "/send") {
+		captcha := securityEnrollmentRequest("GET", "/api/user/phone/change/captcha", "", "", identity, GetPhoneChangeCaptcha)
+		var result struct {
+			Success bool `json:"success"`
+			Data    struct {
+				Token string `json:"challenge_token"`
+				Image string `json:"image"`
+			} `json:"data"`
+		}
+		require.NoError(t, common.Unmarshal(captcha.Body.Bytes(), &result))
+		require.True(t, result.Success, captcha.Body.String())
+		require.Contains(t, captcha.Header().Get("Cache-Control"), "no-store")
+		require.Contains(t, result.Data.Image, "data:image/png;base64,")
+		flow, err := model.GetAuthFlow(result.Data.Token, model.AuthFlowMatch{Purpose: "phone_change_image_v1", UserId: identity.UserID, SessionId: identity.SessionID})
+		require.NoError(t, err)
+		var payload map[string]any
+		require.NoError(t, common.UnmarshalJsonStr(flow.Payload, &payload))
+		payload["digest"] = common.GenerateHMACWithKey([]byte("phone-code:"+common.SessionSecret), "12345")
+		encoded, err := common.Marshal(payload)
+		require.NoError(t, err)
+		require.NoError(t, model.DB.Model(flow).Update("payload", string(encoded)).Error)
+		var request map[string]any
+		require.NoError(t, common.UnmarshalJsonStr(body, &request))
+		request["captcha_token"], request["captcha_answer"] = result.Data.Token, "12345"
+		encoded, err = common.Marshal(request)
+		require.NoError(t, err)
+		body = string(encoded)
+	}
 	response := securityEnrollmentRequest("POST", path, body, "", identity, handler)
 	var result struct {
 		Success bool `json:"success"`
@@ -126,4 +154,19 @@ func TestPhoneBindingControllerWeChatCodeMustBelongToCurrentAccount(t *testing.T
 		response = securityEnrollmentRequest("POST", "/api/user/phone/change/start", `{}`, proof.ProofToken, identity, StartPhoneBinding)
 		require.False(t, decodeSecurityEnrollmentResponse(t, response).Success)
 	}
+}
+
+func TestPhoneChangeCaptchaMissingAnswerReturnsBusinessError(t *testing.T) {
+	user, identity := setupSecurityEnrollmentTest(t)
+	require.NoError(t, model.DB.Create(&model.ExternalIdentityClaim{Provider: "phone", Subject: "13800138000", UserId: user.Id}).Error)
+	t.Setenv("ALIYUN_SMS_ACCESS_KEY_ID", "test")
+	t.Setenv("ALIYUN_SMS_ACCESS_KEY_SECRET", "test")
+	oldSettings := *system_setting.GetPhoneSettings()
+	*system_setting.GetPhoneSettings() = system_setting.PhoneSettings{Enabled: true, Region: "cn-hangzhou", SignName: "test", TemplateCode: "SMS_TEST"}
+	t.Cleanup(func() { *system_setting.GetPhoneSettings() = oldSettings })
+	response := securityEnrollmentRequest("POST", "/api/user/phone/change/send", `{"step":"old"}`, "", identity, SendPhoneChangeCode)
+	require.Equal(t, http.StatusOK, response.Code)
+	require.Contains(t, response.Body.String(), `"success":false`)
+	require.Contains(t, response.Body.String(), `PHONE_CAPTCHA_INVALID`)
+	require.NotContains(t, response.Body.String(), `AUTH_INTERNAL_ERROR`)
 }

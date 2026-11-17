@@ -67,11 +67,11 @@ export function useTopNavLinks(): TopNavLink[] {
     links.push({ title: t('Home'), href: '/' })
   }
 
-  // Console -> /dashboard (new console path). This fork labels the entry 首页.
+  // Console entry opens onboarding. This fork labels the entry 首页.
   if (modules?.console !== false) {
     links.push({
       title: t('Homepage'),
-      href: '/dashboard',
+      href: '/onboarding',
       requiresAuth: !isAuthed,
     })
   }

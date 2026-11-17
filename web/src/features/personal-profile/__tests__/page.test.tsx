@@ -159,7 +159,12 @@ it.each(['password', 'wechat'])(
   async (method) => {
     vi.mocked(api.get).mockImplementation(async (url) => {
       let data: unknown = profile
-      if (url.endsWith('/status')) {
+      if (url.endsWith('/captcha')) {
+        data = {
+          challenge_token: 'image-token',
+          image: 'data:image/png;base64,AA==',
+        }
+      } else if (url.endsWith('/status')) {
         data = { bound: false, phone_masked: '', verification_required: true }
       } else if (url === '/api/verify/methods') {
         data = {
@@ -215,6 +220,7 @@ it.each(['password', 'wechat'])(
         singleUseAuthorization: true,
       })
     )
+    await user.type(screen.getByLabelText('Image verification code'), '12345')
     await user.click(screen.getByRole('button', { name: 'Get code' }))
     await waitFor(() =>
       expect(post).toHaveBeenCalledWith(
@@ -223,6 +229,8 @@ it.each(['password', 'wechat'])(
           step: 'new',
           phone: '13900139000',
           verification_token: 'binding-authorization',
+          captcha_token: 'image-token',
+          captcha_answer: '12345',
         },
         expect.objectContaining({ singleUseAuthorization: true })
       )

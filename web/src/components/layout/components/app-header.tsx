@@ -113,7 +113,7 @@ export function AppHeader({
     <PublicHeader
       className='sticky w-full shrink-0'
       navLinks={links}
-      activeNavHref='/dashboard'
+      activeNavHref='/onboarding'
       showNavigation={showTopNav}
       leftContent={
         <>

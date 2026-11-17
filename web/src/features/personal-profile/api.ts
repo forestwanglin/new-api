@@ -6,6 +6,7 @@ export type PhoneChangeStatus = {
   phone_masked: string
   verification_required: boolean
 }
+export type PhoneChangeCaptcha = { challenge_token: string; image: string }
 export type PhoneCodeResult = { token: string; retry_after: number }
 export type PhoneVerifyResult = { token: string }
 
@@ -36,10 +37,22 @@ export function getPhoneChangeStatus(signal?: AbortSignal) {
   )
 }
 
+export function getPhoneChangeCaptcha(signal: AbortSignal) {
+  return authResult<PhoneChangeCaptcha>(
+    api.get('/api/user/phone/change/captcha', {
+      ...authRequestOptions,
+      signal,
+      disableDuplicate: true,
+    })
+  )
+}
+
 export function sendPhoneCode(
   step: 'old' | 'new',
   phone: string,
   verificationToken: string,
+  captchaToken: string,
+  captchaAnswer: string,
   signal: AbortSignal
 ) {
   return authResult<PhoneCodeResult>(
@@ -49,6 +62,8 @@ export function sendPhoneCode(
         step,
         phone,
         verification_token: verificationToken,
+        captcha_token: captchaToken,
+        captcha_answer: captchaAnswer,
       },
       {
         ...authRequestOptions,

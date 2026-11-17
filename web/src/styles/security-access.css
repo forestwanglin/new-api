@@ -239,6 +239,7 @@
   outline-offset: 3px;
 }
 .security-access-page .sa-tokens > [data-slot='card'] {
+  background: transparent;
   overflow: visible;
   box-shadow: none;
   border: 0;
