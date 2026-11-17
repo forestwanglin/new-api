@@ -30,7 +30,7 @@ export function Onboarding() {
     <SectionPageLayout variant='user'>
       <SectionPageLayout.Title>{t('Getting started')}</SectionPageLayout.Title>
       <SectionPageLayout.Content>
-        <CardStaggerContainer className='flex min-w-0 flex-col gap-4'>
+        <CardStaggerContainer className='flex min-w-0 flex-col gap-4 p-px'>
           <ReferralPanel showStatistics={false} />
           <CardStaggerContainer className='grid items-stretch gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]'>
             <AccessGuideCard title={t('Connect your app')} />

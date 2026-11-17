@@ -217,3 +217,13 @@ test.each([1, 10])(
     }
   }
 )
+
+test('insets the first card by one pixel so its outer ring stays inside the scrollport', async () => {
+  await renderOnboarding()
+  const referral = await screen.findByRole('heading', {
+    name: 'Referral Program',
+  })
+  const card = referral.closest('[data-slot="card"]')
+  expect(card).toHaveClass('ring-1')
+  expect(card?.parentElement).toHaveClass('p-px')
+})
