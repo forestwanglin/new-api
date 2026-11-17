@@ -276,8 +276,8 @@ export function AccessGuideCard(
   }
 
   return (
-    <CardStaggerItem className='bg-card h-full overflow-hidden rounded-2xl border shadow-xs'>
-      <div className='flex h-full flex-col gap-5 p-4 sm:p-5'>
+    <CardStaggerItem className='general-card general-access-card bg-card h-full overflow-hidden rounded-2xl border shadow-xs'>
+      <div className='general-access-content flex h-full flex-col gap-5 p-4 sm:p-5'>
         <div className='flex flex-col gap-1'>
           <div className='flex flex-wrap items-center justify-between gap-2'>
             <div className='flex min-w-0 items-center gap-2'>

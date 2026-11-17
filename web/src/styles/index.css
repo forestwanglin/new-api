@@ -30,6 +30,7 @@ For commercial licensing, please contact support@quantumnous.com
 @import './theme.css';
 @import './theme-presets.css';
 @import './user-page.css';
+@import './general-console.css';
 
 @layer base {
   :root {

@@ -1,0 +1,278 @@
+/* Effective console rules from c-dev/ZYY-AI-demo.html, including its final
+ * C-end refinement cascade. Opt-in classes keep shared components unchanged.
+ * Chart series, row status colors, fixed headers and scrollports remain owned
+ * by their existing components. Portal surfaces keep their shared theme. */
+.general-console-page {
+  --general-page-bg: var(--background);
+  --general-surface: var(--card);
+  --general-inset: var(--muted);
+  --general-control-line: var(--input);
+  --general-line: var(--border);
+  --general-shadow: 0 2px 8px -5px #20365b1c, 0 10px 28px -24px #20365b30;
+  --user-page-gutter: 24px;
+  --font-body:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Microsoft YaHei', sans-serif;
+  min-width: 0;
+  background: var(--general-page-bg);
+  color: var(--foreground);
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Microsoft YaHei', sans-serif;
+  font-size: 15px;
+  line-height: 1.62;
+}
+
+:root:not(.dark) .general-console-page {
+  --general-page-bg: #f8fafd;
+  --general-surface: #fff;
+  --general-inset: #f8fafc;
+  --general-line: #e3e9f2;
+  --general-control-line: #dce2ea;
+  --background: #fff;
+  --card: #fff;
+  --card-foreground: #0f172a;
+  --foreground: #0f172a;
+  --muted: #f7f8fa;
+  --muted-foreground: #5b6b80;
+  --primary: #2563eb;
+  --primary-foreground: #fff;
+  --secondary: #eff4ff;
+  --secondary-foreground: #1e40af;
+  --accent: #eff4ff;
+  --accent-foreground: #1e40af;
+  --border: #e3e9f2;
+  --input: #dce2ea;
+  --ring: #93b4f7;
+  --table-header: #f7f8fa;
+}
+
+.general-console-page [data-slot='section-page-header'] {
+  padding: 28px var(--user-page-gutter) 20px;
+}
+
+.general-console-page [data-slot='section-page-title'] {
+  overflow-wrap: anywhere;
+  white-space: normal;
+  font-size: clamp(22px, 2vw, 28px);
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: -0.6px;
+}
+
+.general-console-page [data-slot='section-page-content'] {
+  padding: 0 var(--user-page-gutter) 24px;
+}
+
+.general-console-page [data-slot='section-page-footer'] {
+  padding: 12px var(--user-page-gutter);
+  border-color: var(--general-line);
+  background: var(--general-surface);
+  font-size: 13px;
+}
+
+.general-console-page :is(.general-card, [data-slot='card']) {
+  min-width: 0;
+  border: 1px solid var(--general-line);
+  border-radius: 14px;
+  background: var(--general-surface);
+  box-shadow: var(--general-shadow);
+}
+
+.general-console-page [data-slot='card'] {
+  --tw-ring-shadow: 0 0 #0000;
+}
+
+.general-console-page :is(.general-access-card, .general-actions-card) h3 {
+  white-space: normal;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: 0;
+}
+
+.general-console-page .general-access-content,
+.general-console-page .general-actions-card {
+  padding: 24px;
+}
+
+.general-console-page .general-access-card {
+  border-color: color-mix(in oklch, var(--primary) 25%, var(--general-line));
+}
+
+.general-console-page .general-filter-card {
+  min-width: 0;
+  flex-shrink: 0;
+  padding: 15px 18px;
+  border: 1px solid var(--general-line);
+  border-radius: 12px;
+  background: var(--general-surface);
+}
+
+.general-console-page [data-slot='button'] {
+  border-radius: 9px;
+  font-size: 14px;
+  line-height: 1.5;
+  transition:
+    background-color 160ms,
+    border-color 160ms,
+    box-shadow 160ms,
+    color 160ms;
+}
+
+.general-console-page [data-slot='button'].bg-primary {
+  box-shadow: 0 3px 8px -4px
+    color-mix(in oklch, var(--primary) 40%, transparent);
+}
+
+.general-console-page [data-slot='button'].bg-primary:not(:disabled):hover {
+  background: color-mix(in oklch, var(--primary) 88%, #000);
+}
+
+.general-console-page [data-slot='button'].border-border:not(:disabled):hover {
+  border-color: color-mix(in oklch, var(--primary) 30%, var(--general-line));
+  color: var(--primary);
+}
+
+.general-console-page
+  :is(
+    [data-slot='input'],
+    [data-slot='select-trigger'],
+    [data-slot='combobox-trigger']
+  ) {
+  min-width: 0;
+  border-color: var(--general-control-line);
+  border-radius: 8px;
+  background: var(--general-surface);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.general-console-page
+  :is(
+    [data-slot='input'],
+    [data-slot='select-trigger'],
+    [data-slot='combobox-trigger']
+  ):focus-visible {
+  border-color: var(--primary);
+}
+
+.general-console-page :is(button, a, summary, [tabindex]):focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 3px;
+}
+
+.general-console-page [data-slot='tabs-list'] {
+  max-width: 100%;
+  border: 1px solid var(--general-line);
+  border-radius: 10px;
+  background: var(--general-inset);
+}
+
+.general-console-page [data-slot='tabs-trigger'] {
+  padding-inline: 12px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.general-console-page [data-slot='tabs-trigger'][data-active] {
+  color: var(--primary);
+}
+
+/* Group labels reuse chart hues. Some presets choose pastel series colors;
+ * deepen only badge text on the light surface, leaving canvas colors intact. */
+:root:not(.dark) .general-console-page [data-slot='status-badge'].text-chart-1 {
+  color: color-mix(in oklch, var(--chart-1) 35%, var(--foreground));
+}
+
+:root:not(.dark) .general-console-page [data-slot='status-badge'].text-chart-2 {
+  color: color-mix(in oklch, var(--chart-2) 35%, var(--foreground));
+}
+
+:root:not(.dark) .general-console-page [data-slot='status-badge'].text-chart-3 {
+  color: color-mix(in oklch, var(--chart-3) 35%, var(--foreground));
+}
+
+:root:not(.dark) .general-console-page [data-slot='status-badge'].text-chart-4 {
+  color: color-mix(in oklch, var(--chart-4) 35%, var(--foreground));
+}
+
+:root:not(.dark) .general-console-page [data-slot='status-badge'].text-chart-5 {
+  color: color-mix(in oklch, var(--chart-5) 35%, var(--foreground));
+}
+
+.general-console-page .general-table-surface {
+  border-color: var(--general-line);
+  border-radius: 12px;
+  background: var(--general-surface);
+  box-shadow: var(--general-shadow);
+}
+
+.general-console-page [data-slot='table-head'] {
+  padding-block: 12px;
+  color: var(--muted-foreground);
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.general-console-page [data-slot='table-cell'] {
+  padding-block: 13px;
+  line-height: 1.65;
+}
+
+.general-console-page .general-chart-heading {
+  padding: 16px 20px;
+  border-color: var(--general-line);
+}
+
+.general-console-page .general-stat-cards [role='group'] {
+  padding: 16px 18px;
+}
+
+.general-console-page .general-stat-value {
+  font-family: inherit;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: -0.5px;
+}
+
+.dark .general-console-page {
+  --general-shadow: 0 2px 8px -5px #0006, 0 10px 28px -24px #0008;
+}
+
+@media (max-width: 640px) {
+  .general-console-page {
+    --user-page-gutter: 16px;
+  }
+
+  .general-console-page [data-slot='section-page-header'] {
+    padding-top: 18px;
+    padding-bottom: 18px;
+  }
+
+  .general-console-page [data-slot='section-page-content'] {
+    padding-bottom: 18px;
+  }
+
+  .general-console-page .general-filter-card {
+    padding: 13px 14px;
+  }
+
+  .general-console-page .general-access-content,
+  .general-console-page .general-actions-card {
+    padding: 18px;
+  }
+
+  .general-console-page .general-stat-cards [role='group'] {
+    padding: 13px 14px;
+  }
+
+  .general-console-page .general-stat-value {
+    font-size: 22px;
+  }
+
+  .general-console-page [data-slot='table-cell'] {
+    padding-block: 11px;
+  }
+}

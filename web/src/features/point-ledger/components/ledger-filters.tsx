@@ -106,7 +106,7 @@ export function LedgerFilters(props: {
   return (
     <form
       onSubmit={form.handleSubmit(apply)}
-      className='mb-4 flex min-w-0 flex-wrap items-center gap-2 sm:gap-3'
+      className='general-filter-card mb-4 flex min-w-0 flex-wrap items-center gap-2 sm:gap-3'
     >
       {props.admin && (
         <Input

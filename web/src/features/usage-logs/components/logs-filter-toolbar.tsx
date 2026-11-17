@@ -144,7 +144,7 @@ export function LogsFilterToolbar<TData>(props: LogsFilterToolbarProps<TData>) {
       <Drawer open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
         <DataTableMobileFilterPanel
           compact={props.compactMobile}
-          className={props.className}
+          className={cn('general-filter-card', props.className)}
           actions={
             <>
               {props.actionStart}
@@ -245,7 +245,7 @@ export function LogsFilterToolbar<TData>(props: LogsFilterToolbarProps<TData>) {
   return (
     <div
       className={cn(
-        'bg-card/50 rounded-lg border p-2.5 sm:p-3',
+        'general-filter-card bg-card/50 rounded-lg border p-2.5 sm:p-3',
         props.className
       )}
     >

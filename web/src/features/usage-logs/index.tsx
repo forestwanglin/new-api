@@ -124,7 +124,11 @@ function UsageLogsContent() {
 
   return (
     <>
-      <SectionPageLayout fixedContent variant='user'>
+      <SectionPageLayout
+        fixedContent
+        variant='user'
+        className='general-console-page general-logs'
+      >
         <SectionPageLayout.Title>
           {t(pageMeta.titleKey)}
         </SectionPageLayout.Title>

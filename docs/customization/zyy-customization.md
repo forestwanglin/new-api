@@ -1169,6 +1169,16 @@
 - 验证：`bun run typecheck`、涉及文件 `bunx oxlint -c .oxlintrc.json ...`、`bun run build` 通过；`bun run test src/features/users src/features/model-plaza src/features/subscriptions-custom --exclude src/features/model-plaza/__tests__/navigation.test.tsx`：22 文件、185 用例通过。测试包含负余额保存资料、非法余额拒绝、7 语言实际资源、语言切换、动态品牌与客服复制。Chrome 本地 `/model` 验证中英文折扣、品牌与客服弹窗。
 - 风险与未覆盖：完整相关测试集中的 `model-plaza/__tests__/navigation.test.tsx` 有 2 条既有失败：断言 `/dashboard`，现有导航为 `/onboarding`；从 HEAD 导出基线复测可重现，不修改本次无关导航。全库 `copyright:check` 存在既有缺失/旧版权头；额外执行的 `lint:plugins` 在未改动的任务插件中有既有警告并返回失败。未对线上用户执行保存或调额。
 
+### Z079 常规七页 Demo 样式对齐
+
+- 需求与原因：常规菜单的新手引导、数据看板、API 密钥、使用日志、积分流水、审计日志和任务日志沿用 `c-dev/ZYY-AI-demo.html` 与个人页面的配色、排版、留白、卡片、控件及表格视觉，同时保留已有页面元素与真实数据。
+- 变更内容：新增 `web/src/styles/general-console.css`，仅在显式 `.general-console-page` 页面启用；使用日志入口同时覆盖 task/drawing 子页。SectionPageLayout 增加可选 className 和页头/标题/内容/页脚语义标记，保留默认布局及 footer portal；积分流水保留原 variant。图表仅调整外部容器/标题，保留 VChart theme/spec 与系列颜色；浅色页的 chart 色文字徽标局部加深，暗色保持原主题。弹窗和下拉 portal 继续沿用共享样式。
+- 影响面：**上游自有文件**：`web/src/components/layout/components/section-page-layout.tsx` 及其测试；`web/src/features/dashboard/index.tsx`、`components/{flow/flow-charts,models/consumption-distribution-chart,models/log-stat-cards,models/model-charts,models/performance-overview,users/user-charts,overview/access-guide/index,overview/recommended-actions-panel}.tsx`；`web/src/features/keys/{index,components/api-keys-table}.tsx`；`web/src/features/usage-logs/{index,components/logs-filter-toolbar,components/usage-logs-table,audit/index,audit/components/audit-log-viewer}.tsx`；`web/src/styles/index.css`。fork 页面 `features/onboarding/index.tsx`、`features/point-ledger/{index,components/ledger-filters}.tsx` 增加样式标记，新增 `styles/__tests__/general-console-theme.test.ts`。
+- 与上游差异：显式页面作用域的样式覆盖和必要 className/data-slot 挂载，不修改 handlers、hooks、权限分支、请求参数、字段、计算、文案或数据；共享调用方未启用作用域时保持原视觉。
+- 开关与默认值：无新增配置、依赖、后端或部署变更。浅色统一 Demo 色板；暗色继承用户主题变量，窄屏减小留白，保留现有表格滚动与移动列表。回滚本轮前端变更即可恢复。
+- 验证：受影响 14 文件/150 项 Vitest 通过，包含新手引导、密钥列表/分组、看板既有模块与图表工具、流水、审计、使用/任务日志及布局/主题回归；`bun run typecheck`、本轮 22 个 TS/TSX 文件 scoped oxlint、24 个文件的受保护版权头安全 scoped oxfmt、`bun run build` 通过。Chrome 本地已核对七页及 drawing 子页的桌面/390px 窄屏浅色布局，积分详情可打开、长表仍在原容器滚动；另核对七页桌面暗色布局，页面无横向溢出，API/任务日志暗色截图正常。验证后恢复 system 主题和默认 viewport。
+- 风险与未覆盖：`detail-preview.test.tsx` 单文件复跑有 29 项通过、定价本地化用例 20 秒超时，与 Z075 记录的既有异常一致；仅运行该定价用例时通过（1 项通过、29 项跳过），本轮未改该测试及其业务组件。审计筛选控件触发既有 Base UI `nativeButton` 控制台警告，相关 Combobox/InputGroupButton 本次未改；未执行创建密钥、删除、真实 API 调用等写操作。Portal 保持共享样式，窄屏暗色与完整端到端业务链路未逐项验收。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 
@@ -1178,6 +1188,7 @@
 
 | 区域 | 文件 | 关联条目 |
 |---|---|---|
+| 常规七页 Demo 样式 | `web/src/components/layout/components/section-page-layout.tsx` 及测试、dashboard 各图表/卡片及入口、keys 列表及入口、usage-logs 筛选/表格/审计及入口、`web/src/styles/index.css`（完整范围见 Z079） | Z079 |
 | 手机图片验证码和首页导航 | controller/service phone_change、共享手机图片渲染、router/api-router.go、middleware/access_token_routes.go、共用手机号弹窗、顶部导航与安全访问局部样式及相关测试 | Z077 |
 | 手机号首次绑定与更换验证策略 | controller phone_change/secure_verification、service phone_change/phone_binding_verification/security_verification、router/api-router.go、middleware/access_token_routes.go、个人资料流程、共享验证 API/类型及关联测试 | Z076 |
 | 独立个人资料与手机号更换 | `router/api-router.go`、`middleware/access_token_routes.go`、`service/security_verification.go`、语言偏好组件、侧栏数据与测试、生成路由和七种 locale | Z073 |

@@ -31,11 +31,16 @@ afterEach(() => {
   useAuthStore.getState().auth.setUser(null)
 })
 
-function Page(props: { variant?: 'default' | 'user'; fixedContent?: boolean }) {
+function Page(props: {
+  variant?: 'default' | 'user'
+  fixedContent?: boolean
+  className?: string
+}) {
   return (
     <SectionPageLayout
       variant={props.variant}
       fixedContent={props.fixedContent}
+      className={props.className}
     >
       <SectionPageLayout.Title>A long page title</SectionPageLayout.Title>
       <SectionPageLayout.Description>
@@ -53,6 +58,20 @@ function Page(props: { variant?: 'default' | 'user'; fixedContent?: boolean }) {
     </SectionPageLayout>
   )
 }
+
+it('keeps custom page appearance scoped around the content and portaled pagination', () => {
+  render(<Page className='general-console-page' fixedContent />)
+  const main = screen.getByRole('main')
+  expect(main).toHaveClass('general-console-page')
+  expect(main).not.toHaveClass('user-page')
+  expect(main).toContainElement(screen.getByText('Page content'))
+  expect(main).toContainElement(
+    screen.getByRole('button', { name: 'Next page' })
+  )
+  expect(screen.getByText('Page content').parentElement).toHaveClass(
+    'overflow-hidden'
+  )
+})
 
 it('keeps the default layout even for an ordinary user unless explicitly opted in', () => {
   useAuthStore

@@ -159,7 +159,7 @@ export function PointLedger(props: { scope: PointLedgerScope }) {
   } else {
     content = (
       <>
-        <div className='min-h-0 flex-1 overflow-auto'>
+        <div className='general-table-surface min-h-0 flex-1 overflow-auto'>
           <StaticDataTable
             tableClassName='min-w-[1100px]'
             data={rows}
@@ -200,7 +200,10 @@ export function PointLedgerPage() {
   const user = useAuthStore((state) => state.auth.user)
   const scope = user?.role === ROLE.SUPER_ADMIN ? 'admin' : 'self'
   return (
-    <SectionPageLayout fixedContent>
+    <SectionPageLayout
+      fixedContent
+      className='general-console-page general-ledger'
+    >
       <SectionPageLayout.Title>{t('Point Ledger')}</SectionPageLayout.Title>
       <SectionPageLayout.Content>
         <PointLedger key={`${user?.id}:${scope}`} scope={scope} />

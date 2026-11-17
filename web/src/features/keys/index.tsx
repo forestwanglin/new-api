@@ -29,7 +29,11 @@ export function ApiKeys() {
   const { t } = useTranslation()
   return (
     <ApiKeysProvider>
-      <SectionPageLayout fixedContent variant='user'>
+      <SectionPageLayout
+        fixedContent
+        variant='user'
+        className='general-console-page general-keys'
+      >
         <SectionPageLayout.Title>{t('API Keys')}</SectionPageLayout.Title>
         <SectionPageLayout.Actions>
           <ApiKeysPrimaryButtons />

@@ -58,6 +58,7 @@ SectionPageLayoutBreadcrumb.displayName = 'SectionPageLayout.Breadcrumb'
 
 export type SectionPageLayoutProps = {
   children: ReactNode
+  className?: string
   fixedContent?: boolean
   stackActionsOnMobile?: boolean
   /** Opt-in page foundation, shared by all account roles. */
@@ -94,8 +95,9 @@ export function SectionPageLayout(props: SectionPageLayoutProps) {
 
   return (
     <PageFooterProvider container={footerContainer}>
-      <Main className={userAppearance ? 'user-page' : undefined}>
+      <Main className={cn(userAppearance && 'user-page', props.className)}>
         <div
+          data-slot='section-page-header'
           className={cn(
             'shrink-0 px-3 pt-3 pb-2.5 sm:px-4 sm:pt-5 sm:pb-3',
             userAppearance && 'user-page-header'
@@ -113,6 +115,7 @@ export function SectionPageLayout(props: SectionPageLayoutProps) {
               }
             >
               <h2
+                data-slot='section-page-title'
                 className={
                   userAppearance
                     ? 'user-page-title'
@@ -136,6 +139,7 @@ export function SectionPageLayout(props: SectionPageLayoutProps) {
         </div>
 
         <div
+          data-slot='section-page-content'
           className={cn(
             props.fixedContent
               ? 'min-h-0 flex-1 overflow-hidden px-3 pt-1 pb-3 sm:px-4 sm:pt-1.5 sm:pb-4'
@@ -148,6 +152,7 @@ export function SectionPageLayout(props: SectionPageLayoutProps) {
 
         <div
           ref={setFooterContainer}
+          data-slot='section-page-footer'
           className={cn(
             'bg-background shrink-0 border-t px-3 py-2.5 empty:hidden sm:px-4 sm:py-3',
             userAppearance && 'user-page-footer'

@@ -113,7 +113,7 @@ export function RecommendedActionsPanel() {
   )
 
   return (
-    <CardStaggerItem className='bg-card h-full rounded-2xl border p-4 shadow-xs sm:p-5'>
+    <CardStaggerItem className='general-card general-actions-card bg-card h-full rounded-2xl border p-4 shadow-xs sm:p-5'>
       <div className='flex h-full flex-col gap-4'>
         <div className='flex flex-col gap-1'>
           <div className='text-muted-foreground text-xs font-medium tracking-wider uppercase'>

@@ -27,7 +27,10 @@ import { ReferralPanel } from '@/features/dashboard/components/overview/referral
 export function Onboarding() {
   const { t } = useTranslation()
   return (
-    <SectionPageLayout variant='user'>
+    <SectionPageLayout
+      variant='user'
+      className='general-console-page general-onboarding'
+    >
       <SectionPageLayout.Title>{t('Getting started')}</SectionPageLayout.Title>
       <SectionPageLayout.Content>
         <CardStaggerContainer className='flex min-w-0 flex-col gap-4 p-px'>
