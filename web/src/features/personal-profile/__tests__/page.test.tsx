@@ -153,3 +153,108 @@ it('shows phone load failure as unavailable with a retry instead of displaying a
   ).toBeDisabled()
   expect(screen.getByRole('button', { name: 'Retry' })).toBeEnabled()
 })
+
+it.each(['password', 'wechat'])(
+  'verifies %s when Bind is clicked before opening the new-phone dialog',
+  async (method) => {
+    vi.mocked(api.get).mockImplementation(async (url) => {
+      let data: unknown = profile
+      if (url.endsWith('/status')) {
+        data = { bound: false, phone_masked: '', verification_required: true }
+      } else if (url === '/api/verify/methods') {
+        data = {
+          scope: 'phone.binding',
+          methods: [{ method, available: true }],
+          oauth_providers: [],
+          password_encryption_enabled: false,
+        }
+      }
+      return { data: { success: true, data } }
+    })
+    const post = vi.spyOn(api, 'post').mockImplementation(async (url) => ({
+      data: {
+        success: true,
+        data:
+          url === '/api/verify'
+            ? {
+                proof_token: 'initial-proof',
+                method,
+                scope: 'phone.binding',
+                expires_at: Date.now() / 1000 + 300,
+              }
+            : {
+                token: 'binding-authorization',
+                expires_at: Date.now() / 1000 + 600,
+                retry_after: 90,
+              },
+      },
+    }))
+    const user = userEvent.setup()
+    renderProfile()
+    await user.click(
+      await screen.findByRole('button', { name: 'Bind phone number' })
+    )
+    expect(screen.queryByLabelText('New phone number')).not.toBeInTheDocument()
+    expect(post).not.toHaveBeenCalled()
+    const field =
+      method === 'password' ? 'Password' : 'WeChat verification code'
+    await user.type(
+      await screen.findByLabelText(field, { selector: 'input' }),
+      method === 'password' ? 'account-password' : '123456'
+    )
+    await user.click(screen.getByRole('button', { name: 'Verify' }))
+    await user.type(
+      await screen.findByLabelText('New phone number'),
+      '13900139000'
+    )
+    expect(post).toHaveBeenCalledWith(
+      '/api/user/phone/change/start',
+      {},
+      expect.objectContaining({
+        headers: { 'X-Security-Proof': 'initial-proof' },
+        singleUseAuthorization: true,
+      })
+    )
+    await user.click(screen.getByRole('button', { name: 'Get code' }))
+    await waitFor(() =>
+      expect(post).toHaveBeenCalledWith(
+        '/api/user/phone/change/send',
+        {
+          step: 'new',
+          phone: '13900139000',
+          verification_token: 'binding-authorization',
+        },
+        expect.objectContaining({ singleUseAuthorization: true })
+      )
+    )
+    expect(
+      post.mock.calls.filter(([url]) => url === '/api/verify')
+    ).toHaveLength(1)
+  }
+)
+
+it('cancelling initial identity verification keeps the phone dialog closed and sends no SMS', async () => {
+  vi.mocked(api.get).mockImplementation(async (url) => {
+    let data: unknown = profile
+    if (url.endsWith('/status')) {
+      data = { bound: false, phone_masked: '', verification_required: true }
+    } else if (url === '/api/verify/methods') {
+      data = {
+        scope: 'phone.binding',
+        methods: [{ method: 'password', available: true }],
+        oauth_providers: [],
+        password_encryption_enabled: false,
+      }
+    }
+    return { data: { success: true, data } }
+  })
+  const post = vi.spyOn(api, 'post')
+  const user = userEvent.setup()
+  renderProfile()
+  await user.click(
+    await screen.findByRole('button', { name: 'Bind phone number' })
+  )
+  await user.click(await screen.findByRole('button', { name: 'Cancel' }))
+  expect(screen.queryByLabelText('New phone number')).not.toBeInTheDocument()
+  expect(post).not.toHaveBeenCalled()
+})

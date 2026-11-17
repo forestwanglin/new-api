@@ -264,7 +264,7 @@ func BindVerificationOperation(operation VerificationOperation) (VerificationBin
 			return VerificationBinding{}, ErrVerificationContextInvalid
 		}
 		normalized = context
-	case VerificationScopePasskeyRegister, VerificationScopePasskeyDelete, VerificationScopeTwoFASetup,
+	case VerificationScopePhoneBinding, VerificationScopePasskeyRegister, VerificationScopePasskeyDelete, VerificationScopeTwoFASetup,
 		VerificationScopeTwoFADisable, VerificationScopeTwoFABackupCodes,
 		VerificationScopePasswordSet, VerificationScopePasswordChange, VerificationScopeAccountDelete:
 		if len(fields) != 0 {
@@ -390,6 +390,9 @@ func GetVerificationRequirements(identity AuthIdentity, scope string) (*Verifica
 	}
 	if err := requireAccessTokenVerificationScope(identity, scope); err != nil {
 		return nil, err
+	}
+	if scope == VerificationScopePhoneBinding {
+		return phoneBindingRequirements(identity, state)
 	}
 	if scope == VerificationScopeAccessTokenGenerate {
 		contact, err := getAccessTokenContact(model.DB, identity.UserID)
@@ -525,6 +528,9 @@ func CompleteSecurityVerification(identity AuthIdentity, binding VerificationBin
 	if _, err := RequireVerificationMethod(identity, binding.Scope, method); err != nil {
 		return nil, err
 	}
+	if binding.Scope == VerificationScopePhoneBinding {
+		return issuePhoneBindingProof(identity, binding, method, "")
+	}
 	token, expiresAt, err := IssueSecurityProof(identity, method, binding)
 	if err != nil {
 		return nil, err
@@ -566,6 +572,9 @@ func ConsumeOperationProof(raw string, identity AuthIdentity, operation Verifica
 	}, func(tx *gorm.DB, flow *model.AuthFlow) error {
 		if err := model.ValidateAuthSessionWithTx(tx, identity); err != nil {
 			return err
+		}
+		if operation.Scope == VerificationScopePhoneBinding {
+			return validatePhoneBindingContactWithTx(tx, identity, claims.Method, flow.Payload)
 		}
 		if operation.Scope == VerificationScopeAccessTokenGenerate {
 			return validateAccessTokenContactWithTx(tx, identity, claims.Method, flow.Payload)

@@ -33,7 +33,7 @@ func setupPhoneChange(t *testing.T) (*model.User, AuthIdentity) {
 
 func TestPhoneChangeVerificationRejectsWrongCodeCrossSessionAndReplay(t *testing.T) {
 	_, identity := setupPhoneChange(t)
-	for _, scenario := range []string{"wrong code", "expired", "other session", "login token", "binding changed", "factor enrolled", "success"} {
+	for _, scenario := range []string{"wrong code", "expired", "other session", "login token", "binding changed", "success"} {
 		t.Run(scenario, func(t *testing.T) {
 			payload := phoneChangePayload{Identity: identity, Original: "13800138000", Phone: "13800138000", Step: "old", Digest: phoneTestSMSHash(t, "123456")}
 			token, err := newPhoneChangeFlow(phoneChangeSMSPurpose, payload, time.Minute)
@@ -93,18 +93,18 @@ func TestPhoneChangeSMSUsesServerBindingAndVerifiedOldPhone(t *testing.T) {
 		codes = append(codes, template["code"])
 		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"Code":"OK"}`)), Header: http.Header{}}, nil
 	})}
-	_, err := SendPhoneChangeCode(identity, "new", "13900139000", "", "192.0.2.1", false)
+	_, err := SendPhoneChangeCode(identity, "new", "13900139000", "", "192.0.2.1")
 	require.Error(t, err)
 	require.Empty(t, phones)
-	token, err := SendPhoneChangeCode(identity, "old", "13700137000", "", "192.0.2.1", false)
+	token, err := SendPhoneChangeCode(identity, "old", "13700137000", "", "192.0.2.1")
 	require.NoError(t, err)
 	require.Equal(t, "13800138000", phones[0])
-	_, err = SendPhoneChangeCode(identity, "old", "", "", "192.0.2.1", false)
+	_, err = SendPhoneChangeCode(identity, "old", "", "", "192.0.2.1")
 	require.ErrorIs(t, err, ErrPhoneRateLimit)
 	require.Len(t, phones, 1)
 	verified, err := VerifyPhoneChangeCode(identity, "old", token, "", codes[0])
 	require.NoError(t, err)
-	token, err = SendPhoneChangeCode(identity, "new", "13900139000", verified, "192.0.2.1", false)
+	token, err = SendPhoneChangeCode(identity, "new", "13900139000", verified, "192.0.2.1")
 	require.NoError(t, err)
 	require.Equal(t, "13900139000", phones[1])
 	ready, err := VerifyPhoneChangeCode(identity, "new", token, "13900139000", codes[1])
@@ -119,6 +119,8 @@ func TestPhoneChangeSMSUsesServerBindingAndVerifiedOldPhone(t *testing.T) {
 }
 
 func TestPhoneChangeDatabaseMatrix(t *testing.T) {
+	useTestSessionSecret(t)
+	phoneBindingTestProviders(t)
 	for _, engine := range []string{"sqlite", "mysql", "postgres"} {
 		t.Run(engine, func(t *testing.T) {
 			var driver gorm.Dialector
@@ -168,11 +170,35 @@ func TestPhoneChangeDatabaseMatrix(t *testing.T) {
 			})
 			identity := AuthIdentity{UserID: user.Id, SessionID: "change-" + suffix, UserAuthVersion: 1, SessionVersion: 1}
 			require.NoError(t, db.Create(&model.UserSession{SID: identity.SessionID, UserID: user.Id, Version: 1, UserAuthVersion: 1, Status: model.UserSessionStatusActive, RefreshHash: "hash", ExpiresAt: time.Now().Add(time.Hour).Unix()}).Error)
+			// Exercise the real database policy/proof/start/expiry path before binding a phone.
+			for _, method := range []string{VerificationMethodPassword, VerificationMethodWeChat} {
+				wechat := ""
+				if method == VerificationMethodWeChat {
+					wechat = "matrix-" + suffix
+				}
+				require.NoError(t, db.Model(&user).Update("wechat_id", wechat).Error)
+				binding, err := BindVerificationOperation(VerificationOperation{Scope: VerificationScopePhoneBinding})
+				require.NoError(t, err)
+				proof, err := issuePhoneBindingProof(identity, binding, method, wechat)
+				require.NoError(t, err)
+				authorization, err := ConsumeOperationProof(proof.ProofToken, identity, VerificationOperation{Scope: VerificationScopePhoneBinding})
+				require.NoError(t, err)
+				started, err := StartPhoneBinding(identity, authorization)
+				require.NoError(t, err)
+				_, payload, err := readPhoneChangeFlow(identity, started.Token, phoneBindingPurpose)
+				require.NoError(t, err)
+				require.NoError(t, db.Transaction(func(tx *gorm.DB) error { return validatePhoneChangeWithTx(tx, payload) }))
+				payload.BindingExpiresAt = time.Now().Add(-time.Second).Unix()
+				require.ErrorIs(t, db.Transaction(func(tx *gorm.DB) error { return validatePhoneChangeWithTx(tx, payload) }), ErrAuthTokenExpired)
+				payload.BindingExpiresAt = started.ExpiresAt
+				require.NoError(t, db.Model(&user).Update("wechat_id", "changed-"+suffix).Error)
+				require.Error(t, db.Transaction(func(tx *gorm.DB) error { return validatePhoneChangeWithTx(tx, payload) }))
+			}
 			require.NoError(t, db.Create(&model.ExternalIdentityClaim{Provider: "phone", Subject: originalPhone, UserId: user.Id}).Error)
 			occupied := model.ExternalIdentityClaim{Provider: "phone", Subject: occupiedPhone, UserId: user.Id + 10000}
 			require.NoError(t, db.Create(&occupied).Error)
 			t.Cleanup(func() { require.NoError(t, db.Unscoped().Delete(&occupied).Error) })
-			payload := phoneChangePayload{Identity: identity, Original: originalPhone, Phone: occupied.Subject, Step: "new"}
+			payload := phoneChangePayload{Identity: identity, Original: originalPhone, Phone: occupied.Subject, Step: "new", BindingExpiresAt: time.Now().Add(time.Minute).Unix()}
 			conflict, err := newPhoneChangeFlow(phoneChangeReadyPurpose, payload, time.Minute)
 			require.NoError(t, err)
 			require.ErrorIs(t, CompletePhoneChange(identity, conflict), ErrPhoneOwned)
@@ -208,4 +234,164 @@ func TestPhoneChangeDatabaseMatrix(t *testing.T) {
 			require.Error(t, CompletePhoneChange(identity, token))
 		})
 	}
+}
+
+func TestPhoneBindingVerificationSelectsWeChatOtherwisePasswordDespiteMFA(t *testing.T) {
+	for _, wechat := range []string{"", "phone-owner-openid"} {
+		t.Run("wechat="+wechat, func(t *testing.T) {
+			user, identity := setupPhoneChange(t)
+			require.NoError(t, model.DB.Where("user_id = ?", user.Id).Delete(&model.ExternalIdentityClaim{}).Error)
+			require.NoError(t, model.DB.Model(user).Update("wechat_id", wechat).Error)
+			require.NoError(t, model.DB.Create(&model.TwoFA{UserId: user.Id, Secret: "unused", IsEnabled: true}).Error)
+			oldEnabled, oldAddress, oldToken, oldPassword := common.WeChatAuthEnabled, common.WeChatServerAddress, common.WeChatServerToken, common.PasswordLoginEnabled
+			common.WeChatAuthEnabled, common.WeChatServerAddress, common.WeChatServerToken, common.PasswordLoginEnabled = true, "https://wechat.test", "test", true
+			t.Cleanup(func() {
+				common.WeChatAuthEnabled, common.WeChatServerAddress, common.WeChatServerToken, common.PasswordLoginEnabled = oldEnabled, oldAddress, oldToken, oldPassword
+			})
+			requirements, err := GetVerificationRequirements(identity, "phone.binding")
+			require.NoError(t, err)
+			want := VerificationMethodPassword
+			if wechat != "" {
+				want = VerificationMethodWeChat
+			}
+			require.Equal(t, []VerificationMethodOption{{Method: want, Available: true}}, requirements.Methods)
+		})
+	}
+}
+
+func phoneBindingTestProviders(t *testing.T) {
+	t.Helper()
+	oldEnabled, oldAddress, oldToken, oldPassword, oldEncryption := common.WeChatAuthEnabled, common.WeChatServerAddress, common.WeChatServerToken, common.PasswordLoginEnabled, common.PasswordLoginEncryptionEnabled
+	common.WeChatAuthEnabled, common.WeChatServerAddress, common.WeChatServerToken, common.PasswordLoginEnabled, common.PasswordLoginEncryptionEnabled = true, "https://wechat.test", "test", true, false
+	t.Cleanup(func() {
+		common.WeChatAuthEnabled, common.WeChatServerAddress, common.WeChatServerToken, common.PasswordLoginEnabled, common.PasswordLoginEncryptionEnabled = oldEnabled, oldAddress, oldToken, oldPassword, oldEncryption
+	})
+}
+
+func TestPhoneBindingProofOwnershipIsolationExpiryAndContactChanges(t *testing.T) {
+	for _, method := range []string{VerificationMethodPassword, VerificationMethodWeChat} {
+		t.Run(method, func(t *testing.T) {
+			user, identity := setupPhoneChange(t)
+			useTestSessionSecret(t)
+			phoneBindingTestProviders(t)
+			require.NoError(t, model.DB.Where("user_id = ?", user.Id).Delete(&model.ExternalIdentityClaim{}).Error)
+			hash, err := common.Password2Hash("initial-password")
+			require.NoError(t, err)
+			require.NoError(t, model.DB.Model(user).Update("password", hash).Error)
+			operation := VerificationOperation{Scope: VerificationScopePhoneBinding}
+			var proof *SecurityProof
+			if method == VerificationMethodWeChat {
+				require.NoError(t, model.DB.Model(user).Update("wechat_id", "own-openid").Error)
+				_, err = CompletePhoneBindingWeChat(identity, operation, "other-openid")
+				require.Error(t, err)
+				_, err = VerifySecurityInput(identity, VerificationInput{Scope: operation.Scope, Method: VerificationMethodPassword, Password: "initial-password"})
+				require.ErrorIs(t, err, ErrProofMethod)
+				proof, err = CompletePhoneBindingWeChat(identity, operation, "own-openid")
+			} else {
+				_, err = VerifySecurityInput(identity, VerificationInput{Scope: operation.Scope, Method: method, Password: "wrong-password"})
+				require.Error(t, err)
+				proof, err = VerifySecurityInput(identity, VerificationInput{Scope: operation.Scope, Method: method, Password: "initial-password"})
+			}
+			require.NoError(t, err)
+			_, err = ConsumeOperationProof(proof.ProofToken, identity, VerificationOperation{Scope: VerificationScopeAccountBind, Context: []byte(`{"provider":"phone"}`)})
+			require.Error(t, err)
+			other := identity
+			other.SessionID = "other-session"
+			_, err = ConsumeOperationProof(proof.ProofToken, other, operation)
+			require.Error(t, err)
+			authorization, err := ConsumeOperationProof(proof.ProofToken, identity, operation)
+			require.NoError(t, err)
+			_, err = ConsumeOperationProof(proof.ProofToken, identity, operation)
+			require.Error(t, err)
+			started, err := StartPhoneBinding(identity, authorization)
+			require.NoError(t, err)
+			_, payload, err := readPhoneChangeFlow(identity, started.Token, phoneBindingPurpose)
+			require.NoError(t, err)
+			require.NoError(t, model.DB.Transaction(func(tx *gorm.DB) error { return validatePhoneChangeWithTx(tx, payload) }))
+			payload.BindingExpiresAt = time.Now().Add(-time.Second).Unix()
+			require.ErrorIs(t, model.DB.Transaction(func(tx *gorm.DB) error { return validatePhoneChangeWithTx(tx, payload) }), ErrAuthTokenExpired)
+			payload.BindingExpiresAt = started.ExpiresAt
+			require.NoError(t, model.DB.Model(user).Update("wechat_id", "new-openid").Error)
+			require.Error(t, model.DB.Transaction(func(tx *gorm.DB) error { return validatePhoneChangeWithTx(tx, payload) }))
+		})
+	}
+}
+
+func TestPhoneBindingUnavailableChannelDoesNotDowngrade(t *testing.T) {
+	user, identity := setupPhoneChange(t)
+	phoneBindingTestProviders(t)
+	require.NoError(t, model.DB.Where("user_id = ?", user.Id).Delete(&model.ExternalIdentityClaim{}).Error)
+	require.NoError(t, model.DB.Model(user).Update("wechat_id", "own-openid").Error)
+	common.WeChatAuthEnabled = false
+	requirements, err := GetVerificationRequirements(identity, VerificationScopePhoneBinding)
+	require.NoError(t, err)
+	require.Equal(t, VerificationMethodWeChat, requirements.Methods[0].Method)
+	require.False(t, requirements.Methods[0].Available)
+	require.NoError(t, model.DB.Model(user).Updates(map[string]any{"wechat_id": "", "password": ""}).Error)
+	requirements, err = GetVerificationRequirements(identity, VerificationScopePhoneBinding)
+	require.NoError(t, err)
+	require.Equal(t, VerificationMethodPassword, requirements.Methods[0].Method)
+	require.False(t, requirements.Methods[0].Available)
+}
+
+func TestPhoneChangeRejectsLegacyPurposeAndExpiredOriginalAuthorization(t *testing.T) {
+	_, identity := setupPhoneChange(t)
+	payload := phoneChangePayload{Identity: identity, Original: "13800138000", Phone: "13900139000", Step: "new", BindingExpiresAt: time.Now().Add(-time.Second).Unix()}
+	token, err := newPhoneChangeFlow(phoneChangeReadyPurpose, payload, time.Minute)
+	require.NoError(t, err)
+	require.ErrorIs(t, CompletePhoneChange(identity, token), ErrAuthTokenExpired)
+	token, err = newPhoneChangeFlow("phone_change_ready", payload, time.Minute)
+	require.NoError(t, err)
+	require.Error(t, CompletePhoneChange(identity, token))
+}
+
+func TestPhoneBindingSMSRequiresInitialAuthorizationAndAllowsExplicitResend(t *testing.T) {
+	user, identity := setupPhoneChange(t)
+	useTestSessionSecret(t)
+	phoneBindingTestProviders(t)
+	require.NoError(t, model.DB.Where("user_id = ?", user.Id).Delete(&model.ExternalIdentityClaim{}).Error)
+	require.NoError(t, model.DB.Model(user).Update("wechat_id", "own-openid").Error)
+	t.Setenv("ALIYUN_SMS_ACCESS_KEY_ID", "test-key")
+	t.Setenv("ALIYUN_SMS_ACCESS_KEY_SECRET", "test-secret")
+	oldSettings := *system_setting.GetPhoneSettings()
+	*system_setting.GetPhoneSettings() = system_setting.PhoneSettings{Enabled: true, Region: "cn-hangzhou", SignName: "test", TemplateCode: "SMS_TEST"}
+	oldClient := http.DefaultClient
+	t.Cleanup(func() { *system_setting.GetPhoneSettings() = oldSettings; http.DefaultClient = oldClient })
+	delivered := 0
+	code := ""
+	http.DefaultClient = &http.Client{Transport: phoneSMSRoundTripper(func(r *http.Request) (*http.Response, error) {
+		delivered++
+		require.NoError(t, r.ParseForm())
+		var template map[string]string
+		require.NoError(t, common.UnmarshalJsonStr(r.Form.Get("TemplateParam"), &template))
+		code = template["code"]
+		return &http.Response{StatusCode: 200, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(`{"Code":"OK"}`))}, nil
+	})}
+	_, err := SendPhoneChangeCode(identity, "new", "13900139000", "", "192.0.2.1")
+	require.Error(t, err)
+	require.Zero(t, delivered)
+	proof, err := CompletePhoneBindingWeChat(identity, VerificationOperation{Scope: VerificationScopePhoneBinding}, "own-openid")
+	require.NoError(t, err)
+	authorization, err := ConsumeOperationProof(proof.ProofToken, identity, VerificationOperation{Scope: VerificationScopePhoneBinding})
+	require.NoError(t, err)
+	started, err := StartPhoneBinding(identity, authorization)
+	require.NoError(t, err)
+	first, err := SendPhoneChangeCode(identity, "new", "13900139000", started.Token, "192.0.2.1")
+	require.NoError(t, err)
+	_, err = SendPhoneChangeCode(identity, "new", "13900139000", started.Token, "192.0.2.1")
+	require.ErrorIs(t, err, ErrPhoneRateLimit)
+	require.Equal(t, 1, delivered)
+	// Clear only the elapsed-cooldown fixture; retain hourly and daily reservations.
+	require.NoError(t, model.DB.Where("purpose = ?", "phone_cooldown").Delete(&model.AuthFlow{}).Error)
+	second, err := SendPhoneChangeCode(identity, "new", "13900139000", started.Token, "192.0.2.1")
+	require.NoError(t, err)
+	require.Equal(t, 2, delivered)
+	_, err = VerifyPhoneChangeCode(identity, "new", first, "13900139000", code)
+	require.Error(t, err)
+	ready, err := VerifyPhoneChangeCode(identity, "new", second, "13900139000", code)
+	require.NoError(t, err)
+	require.NoError(t, CompletePhoneChange(identity, ready))
+	owner, err := model.GetPhoneUserID("13900139000")
+	require.NoError(t, err)
+	require.Equal(t, identity.UserID, owner)
 }

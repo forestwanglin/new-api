@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -39,6 +40,7 @@ func phoneChangeControllerToken(t *testing.T, identity service.AuthIdentity, pat
 func TestPhoneChangeControllerRotatesCurrentSessionAndRevokesOthers(t *testing.T) {
 	user, identity := setupSecurityEnrollmentTest(t)
 	require.NoError(t, model.DB.Create(&model.ExternalIdentityClaim{Provider: "phone", Subject: "13800138000", UserId: user.Id}).Error)
+	require.NoError(t, model.DB.Create(&model.TwoFA{UserId: user.Id, Secret: "unused", IsEnabled: true}).Error)
 	other, err := service.CreateLoginSession(user.Id, "password", "192.0.2.2", "other-device")
 	require.NoError(t, err)
 	status := securityEnrollmentRequest("GET", "/api/user/phone/change/status", "", "", identity, GetPhoneChangeStatus)
@@ -84,11 +86,44 @@ func TestPhoneChangeControllerRotatesCurrentSessionAndRevokesOthers(t *testing.T
 	require.Contains(t, replay.Body.String(), `"success":false`)
 }
 
-func TestPhoneChangeControllerRejectsMFABypassBeforeSMSDelivery(t *testing.T) {
+func TestPhoneBindingControllerRejectsMissingProofBeforeSMSDelivery(t *testing.T) {
 	user, identity := setupSecurityEnrollmentTest(t)
 	require.NoError(t, model.DB.Create(&model.ExternalIdentityClaim{Provider: "phone", Subject: "13800138000", UserId: user.Id}).Error)
 	require.NoError(t, model.DB.Create(&model.TwoFA{UserId: user.Id, Secret: "unused", IsEnabled: true}).Error)
-	response := securityEnrollmentRequest("POST", "/api/user/phone/change/send", `{"step":"old"}`, "", identity, SendPhoneChangeCode)
+	response := securityEnrollmentRequest("POST", "/api/user/phone/change/start", `{}`, "", identity, StartPhoneBinding)
 	require.Contains(t, response.Body.String(), `"success":false`)
 	require.Contains(t, response.Body.String(), "SECURITY_PROOF")
+}
+
+func TestPhoneBindingControllerWeChatCodeMustBelongToCurrentAccount(t *testing.T) {
+	user, identity := setupSecurityEnrollmentTest(t)
+	require.NoError(t, model.DB.Model(user).Update("wechat_id", "phone-owner-openid").Error)
+	oldEnabled, oldAddress, oldToken := common.WeChatAuthEnabled, common.WeChatServerAddress, common.WeChatServerToken
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		openid := "another-account"
+		if r.URL.Query().Get("code") == "123456" {
+			openid = "phone-owner-openid"
+		}
+		_, _ = fmt.Fprintf(w, `{"success":true,"data":%q}`, openid)
+	}))
+	common.WeChatAuthEnabled, common.WeChatServerAddress, common.WeChatServerToken = true, server.URL, "test-token"
+	t.Cleanup(func() {
+		server.Close()
+		common.WeChatAuthEnabled, common.WeChatServerAddress, common.WeChatServerToken = oldEnabled, oldAddress, oldToken
+	})
+	for _, code := range []string{"654321", "123456"} {
+		response := securityEnrollmentRequest("POST", "/api/verify", fmt.Sprintf(`{"scope":"phone.binding","method":"wechat","code":%q}`, code), "", identity, UniversalVerify)
+		body := decodeSecurityEnrollmentResponse(t, response)
+		if code == "654321" {
+			require.False(t, body.Success)
+			continue
+		}
+		require.True(t, body.Success, response.Body.String())
+		var proof service.SecurityProof
+		require.NoError(t, common.Unmarshal(body.Data, &proof))
+		response = securityEnrollmentRequest("POST", "/api/user/phone/change/start", `{}`, proof.ProofToken, identity, StartPhoneBinding)
+		require.True(t, decodeSecurityEnrollmentResponse(t, response).Success, response.Body.String())
+		response = securityEnrollmentRequest("POST", "/api/user/phone/change/start", `{}`, proof.ProofToken, identity, StartPhoneBinding)
+		require.False(t, decodeSecurityEnrollmentResponse(t, response).Success)
+	}
 }

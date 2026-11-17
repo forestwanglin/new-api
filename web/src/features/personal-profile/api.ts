@@ -9,6 +9,23 @@ export type PhoneChangeStatus = {
 export type PhoneCodeResult = { token: string; retry_after: number }
 export type PhoneVerifyResult = { token: string }
 
+export type PhoneBindingAuthorization = { token: string; expires_at: number }
+
+export function startPhoneBinding(proof: string, signal: AbortSignal) {
+  return authResult<PhoneBindingAuthorization>(
+    api.post(
+      '/api/user/phone/change/start',
+      {},
+      {
+        ...authRequestOptions,
+        signal,
+        singleUseAuthorization: true,
+        headers: { 'X-Security-Proof': proof },
+      }
+    )
+  )
+}
+
 export function getPhoneChangeStatus(signal?: AbortSignal) {
   return authResult<PhoneChangeStatus>(
     api.get('/api/user/phone/change/status', {
@@ -23,7 +40,6 @@ export function sendPhoneCode(
   step: 'old' | 'new',
   phone: string,
   verificationToken: string,
-  proof: string,
   signal: AbortSignal
 ) {
   return authResult<PhoneCodeResult>(
@@ -38,7 +54,6 @@ export function sendPhoneCode(
         ...authRequestOptions,
         signal,
         singleUseAuthorization: true,
-        headers: proof ? { 'X-Security-Proof': proof } : undefined,
       }
     )
   )

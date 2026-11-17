@@ -32,6 +32,24 @@ func GetPhoneChangeStatus(c *gin.Context) {
 	common.ApiSuccess(c, result)
 }
 
+func StartPhoneBinding(c *gin.Context) {
+	identity, ok := middleware.GetSessionAuthIdentity(c)
+	if !ok {
+		writeSecurityOperationError(c, service.ErrAuthTokenInvalid)
+		return
+	}
+	authorization := middleware.RequireSecurityProof(c, service.VerificationOperation{Scope: service.VerificationScopePhoneBinding})
+	if authorization == nil {
+		return
+	}
+	result, err := service.StartPhoneBinding(identity, authorization)
+	if err != nil {
+		writePhoneChangeError(c, err)
+		return
+	}
+	common.ApiSuccess(c, result)
+}
+
 func SendPhoneChangeCode(c *gin.Context) {
 	identity, ok := middleware.GetSessionAuthIdentity(c)
 	if !ok {
@@ -43,19 +61,7 @@ func SendPhoneChangeCode(c *gin.Context) {
 		common.ApiErrorT(c, "Invalid parameters")
 		return
 	}
-	status, err := service.GetPhoneChangeStatus(identity)
-	if err != nil {
-		writePhoneChangeError(c, err)
-		return
-	}
-	strong := false
-	if status.VerificationRequired && (request.Step == "old" || !status.Bound) {
-		if middleware.RequireSecurityProof(c, service.VerificationOperation{Scope: service.VerificationScopeAccountBind, Context: []byte(`{"provider":"phone"}`)}) == nil {
-			return
-		}
-		strong = true
-	}
-	token, err := service.SendPhoneChangeCode(identity, request.Step, request.Phone, request.VerificationToken, c.ClientIP(), strong)
+	token, err := service.SendPhoneChangeCode(identity, request.Step, request.Phone, request.VerificationToken, c.ClientIP())
 	if err != nil {
 		writePhoneChangeError(c, err)
 		return

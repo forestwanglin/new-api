@@ -110,7 +110,11 @@ it('prevents changing the target number while SMS delivery is pending', async ()
   render(
     <PhoneChangeDialog
       open
-      status={{ bound: false, phone_masked: '', verification_required: false }}
+      status={{ bound: false, phone_masked: '', verification_required: true }}
+      bindingAuthorization={{
+        token: 'binding-auth',
+        expires_at: Date.now() / 1000 + 600,
+      }}
       onOpenChange={vi.fn()}
       onSuccess={vi.fn()}
     />
@@ -195,7 +199,11 @@ it('changing the new number clears its SMS authorization and entered code', asyn
   render(
     <PhoneChangeDialog
       open
-      status={{ bound: false, phone_masked: '', verification_required: false }}
+      status={{ bound: false, phone_masked: '', verification_required: true }}
+      bindingAuthorization={{
+        token: 'binding-auth',
+        expires_at: Date.now() / 1000 + 600,
+      }}
       onOpenChange={vi.fn()}
       onSuccess={vi.fn()}
     />

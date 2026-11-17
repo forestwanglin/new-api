@@ -183,7 +183,11 @@ func UniversalVerify(c *gin.Context) {
 			if err != nil {
 				err = service.ErrVerificationFailed
 			} else {
-				proof, err = service.CompleteAccessTokenWeChat(identity, operation, response.Data)
+				if operation.Scope == service.VerificationScopePhoneBinding {
+					proof, err = service.CompletePhoneBindingWeChat(identity, operation, response.Data)
+				} else {
+					proof, err = service.CompleteAccessTokenWeChat(identity, operation, response.Data)
+				}
 			}
 		}
 	} else {

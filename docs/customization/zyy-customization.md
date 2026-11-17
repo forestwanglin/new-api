@@ -1111,6 +1111,8 @@
 
 ### Z073 独立 Demo 个人资料与手机号更换
 
+- 验证策略后续调整见 Z076；以下为首版行为记录。
+
 - 布局修复：手机号弹窗 footer 使用局部 `margin: 22px 0 0` 覆盖公共 DialogFooter 的横向及底部负 margin，让取消/确认按钮保持在弹窗内容边界内、右对齐；不影响其他弹窗。Chrome 实页确认修复前贴边、修复后恢复右侧和底部留白；手机号弹窗 6 项测试、CSS 格式及 diff 检查通过。
 
 - 需求与原因：新增独立个人资料入口，按 Demo 还原基本资料和更换手机号交互；旧 `/profile`、`/security` 菜单和页面保留。
@@ -1141,6 +1143,15 @@
 - 验证：侧栏、顶部导航与命令菜单定向 Vitest 通过；`bun check -b`、oxlint、oxfmt 和 `git diff --check` 通过。全量 Vitest 为 292 文件通过、1 文件失败（3100 用例通过、1 失败）；未修改的 `detail-preview.test.tsx` 中 `task log prices use localized unit labels from pricing metadata` 超时，单独运行该用例通过，未发现与本次导航改动的调用关系。
 - 风险与未覆盖：未进行真实浏览器登录态验收；个人资料下拉菜单和移动用户区仍保留 `/profile` 作为直接入口，按需求仅隐藏控制台侧栏菜单。
 
+### Z076 手机号首次绑定与更换验证策略
+
+- 需求与行为：未绑定手机号时，点击绑定先验证当前账号的微信验证码（已绑微信）或现有密码（未绑微信），验证成功再进入新号码短信。更换手机号直接验证原号短信，再验证新号短信，即使已启用 2FA/Passkey 也不额外弹验证。
+- 实现边界：独立 `phone.binding` 证明及 session-only `/api/user/phone/change/start`，复用现有安全验证弹窗、微信服务归属校验、密码加密与可用性配置；不改变登录、访问令牌创建、通用账户绑定等其他验证策略。首次证明消费后生成短期绑定授权支持短信重发，手机流程携带策略版本并绑定原号码/渠道、用户/会话/auth version；过期、重放、跨用途或渠道归属变化均拒绝。
+- 兼容与默认值：无新增配置、依赖或数据库迁移。微信渠道不可用不降级密码，无微信且无可用密码时明确失败。保留验证码期限/尝试次数、发送限流、事务唯一归属、本机会话旋转和其他会话失效。
+- 验证：个人资料和共享验证 Vitest 4 文件/44 用例、TypeCheck 1,637 文件/2 项目、定向 Oxlint/Oxfmt、diff 检查通过。SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 16.16 的后端身份验证定向回归连续两轮通过；生产构建和开发后端重建通过。独立复核无阻断问题。浏览器标签被其他会话占用，未完成真实页面流程；未发送真实短信。
+- 收尾复验：隔离暂存副本个人资料 13 项测试、1,633 文件类型检查和生产构建通过；service/controller/router 手机号定向测试通过。完整 `go test ./service ./controller ./router ./middleware` 未全绿，router 的 `TestUserPointBalancesAPI` 因测试库缺少 `external_identity_claims` 表失败；本次未修改该测试或对应模型。
+- 参考：OWASP ASVS 5.0.0、Authentication/Session Management Cheat Sheets，覆盖本次相关的服务端校验、用途隔离、限流、防重放及会话控制；不声明完整 ASVS 合规。外部微信/短信服务通过测试替身验证，不代表真实投递验收。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 
@@ -1150,6 +1161,7 @@
 
 | 区域 | 文件 | 关联条目 |
 |---|---|---|
+| 手机号首次绑定与更换验证策略 | controller phone_change/secure_verification、service phone_change/phone_binding_verification/security_verification、router/api-router.go、middleware/access_token_routes.go、个人资料流程、共享验证 API/类型及关联测试 | Z076 |
 | 独立个人资料与手机号更换 | `router/api-router.go`、`middleware/access_token_routes.go`、`service/security_verification.go`、语言偏好组件、侧栏数据与测试、生成路由和七种 locale | Z073 |
 | 新手引导功能复制 | sidebar data/config、个人/管理员菜单配置、邀请卡片、接入卡片、推荐操作、路由生成文件及七种 locale | Z072 |
 | 创建访问令牌联系人验证 | `controller/secure_verification.go`、`service/security_verification.go`、新增联系人验证 service/测试、`router/api-router.go`、`middleware/access_token_routes.go`、共享验证类型/API/hooks/弹窗与七种 locale | Z071 |

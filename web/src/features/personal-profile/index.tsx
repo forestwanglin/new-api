@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -19,6 +19,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { SecureVerificationDialog } from '@/features/auth/secure-verification'
 import { getUserProfile } from '@/features/profile/api'
 import { LanguagePreferencesCard } from '@/features/profile/components/language-preferences-card'
 import { api } from '@/lib/api'
@@ -29,6 +30,7 @@ import { useAuthStore } from '@/stores/auth-store'
 
 import { getPhoneChangeStatus } from './api'
 import { PhoneChangeDialog } from './phone-change-dialog'
+import { usePhoneChange } from './use-phone-change'
 
 import '@/styles/personal-profile.css'
 
@@ -43,7 +45,6 @@ const profileSchema = z.object({
 export function PersonalProfile() {
   const { t } = useTranslation()
   const user = useAuthStore((state) => state.auth.user)
-  const [phoneOpen, setPhoneOpen] = useState(false)
   const form = useForm<z.infer<typeof profileSchema>>({
     resolver: zodResolver(profileSchema),
     defaultValues: { nickname: '' },
@@ -60,6 +61,7 @@ export function PersonalProfile() {
     queryKey: ['personal-profile-phone', user?.id],
     queryFn: ({ signal }) => getPhoneChangeStatus(signal),
   })
+  const phoneChange = usePhoneChange(phoneQuery.data)
   const profile = profileQuery.data
   const reset = form.reset
   const getFieldState = form.getFieldState
@@ -210,8 +212,8 @@ export function PersonalProfile() {
                       type='button'
                       variant='outline'
                       className='pp-button pp-outline'
-                      disabled={!phoneQuery.data}
-                      onClick={() => setPhoneOpen(true)}
+                      disabled={!phoneQuery.data || phoneChange.pending}
+                      onClick={() => void phoneChange.start()}
                     >
                       {t(
                         phoneQuery.data?.bound
@@ -262,8 +264,9 @@ export function PersonalProfile() {
       </div>
       {phoneQuery.data && (
         <PhoneChangeDialog
-          open={phoneOpen}
-          onOpenChange={setPhoneOpen}
+          open={phoneChange.open}
+          onOpenChange={phoneChange.onOpenChange}
+          bindingAuthorization={phoneChange.bindingAuthorization}
           status={phoneQuery.data}
           onSuccess={() => {
             void phoneQuery.refetch()
@@ -271,6 +274,7 @@ export function PersonalProfile() {
           }}
         />
       )}
+      <SecureVerificationDialog {...phoneChange.verificationDialogProps} />
     </Main>
   )
 }

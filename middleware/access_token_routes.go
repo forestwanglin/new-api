@@ -71,6 +71,7 @@ var accessTokenRouteRules = map[string]accessTokenRouteRule{
 	"GET /api/user/self":                           accessTokenScopeRule("profile:read"),
 	"GET /api/user/models":                         accessTokenScopeRule("profile:read"),
 	"PUT /api/user/self":                           accessTokenScopeRule("profile:write"),
+	"POST /api/user/phone/change/start":            accessTokenSessionRule,
 	"GET /api/user/phone/change/status":            accessTokenSessionRule,
 	"POST /api/user/phone/change/send":             accessTokenSessionRule,
 	"POST /api/user/phone/change/verify":           accessTokenSessionRule,

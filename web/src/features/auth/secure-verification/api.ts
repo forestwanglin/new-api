@@ -227,7 +227,10 @@ export async function verify(
         break
       case 'wechat':
       case 'sms':
-        if (operation.scope !== 'access_token.generate') {
+        if (
+          operation.scope !== 'access_token.generate' &&
+          !(input.method === 'wechat' && operation.scope === 'phone.binding')
+        ) {
           throw new AuthOperationError(
             'This verification method is not allowed for this action.'
           )

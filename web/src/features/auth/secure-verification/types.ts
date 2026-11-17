@@ -36,6 +36,7 @@ export type SecurityProofScope =
   | 'access_token.generate'
   | 'access_token.update'
   | 'access_token.revoke'
+  | 'phone.binding'
   | 'account.binding.bind'
   | 'account.binding.unbind'
   | 'account.password.set'

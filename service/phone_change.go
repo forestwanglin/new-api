@@ -10,9 +10,9 @@ import (
 	"gorm.io/gorm"
 )
 
-const phoneChangeSMSPurpose = "phone_change_sms"
-const phoneChangeOldPurpose = "phone_change_old"
-const phoneChangeReadyPurpose = "phone_change_ready"
+const phoneChangeSMSPurpose = "phone_change_sms_v2"
+const phoneChangeOldPurpose = "phone_change_old_v2"
+const phoneChangeReadyPurpose = "phone_change_ready_v2"
 
 type PhoneChangeStatus struct {
 	Bound                bool   `json:"bound"`
@@ -21,12 +21,13 @@ type PhoneChangeStatus struct {
 }
 
 type phoneChangePayload struct {
-	Identity AuthIdentity `json:"identity"`
-	Original string       `json:"original"`
-	Phone    string       `json:"phone"`
-	Step     string       `json:"step"`
-	Digest   string       `json:"digest,omitempty"`
-	Strong   bool         `json:"strong"`
+	Identity         AuthIdentity         `json:"identity"`
+	Original         string               `json:"original"`
+	Phone            string               `json:"phone"`
+	Step             string               `json:"step"`
+	Digest           string               `json:"digest,omitempty"`
+	BindingContact   *phoneBindingContact `json:"binding_contact,omitempty"`
+	BindingExpiresAt int64                `json:"binding_expires_at,omitempty"`
 }
 
 func getCurrentPhone(tx *gorm.DB, userID int) (string, error) {
@@ -49,11 +50,7 @@ func GetPhoneChangeStatus(identity AuthIdentity) (*PhoneChangeStatus, error) {
 	if err != nil {
 		return nil, err
 	}
-	state, err := model.GetUserVerificationState(identity.UserID)
-	if err != nil {
-		return nil, err
-	}
-	result := &PhoneChangeStatus{Bound: phone != "", VerificationRequired: phone == "" || state.HasTwoFA || state.HasPasskey}
+	result := &PhoneChangeStatus{Bound: phone != "", VerificationRequired: phone == ""}
 	if phone != "" {
 		if !mainlandPhonePattern.MatchString(phone) {
 			return nil, ErrVerificationUnavailable
@@ -92,22 +89,24 @@ func validatePhoneChangeWithTx(tx *gorm.DB, payload phoneChangePayload) error {
 	if phone != payload.Original {
 		return model.ErrAccountBindingChanged
 	}
-	if !payload.Strong {
-		var twoFA, passkey int64
-		if err := tx.Model(&model.TwoFA{}).Where("user_id = ? AND is_enabled = ?", payload.Identity.UserID, true).Count(&twoFA).Error; err != nil {
-			return err
-		}
-		if err := tx.Model(&model.PasskeyCredential{}).Where("user_id = ?", payload.Identity.UserID).Count(&passkey).Error; err != nil {
-			return err
-		}
-		if twoFA != 0 || passkey != 0 {
-			return ErrProofMethod
-		}
+	if (payload.Step != "old" && payload.BindingExpiresAt == 0) || (payload.BindingExpiresAt != 0 && payload.BindingExpiresAt <= time.Now().Unix()) {
+		return ErrAuthTokenExpired
 	}
+	if payload.Original == "" {
+		if payload.BindingContact == nil || payload.BindingExpiresAt == 0 {
+			return ErrAuthTokenExpired
+		}
+		encoded, err := common.Marshal(payload.BindingContact)
+		if err != nil {
+			return err
+		}
+		return validatePhoneBindingContactWithTx(tx, payload.Identity, payload.BindingContact.Method, string(encoded))
+	}
+
 	return nil
 }
 
-func SendPhoneChangeCode(identity AuthIdentity, step, phone, verifiedToken, ip string, strong bool) (string, error) {
+func SendPhoneChangeCode(identity AuthIdentity, step, phone, verifiedToken, ip string) (string, error) {
 	if !PhoneSMSConfigured() {
 		return "", ErrVerificationUnavailable
 	}
@@ -119,16 +118,13 @@ func SendPhoneChangeCode(identity AuthIdentity, step, phone, verifiedToken, ip s
 	if err != nil {
 		return "", err
 	}
-	payload := phoneChangePayload{Identity: identity, Original: original, Step: step, Strong: strong}
+	payload := phoneChangePayload{Identity: identity, Original: original, Step: step}
 	var oldFlow *model.AuthFlow
 	if step == "old" {
 		if !status.Bound {
 			return "", ErrVerificationFailed
 		}
 		payload.Phone = original
-		if status.VerificationRequired && !strong {
-			return "", ErrProofMethod
-		}
 	} else if step == "new" {
 		if !mainlandPhonePattern.MatchString(phone) || phone == original {
 			return "", common.NewMessage("Enter a valid mainland China phone number")
@@ -140,9 +136,12 @@ func SendPhoneChangeCode(identity AuthIdentity, step, phone, verifiedToken, ip s
 			}
 			payload.Step = "new"
 			payload.Phone = phone
-		} else if !strong {
-			return "", ErrProofMethod
 		} else {
+			_, payload, err = readPhoneChangeFlow(identity, verifiedToken, phoneBindingPurpose)
+			if err != nil {
+				return "", err
+			}
+			payload.Step = "new"
 			payload.Phone = phone
 		}
 		owner, err := model.GetPhoneUserID(phone)
@@ -211,6 +210,9 @@ func VerifyPhoneChangeCode(identity AuthIdentity, step, token, phone, code strin
 		return "", err
 	}
 	payload.Digest = ""
+	if step == "old" {
+		payload.BindingExpiresAt = time.Now().Add(10 * time.Minute).Unix()
+	}
 	purpose := phoneChangeOldPurpose
 	if step == "new" {
 		purpose = phoneChangeReadyPurpose

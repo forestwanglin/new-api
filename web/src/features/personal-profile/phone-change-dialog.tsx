@@ -6,7 +6,6 @@ import { Dialog } from '@/components/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { SecureVerificationDialog } from '@/features/auth/secure-verification'
 import { useAccountSecurity } from '@/features/security/hooks/use-account-security'
 import { SupportDialog } from '@/features/subscriptions-custom/support-dialog'
 import { useCountdown } from '@/hooks/use-countdown'
@@ -16,11 +15,13 @@ import {
   sendPhoneCode,
   verifyPhoneCode,
   type PhoneChangeStatus,
+  type PhoneBindingAuthorization,
 } from './api'
 
 type Props = {
   open: boolean
   status: PhoneChangeStatus
+  bindingAuthorization?: PhoneBindingAuthorization
   onOpenChange: (open: boolean) => void
   onSuccess: () => void
 }
@@ -48,11 +49,18 @@ export function PhoneChangeDialog(props: Props) {
     setPhone('')
     setCode('')
     setSMSToken('')
-    setVerificationToken('')
-    verificationExpiresAt.current = 0
+    setVerificationToken(props.bindingAuthorization?.token ?? '')
+    verificationExpiresAt.current =
+      (props.bindingAuthorization?.expires_at ?? 0) * 1000
     setExpired(false)
     return cancel
-  }, [props.open, props.status.bound, security.sessionKey, cancel])
+  }, [
+    props.open,
+    props.status.bound,
+    props.bindingAuthorization,
+    security.sessionKey,
+    cancel,
+  ])
 
   useEffect(() => {
     if (!props.open) return
@@ -65,14 +73,15 @@ export function PhoneChangeDialog(props: Props) {
     props.onOpenChange(open)
   }
   const resetExpiredVerification = () => {
-    if (
-      step !== 'new' ||
-      !props.status.bound ||
-      Date.now() < verificationExpiresAt.current
-    ) {
+    if (step !== 'new' || Date.now() < verificationExpiresAt.current) {
       return false
     }
     security.cancel()
+    if (!props.status.bound) {
+      close(false)
+      toast.error(t('Security verification has expired. Please verify again.'))
+      return true
+    }
     setStep('old')
     setVerificationToken('')
     verificationExpiresAt.current = 0
@@ -86,18 +95,8 @@ export function PhoneChangeDialog(props: Props) {
     if (resetExpiredVerification()) return
     setExpired(false)
     const result = await security.run(async (signal) => {
-      let proof = ''
-      if (
-        props.status.verification_required &&
-        (step === 'old' || !props.status.bound)
-      ) {
-        proof = await security.verify(
-          { scope: 'account.binding.bind', context: { provider: 'phone' } },
-          signal
-        )
-      }
       return {
-        ...(await sendPhoneCode(step, phone, verificationToken, proof, signal)),
+        ...(await sendPhoneCode(step, phone, verificationToken, signal)),
         notification_warning: false,
       }
     })
@@ -151,7 +150,7 @@ export function PhoneChangeDialog(props: Props) {
   return (
     <>
       <Dialog
-        open={props.open && !security.showVerification}
+        open={props.open}
         onOpenChange={close}
         title={title}
         description={t(
@@ -279,7 +278,6 @@ export function PhoneChangeDialog(props: Props) {
           </p>
         )}
       </Dialog>
-      <SecureVerificationDialog {...security.verificationDialogProps} />
       <SupportDialog open={supportOpen} onOpenChange={setSupportOpen} />
     </>
   )
