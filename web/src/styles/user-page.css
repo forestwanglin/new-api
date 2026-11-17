@@ -18,14 +18,21 @@ For commercial licensing, please contact support@quantumnous.com
 */
 /* A1: Demo spacing and surface hierarchy, scoped to opted-in user pages.
  * Colors and radius intentionally inherit the active theme/preferences.
- * Demo bg/bg2 -> background/muted; line -> border; tx/tx2 -> foreground/muted-foreground.
+ * Default light canvas matches the demo; presets and dark mode use muted.
+ * Cards retain --card; line -> border; tx/tx2 -> foreground/muted-foreground.
  * Do not apply these tokens to body: admin pages and portal dialogs keep their theme.
  */
 .user-page {
+  --user-page-bg: #f8fafd;
   --user-page-gutter: 1rem;
   --user-page-section-gap: 1rem;
-  background: var(--background);
+  background: var(--user-page-bg);
   color: var(--foreground);
+}
+
+:is(.dark, body[data-theme-preset]:not([data-theme-preset='default']))
+  .user-page {
+  --user-page-bg: var(--muted);
 }
 
 .user-page .user-page-header {
