@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 
+import { useCountdown } from '@/hooks/use-countdown'
 import { AuthOperationError } from '@/lib/secure-verification'
 import type { AuthBundle } from '@/stores/auth-store'
 
@@ -25,6 +26,7 @@ import type { PasskeyDomains } from '../../passkey/assertion'
 import {
   checkVerificationMethods,
   getLoginVerificationRequirements,
+  sendVerificationSMS,
   verify,
   verifyLogin,
 } from '../api'
@@ -65,6 +67,12 @@ function verificationReducer(
         methods.find((option) => option.method === 'passkey') ?? methods[0]
       let input: VerificationInput | null = null
       switch (preferred?.method) {
+        case 'wechat':
+          input = { method: 'wechat', code: '' }
+          break
+        case 'sms':
+          input = { method: 'sms', code: '', smsToken: '' }
+          break
         case '2fa':
           input = { method: '2fa', code: '' }
           break
@@ -104,7 +112,10 @@ function verificationReducer(
       if (input?.method === 'password') {
         input = { method: 'password', password: '' }
       }
-      if (input?.method === '2fa') input = { method: '2fa', code: '' }
+      if (input?.method === '2fa' || input?.method === 'wechat') {
+        input = { method: input.method, code: '' }
+      }
+      if (input?.method === 'sms') input = { ...input, code: '' }
       return { ...state, phase: 'verifying', input, error: undefined }
     }
     case 'error':
@@ -145,6 +156,11 @@ export function useSecureVerification() {
     null
   )
 
+  const [smsSending, setSMSSending] = useState(false)
+  const smsCountdown = useCountdown({ initialSeconds: 90 })
+  const resetSMSCountdown = smsCountdown.reset
+  const startSMSCountdown = smsCountdown.start
+
   const cancel = useCallback(() => {
     const current = pending.current
     pending.current = null
@@ -152,8 +168,10 @@ export function useSecureVerification() {
     if (current) current.initialPassword = undefined
     current?.resolve(null)
     setPasskeyDomains(null)
+    setSMSSending(false)
+    resetSMSCountdown()
     dispatch({ type: 'reset' })
-  }, [])
+  }, [resetSMSCountdown])
 
   useEffect(() => cancel, [cancel])
 
@@ -332,6 +350,49 @@ export function useSecureVerification() {
     [cancel, state]
   )
 
+  const sendSMS = useCallback(async () => {
+    const current = pending.current
+    if (
+      !current ||
+      current.kind !== 'operation' ||
+      current.request.scope !== 'access_token.generate' ||
+      current.submitting ||
+      smsCountdown.isActive ||
+      state.phase !== 'ready' ||
+      state.input?.method !== 'sms'
+    ) {
+      return
+    }
+    current.submitting = true
+    setSMSSending(true)
+    dispatch({
+      type: 'input',
+      input: { method: 'sms', code: '', smsToken: '' },
+    })
+    try {
+      const result = await sendVerificationSMS(
+        current.request,
+        current.controller.signal
+      )
+      if (pending.current !== current) return
+      dispatch({
+        type: 'input',
+        input: { method: 'sms', code: '', smsToken: result.sms_token },
+      })
+      startSMSCountdown(result.retry_after)
+    } catch (error) {
+      if (pending.current === current) {
+        dispatch({
+          type: 'error',
+          error: AuthOperationError.from(error).message,
+        })
+      }
+    } finally {
+      current.submitting = false
+      if (pending.current === current) setSMSSending(false)
+    }
+  }, [smsCountdown.isActive, startSMSCountdown, state])
+
   const retry = useCallback(() => {
     if (pending.current && state.phase === 'error') {
       void loadRequirements(pending.current)
@@ -354,6 +415,9 @@ export function useSecureVerification() {
       onRetry: retry,
       onInputChange: setInput,
       onVerify: executeVerification,
+      onSendSMS: sendSMS,
+      smsSending,
+      smsRetryAfter: smsCountdown.isActive ? smsCountdown.secondsLeft : 0,
     },
   }
 }

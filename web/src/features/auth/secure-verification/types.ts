@@ -24,6 +24,8 @@ export type VerificationMethod =
   | 'password'
   | 'oauth'
   | 'session'
+  | 'wechat'
+  | 'sms'
 export type SecurityProofScope =
   | 'channel.key.read'
   | 'passkey.register'
@@ -114,6 +116,8 @@ export interface VerificationRequirements {
   methods: { method: VerificationMethod; available: boolean; reason?: string }[]
   oauth_providers: { slug: string; name: string }[]
   password_encryption_enabled: boolean
+  phone_masked?: string
+  wechat_qrcode?: string
 }
 
 export type VerificationInput =
@@ -122,6 +126,8 @@ export type VerificationInput =
   | { method: 'passkey'; rpID?: string }
   | { method: 'oauth'; provider: string }
   | { method: 'session' }
+  | { method: 'wechat'; code: string }
+  | { method: 'sms'; code: string; smsToken: string }
 
 export type RequestVerificationOptions = VerificationOperation & {
   title?: string

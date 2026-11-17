@@ -1090,6 +1090,13 @@
 - 验证：先红后绿验证页面无 tablist/tab 且默认查询积分类型；`bun run test src/features/points` 6 文件/32 用例通过，typecheck 1621 文件/2 项目、两个 TSX 文件的 oxlint/oxfmt、生产构建及 `git diff --check` 通过。
 - 风险与未覆盖：未执行已登录控制台的真实浏览器验收；未修改后端、数据库和公共 Tabs 组件。
 
+### Z071 创建访问令牌优先使用微信或手机验证码
+
+- 需求与行为：仅创建访问令牌（`access_token.generate`）按已绑定微信、已绑定手机号、现有验证流程依次选择。绑定微信时校验公众号验证码对应当前账号；未绑微信但有手机号时向当前已绑定手机发送短信。该创建专用策略优先于已配置的 2FA/Passkey；所选渠道不可用或验证失败时明确报错，不自动降级。
+- 实现与上游差异：在现有安全验证 methods/verify、共享弹窗和操作证明架构内增加 `wechat`/`sms` 方法，新增 session-only `POST /api/verify/sms/send`。验证码与当前用户、会话、auth version、令牌 scopes 和 expires_at 绑定，证明单次消费并复查当前绑定/优先级；既有微信绑定短信必须按 scope 分流，保留原 MFA 限制。令牌更新/撤销、账户绑定、登录及管理员敏感操作保持既有规则。
+- 开关与默认值：无新增配置、依赖或迁移；沿用公众号验证码和二维码配置、阿里云短信设置与账号/IP发送限流。仅展示脱敏手机号，不接受任意目标号码；不自动重试供应商请求。
+- 验证与边界：controller 创建联系人验证定向测试通过 SQLite、MySQL 8.4.13、PostgreSQL 16.16，覆盖 OpenID 归属、实际创建、跨 scope/账户/会话、过期/耗尽/重发/重放、发送限流/失败、撤销、绑定变更和旧密码/MFA 证明失效；原有 Phone/WeChat 绑定相关回归通过。前端 8 文件/94 用例、typecheck、定向 lint/格式与生产构建通过。原始 HEAD 的 router catalog 检查亦有六条已有声明缺失，本次新增路由已声明。外部微信/短信 HTTP 使用测试替身，未做真实投递、登录后浏览器验收或生产部署。回滚需同步前后端，无数据迁移。可执行契约见 `.trellis/spec/new-api/backend/access-token-contact-verification.md`。
+
 ### Z072 控制台独立新手引导
 
 - 需求与原因：将新用户邀请、应用接入和推荐操作复制到常规首位的独立页面，保留概览原有 UI 与逻辑。
@@ -1122,6 +1129,7 @@
 |---|---|---|
 | 独立个人资料与手机号更换 | `router/api-router.go`、`middleware/access_token_routes.go`、`service/security_verification.go`、语言偏好组件、侧栏数据与测试、生成路由和七种 locale | Z073 |
 | 新手引导功能复制 | sidebar data/config、个人/管理员菜单配置、邀请卡片、接入卡片、推荐操作、路由生成文件及七种 locale | Z072 |
+| 创建访问令牌联系人验证 | `controller/secure_verification.go`、`service/security_verification.go`、新增联系人验证 service/测试、`router/api-router.go`、`middleware/access_token_routes.go`、共享验证类型/API/hooks/弹窗与七种 locale | Z071 |
 | 使用日志费用可见性 | `web/src/features/usage-logs/components/columns/common-logs-columns.tsx` | Z064 |
 | 微信绑定二次验证 | `controller/wechat.go`、安全证明 service、`router/api-router.go`、`middleware/access_token_routes.go`、认证入口、微信绑定对话框与七种 locale | Z063 |
 | 邀请入口及认证归因 | `controller/wechat.go`、`web/src/routes/{__root.tsx,(auth)/sign-up.tsx}`；与 fork 自有手机/微信认证扩展联动 | Z061 |

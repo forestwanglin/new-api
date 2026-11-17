@@ -5920,6 +5920,7 @@
     "Send": "Send",
     "Send a request": "Send a request",
     "Send chat completions to the OpenAI-compatible /v1/chat/completions instead of the native Ollama /api/chat": "Send chat completions to the OpenAI-compatible /v1/chat/completions instead of the native Ollama /api/chat",
+    "Send a verification code to {{phone}}.": "Send a verification code to {{phone}}.",
     "Send code": "Send code",
     "Send reset email": "Send reset email",
     "Send the original request body to upstream without conversion. Only available for native forwarding routes.": "Send the original request body to upstream without conversion. Only available for native forwarding routes.",

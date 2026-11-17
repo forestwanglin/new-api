@@ -225,6 +225,26 @@ export async function verify(
           )
         )
         break
+      case 'wechat':
+      case 'sms':
+        if (operation.scope !== 'access_token.generate') {
+          throw new AuthOperationError(
+            'This verification method is not allowed for this action.'
+          )
+        }
+        proof = await authResult<SecurityProof>(
+          api.post(
+            '/api/verify',
+            {
+              method: input.method,
+              ...operationFields,
+              code: input.code.trim(),
+              ...(input.method === 'sms' ? { sms_token: input.smsToken } : {}),
+            },
+            { ...authRequestOptions, signal }
+          )
+        )
+        break
       case '2fa':
         proof = await authResult<SecurityProof>(
           api.post(
@@ -356,4 +376,22 @@ async function verifyOAuth(
     exchange.finish({ success: false, message: failure.message })
     throw failure
   }
+}
+
+export async function sendVerificationSMS(
+  operation: VerificationOperation,
+  signal: AbortSignal
+): Promise<{ sms_token: string; retry_after: number }> {
+  if (operation.scope !== 'access_token.generate') {
+    throw new AuthOperationError(
+      'This verification method is not allowed for this action.'
+    )
+  }
+  return authResult(
+    api.post(
+      '/api/verify/sms/send',
+      { scope: operation.scope, context: operation.context },
+      { ...authRequestOptions, signal }
+    )
+  )
 }

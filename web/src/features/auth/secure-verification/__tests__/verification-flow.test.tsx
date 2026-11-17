@@ -569,3 +569,214 @@ it('verifies with the clicked provider when several linked accounts are availabl
     screen.getByRole('button', { name: 'Continue with Linux DO' })
   ).toBeDisabled()
 })
+
+it('verifies token creation with the bound WeChat account code', async () => {
+  const user = userEvent.setup()
+  const result = vi.fn()
+  vi.spyOn(api, 'get').mockResolvedValue({
+    data: {
+      success: true,
+      data: {
+        scope: 'access_token.generate',
+        methods: [{ method: 'wechat', available: true }],
+        oauth_providers: [],
+        password_encryption_enabled: false,
+      },
+    },
+  })
+  const post = vi.spyOn(api, 'post').mockResolvedValue({
+    data: {
+      success: true,
+      data: {
+        proof_token: 'wechat-proof',
+        method: 'wechat',
+        scope: 'access_token.generate',
+        expires_at: Math.floor(Date.now() / 1000) + 300,
+      },
+    },
+  })
+  render(
+    <Harness
+      onResult={result}
+      operation={{
+        scope: 'access_token.generate',
+        context: { scopes: ['profile:read'], expires_at: 0 },
+      }}
+    />
+  )
+  await user.click(screen.getByRole('button', { name: 'Protected action' }))
+  await user.type(
+    await screen.findByLabelText('WeChat verification code'),
+    '123456'
+  )
+  await user.click(screen.getByRole('button', { name: 'Verify' }))
+  await waitFor(() =>
+    expect(result).toHaveBeenCalledWith(
+      expect.objectContaining({ proof_token: 'wechat-proof' })
+    )
+  )
+  expect(post).toHaveBeenCalledWith(
+    '/api/verify',
+    expect.objectContaining({
+      method: 'wechat',
+      code: '123456',
+      scope: 'access_token.generate',
+      context: { scopes: ['profile:read'], expires_at: 0 },
+    }),
+    expect.anything()
+  )
+})
+
+it('sends SMS only on click and requires its code before verifying token creation', async () => {
+  const user = userEvent.setup()
+  const result = vi.fn()
+  vi.spyOn(api, 'get').mockResolvedValue({
+    data: {
+      success: true,
+      data: {
+        scope: 'access_token.generate',
+        methods: [{ method: 'sms', available: true }],
+        phone_masked: '138****8000',
+        oauth_providers: [],
+        password_encryption_enabled: false,
+      },
+    },
+  })
+  const post = vi.spyOn(api, 'post').mockImplementation(async (url) => ({
+    data: {
+      success: true,
+      data:
+        url === '/api/verify/sms/send'
+          ? { sms_token: 'sms-flow', retry_after: 90 }
+          : {
+              proof_token: 'sms-proof',
+              method: 'sms',
+              scope: 'access_token.generate',
+              expires_at: Math.floor(Date.now() / 1000) + 300,
+            },
+    },
+  }))
+  render(
+    <Harness
+      onResult={result}
+      operation={{
+        scope: 'access_token.generate',
+        context: { scopes: ['profile:read'], expires_at: 0 },
+      }}
+    />
+  )
+  await user.click(screen.getByRole('button', { name: 'Protected action' }))
+  await screen.findByText('138****8000', { exact: false })
+  expect(post).not.toHaveBeenCalled()
+  expect(screen.getByRole('button', { name: 'Verify' })).toBeDisabled()
+  await user.click(screen.getByRole('button', { name: 'Send code' }))
+  expect(
+    await screen.findByRole('button', { name: 'Resend in 90s' })
+  ).toBeDisabled()
+  await user.type(
+    await screen.findByRole('textbox', { name: 'SMS verification code' }),
+    '123456'
+  )
+  await user.click(screen.getByRole('button', { name: 'Verify' }))
+  await waitFor(() =>
+    expect(result).toHaveBeenCalledWith(
+      expect.objectContaining({ proof_token: 'sms-proof' })
+    )
+  )
+  expect(post).toHaveBeenCalledWith(
+    '/api/verify',
+    expect.objectContaining({
+      method: 'sms',
+      sms_token: 'sms-flow',
+      code: '123456',
+      context: { scopes: ['profile:read'], expires_at: 0 },
+    }),
+    expect.anything()
+  )
+})
+
+it('keeps SMS verification disabled after delivery failure and permits an explicit retry', async () => {
+  const user = userEvent.setup()
+  vi.spyOn(api, 'get').mockResolvedValue({
+    data: {
+      success: true,
+      data: {
+        scope: 'access_token.generate',
+        methods: [{ method: 'sms', available: true }],
+        phone_masked: '138****8000',
+        oauth_providers: [],
+        password_encryption_enabled: false,
+      },
+    },
+  })
+  const post = vi
+    .spyOn(api, 'post')
+    .mockRejectedValueOnce(new Error('SMS delivery failed'))
+    .mockResolvedValue({
+      data: {
+        success: true,
+        data: { sms_token: 'retry-flow', retry_after: 90 },
+      },
+    })
+  render(
+    <Harness
+      onResult={vi.fn()}
+      operation={{
+        scope: 'access_token.generate',
+        context: { scopes: ['profile:read'], expires_at: 0 },
+      }}
+    />
+  )
+  await user.click(screen.getByRole('button', { name: 'Protected action' }))
+  await user.click(await screen.findByRole('button', { name: 'Send code' }))
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: 'Send code' })).toBeEnabled()
+  )
+  expect(screen.getByRole('button', { name: 'Verify' })).toBeDisabled()
+  await user.click(screen.getByRole('button', { name: 'Send code' }))
+  await waitFor(() => expect(post).toHaveBeenCalledTimes(2))
+  expect(screen.getByRole('button', { name: 'Verify' })).toBeDisabled()
+})
+
+it('ignores SMS delivery completing after cancellation', async () => {
+  const user = userEvent.setup()
+  const result = vi.fn()
+  vi.spyOn(api, 'get').mockResolvedValue({
+    data: {
+      success: true,
+      data: {
+        scope: 'access_token.generate',
+        methods: [{ method: 'sms', available: true }],
+        phone_masked: '138****8000',
+        oauth_providers: [],
+        password_encryption_enabled: false,
+      },
+    },
+  })
+  let complete!: (value: unknown) => void
+  vi.spyOn(api, 'post').mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        complete = resolve
+      })
+  )
+  render(
+    <Harness
+      onResult={result}
+      operation={{
+        scope: 'access_token.generate',
+        context: { scopes: ['profile:read'], expires_at: 0 },
+      }}
+    />
+  )
+  await user.click(screen.getByRole('button', { name: 'Protected action' }))
+  await user.click(await screen.findByRole('button', { name: 'Send code' }))
+  await user.click(screen.getByRole('button', { name: 'Cancel' }))
+  await act(async () =>
+    complete({
+      data: { success: true, data: { sms_token: 'stale', retry_after: 90 } },
+    })
+  )
+  expect(result).toHaveBeenCalledExactlyOnceWith(null)
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+})

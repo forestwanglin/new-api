@@ -311,6 +311,8 @@ type VerificationRequirements struct {
 	Methods                   []VerificationMethodOption  `json:"methods"`
 	OAuthProviders            []VerificationOAuthProvider `json:"oauth_providers"`
 	PasswordEncryptionEnabled bool                        `json:"password_encryption_enabled"`
+	PhoneMasked               string                      `json:"phone_masked,omitempty"`
+	WeChatQRCode              string                      `json:"wechat_qrcode,omitempty"`
 }
 
 // securityVerificationPolicy is the only operation-to-method policy. Device
@@ -388,6 +390,29 @@ func GetVerificationRequirements(identity AuthIdentity, scope string) (*Verifica
 	}
 	if err := requireAccessTokenVerificationScope(identity, scope); err != nil {
 		return nil, err
+	}
+	if scope == VerificationScopeAccessTokenGenerate {
+		contact, err := getAccessTokenContact(model.DB, identity.UserID)
+		if err != nil {
+			return nil, err
+		}
+		if contact.Method != "" {
+			if _, token := model.ParseAccessTokenSessionID(identity.SessionID); token {
+				return nil, ErrVerificationForbidden
+			}
+			option := VerificationMethodOption{Method: contact.Method, Available: contactMethodAvailable(contact)}
+			if !option.Available {
+				option.Reason = ErrVerificationUnavailable.Error()
+			}
+			requirements := &VerificationRequirements{Scope: scope, Methods: []VerificationMethodOption{option}, OAuthProviders: []VerificationOAuthProvider{}, PasswordEncryptionEnabled: common.PasswordLoginEncryptionEnabled}
+			if contact.Method == VerificationMethodSMS && mainlandPhonePattern.MatchString(contact.Subject) {
+				requirements.PhoneMasked = contact.Subject[:3] + "****" + contact.Subject[7:]
+			}
+			if contact.Method == VerificationMethodWeChat {
+				requirements.WeChatQRCode = common.WeChatAccountQRCodeImageURL
+			}
+			return requirements, nil
+		}
 	}
 	methods, err := securityVerificationPolicy(scope, *state)
 	if err != nil {
@@ -521,7 +546,7 @@ func ConsumeOperationProof(raw string, identity AuthIdentity, operation Verifica
 	if err := ValidateStepUpIdentity(identity); err != nil {
 		return nil, err
 	}
-	if claims.Method == VerificationMethodSMS {
+	if claims.Method == VerificationMethodSMS && operation.Scope != VerificationScopeAccessTokenGenerate {
 		if _, err := requireWeChatBindingSMS(identity, operation); err != nil {
 			return nil, err
 		}
@@ -541,6 +566,9 @@ func ConsumeOperationProof(raw string, identity AuthIdentity, operation Verifica
 	}, func(tx *gorm.DB, flow *model.AuthFlow) error {
 		if err := model.ValidateAuthSessionWithTx(tx, identity); err != nil {
 			return err
+		}
+		if operation.Scope == VerificationScopeAccessTokenGenerate {
+			return validateAccessTokenContactWithTx(tx, identity, claims.Method, flow.Payload)
 		}
 		if claims.Method == VerificationMethodSMS {
 			var payload weChatBindingSMSPayload
@@ -595,6 +623,7 @@ type VerificationInput struct {
 	Password          string          `json:"password,omitempty"`
 	PasswordEncrypted string          `json:"password_encrypted,omitempty"`
 	EncryptionKeyID   string          `json:"encryption_key_id,omitempty"`
+	SMSToken          string          `json:"sms_token,omitempty"`
 }
 
 func VerifySecurityInput(identity AuthIdentity, input VerificationInput) (*SecurityProof, error) {
@@ -635,7 +664,9 @@ func VerifySecurityInput(identity AuthIdentity, input VerificationInput) (*Secur
 		if err := VerifyTwoFactorCode(twoFA, input.Code); err != nil {
 			return nil, err
 		}
-	case VerificationMethodPasskey, VerificationMethodOAuth:
+	case VerificationMethodSMS:
+		return verifyAccessTokenSMS(identity, VerificationOperation{Scope: input.Scope, Context: input.Context}, input.SMSToken, input.Code)
+	case VerificationMethodPasskey, VerificationMethodOAuth, VerificationMethodWeChat:
 		return nil, ErrVerificationFlowRequired
 	default:
 		return nil, ErrProofMethod

@@ -5920,6 +5920,7 @@
     "Send": "Gửi",
     "Send a request": "Gửi yêu cầu",
     "Send chat completions to the OpenAI-compatible /v1/chat/completions instead of the native Ollama /api/chat": "Gửi yêu cầu chat completions tới /v1/chat/completions tương thích OpenAI thay vì /api/chat gốc của Ollama",
+    "Send a verification code to {{phone}}.": "Gửi mã xác minh đến {{phone}}.",
     "Send code": "Gửi mã",
     "Send reset email": "Gửi email đặt lại",
     "Send the original request body to upstream without conversion. Only available for native forwarding routes.": "Gửi phần thân yêu cầu gốc lên upstream mà không chuyển đổi. Chỉ dùng được cho các tuyến chuyển tiếp nguyên bản.",

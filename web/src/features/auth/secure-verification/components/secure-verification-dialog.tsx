@@ -26,6 +26,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
+import { WeChatVerificationHint } from '../../components/wechat-verification-hint'
 import type { PasskeyDomains } from '../../passkey/assertion'
 import { PasskeyDomainSelector } from '../../passkey/components/passkey-domain-selector'
 import type {
@@ -37,6 +38,9 @@ import type {
 interface SecureVerificationDialogProps {
   state: SecureVerificationState
   passkeyDomains?: PasskeyDomains | null
+  onSendSMS?: () => void | Promise<void>
+  smsSending?: boolean
+  smsRetryAfter?: number
   onVerify: (input?: VerificationInput) => void | Promise<void>
   onCancel: () => void
   onRetry: () => void
@@ -49,6 +53,8 @@ const methodLabels: Record<VerificationMethod, string> = {
   password: 'Password',
   oauth: 'Linked account',
   session: 'Login session',
+  wechat: 'WeChat',
+  sms: 'SMS verification code',
 }
 
 export function SecureVerificationDialog(props: SecureVerificationDialogProps) {
@@ -63,20 +69,39 @@ export function SecureVerificationDialog(props: SecureVerificationDialogProps) {
   const login = state.request.scope === 'auth.login'
   const acceptsBackupCode =
     state.request.scope !== '2fa.backup_codes.regenerate'
-  let canVerify = state.phase === 'ready' && Boolean(input)
+  let canVerify = state.phase === 'ready' && Boolean(input) && !props.smsSending
   if (input?.method === 'password') {
     canVerify = canVerify && input.password.length > 0
   }
   if (input?.method === '2fa') {
     canVerify = canVerify && input.code.trim().length >= 6
   }
+  if (input?.method === 'wechat') {
+    canVerify = canVerify && /^\d{4,10}$/.test(input.code.trim())
+  }
+  if (input?.method === 'sms') {
+    canVerify =
+      canVerify && Boolean(input.smsToken) && /^\d{6}$/.test(input.code.trim())
+  }
   // Linked-account verification starts from the provider button itself.
   const showSubmit = state.phase !== 'error' && input?.method !== 'oauth'
   const error = 'error' in state ? state.error : undefined
   const formId = `${inputId}-form`
+  let smsSendLabel = t('Send code')
+  if (props.smsSending) {
+    smsSendLabel = t('Sending...')
+  } else if (props.smsRetryAfter) {
+    smsSendLabel = t('Resend in {{seconds}}s', { seconds: props.smsRetryAfter })
+  }
 
   const selectMethod = (method: string) => {
     switch (method) {
+      case 'wechat':
+        props.onInputChange({ method, code: '' })
+        break
+      case 'sms':
+        props.onInputChange({ method, code: '', smsToken: '' })
+        break
       case '2fa':
         props.onInputChange({ method, code: '' })
         break
@@ -181,6 +206,73 @@ export function SecureVerificationDialog(props: SecureVerificationDialogProps) {
                   </TabsTrigger>
                 ))}
               </TabsList>
+              <TabsContent value='wechat' className='space-y-3'>
+                {ready.requirements.wechat_qrcode && (
+                  <img
+                    src={ready.requirements.wechat_qrcode}
+                    alt={t('WeChat login QR code')}
+                    className='mx-auto size-48 rounded-lg border object-contain'
+                  />
+                )}
+                <p className='text-muted-foreground text-sm'>
+                  <WeChatVerificationHint />
+                </p>
+                <Label htmlFor={inputId}>{t('WeChat verification code')}</Label>
+                <Input
+                  id={inputId}
+                  autoComplete='one-time-code'
+                  inputMode='numeric'
+                  maxLength={10}
+                  autoFocus
+                  disabled={verifying}
+                  value={input.method === 'wechat' ? input.code : ''}
+                  onChange={(event) =>
+                    props.onInputChange({
+                      method: 'wechat',
+                      code: event.target.value,
+                    })
+                  }
+                />
+              </TabsContent>
+              <TabsContent value='sms' className='space-y-3'>
+                <p className='text-muted-foreground text-sm'>
+                  {t('Send a verification code to {{phone}}.', {
+                    phone: ready.requirements.phone_masked ?? '',
+                  })}
+                </p>
+                <Label htmlFor={inputId}>{t('SMS verification code')}</Label>
+                <div className='flex gap-2'>
+                  <Input
+                    id={inputId}
+                    autoComplete='one-time-code'
+                    inputMode='numeric'
+                    maxLength={6}
+                    autoFocus
+                    disabled={verifying || props.smsSending}
+                    value={input.method === 'sms' ? input.code : ''}
+                    onChange={(event) => {
+                      if (input.method === 'sms') {
+                        props.onInputChange({
+                          ...input,
+                          code: event.target.value,
+                        })
+                      }
+                    }}
+                  />
+                  <Button
+                    type='button'
+                    variant='outline'
+                    disabled={
+                      verifying ||
+                      props.smsSending ||
+                      Boolean(props.smsRetryAfter)
+                    }
+                    onClick={() => void props.onSendSMS?.()}
+                  >
+                    {smsSendLabel}
+                  </Button>
+                </div>
+              </TabsContent>
               <TabsContent value='password' className='space-y-2'>
                 <Label htmlFor={inputId}>{t('Password')}</Label>
                 <Input

@@ -170,11 +170,49 @@ func UniversalVerify(c *gin.Context) {
 		common.ApiErrorT(c, "Invalid parameters")
 		return
 	}
-	proof, err := service.VerifySecurityInput(identity, request)
+	var proof *service.SecurityProof
+	var err error
+	if request.Method == service.VerificationMethodWeChat {
+		operation := service.VerificationOperation{Scope: request.Scope, Context: request.Context}
+		if _, err = service.BindVerificationOperation(operation); err == nil {
+			_, err = service.RequireVerificationMethod(identity, request.Scope, request.Method)
+		}
+		if err == nil {
+			var response *wechatLoginResponse
+			response, err = getWeChatResponseByCode(strings.TrimSpace(request.Code))
+			if err != nil {
+				err = service.ErrVerificationFailed
+			} else {
+				proof, err = service.CompleteAccessTokenWeChat(identity, operation, response.Data)
+			}
+		}
+	} else {
+		proof, err = service.VerifySecurityInput(identity, request)
+	}
 	if err != nil {
 		writeSecurityOperationError(c, err)
 		return
 	}
 	recordUserSecurityAudit(c, identity.UserID, "user.security_verify", map[string]any{"method": proof.Method, "scope": proof.Scope})
 	common.ApiSuccess(c, proof)
+}
+
+func SendVerificationSMS(c *gin.Context) {
+	identity, ok := middleware.GetStepUpIdentity(c)
+	if !ok {
+		writeSecurityOperationError(c, service.ErrAuthTokenInvalid)
+		return
+	}
+	var operation service.VerificationOperation
+	if common.DecodeJson(c.Request.Body, &operation) != nil {
+		common.ApiErrorT(c, "Invalid request")
+		return
+	}
+	token, err := service.SendAccessTokenSMS(identity, operation, c.ClientIP())
+	if err != nil {
+		writeSecurityOperationError(c, err)
+		return
+	}
+	recordUserSecurityAudit(c, identity.UserID, "user.security_verify", map[string]any{"method": "sms", "scope": operation.Scope, "event": "send"})
+	common.ApiSuccess(c, gin.H{"sms_token": token, "retry_after": 90})
 }

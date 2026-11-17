@@ -5920,6 +5920,7 @@
     "Send": "发送",
     "Send a request": "发送请求",
     "Send chat completions to the OpenAI-compatible /v1/chat/completions instead of the native Ollama /api/chat": "将对话补全请求发送至 OpenAI 兼容的 /v1/chat/completions，而不是 Ollama 原生的 /api/chat",
+    "Send a verification code to {{phone}}.": "发送验证码至 {{phone}}。",
     "Send code": "发送验证码",
     "Send reset email": "发送重置邮件",
     "Send the original request body to upstream without conversion. Only available for native forwarding routes.": "将原始请求体不经转换直接发送到上游。仅原生转发路由可用。",

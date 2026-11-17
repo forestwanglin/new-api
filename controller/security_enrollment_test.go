@@ -252,8 +252,13 @@ func TestSecurityEnrollmentAccessTokenMethodPolicy(t *testing.T) {
 					count = 2
 				}
 				require.Len(t, requirements.Methods, count)
-				assert.Equal(t, test.method, requirements.Methods[0].Method)
-				assert.Equal(t, test.available, requirements.Methods[0].Available)
+				expectedMethod, expectedAvailable := test.method, test.available
+				if test.wechat && scope == service.VerificationScopeAccessTokenGenerate {
+					expectedMethod = "wechat"
+					expectedAvailable = common.WeChatAuthEnabled && common.WeChatServerAddress != "" && common.WeChatServerToken != ""
+				}
+				assert.Equal(t, expectedMethod, requirements.Methods[0].Method)
+				assert.Equal(t, expectedAvailable, requirements.Methods[0].Available)
 				if count == 2 {
 					assert.Equal(t, service.VerificationMethodOption{Method: "passkey", Available: true}, requirements.Methods[1])
 				}
