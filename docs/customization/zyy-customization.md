@@ -1159,6 +1159,16 @@
 - 兼容与风险：无新增依赖、配置或数据库迁移；新旧前后端接口不兼容，必须成套发布或回滚。未提供图片校验的旧客户端请求失败；不改变匿名手机登录及其他敏感操作策略。验证码是纵深防御，不能取代身份验证和限流。
 - 验证：相关前端 5 文件/46 用例、TypeCheck 1,637 文件/2 项目、定向 Oxlint/Oxfmt、生产构建及 diff 检查通过；后端 PhoneChange/PhoneBinding/PhoneCaptcha 定向回归通过，真实 SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 16.16 矩阵连续两次通过，含图片挑战并发消费仅一次投递。独立复核无阻断。浏览器确认首页进入新手引导、Logo 链接模型页、令牌背景透明透出白色容器；开发后端重建后登录态失效，未完成手机号弹窗实页端到端，未发送真实短信。
 
+### Z078 用户负余额编辑与模型页、公共页脚国际化
+
+- 需求与原因：负余额用户仍需能够保存资料；模型分类去除多余标记；非中文折扣统一使用百分比优惠；公共页脚应与站点品牌和界面语言保持一致。
+- 变更内容：用户编辑表单允许有限负余额，资料提交仍不发送余额、不改变原有原子调额入口；模型侧栏移除所有模型及分类圆点，保留厂商圆点；简繁中文保留折数和最高节省提示，其余语言按 `(1 - ratio) × 100` 四舍五入显示 `xx% OFF`，头部不重复显示最高节省提示；Footer 复用 HeaderLogo 和 useSystemConfig，左侧版权跟随后台网站名称；页脚、客服弹窗及 New API 版权说明支持现有 7 种语言。
+- 影响面：`web/src/features/model-plaza/{index,model-sidebar}.tsx`、`web/src/features/subscriptions-custom/{footer,support-dialog}.tsx` 及对应组件测试；**上游自有文件**：`web/src/features/users/lib/user-form.ts`、`web/src/features/users/components/__tests__/permissions.test.tsx`、`web/src/i18n/locales/{en,zh,zh-TW,fr,ru,ja,vi}.json`；新增用户表单校验、页脚语言与品牌测试。
+- 与上游差异：扩展用户资料表单以接受现有负余额；延续 fork 模型广场和订阅公共页脚，改为站点配置与多语言显示，计费与余额调整 API 契约不变。
+- 开关与默认值：无新开关或依赖；站点品牌沿用 Header 的系统配置；中文折数与原有优惠计算保持一致。
+- 验证：`bun run typecheck`、涉及文件 `bunx oxlint -c .oxlintrc.json ...`、`bun run build` 通过；`bun run test src/features/users src/features/model-plaza src/features/subscriptions-custom --exclude src/features/model-plaza/__tests__/navigation.test.tsx`：22 文件、185 用例通过。测试包含负余额保存资料、非法余额拒绝、7 语言实际资源、语言切换、动态品牌与客服复制。Chrome 本地 `/model` 验证中英文折扣、品牌与客服弹窗。
+- 风险与未覆盖：完整相关测试集中的 `model-plaza/__tests__/navigation.test.tsx` 有 2 条既有失败：断言 `/dashboard`，现有导航为 `/onboarding`；从 HEAD 导出基线复测可重现，不修改本次无关导航。全库 `copyright:check` 存在既有缺失/旧版权头；额外执行的 `lint:plugins` 在未改动的任务插件中有既有警告并返回失败。未对线上用户执行保存或调额。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 

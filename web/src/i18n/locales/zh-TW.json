@@ -1,5 +1,16 @@
 {
   "translation": {
+    "modelPlaza.percentOff": "{{percent}}% OFF",
+    "Connect leading AI models to the tools you already use. Subscribe to earn points, pay per call, and keep your points forever.": "將主流大型語言模型接入你正在使用的工具。訂閱獲得積分，按呼叫扣除積分，積分永久有效。",
+    "Help": "幫助",
+    "Common errors": "常見錯誤",
+    "Partnerships": "合作",
+    "Partnership inquiries": "合作諮詢",
+    "Contact our partnership team": "聯絡合作",
+    "Contact us for integration errors, billing questions, invoices, and bulk purchases. Available weekdays, 9:00–21:00.": "接入錯誤、扣費疑問、開立發票與批量採購都可以聯絡我們。工作日 9:00–21:00 在線。",
+    "WeCom (fastest response)": "企業微信（回覆最快）",
+    "Copy WeCom ID": "複製微信號",
+    "Copy email": "複製電子郵件",
     "Access Tokens": "存取權杖",
     "Manage your bound phone and login devices to protect your account and assets.": "管理綁定手機號與登入裝置，保護帳號與資產安全。",
     "Login devices": "登入裝置",

@@ -55,7 +55,6 @@ export function ModelSidebar(props: ModelSidebarProps) {
           aria-pressed={allSelected}
           onClick={() => props.onChange({ category: null, vendorId: null })}
         >
-          <span className='mp-dot' aria-hidden='true' />
           <span className='mp-item-name'>{t('All Models')}</span>
           <span className='mp-item-count'>{props.count}</span>
         </Button>
@@ -74,7 +73,6 @@ export function ModelSidebar(props: ModelSidebarProps) {
                 props.onChange({ category: group.id, vendorId: null })
               }
             >
-              <span className='mp-dot' aria-hidden='true' />
               <span className='mp-item-name'>{group.label}</span>
               <span className='mp-item-count'>{group.count}</span>
             </Button>

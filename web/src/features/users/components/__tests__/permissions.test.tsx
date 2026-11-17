@@ -53,7 +53,8 @@ const description =
 function renderPermissions(
   viewerRole: number,
   allowed?: boolean,
-  editing = true
+  editing = true,
+  quota = 0
 ) {
   useAuthStore
     .getState()
@@ -128,6 +129,7 @@ function renderPermissions(
         success: true,
         data: {
           ...target,
+          quota,
           admin_permissions:
             allowed === undefined ? {} : { audit: { read: allowed } },
         },
@@ -143,7 +145,7 @@ function renderPermissions(
         <UsersMutateDrawer
           open
           onOpenChange={() => undefined}
-          currentRow={editing ? target : undefined}
+          currentRow={editing ? { ...target, quota } : undefined}
         />
       </UsersProvider>
     </QueryClientProvider>
@@ -206,25 +208,32 @@ it.each([undefined, true])(
   }
 )
 
-it('root saving an administrator without changing permissions or password does not verify', async () => {
-  const put = vi
-    .spyOn(api, 'put')
-    .mockResolvedValue({ data: { success: true } })
-  const get = renderPermissions(100, true)
-  const displayName = await screen.findByDisplayValue('Managed admin')
-  await userEvent.clear(displayName)
-  await userEvent.type(displayName, 'Renamed admin')
-  await userEvent.click(screen.getByRole('button', { name: 'Save changes' }))
-  await waitFor(() =>
-    expect(put).toHaveBeenCalledWith(
-      '/api/user/',
-      expect.objectContaining({ id: 2, display_name: 'Renamed admin' }),
-      {}
+it.each([0, -500000])(
+  'root saves profile changes with balance %s without changing quota or requiring verification',
+  async (quota) => {
+    const put = vi
+      .spyOn(api, 'put')
+      .mockResolvedValue({ data: { success: true } })
+    const get = renderPermissions(100, true, true, quota)
+    const displayName = await screen.findByDisplayValue('Managed admin')
+    await userEvent.clear(displayName)
+    await userEvent.type(displayName, 'Renamed admin')
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+    await waitFor(() =>
+      expect(put).toHaveBeenCalledWith(
+        '/api/user/',
+        expect.objectContaining({ id: 2, display_name: 'Renamed admin' }),
+        {}
+      )
     )
-  )
-  expect(put.mock.calls[0][1]).not.toHaveProperty('admin_permissions')
-  expect(get).not.toHaveBeenCalledWith('/api/verify/methods', expect.anything())
-})
+    expect(put.mock.calls[0][1]).not.toHaveProperty('admin_permissions')
+    expect(put.mock.calls[0][1]).not.toHaveProperty('quota')
+    expect(get).not.toHaveBeenCalledWith(
+      '/api/verify/methods',
+      expect.anything()
+    )
+  }
+)
 
 it('admin cannot edit the audit permission even when the catalog is available', async () => {
   renderPermissions(10)

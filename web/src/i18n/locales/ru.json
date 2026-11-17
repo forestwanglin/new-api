@@ -1,5 +1,16 @@
 {
   "translation": {
+    "modelPlaza.percentOff": "{{percent}}% OFF",
+    "Connect leading AI models to the tools you already use. Subscribe to earn points, pay per call, and keep your points forever.": "Подключайте ведущие модели ИИ к привычным инструментам. Получайте баллы по подписке, платите за вызовы и пользуйтесь баллами без ограничения срока.",
+    "Help": "Помощь",
+    "Common errors": "Частые ошибки",
+    "Partnerships": "Партнёрство",
+    "Partnership inquiries": "Запросы о партнёрстве",
+    "Contact our partnership team": "Связаться с отделом партнёрства",
+    "Contact us for integration errors, billing questions, invoices, and bulk purchases. Available weekdays, 9:00–21:00.": "Свяжитесь с нами по вопросам интеграции, оплаты, счетов и оптовых закупок. Мы на связи по рабочим дням с 9:00 до 21:00.",
+    "WeCom (fastest response)": "WeCom (самый быстрый ответ)",
+    "Copy WeCom ID": "Скопировать ID WeCom",
+    "Copy email": "Скопировать email",
     "Access Tokens": "Токены доступа",
     "Manage your bound phone and login devices to protect your account and assets.": "Управляйте привязанным телефоном и устройствами для защиты аккаунта и средств.",
     "Login devices": "Устройства входа",

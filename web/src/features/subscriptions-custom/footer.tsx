@@ -1,55 +1,70 @@
 import { Link } from '@tanstack/react-router'
+import { useTranslation } from 'react-i18next'
+
+import { HeaderLogo } from '@/components/layout/components/header-logo'
+import { Button, buttonVariants } from '@/components/ui/button'
+import { useSystemConfig } from '@/hooks/use-system-config'
 
 import '@/styles/subscriptions-custom-footer.css'
-import { Button, buttonVariants } from '@/components/ui/button'
 
 type Props = { onContact: () => void }
 
-/** Demo footer, scoped to the custom subscription page only. */
+/** Shared footer for custom public pages. */
 export function SubscriptionsCustomFooter(props: Props) {
+  const { t } = useTranslation()
+  const { systemName, logo, loading, logoLoaded } = useSystemConfig()
+  const year = new Date().getFullYear()
   return (
     <footer className='subscriptions-custom-footer'>
       <div className='sub-footer-wrap'>
         <div className='sub-footer-main'>
           <div>
-            <a className='sub-footer-brand' href='/'>
-              <span className='sub-footer-logo' aria-hidden='true'>
-                Z
-              </span>
-              <span>ZYY AI</span>
-            </a>
+            <Link className='sub-footer-brand' to='/'>
+              <HeaderLogo
+                src={logo}
+                alt={t('Logo')}
+                loading={loading}
+                logoLoaded={logoLoaded}
+                className='size-[30px] shrink-0 rounded-lg object-contain'
+              />
+              <span>{systemName}</span>
+            </Link>
             <p className='sub-footer-desc'>
-              把主流大模型接进你正在用的工具。订阅获得积分，按调用扣积分，积分永久有效。
+              {t(
+                'Connect leading AI models to the tools you already use. Subscribe to earn points, pay per call, and keep your points forever.'
+              )}
             </p>
           </div>
           <div className='sub-footer-columns'>
             <div>
-              <h2>帮助</h2>
+              <h2>{t('Help')}</h2>
               <Link
                 to='/tutorial'
                 className={buttonVariants({ variant: 'link' })}
               >
-                常见报错
+                {t('Common errors')}
               </Link>
               <Button variant='link' onClick={props.onContact}>
-                联系客服
+                {t('Contact support')}
               </Button>
             </div>
             <div>
-              <h2>合作</h2>
+              <h2>{t('Partnerships')}</h2>
               <Button variant='link' onClick={props.onContact}>
-                合作咨询
+                {t('Partnership inquiries')}
               </Button>
               <Button variant='link' onClick={props.onContact}>
-                联系合作
+                {t('Contact our partnership team')}
               </Button>
             </div>
           </div>
         </div>
         <div className='sub-footer-copy'>
-          <span>© 2026 ZYY AI</span>
+          <span>
+            © {year} {systemName}
+          </span>
           <span className='sub-footer-attribution'>
-            © 2026{' '}
+            © {year}{' '}
             <a
               href='https://github.com/QuantumNous/new-api'
               target='_blank'
@@ -57,7 +72,7 @@ export function SubscriptionsCustomFooter(props: Props) {
             >
               New API
             </a>
-            . 版权所有，由项目贡献者设计与开发。
+            . {t('footer.newapi.projectAttributionSuffix')}
           </span>
         </div>
       </div>

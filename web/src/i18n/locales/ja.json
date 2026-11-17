@@ -1,5 +1,16 @@
 {
   "translation": {
+    "modelPlaza.percentOff": "{{percent}}% OFF",
+    "Connect leading AI models to the tools you already use. Subscribe to earn points, pay per call, and keep your points forever.": "主要なAIモデルを普段お使いのツールに接続。サブスクリプションでポイントを獲得し、呼び出しごとに消費します。ポイントの有効期限はありません。",
+    "Help": "ヘルプ",
+    "Common errors": "よくあるエラー",
+    "Partnerships": "パートナーシップ",
+    "Partnership inquiries": "提携に関するお問い合わせ",
+    "Contact our partnership team": "提携担当に連絡",
+    "Contact us for integration errors, billing questions, invoices, and bulk purchases. Available weekdays, 9:00–21:00.": "接続エラー、料金、請求書、一括購入についてお問い合わせください。平日9:00〜21:00に対応しています。",
+    "WeCom (fastest response)": "WeCom（最速の対応）",
+    "Copy WeCom ID": "WeCom IDをコピー",
+    "Copy email": "メールアドレスをコピー",
     "Access Tokens": "アクセストークン",
     "Manage your bound phone and login devices to protect your account and assets.": "電話番号とログイン端末を管理し、アカウントと資産を保護します。",
     "Login devices": "ログイン端末",

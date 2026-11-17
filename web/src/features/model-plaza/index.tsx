@@ -32,7 +32,7 @@ import { usePricingData } from '@/features/pricing/hooks/use-pricing-data'
 import { filterBySearch } from '@/features/pricing/lib/filters'
 import { SubscriptionsCustomFooter } from '@/features/subscriptions-custom/footer'
 import { SupportDialog } from '@/features/subscriptions-custom/support-dialog'
-import { toIntlLocale } from '@/i18n/languages'
+import { normalizeInterfaceLanguage, toIntlLocale } from '@/i18n/languages'
 import { getServerErrorMessage } from '@/lib/server-error-message'
 import { useAuthStore } from '@/stores/auth-store'
 import { useLoginModalStore } from '@/stores/login-modal-store'
@@ -61,6 +61,10 @@ import '@/styles/model-plaza.css'
 
 export function ModelPlaza() {
   const { t, i18n } = useTranslation()
+  const language = normalizeInterfaceLanguage(
+    i18n.resolvedLanguage || i18n.language
+  )
+  const isChinese = language === 'zhCN' || language === 'zhTW'
   const referenceExchangeRate = useSystemConfigStore(
     (state) =>
       state.config.modelReferenceExchangeRate ??
@@ -195,16 +199,23 @@ export function ModelPlaza() {
             >
               <span>{t('Models from')}</span>
               <strong>
-                {t('{{discount}} tenths of reference price', {
-                  discount: formatModelDiscount(bestDiscount),
-                })}
+                {isChinese
+                  ? t('{{discount}} tenths of reference price', {
+                      discount: formatModelDiscount(bestDiscount),
+                    })
+                  : t('modelPlaza.percentOff', {
+                      defaultValue: '{{percent}}% OFF',
+                      percent: Math.round((1 - bestDiscount) * 100),
+                    })}
               </strong>
               <span>{t('Compared with the official website')}</span>
-              <b>
-                {t('Save up to {{percent}}%', {
-                  percent: Math.round((1 - bestDiscount) * 100),
-                })}
-              </b>
+              {isChinese && (
+                <b>
+                  {t('Save up to {{percent}}%', {
+                    percent: Math.round((1 - bestDiscount) * 100),
+                  })}
+                </b>
+              )}
             </div>
           )}
 
@@ -364,15 +375,24 @@ function ModelDiscount(props: {
   model: Parameters<typeof getModelDiscountRatio>[0]
   referenceExchangeRate: number
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const language = normalizeInterfaceLanguage(
+    i18n.resolvedLanguage || i18n.language
+  )
+  const isChinese = language === 'zhCN' || language === 'zhTW'
   const ratio = getModelDiscountRatio(props.model, props.referenceExchangeRate)
   if (ratio === null) return <span className='mp-unavailable'>—</span>
   return (
     <>
       <span className='mp-discount'>
-        {t('{{discount}} tenths of reference price', {
-          discount: formatModelDiscount(ratio),
-        })}
+        {isChinese
+          ? t('{{discount}} tenths of reference price', {
+              discount: formatModelDiscount(ratio),
+            })
+          : t('modelPlaza.percentOff', {
+              defaultValue: '{{percent}}% OFF',
+              percent: Math.round((1 - ratio) * 100),
+            })}
       </span>
       {ratio < 1 && (
         <span className='mp-saving'>

@@ -39,6 +39,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { api } from '@/lib/api'
 import { Route as subscriptionRoute } from '@/routes/subscription'
 import { useAuthStore } from '@/stores/auth-store'
+import { useSystemConfigStore } from '@/stores/system-config-store'
 
 import { SubscriptionsCustom } from '..'
 import rules from '../rules.json'
@@ -170,32 +171,40 @@ function signIn() {
 it('renders footer columns and links common errors to the tutorial', async () => {
   const { router } = await renderDemo()
   const footer = within(screen.getByRole('contentinfo'))
-  expect(footer.getByText('帮助')).toBeVisible()
-  expect(footer.getByText('合作')).toBeVisible()
-  expect(footer.getByText('© 2026 ZYY AI')).toBeVisible()
-  expect(footer.getByRole('link', { name: '常见报错' })).toHaveAttribute(
+  expect(footer.getByText('Help')).toBeVisible()
+  expect(footer.getByText('Partnerships')).toBeVisible()
+  expect(
+    footer.getByText(
+      `© ${new Date().getFullYear()} ${useSystemConfigStore.getState().config.systemName}`
+    )
+  ).toBeVisible()
+  expect(footer.getByRole('link', { name: 'Common errors' })).toHaveAttribute(
     'href',
     '/tutorial'
   )
-  await userEvent.click(footer.getByRole('link', { name: '常见报错' }))
+  await userEvent.click(footer.getByRole('link', { name: 'Common errors' }))
   await waitFor(() => expect(router.state.location.pathname).toBe('/tutorial'))
 })
 it('opens customer support with configured contact details', async () => {
   const user = userEvent.setup()
   await renderDemo()
-  await user.click(screen.getAllByRole('button', { name: '联系客服' })[0])
-  const dialog = screen.getByRole('dialog', { name: '联系客服' })
-  expect(within(dialog).getByText('企业微信（响应最快）')).toBeVisible()
+  await user.click(
+    screen.getAllByRole('button', { name: 'Contact support' })[0]
+  )
+  const dialog = screen.getByRole('dialog', { name: 'Contact support' })
+  expect(within(dialog).getByText('WeCom (fastest response)')).toBeVisible()
   expect(
-    within(dialog).getByRole('button', { name: '复制微信号' })
+    within(dialog).getByRole('button', { name: 'Copy WeCom ID' })
   ).toBeVisible()
   expect(within(dialog).getByText(/ops@example.com/)).toBeVisible()
   const write = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue()
-  await user.click(within(dialog).getByRole('button', { name: '复制微信号' }))
+  await user.click(
+    within(dialog).getByRole('button', { name: 'Copy WeCom ID' })
+  )
   expect(write).toHaveBeenCalledWith('configured-wecom')
-  await user.click(within(dialog).getByRole('button', { name: '复制邮箱' }))
+  await user.click(within(dialog).getByRole('button', { name: 'Copy email' }))
   expect(write).toHaveBeenCalledWith('ops@example.com')
-  await user.click(within(dialog).getByRole('button', { name: '知道了' }))
+  await user.click(within(dialog).getByRole('button', { name: 'Got it' }))
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 })
 it('shows configured offers, exact annual points and all rules', async () => {

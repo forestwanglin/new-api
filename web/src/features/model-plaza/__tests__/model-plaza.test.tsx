@@ -19,9 +19,15 @@ For commercial licensing, please contact support@quantumnous.com
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import i18next from 'i18next'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 import type { PricingData } from '@/features/pricing/types'
+import en from '@/i18n/locales/en.json'
+import fr from '@/i18n/locales/fr.json'
+import ja from '@/i18n/locales/ja.json'
+import ru from '@/i18n/locales/ru.json'
+import viLocale from '@/i18n/locales/vi.json'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 import { useLoginModalStore } from '@/stores/login-modal-store'
@@ -448,12 +454,12 @@ it('keeps the headline lowest discount across all models when the list is filter
   const promotion = await screen.findByRole('status', {
     name: 'Model discount',
   })
-  expect(promotion).toHaveTextContent('Save up to 93%')
+  expect(promotion).toHaveTextContent('93% OFF')
   await userEvent
     .setup()
     .click(screen.getByRole('button', { name: /^Domestic Models/ }))
   expect(screen.queryByText('gpt-api-model')).not.toBeInTheDocument()
-  expect(promotion).toHaveTextContent('Save up to 93%')
+  expect(promotion).toHaveTextContent('93% OFF')
   expect(
     screen.getByText(
       'Overseas reference prices used for discount comparisons are converted at a reference rate of USD 1 = CNY 7. This rate is for display only and does not change billing.'
@@ -496,7 +502,7 @@ it('reacts to the configured reference exchange rate in overseas prices, discoun
   ).toBeVisible()
   expect(
     screen.getByRole('status', { name: 'Model discount' })
-  ).toHaveTextContent('Save up to 90%')
+  ).toHaveTextContent('90% OFF')
   const domestic = within(screen.getByRole('row', { name: /deepseek-chat/ }))
   expect(domestic.getByLabelText('Original price 2')).toBeVisible()
   expect(
@@ -577,3 +583,73 @@ it('names the codex-auto-review vendor OpenAI when the response has no OpenAI ve
   await userEvent.setup().click(vendor)
   expect(screen.getByText('codex-auto-review')).toBeVisible()
 })
+
+it('removes category dots while keeping vendor dots and category selection', async () => {
+  renderPlaza()
+  await screen.findByRole('row', { name: /deepseek-chat/ })
+  for (const name of [/^All Models/, /^Domestic Models/, /^Overseas Models/]) {
+    expect(
+      screen.getByRole('button', { name }).querySelector('.mp-dot')
+    ).toBeNull()
+  }
+  expect(
+    screen.getByRole('button', { name: /DeepSeek/ }).querySelector('.mp-dot')
+  ).not.toBeNull()
+})
+
+it.each(['en', 'fr', 'ru', 'ja', 'vi'])(
+  'shows computed percent OFF and no duplicate headline saving in %s',
+  async (language) => {
+    const resources = { en, fr, ru, ja, vi: viLocale }
+    i18next.addResourceBundle(
+      language,
+      'translation',
+      resources[language as keyof typeof resources].translation
+    )
+    await i18next.changeLanguage(language)
+    vi.mocked(api.get).mockResolvedValue({
+      data: { ...pricing, group_ratio: { default: 0.5 } },
+    })
+    renderPlaza()
+    const promotion = await screen.findByRole('status', {
+      name: i18next.t('Model discount'),
+    })
+    expect(promotion).toHaveTextContent('93% OFF')
+    expect(promotion).not.toHaveTextContent(
+      i18next.t('Save up to {{percent}}%', { percent: 93 })
+    )
+    const row = within(screen.getByRole('row', { name: /deepseek-chat/ }))
+    expect(row.getByText('50% OFF')).toBeVisible()
+    cleanup()
+    i18next.removeResourceBundle(language, 'translation')
+    i18next.addResourceBundle('en', 'translation', {})
+    await i18next.changeLanguage('en')
+  }
+)
+
+it.each(['zhCN', 'zhTW'])(
+  'keeps tenths and the headline saving for %s',
+  async (language) => {
+    i18next.addResourceBundle(language, 'translation', {
+      '{{discount}} tenths of reference price': '{{discount}} 折',
+    })
+    await i18next.changeLanguage(language)
+    vi.mocked(api.get).mockResolvedValue({
+      data: { ...pricing, group_ratio: { default: 0.5 } },
+    })
+    renderPlaza()
+    const promotion = await screen.findByRole('status', {
+      name: 'Model discount',
+    })
+    expect(promotion).toHaveTextContent('0.7 折')
+    expect(promotion).toHaveTextContent('Save up to 93%')
+    expect(
+      within(screen.getByRole('row', { name: /deepseek-chat/ })).getByText(
+        '5 折'
+      )
+    ).toBeVisible()
+    cleanup()
+    await i18next.changeLanguage('en')
+    i18next.removeResourceBundle(language, 'translation')
+  }
+)
