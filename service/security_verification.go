@@ -177,6 +177,10 @@ func BindVerificationOperation(operation VerificationOperation) (VerificationBin
 		}
 		context.Provider = strings.TrimSpace(context.Provider)
 		switch context.Provider {
+		case "phone":
+			if len(fields) != 1 {
+				return VerificationBinding{}, ErrVerificationContextInvalid
+			}
 		case "email":
 			context.Email = model.NormalizeEmail(context.Email)
 			if len(fields) != 2 || common.Validate.Var(context.Email, "required,email") != nil || context.Code != "" {

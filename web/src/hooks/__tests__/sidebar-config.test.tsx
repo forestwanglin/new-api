@@ -135,6 +135,7 @@ describe('security sidebar visibility', () => {
       'Points wallet',
       'My subscription',
       'Profile',
+      'Personal Profile',
       'Security & Access',
     ])
     expect(

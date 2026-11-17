@@ -134,6 +134,11 @@ export function useSidebarData(badges: SidebarBadges = {}): SidebarData {
             icon: User,
           },
           {
+            title: t('Personal Profile'),
+            url: '/personal-profile',
+            icon: User,
+          },
+          {
             title: t('Security & Access'),
             url: '/security',
             icon: ShieldCheck,

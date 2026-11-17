@@ -38,6 +38,7 @@ import type { UserProfile } from '../types'
 type LanguagePreferencesCardProps = {
   profile: UserProfile | null
   onProfileUpdate: () => void
+  variant?: 'demo'
 }
 
 export function LanguagePreferencesCard(props: LanguagePreferencesCardProps) {
@@ -95,6 +96,33 @@ export function LanguagePreferencesCard(props: LanguagePreferencesCardProps) {
     } finally {
       setSaving(false)
     }
+  }
+
+  if (props.variant === 'demo') {
+    return (
+      <div className='pp-field'>
+        <label className='pp-label' id='pp-language-label'>
+          {t('Preferred language')}
+        </label>
+        <div>
+          <Combobox
+            aria-labelledby='pp-language-label'
+            options={INTERFACE_LANGUAGE_OPTIONS.map((language) => ({
+              value: language.code,
+              label: language.label,
+            }))}
+            value={currentLanguage}
+            onValueChange={handleLanguageChange}
+            disabled={saving}
+            className='pp-language-select'
+            placeholder={t('Select language')}
+          />
+          <p className='pp-hint'>
+            {t('Set the language used across the interface')}
+          </p>
+        </div>
+      </div>
+    )
   }
 
   return (

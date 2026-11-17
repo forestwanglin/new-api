@@ -50,6 +50,7 @@ import { Route as AuthenticatedModelsIndexRouteImport } from './routes/_authenti
 import { Route as AuthenticatedModelsSectionRouteImport } from './routes/_authenticated/models/$section'
 import { Route as AuthenticatedMySubscriptionIndexRouteImport } from './routes/_authenticated/my-subscription/index'
 import { Route as AuthenticatedOnboardingIndexRouteImport } from './routes/_authenticated/onboarding/index'
+import { Route as AuthenticatedPersonalProfileIndexRouteImport } from './routes/_authenticated/personal-profile/index'
 import { Route as AuthenticatedPlaygroundIndexRouteImport } from './routes/_authenticated/playground/index'
 import { Route as AuthenticatedPointLedgerIndexRouteImport } from './routes/_authenticated/point-ledger/index'
 import { Route as AuthenticatedPointsWalletIndexRouteImport } from './routes/_authenticated/points-wallet/index'
@@ -299,6 +300,12 @@ const AuthenticatedOnboardingIndexRoute =
     path: '/onboarding/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedPersonalProfileIndexRoute =
+  AuthenticatedPersonalProfileIndexRouteImport.update({
+    id: '/personal-profile/',
+    path: '/personal-profile/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedPlaygroundIndexRoute =
   AuthenticatedPlaygroundIndexRouteImport.update({
     id: '/playground/',
@@ -544,6 +551,7 @@ export interface FileRoutesByFullPath {
   '/models/': typeof AuthenticatedModelsIndexRoute
   '/my-subscription/': typeof AuthenticatedMySubscriptionIndexRoute
   '/onboarding/': typeof AuthenticatedOnboardingIndexRoute
+  '/personal-profile/': typeof AuthenticatedPersonalProfileIndexRoute
   '/playground/': typeof AuthenticatedPlaygroundIndexRoute
   '/point-ledger/': typeof AuthenticatedPointLedgerIndexRoute
   '/points-wallet/': typeof AuthenticatedPointsWalletIndexRoute
@@ -618,6 +626,7 @@ export interface FileRoutesByTo {
   '/models': typeof AuthenticatedModelsIndexRoute
   '/my-subscription': typeof AuthenticatedMySubscriptionIndexRoute
   '/onboarding': typeof AuthenticatedOnboardingIndexRoute
+  '/personal-profile': typeof AuthenticatedPersonalProfileIndexRoute
   '/playground': typeof AuthenticatedPlaygroundIndexRoute
   '/point-ledger': typeof AuthenticatedPointLedgerIndexRoute
   '/points-wallet': typeof AuthenticatedPointsWalletIndexRoute
@@ -696,6 +705,7 @@ export interface FileRoutesById {
   '/_authenticated/models/': typeof AuthenticatedModelsIndexRoute
   '/_authenticated/my-subscription/': typeof AuthenticatedMySubscriptionIndexRoute
   '/_authenticated/onboarding/': typeof AuthenticatedOnboardingIndexRoute
+  '/_authenticated/personal-profile/': typeof AuthenticatedPersonalProfileIndexRoute
   '/_authenticated/playground/': typeof AuthenticatedPlaygroundIndexRoute
   '/_authenticated/point-ledger/': typeof AuthenticatedPointLedgerIndexRoute
   '/_authenticated/points-wallet/': typeof AuthenticatedPointsWalletIndexRoute
@@ -773,6 +783,7 @@ export interface FileRouteTypes {
     | '/models/'
     | '/my-subscription/'
     | '/onboarding/'
+    | '/personal-profile/'
     | '/playground/'
     | '/point-ledger/'
     | '/points-wallet/'
@@ -847,6 +858,7 @@ export interface FileRouteTypes {
     | '/models'
     | '/my-subscription'
     | '/onboarding'
+    | '/personal-profile'
     | '/playground'
     | '/point-ledger'
     | '/points-wallet'
@@ -924,6 +936,7 @@ export interface FileRouteTypes {
     | '/_authenticated/models/'
     | '/_authenticated/my-subscription/'
     | '/_authenticated/onboarding/'
+    | '/_authenticated/personal-profile/'
     | '/_authenticated/playground/'
     | '/_authenticated/point-ledger/'
     | '/_authenticated/points-wallet/'
@@ -1268,6 +1281,13 @@ declare module '@tanstack/react-router' {
       path: '/onboarding'
       fullPath: '/onboarding/'
       preLoaderRoute: typeof AuthenticatedOnboardingIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/personal-profile/': {
+      id: '/_authenticated/personal-profile/'
+      path: '/personal-profile'
+      fullPath: '/personal-profile/'
+      preLoaderRoute: typeof AuthenticatedPersonalProfileIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/playground/': {
@@ -1617,6 +1637,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedModelsIndexRoute: typeof AuthenticatedModelsIndexRoute
   AuthenticatedMySubscriptionIndexRoute: typeof AuthenticatedMySubscriptionIndexRoute
   AuthenticatedOnboardingIndexRoute: typeof AuthenticatedOnboardingIndexRoute
+  AuthenticatedPersonalProfileIndexRoute: typeof AuthenticatedPersonalProfileIndexRoute
   AuthenticatedPlaygroundIndexRoute: typeof AuthenticatedPlaygroundIndexRoute
   AuthenticatedPointLedgerIndexRoute: typeof AuthenticatedPointLedgerIndexRoute
   AuthenticatedPointsWalletIndexRoute: typeof AuthenticatedPointsWalletIndexRoute
@@ -1653,6 +1674,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedModelsIndexRoute: AuthenticatedModelsIndexRoute,
   AuthenticatedMySubscriptionIndexRoute: AuthenticatedMySubscriptionIndexRoute,
   AuthenticatedOnboardingIndexRoute: AuthenticatedOnboardingIndexRoute,
+  AuthenticatedPersonalProfileIndexRoute:
+    AuthenticatedPersonalProfileIndexRoute,
   AuthenticatedPlaygroundIndexRoute: AuthenticatedPlaygroundIndexRoute,
   AuthenticatedPointLedgerIndexRoute: AuthenticatedPointLedgerIndexRoute,
   AuthenticatedPointsWalletIndexRoute: AuthenticatedPointsWalletIndexRoute,

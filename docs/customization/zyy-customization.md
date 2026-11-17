@@ -1102,6 +1102,16 @@
 - 概览同类修复：概览内容容器同样增加 `p-px`，为首张邀请卡片的外侧边框保留 1px 空间；不改模块、统计及折叠逻辑。按用户明确要求未运行测试，仅检查本次 diff。
 - 风险与未覆盖：未执行已登录控制台真实浏览器验收；认证、令牌创建流程及后端奖励规则沿用现有实现。
 
+### Z073 独立 Demo 个人资料与手机号更换
+
+- 需求与原因：新增独立个人资料入口，按 Demo 还原基本资料和更换手机号交互；旧 `/profile`、`/security` 菜单和页面保留。
+- 变更内容：新增 `/personal-profile` 页，提供昵称保存、脱敏手机号、偏好语言和不可自定义的头像按钮（tooltip「暂不可用」）；新页不展示邮箱及发票抬头。新增登录态 `/api/user/phone/change/{status,send,verify,complete}`，先验证原号码再验证新号码，未绑定及已启用强因子时接入原安全证明，完成后旋转本机会话并注销其他设备。
+- 影响面：新增 `controller/phone_change.go`、`service/phone_change.go` 及定向测试、`router/phone_change_routes_test.go`、`web/src/features/personal-profile/`、独立路由和 scoped CSS。**上游自有文件**：`router/api-router.go`、`middleware/access_token_routes.go`、`service/security_verification.go`、`web/src/features/profile/components/language-preferences-card.tsx`、`web/src/hooks/use-sidebar-data.ts`、侧栏测试、`web/src/routeTree.gen.ts` 和七种 locale，均为窄扩展。
+- 与上游差异：独立新增 Demo 页面，不替换原有个人资料；新增 session/purpose 绑定的手机更换凭证，复用现有身份声明表、AuthFlow、短信限流与用户会话机制。
+- 开关与默认值：无新增生产依赖或数据库字段；沿用现有阿里云短信配置。仅支持中国大陆 11 位手机号，验证码 5 分钟有效、最多 5 次尝试；凭证不写入浏览器存储；请求不自动重放。
+- 验证：`bun check -b` 通过；个人资料、侧栏和原语言偏好 4 文件/55 用例通过，定向 lint/格式、生产构建、手机号路由 session-only 检查及 `git diff --check` 通过；controller/service PhoneChange 定向测试通过。真实 SQLite、MySQL 8.4.13、PostgreSQL 16.16 的 service PhoneChange 测试连续两次通过，覆盖占用回滚和并发唯一消费；开发后端 `make dev-api-rebuild` 成功。浏览器确认旧入口保留、头像键盘 tooltip、390px 响应式布局；Demo 对照为源码核对。
+- 风险与未覆盖：未发送真实短信；重建开发后端后需要重新登录，未完成登录态页面端到端更换。完整路由 catalog 检查仍有原有六条声明缺失，本次四条手机号路由已声明并独立验证。可执行契约见 `.trellis/spec/new-api/backend/personal-profile.md`。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 以下文件在 `main` 中已存在，fork 对其做了修改。升级 `upstream/main` 时优先复核这些位置，
@@ -1110,6 +1120,7 @@
 
 | 区域 | 文件 | 关联条目 |
 |---|---|---|
+| 独立个人资料与手机号更换 | `router/api-router.go`、`middleware/access_token_routes.go`、`service/security_verification.go`、语言偏好组件、侧栏数据与测试、生成路由和七种 locale | Z073 |
 | 新手引导功能复制 | sidebar data/config、个人/管理员菜单配置、邀请卡片、接入卡片、推荐操作、路由生成文件及七种 locale | Z072 |
 | 使用日志费用可见性 | `web/src/features/usage-logs/components/columns/common-logs-columns.tsx` | Z064 |
 | 微信绑定二次验证 | `controller/wechat.go`、安全证明 service、`router/api-router.go`、`middleware/access_token_routes.go`、认证入口、微信绑定对话框与七种 locale | Z063 |
