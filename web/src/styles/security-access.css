@@ -189,6 +189,7 @@
   margin-top: 6px;
 }
 .security-access-page .sa-devices {
+  overflow: visible;
   border: 0;
   padding: 0;
   gap: 16px;
@@ -238,6 +239,7 @@
   outline-offset: 3px;
 }
 .security-access-page .sa-tokens > [data-slot='card'] {
+  overflow: visible;
   box-shadow: none;
   border: 0;
   padding: 0;
