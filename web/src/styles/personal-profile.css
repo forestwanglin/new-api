@@ -224,7 +224,7 @@
   flex-direction: row;
   justify-content: flex-end;
   gap: 9px;
-  margin-top: 22px;
+  margin: 22px 0 0;
   padding: 0;
   background: transparent;
   border: 0;

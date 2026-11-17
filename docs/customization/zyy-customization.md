@@ -1111,6 +1111,8 @@
 
 ### Z073 独立 Demo 个人资料与手机号更换
 
+- 布局修复：手机号弹窗 footer 使用局部 `margin: 22px 0 0` 覆盖公共 DialogFooter 的横向及底部负 margin，让取消/确认按钮保持在弹窗内容边界内、右对齐；不影响其他弹窗。Chrome 实页确认修复前贴边、修复后恢复右侧和底部留白；手机号弹窗 6 项测试、CSS 格式及 diff 检查通过。
+
 - 需求与原因：新增独立个人资料入口，按 Demo 还原基本资料和更换手机号交互；旧 `/profile`、`/security` 菜单和页面保留。
 - 变更内容：新增 `/personal-profile` 页，提供昵称保存、脱敏手机号、偏好语言和不可自定义的头像按钮（tooltip「暂不可用」）；新页不展示邮箱及发票抬头。新增登录态 `/api/user/phone/change/{status,send,verify,complete}`，先验证原号码再验证新号码，未绑定及已启用强因子时接入原安全证明，完成后旋转本机会话并注销其他设备。
 - 影响面：新增 `controller/phone_change.go`、`service/phone_change.go` 及定向测试、`router/phone_change_routes_test.go`、`web/src/features/personal-profile/`、独立路由和 scoped CSS。**上游自有文件**：`router/api-router.go`、`middleware/access_token_routes.go`、`service/security_verification.go`、`web/src/features/profile/components/language-preferences-card.tsx`、`web/src/hooks/use-sidebar-data.ts`、侧栏测试、`web/src/routeTree.gen.ts` 和七种 locale，均为窄扩展。
