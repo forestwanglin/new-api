@@ -191,7 +191,7 @@ export function OverviewDashboard() {
         </Button>
       </SectionPageLayout.Actions>
       <SectionPageLayout.Content>
-        <div className='flex flex-col gap-4'>
+        <div className='flex flex-col gap-4 p-px'>
           <ReferralPanel />
           <div id={setupGuideId} hidden={!setupGuideExpanded}>
             {setupGuideExpanded && (
