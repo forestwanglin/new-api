@@ -26,6 +26,7 @@ import { IconBadge } from '@/components/ui/icon-badge'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatQuota } from '@/lib/format'
+import { cn } from '@/lib/utils'
 
 import type { UserWalletData } from '../types'
 
@@ -35,6 +36,7 @@ interface AffiliateRewardsCardProps {
   onTransfer: () => void
   complianceConfirmed?: boolean
   loading?: boolean
+  showStatistics?: boolean
 }
 
 export function AffiliateRewardsCard({
@@ -43,17 +45,25 @@ export function AffiliateRewardsCard({
   onTransfer,
   complianceConfirmed = true,
   loading,
+  showStatistics = true,
 }: AffiliateRewardsCardProps) {
   const { t } = useTranslation()
   if (loading) {
     return (
       <Card data-card-hover='false' className='bg-muted/20 py-0'>
-        <CardContent className='grid gap-4 p-3 sm:p-4 lg:grid-cols-[minmax(220px,1fr)_minmax(220px,0.72fr)_minmax(320px,1.15fr)] lg:items-center'>
+        <CardContent
+          className={cn(
+            'grid gap-4 p-3 sm:p-4 lg:items-center',
+            showStatistics
+              ? 'lg:grid-cols-[minmax(220px,1fr)_minmax(220px,0.72fr)_minmax(320px,1.15fr)]'
+              : 'lg:grid-cols-2'
+          )}
+        >
           <div>
             <Skeleton className='h-5 w-32' />
             <Skeleton className='mt-2 h-4 w-48' />
           </div>
-          <Skeleton className='h-14 rounded-lg' />
+          {showStatistics && <Skeleton className='h-14 rounded-lg' />}
           <Skeleton className='h-10 rounded-lg' />
         </CardContent>
       </Card>
@@ -64,7 +74,14 @@ export function AffiliateRewardsCard({
 
   return (
     <Card data-card-hover='false' className='bg-muted/20 py-0'>
-      <CardContent className='grid gap-3 p-3 sm:gap-4 sm:p-4 lg:grid-cols-[minmax(200px,1fr)_minmax(180px,0.65fr)_minmax(280px,1fr)] lg:items-center'>
+      <CardContent
+        className={cn(
+          'grid gap-3 p-3 sm:gap-4 sm:p-4 lg:items-center',
+          showStatistics
+            ? 'lg:grid-cols-[minmax(200px,1fr)_minmax(180px,0.65fr)_minmax(280px,1fr)]'
+            : 'lg:grid-cols-2'
+        )}
+      >
         <div className='flex min-w-0 items-center gap-2.5'>
           <IconBadge tone='chart-3'>
             <Share2 />
@@ -81,22 +98,24 @@ export function AffiliateRewardsCard({
           </div>
         </div>
 
-        <div className='grid grid-cols-3 gap-1.5 text-center'>
-          {[
-            [t('Pending'), formatQuota(user?.aff_quota ?? 0)],
-            [t('Total Earned'), formatQuota(user?.aff_history_quota ?? 0)],
-            [t('Invites'), String(user?.aff_count ?? 0)],
-          ].map(([label, value]) => (
-            <div key={label}>
-              <div className='text-muted-foreground truncate text-[10px] font-medium tracking-wider uppercase'>
-                {label}
+        {showStatistics && (
+          <div className='grid grid-cols-3 gap-1.5 text-center'>
+            {[
+              [t('Pending'), formatQuota(user?.aff_quota ?? 0)],
+              [t('Total Earned'), formatQuota(user?.aff_history_quota ?? 0)],
+              [t('Invites'), String(user?.aff_count ?? 0)],
+            ].map(([label, value]) => (
+              <div key={label}>
+                <div className='text-muted-foreground truncate text-[10px] font-medium tracking-wider uppercase'>
+                  {label}
+                </div>
+                <div className='mt-0.5 truncate text-sm font-semibold tabular-nums'>
+                  {value}
+                </div>
               </div>
-              <div className='mt-0.5 truncate text-sm font-semibold tabular-nums'>
-                {value}
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
         <div className='flex items-center gap-2'>
           <Input
@@ -124,7 +143,12 @@ export function AffiliateRewardsCard({
           )}
         </div>
         {!complianceConfirmed ? (
-          <p className='text-muted-foreground text-xs lg:col-span-3'>
+          <p
+            className={cn(
+              'text-muted-foreground text-xs',
+              showStatistics ? 'lg:col-span-3' : 'lg:col-span-2'
+            )}
+          >
             {t(
               'Referral reward transfer is disabled until the administrator confirms compliance terms.'
             )}

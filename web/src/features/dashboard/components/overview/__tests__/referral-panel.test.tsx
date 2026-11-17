@@ -17,7 +17,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createInstance } from 'i18next'
 import { I18nextProvider, initReactI18next } from 'react-i18next'
@@ -118,26 +124,37 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-function renderPanel() {
+function renderPanel(showStatistics?: boolean) {
   return render(
     <QueryClientProvider client={client}>
       <I18nextProvider i18n={i18n}>
-        <ReferralPanel />
+        <ReferralPanel showStatistics={showStatistics} />
       </I18nextProvider>
     </QueryClientProvider>
   )
 }
 
-it('renders the localized invite heading with the invite link and invite count', async () => {
-  renderPanel()
-
+it('keeps the invite link and copy action without the three reward statistics', async () => {
+  const user = userEvent.setup()
+  const writeText = vi
+    .spyOn(navigator.clipboard, 'writeText')
+    .mockResolvedValue()
+  renderPanel(false)
   expect(
     await screen.findByRole('heading', { name: '邀请好友注册' })
   ).toBeVisible()
   expect(screen.getByDisplayValue(/\?aff=zyycode$/)).toBeVisible()
-  const invitesCell = screen.getByText('邀请').parentElement
-  if (!invitesCell) throw new Error('Invite counter cell is missing')
-  expect(within(invitesCell).getByText('2')).toBeVisible()
+  expect(screen.queryByText('待确认')).not.toBeInTheDocument()
+  expect(screen.queryByText('总收入')).not.toBeInTheDocument()
+  expect(screen.queryByText('邀请')).not.toBeInTheDocument()
+  await user.click(
+    screen.getByRole('button', { name: i18n.t('Copy referral link') })
+  )
+  await waitFor(() =>
+    expect(writeText).toHaveBeenCalledWith(
+      expect.stringMatching(/\?aff=zyycode$/)
+    )
+  )
 })
 
 it('offers the transfer action only once rewards are pending', async () => {
@@ -180,4 +197,14 @@ it('transfers the pending rewards and syncs the refreshed balance', async () => 
   await waitFor(() =>
     expect(screen.queryByText('转移奖励')).not.toBeInTheDocument()
   )
+})
+
+it('keeps the three statistics when rendered with overview defaults', async () => {
+  renderPanel()
+  await screen.findByRole('heading', { name: '邀请好友注册' })
+  expect(screen.getByText('待确认')).toBeVisible()
+  expect(screen.getByText('总收入')).toBeVisible()
+  const invitesCell = screen.getByText('邀请').parentElement
+  if (!invitesCell) throw new Error('Invite counter cell is missing')
+  expect(within(invitesCell).getByText('2')).toBeVisible()
 })

@@ -81,7 +81,9 @@ function EmptyKeyState(props: { onCreate: () => void }) {
  * Overview onboarding card: endpoint, API key, group models and copyable code
  * samples in one place. Replaces the previous setup guide.
  */
-export function AccessGuideCard(props: { onHide: () => void }) {
+export function AccessGuideCard(
+  props: { onHide?: () => void; title?: string } = {}
+) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const { items: apiInfoItems } = useApiInfo()
@@ -283,19 +285,21 @@ export function AccessGuideCard(props: { onHide: () => void }) {
                 <Rocket />
               </IconBadge>
               <h3 className='truncate text-sm font-semibold'>
-                {t('Build your first app')}
+                {props.title ?? t('Build your first app')}
               </h3>
             </div>
-            <Button
-              type='button'
-              variant='ghost'
-              size='sm'
-              className='h-7 shrink-0 gap-1.5 px-2 text-xs'
-              onClick={props.onHide}
-            >
-              <ChevronUp className='size-3.5' aria-hidden='true' />
-              {t('Hide setup guide')}
-            </Button>
+            {props.onHide && (
+              <Button
+                type='button'
+                variant='ghost'
+                size='sm'
+                className='h-7 shrink-0 gap-1.5 px-2 text-xs'
+                onClick={props.onHide}
+              >
+                <ChevronUp className='size-3.5' aria-hidden='true' />
+                {t('Hide setup guide')}
+              </Button>
+            )}
           </div>
           <p className='text-muted-foreground text-xs leading-relaxed'>
             {t(

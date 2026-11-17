@@ -1,5 +1,7 @@
 {
   "translation": {
+    "Getting started": "Premiers pas",
+    "Connect your app": "Connecter votre application",
     "Adjust Points": "Ajuster les points",
     "Failed to adjust points": "Échec de l’ajustement des points",
     "Points adjusted successfully": "Points ajustés avec succès",

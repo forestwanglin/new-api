@@ -1,5 +1,7 @@
 {
   "translation": {
+    "Getting started": "はじめに",
+    "Connect your app": "アプリを接続",
     "Adjust Points": "ポイントを調整",
     "Failed to adjust points": "ポイントの調整に失敗しました",
     "Points adjusted successfully": "ポイントを調整しました",

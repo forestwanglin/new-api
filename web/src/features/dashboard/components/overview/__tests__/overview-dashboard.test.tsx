@@ -208,3 +208,30 @@ describe('overview dashboard layout', () => {
     ).toBeTruthy()
   })
 })
+
+test('keeps overview statistics and its persisted collapsed guide preference', async () => {
+  window.localStorage.setItem(
+    'dashboard_overview_setup_guide_expanded',
+    'collapsed'
+  )
+  await renderOverview()
+  expect(
+    await screen.findByRole('heading', { name: 'Referral Program' })
+  ).toBeVisible()
+  expect(screen.getByText('Pending')).toBeVisible()
+  expect(screen.getByText('Total Earned')).toBeVisible()
+  expect(screen.getByText('Invites')).toBeVisible()
+  expect(screen.getByRole('button', { name: 'Setup guide' })).toHaveAttribute(
+    'aria-expanded',
+    'false'
+  )
+  expect(screen.queryByText('Build your first app')).not.toBeInTheDocument()
+  expect(screen.queryByText('Recommended actions')).not.toBeInTheDocument()
+  const user = userEvent.setup()
+  await user.click(screen.getByRole('button', { name: 'Setup guide' }))
+  expect(await screen.findByText('Build your first app')).toBeVisible()
+  expect(screen.getByText('Recommended actions')).toBeVisible()
+  expect(
+    window.localStorage.getItem('dashboard_overview_setup_guide_expanded')
+  ).toBe('expanded')
+})

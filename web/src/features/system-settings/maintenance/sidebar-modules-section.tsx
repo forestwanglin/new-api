@@ -98,6 +98,10 @@ export function SidebarModulesSection({
       },
     },
     console: {
+      onboarding: {
+        title: t('Getting started'),
+        description: t('Connect your app'),
+      },
       detail: {
         title: t('Dashboard'),
         description: t('Aggregated usage metrics and trend charts.'),

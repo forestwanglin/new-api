@@ -1,5 +1,7 @@
 {
   "translation": {
+    "Getting started": "新手引导",
+    "Connect your app": "接入应用",
     "Adjust Points": "调整积分",
     "Failed to adjust points": "调整积分失败",
     "Points adjusted successfully": "积分调整成功",

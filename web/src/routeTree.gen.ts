@@ -49,6 +49,7 @@ import { Route as AuthenticatedKeysIndexRouteImport } from './routes/_authentica
 import { Route as AuthenticatedModelsIndexRouteImport } from './routes/_authenticated/models/index'
 import { Route as AuthenticatedModelsSectionRouteImport } from './routes/_authenticated/models/$section'
 import { Route as AuthenticatedMySubscriptionIndexRouteImport } from './routes/_authenticated/my-subscription/index'
+import { Route as AuthenticatedOnboardingIndexRouteImport } from './routes/_authenticated/onboarding/index'
 import { Route as AuthenticatedPlaygroundIndexRouteImport } from './routes/_authenticated/playground/index'
 import { Route as AuthenticatedPointLedgerIndexRouteImport } from './routes/_authenticated/point-ledger/index'
 import { Route as AuthenticatedPointsWalletIndexRouteImport } from './routes/_authenticated/points-wallet/index'
@@ -290,6 +291,12 @@ const AuthenticatedMySubscriptionIndexRoute =
   AuthenticatedMySubscriptionIndexRouteImport.update({
     id: '/my-subscription/',
     path: '/my-subscription/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedOnboardingIndexRoute =
+  AuthenticatedOnboardingIndexRouteImport.update({
+    id: '/onboarding/',
+    path: '/onboarding/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedPlaygroundIndexRoute =
@@ -536,6 +543,7 @@ export interface FileRoutesByFullPath {
   '/keys/': typeof AuthenticatedKeysIndexRoute
   '/models/': typeof AuthenticatedModelsIndexRoute
   '/my-subscription/': typeof AuthenticatedMySubscriptionIndexRoute
+  '/onboarding/': typeof AuthenticatedOnboardingIndexRoute
   '/playground/': typeof AuthenticatedPlaygroundIndexRoute
   '/point-ledger/': typeof AuthenticatedPointLedgerIndexRoute
   '/points-wallet/': typeof AuthenticatedPointsWalletIndexRoute
@@ -609,6 +617,7 @@ export interface FileRoutesByTo {
   '/keys': typeof AuthenticatedKeysIndexRoute
   '/models': typeof AuthenticatedModelsIndexRoute
   '/my-subscription': typeof AuthenticatedMySubscriptionIndexRoute
+  '/onboarding': typeof AuthenticatedOnboardingIndexRoute
   '/playground': typeof AuthenticatedPlaygroundIndexRoute
   '/point-ledger': typeof AuthenticatedPointLedgerIndexRoute
   '/points-wallet': typeof AuthenticatedPointsWalletIndexRoute
@@ -686,6 +695,7 @@ export interface FileRoutesById {
   '/_authenticated/keys/': typeof AuthenticatedKeysIndexRoute
   '/_authenticated/models/': typeof AuthenticatedModelsIndexRoute
   '/_authenticated/my-subscription/': typeof AuthenticatedMySubscriptionIndexRoute
+  '/_authenticated/onboarding/': typeof AuthenticatedOnboardingIndexRoute
   '/_authenticated/playground/': typeof AuthenticatedPlaygroundIndexRoute
   '/_authenticated/point-ledger/': typeof AuthenticatedPointLedgerIndexRoute
   '/_authenticated/points-wallet/': typeof AuthenticatedPointsWalletIndexRoute
@@ -762,6 +772,7 @@ export interface FileRouteTypes {
     | '/keys/'
     | '/models/'
     | '/my-subscription/'
+    | '/onboarding/'
     | '/playground/'
     | '/point-ledger/'
     | '/points-wallet/'
@@ -835,6 +846,7 @@ export interface FileRouteTypes {
     | '/keys'
     | '/models'
     | '/my-subscription'
+    | '/onboarding'
     | '/playground'
     | '/point-ledger'
     | '/points-wallet'
@@ -911,6 +923,7 @@ export interface FileRouteTypes {
     | '/_authenticated/keys/'
     | '/_authenticated/models/'
     | '/_authenticated/my-subscription/'
+    | '/_authenticated/onboarding/'
     | '/_authenticated/playground/'
     | '/_authenticated/point-ledger/'
     | '/_authenticated/points-wallet/'
@@ -1248,6 +1261,13 @@ declare module '@tanstack/react-router' {
       path: '/my-subscription'
       fullPath: '/my-subscription/'
       preLoaderRoute: typeof AuthenticatedMySubscriptionIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/onboarding/': {
+      id: '/_authenticated/onboarding/'
+      path: '/onboarding'
+      fullPath: '/onboarding/'
+      preLoaderRoute: typeof AuthenticatedOnboardingIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/playground/': {
@@ -1596,6 +1616,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedKeysIndexRoute: typeof AuthenticatedKeysIndexRoute
   AuthenticatedModelsIndexRoute: typeof AuthenticatedModelsIndexRoute
   AuthenticatedMySubscriptionIndexRoute: typeof AuthenticatedMySubscriptionIndexRoute
+  AuthenticatedOnboardingIndexRoute: typeof AuthenticatedOnboardingIndexRoute
   AuthenticatedPlaygroundIndexRoute: typeof AuthenticatedPlaygroundIndexRoute
   AuthenticatedPointLedgerIndexRoute: typeof AuthenticatedPointLedgerIndexRoute
   AuthenticatedPointsWalletIndexRoute: typeof AuthenticatedPointsWalletIndexRoute
@@ -1631,6 +1652,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedKeysIndexRoute: AuthenticatedKeysIndexRoute,
   AuthenticatedModelsIndexRoute: AuthenticatedModelsIndexRoute,
   AuthenticatedMySubscriptionIndexRoute: AuthenticatedMySubscriptionIndexRoute,
+  AuthenticatedOnboardingIndexRoute: AuthenticatedOnboardingIndexRoute,
   AuthenticatedPlaygroundIndexRoute: AuthenticatedPlaygroundIndexRoute,
   AuthenticatedPointLedgerIndexRoute: AuthenticatedPointLedgerIndexRoute,
   AuthenticatedPointsWalletIndexRoute: AuthenticatedPointsWalletIndexRoute,

@@ -94,6 +94,33 @@ function sidebarFor(admin?: object, user?: object, canConfigure = true) {
   return result
 }
 
+describe('onboarding sidebar placement', () => {
+  it('shows onboarding first in General for existing console configurations', () => {
+    const { result } = sidebarFor({ console: { enabled: true, detail: true } })
+    const items = result.current.find((group) => group.id === 'general')?.items
+    expect(items?.slice(0, 2).map((item) => item.title)).toEqual([
+      'Getting started',
+      'Overview',
+    ])
+    expect(items?.[0]).toMatchObject({ url: '/onboarding' })
+  })
+  it.each([
+    [{ console: { enabled: false } }, undefined],
+    [{ console: { enabled: true, onboarding: false } }, undefined],
+    [undefined, { console: { enabled: true, onboarding: false } }],
+  ])(
+    'hides onboarding when the console or module is disabled (%j, %j)',
+    (admin, user) => {
+      const { result } = sidebarFor(admin, user)
+      expect(
+        result.current
+          .flatMap((group) => group.items)
+          .some((item) => item.title === 'Getting started')
+      ).toBe(false)
+    }
+  )
+})
+
 describe('security sidebar visibility', () => {
   it('old configurations show Security & Access immediately after Profile and keep API Keys', () => {
     const { result } = sidebarFor(

@@ -83,6 +83,11 @@ export function SidebarModulesCard() {
       description: t('Data management and log viewing'),
       modules: [
         {
+          key: 'onboarding',
+          title: t('Getting started'),
+          description: t('Connect your app'),
+        },
+        {
           key: 'detail',
           title: t('Dashboard'),
           description: t('System data statistics'),

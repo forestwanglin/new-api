@@ -83,7 +83,7 @@ function syncBalanceToAuthStore(latest: UserWalletData | null): void {
   })
 }
 
-export function ReferralPanel() {
+export function ReferralPanel(props: { showStatistics?: boolean } = {}) {
   const [transferDialogOpen, setTransferDialogOpen] = useState(false)
   const {
     affiliateLink,
@@ -106,6 +106,7 @@ export function ReferralPanel() {
   return (
     <>
       <AffiliateRewardsCard
+        showStatistics={props.showStatistics}
         user={selfQuery.data ?? null}
         affiliateLink={affiliateLink}
         onTransfer={() => setTransferDialogOpen(true)}

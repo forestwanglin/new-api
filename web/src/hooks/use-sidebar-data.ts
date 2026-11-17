@@ -30,6 +30,7 @@ import {
   MessageSquare,
   PlugZap,
   Radio,
+  Rocket,
   ServerCog,
   Settings,
   ShieldCheck,
@@ -73,6 +74,11 @@ export function useSidebarData(badges: SidebarBadges = {}): SidebarData {
         id: 'general',
         title: t('General'),
         items: [
+          {
+            title: t('Getting started'),
+            url: '/onboarding',
+            icon: Rocket,
+          },
           {
             title: t('Overview'),
             url: '/dashboard/overview',
