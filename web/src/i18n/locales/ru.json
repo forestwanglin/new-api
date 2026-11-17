@@ -303,7 +303,7 @@
     "+{{count}} more": "ещё {{count}}",
     "| Based on": "| На основе",
     "0 means data is kept permanently": "0 означает, что данные хранятся постоянно",
-    "0 means unlimited": "0 означает без ограничений",
+    "0 means unlimited": "0 — без ограничений",
     "1 Day": "1 день",
     "1 day ago": "1 день назад",
     "1 hour": "1 час",
@@ -8078,6 +8078,17 @@
     "Current available and frozen balances come from your points accounts.": "Доступные и замороженные остатки взяты с ваших счетов баллов.",
     "Pending invitation rewards are excluded from available points until release.": "Ожидающие награды за приглашения не входят в доступные баллы до разблокировки.",
     "Processing and frozen invitation rewards become available only after release.": "Обрабатываемые и замороженные награды становятся доступны только после разблокировки.",
-    "Invitation rewards": "Награды за приглашения"
+    "Invitation rewards": "Награды за приглашения",
+    "Point Limit": "Лимит баллов",
+    "Point limit": "Лимит баллов",
+    "Used points": "Использовано баллов",
+    "Remaining points": "Осталось баллов",
+    "Limit this API key by consumed points": "Ограничить этот API-ключ по расходу баллов",
+    "0 means unlimited. 1 RMB equals 1,000 points.": "0 — без ограничений. 1 юань равен 1 000 баллам.",
+    "Point limit must be a non-negative int64 integer string": "Лимит баллов должен быть целым неотрицательным числом",
+    "Enter a point limit to convert this key from its legacy money limit. The money limit will become unlimited.": "Введите лимит баллов для этого ключа. Прежний денежный лимит станет неограниченным.",
+    "Not set (legacy money limit retained)": "Не задан (прежний денежный лимит сохранён)",
+    "Set a point limit when editing this key to replace its legacy money limit.": "При редактировании задайте лимит баллов для замены прежнего денежного лимита.",
+    "Point usage is cumulative; editing the limit does not reset used points.": "Расход баллов накапливается; изменение лимита не сбрасывает использованные баллы."
   }
 }

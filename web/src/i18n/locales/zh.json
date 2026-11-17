@@ -303,7 +303,7 @@
     "+{{count}} more": "还有 {{count}} 项",
     "| Based on": "| 基于",
     "0 means data is kept permanently": "0 表示永久保留数据",
-    "0 means unlimited": "0 表示不限",
+    "0 means unlimited": "0 表示不限制",
     "1 Day": "1 天",
     "1 day ago": "1 天前",
     "1 hour": "1 小时",
@@ -8077,6 +8077,17 @@
     "Current available and frozen balances come from your points accounts.": "可用及冻结余额来自您的积分账户。",
     "Pending invitation rewards are excluded from available points until release.": "待发放邀请奖励在释放前不计入可用积分。",
     "Processing and frozen invitation rewards become available only after release.": "处理中的邀请奖励及冻结奖励，只有释放后才可使用。",
-    "Invitation rewards": "邀请奖励"
+    "Invitation rewards": "邀请奖励",
+    "Point Limit": "积分额度",
+    "Point limit": "积分额度",
+    "Used points": "已用积分",
+    "Remaining points": "剩余积分",
+    "Limit this API key by consumed points": "根据消耗的积分限制此 API Key",
+    "0 means unlimited. 1 RMB equals 1,000 points.": "0 表示不限制。1 元人民币等于 1,000 积分。",
+    "Point limit must be a non-negative int64 integer string": "积分额度必须为非负整数",
+    "Enter a point limit to convert this key from its legacy money limit. The money limit will become unlimited.": "请输入积分额度，将此 Key 从原金额限制转换为积分限制。金额限制将改为不限制。",
+    "Not set (legacy money limit retained)": "未设置（保留原金额限制）",
+    "Set a point limit when editing this key to replace its legacy money limit.": "编辑此 Key 时设置积分额度，以替换原金额限制。",
+    "Point usage is cumulative; editing the limit does not reset used points.": "积分用量累计计算；编辑额度不会重置已用积分。"
   }
 }

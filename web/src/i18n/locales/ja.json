@@ -303,7 +303,7 @@
     "+{{count}} more": "他 {{count}} 件",
     "| Based on": "| に基づく",
     "0 means data is kept permanently": "0 はデータを永続的に保持することを意味します",
-    "0 means unlimited": "0は無制限を意味します",
+    "0 means unlimited": "0 は無制限",
     "1 Day": "1日",
     "1 day ago": "1日前",
     "1 hour": "1 時間",
@@ -8076,6 +8076,17 @@
     "Current available and frozen balances come from your points accounts.": "利用可能残高と凍結残高はポイント口座に基づきます。",
     "Pending invitation rewards are excluded from available points until release.": "保留中の招待報酬は、解除されるまで利用可能ポイントに含まれません。",
     "Processing and frozen invitation rewards become available only after release.": "処理中および凍結中の招待報酬は、解除後にのみ利用できます。",
-    "Invitation rewards": "招待報酬"
+    "Invitation rewards": "招待報酬",
+    "Point Limit": "ポイント上限",
+    "Point limit": "ポイント上限",
+    "Used points": "使用済みポイント",
+    "Remaining points": "残りポイント",
+    "Limit this API key by consumed points": "消費ポイントでこの API キーを制限",
+    "0 means unlimited. 1 RMB equals 1,000 points.": "0 は無制限。1 人民元は 1,000 ポイントです。",
+    "Point limit must be a non-negative int64 integer string": "ポイント上限は 0 以上の整数にしてください",
+    "Enter a point limit to convert this key from its legacy money limit. The money limit will become unlimited.": "ポイント上限を入力すると、このキーの従来の金額制限がポイント制限に変わります。金額制限は無制限になります。",
+    "Not set (legacy money limit retained)": "未設定（従来の金額制限を維持）",
+    "Set a point limit when editing this key to replace its legacy money limit.": "このキーの編集時にポイント上限を設定すると、従来の金額制限が置き換わります。",
+    "Point usage is cumulative; editing the limit does not reset used points.": "使用ポイントは累積されます。上限を編集しても使用済みポイントはリセットされません。"
   }
 }

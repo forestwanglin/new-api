@@ -11,18 +11,24 @@ import (
 func TestTokenAutoGroupsRoundTripThroughRedisHashCache(t *testing.T) {
 	useUserCacheMiniRedis(t)
 	token := Token{
-		Id:         42,
-		UserId:     7,
-		Key:        "token-auto-groups-cache-key",
-		Name:       "auto-cache",
-		Group:      "auto",
-		AutoGroups: `["vip","default"]`,
+		Id:                42,
+		UserId:            7,
+		Key:               "token-auto-groups-cache-key",
+		Name:              "auto-cache",
+		Group:             "auto",
+		AutoGroups:        `["vip","default"]`,
+		PointLimitEnabled: true, PointLimit: 9223372036854775807, ReservedPoints: 7,
 	}
 
 	require.NoError(t, cacheSetTokenForTest(token))
 	cached, err := cacheGetTokenByKey(token.Key)
 	require.NoError(t, err)
 	assert.Equal(t, token.AutoGroups, cached.AutoGroups)
+	assert.True(t, cached.PointLimitEnabled)
+	assert.Equal(t, token.PointLimit, cached.PointLimit)
+	require.NoError(t, common.RDB.HSet(t.Context(), getTokenCacheKey(token.Key), "PointLimit", "0").Err())
+	_, err = cacheGetTokenByKey(token.Key)
+	require.Error(t, err, "point metadata tampering invalidates the cache")
 	groups, err := cached.GetAutoGroups()
 	require.NoError(t, err)
 	assert.Equal(t, []string{"vip", "default"}, groups)

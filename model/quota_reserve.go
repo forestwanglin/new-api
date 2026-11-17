@@ -223,8 +223,12 @@ func adjustLockedTokenQuotaTx(tx *gorm.DB, token *Token, delta int) error {
 		(delta < 0 && (token.RemainQuota < math.MinInt-delta || token.UsedQuota > math.MaxInt+delta)) {
 		return errors.New("token quota overflow")
 	}
+	remaining := token.RemainQuota + delta
+	if token.PointLimitEnabled {
+		remaining = 0
+	}
 	result := tx.Model(&Token{}).Where("id = ?", token.Id).Updates(map[string]any{
-		"remain_quota":  token.RemainQuota + delta,
+		"remain_quota":  remaining,
 		"used_quota":    token.UsedQuota - delta,
 		"accessed_time": common.GetTimestamp(),
 	})

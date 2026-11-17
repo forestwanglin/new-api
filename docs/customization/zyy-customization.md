@@ -1179,6 +1179,16 @@
 - 验证：受影响 14 文件/150 项 Vitest 通过，包含新手引导、密钥列表/分组、看板既有模块与图表工具、流水、审计、使用/任务日志及布局/主题回归；`bun run typecheck`、本轮 22 个 TS/TSX 文件 scoped oxlint、24 个文件的受保护版权头安全 scoped oxfmt、`bun run build` 通过。Chrome 本地已核对七页及 drawing 子页的桌面/390px 窄屏浅色布局，积分详情可打开、长表仍在原容器滚动；另核对七页桌面暗色布局，页面无横向溢出，API/任务日志暗色截图正常。验证后恢复 system 主题和默认 viewport。
 - 风险与未覆盖：`detail-preview.test.tsx` 单文件复跑有 29 项通过、定价本地化用例 20 秒超时，与 Z075 记录的既有异常一致；仅运行该定价用例时通过（1 项通过、29 项跳过），本轮未改该测试及其业务组件。审计筛选控件触发既有 Base UI `nativeButton` 控制台警告，相关 Combobox/InputGroupButton 本次未改；未执行创建密钥、删除、真实 API 调用等写操作。Portal 保持共享样式，窄屏暗色与完整端到端业务链路未逐项验收。
 
+### Z080 API Key 积分额度限制
+
+- 需求与原因：API Key 创建和编辑需要使用业务积分限制消费，隐藏原金额额度输入，并在列表显示配置额度与累计已用积分。
+- 变更内容：新增 `point_limit_enabled`、`point_limit`、`reserved_points` 及调用级模式/预留字段；使用现有积分预扣、结算、退款、重放和不确定结果事务，在主库锁定 Key 后检查生命周期积分上限。金额字段在积分模式保存为 `remain_quota=0`、`unlimited_quota=true`；旧 Key 保留金额限制直到完整编辑，首次转换要求手动输入积分上限，状态更新不会转换。积分按固定 1 RMB=1000 积分、调用汇率快照和精确进一法计算，0 表示不限制。
+- 影响面：`model/{token,point_call_billing,quota_reserve,token_cache}.go`、`controller/{token,token_test}.go`、`middleware/auth.go`、`service/points_billing.go`、`model/{point,token_auto_groups_cache}_test.go`；API Key 前端表单、列表/移动额度单元格、快捷创建测试及七种 locale。**上游自有文件**：`controller/{token,token_test}.go`、`middleware/auth.go`、`model/{token,quota_reserve,token_cache,token_auto_groups_cache_test}.go`、改动的 `web/src/features/keys/` 文件和七种 `web/src/i18n/locales/*.json`，升级时需优先复核。
+- 与上游差异：将原 API Key 金额额度管理扩展为独立的生命周期积分上限和精确使用量投影；保留未转换 Key 的旧金额准入和已有账务语义。
+- 开关与默认值：无新增配置或依赖；新增字段默认关闭/0，正数为生命周期上限，0 为不限制。旧二进制不具备积分限额准入，回滚前必须停止新准入并保留新增列与历史。
+- 验证：前端 `bun run test -- src/features/keys src/features/dashboard/lib/__tests__/access-guide.test.ts src/features/dashboard/components/overview/access-guide/__tests__/access-guide.test.tsx`（10 文件/115 用例）、`bun run typecheck`、改动文件 Oxlint/Oxfmt、`bun run build` 均通过；后端 `go test ./model -count=1` 通过，积分生命周期与迁移用例在 SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 16.16 隔离库通过（含重复迁移、并发预留、退款/重放、旧调用转换和溢出）；`go test ./service ./middleware` 通过。完整 controller 测试中的 `TestAccessTokenCreationChecksGrantBeforeConsumingProof` 在本任务前后均因缺少 `external_identity_claims` 夹具失败，未改该问题。
+- 风险与未覆盖：历史上没有 `PointCallBilling` 记录的调用无法可靠反推积分；旧二进制无法执行新积分上限；未进行真实生产 API 写入或线上浏览器流程验收。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 
@@ -1188,6 +1198,7 @@
 
 | 区域 | 文件 | 关联条目 |
 |---|---|---|
+| API Key 积分限额 | `controller/{token,token_test}.go`、`middleware/auth.go`、`model/{token,quota_reserve,token_cache,token_auto_groups_cache_test}.go`、API Key 表单/列表/类型及测试、七种 locale | Z080 |
 | 常规七页 Demo 样式 | `web/src/components/layout/components/section-page-layout.tsx` 及测试、dashboard 各图表/卡片及入口、keys 列表及入口、usage-logs 筛选/表格/审计及入口、`web/src/styles/index.css`（完整范围见 Z079） | Z079 |
 | 手机图片验证码和首页导航 | controller/service phone_change、共享手机图片渲染、router/api-router.go、middleware/access_token_routes.go、共用手机号弹窗、顶部导航与安全访问局部样式及相关测试 | Z077 |
 | 手机号首次绑定与更换验证策略 | controller phone_change/secure_verification、service phone_change/phone_binding_verification/security_verification、router/api-router.go、middleware/access_token_routes.go、个人资料流程、共享验证 API/类型及关联测试 | Z076 |

@@ -62,6 +62,9 @@ const key = apiKeySchema.parse({
   name: 'production',
   key: 'demo********1234',
   status: 1,
+  point_limit_enabled: true,
+  point_limit: '200',
+  used_points: '120',
   remain_quota: 40_000_000,
   used_quota: 60_000_000,
   unlimited_quota: false,
@@ -81,7 +84,7 @@ const clients: QueryClient[] = []
 
 function QuotaTable(props: { apiKey: ApiKey }) {
   const columns = useApiKeysColumns(now).filter(
-    (column) => column.id === 'quota'
+    (column) => column.id === 'points'
   )
   const table = useReactTable({
     columns,
@@ -151,20 +154,38 @@ afterEach(() => {
     .setConfig({ currency: { ...DEFAULT_CURRENCY_CONFIG } })
 })
 
-it('shows desktop remaining and used amounts side by side without labels, with the currency only in the header', () => {
-  renderQuota()
+it('shows the configured and consumed points exactly without currency conversion', () => {
+  renderQuota({
+    ...key,
+    point_limit_enabled: true,
+    point_limit: '9007199254740993',
+    used_points: '9007199254740001',
+  })
   expect(
-    screen.getByRole('columnheader', { name: 'Quota ($)' })
+    screen.getByRole('columnheader', { name: 'Point limit' })
   ).toBeInTheDocument()
   const trigger = screen.getByRole('button', {
-    name: /Remaining 80; Remaining percentage 40%; Used amount 120/,
+    name: /Point limit 9,007,199,254,740,993; Used points 9,007,199,254,740,001/,
   })
-  expect(trigger).toHaveTextContent('80120')
+  expect(trigger).toHaveTextContent('9,007,199,254,740,993')
+  expect(trigger).toHaveTextContent('9,007,199,254,740,001')
+  expect(trigger).not.toHaveTextContent('$')
+})
+
+it('shows desktop configured and used points side by side without currency', () => {
+  renderQuota()
+  expect(
+    screen.getByRole('columnheader', { name: 'Point limit' })
+  ).toBeInTheDocument()
+  const trigger = screen.getByRole('button', {
+    name: /Point limit 200; Used points 120/,
+  })
+  expect(trigger).toHaveTextContent('200120')
   expect(trigger).not.toHaveTextContent(/Remaining|Used amount/)
   expect(
     trigger.querySelector('[data-slot="api-key-quota-values"]')
   ).toHaveClass('grid-cols-2')
-  expect(within(trigger).getByText('80')).toHaveClass('text-left')
+  expect(within(trigger).getByText('200')).toHaveClass('text-left')
   expect(within(trigger).getByText('120')).toHaveClass('text-right')
   expect(trigger.parentElement).toHaveClass('max-w-45')
   expect(trigger).not.toHaveTextContent('$')
@@ -173,31 +194,35 @@ it('shows desktop remaining and used amounts side by side without labels, with t
 })
 
 it.each([
-  ['unused', 500000, 0, 100, 'text-emerald-500'],
-  ['low remaining', 150000, 350000, 30, 'text-amber-500'],
-  ['critical remaining', 50000, 450000, 10, 'text-rose-500'],
-  ['exhausted', 0, 500000, 0, null],
-  ['overdrawn', -50000, 500000, 0, null],
-  ['zero total', 0, 0, 0, null],
-  ['negative total', -500000, 100000, 0, null],
+  ['unused', '500', '0', 100, 'text-emerald-500'],
+  ['low remaining', '500', '350', 30, 'text-amber-500'],
+  ['critical remaining', '500', '450', 10, 'text-rose-500'],
+  ['exhausted', '500', '500', 0, 'text-muted-foreground/60'],
+  ['overdrawn', '500', '550', 0, 'text-muted-foreground/60'],
 ])(
-  'renders the %s progress without invalid values or hiding negative balances',
-  (_label, remaining, used, percentage, color) => {
-    renderQuota({ ...key, remain_quota: remaining, used_quota: used })
-    const button = screen.getByRole('button')
+  'renders the %s point progress',
+  (_label, limit, used, percentage, color) => {
+    renderQuota({ ...key, point_limit: limit, used_points: used })
     const progress = screen.getByRole('progressbar')
     expect(progress).toHaveAttribute('aria-valuenow', String(percentage))
-    if (color) expect(progress).toHaveClass(color)
-    if (remaining < 0) {
-      expect(
-        within(button).getByText(remaining === -500000 ? '-1' : '-0.1')
-      ).toHaveClass('text-destructive')
-    }
+    expect(progress).toHaveClass(color)
   }
 )
 
+it('keeps legacy money restrictions visibly pending until the key is edited', async () => {
+  renderQuota({ ...key, point_limit_enabled: false })
+  const button = screen.getByRole('button', {
+    name: /Not set \(legacy money limit retained\)/,
+  })
+  expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+  await userEvent.click(button)
+  expect(await screen.findByRole('dialog')).toHaveTextContent(
+    'Set a point limit when editing this key to replace its legacy money limit.'
+  )
+})
+
 it('shows unlimited with cumulative usage and explains it on demand', async () => {
-  renderQuota({ ...key, unlimited_quota: true })
+  renderQuota({ ...key, point_limit: '0' })
   const button = screen.getByRole('button', { name: /Unlimited/ })
   expect(button).toHaveTextContent('Unlimited')
   expect(button).toHaveTextContent('Unlimited120')
@@ -208,11 +233,11 @@ it('shows unlimited with cumulative usage and explains it on demand', async () =
   const detail = await screen.findByRole('dialog')
   expect(within(detail).getByText('120')).toBeInTheDocument()
   expect(detail).toHaveTextContent(
-    'This API key has no quota limit. Requests still require available wallet or subscription quota.'
+    'Point usage is cumulative; editing the limit does not reset used points.'
   )
 })
 
-it('keeps small custom-currency amounts exact and shows full values in the detail', async () => {
+it('keeps point values independent of custom currency settings', async () => {
   useSystemConfigStore.getState().setConfig({
     currency: {
       ...DEFAULT_CURRENCY_CONFIG,
@@ -220,17 +245,17 @@ it('keeps small custom-currency amounts exact and shows full values in the detai
       customCurrencySymbol: '🐱',
     },
   })
-  renderQuota({ ...key, remain_quota: 1900, used_quota: 1100 })
+  renderQuota({ ...key, point_limit: '3', used_points: '1' })
   expect(
-    screen.getByRole('columnheader', { name: 'Quota (🐱)' })
+    screen.getByRole('columnheader', { name: 'Point limit' })
   ).toBeInTheDocument()
   const button = screen.getByRole('button')
-  expect(button).toHaveTextContent('0.0038')
+  expect(button).toHaveTextContent('3')
   expect(button).not.toHaveTextContent('🐱')
   await userEvent.click(button)
   const detail = await screen.findByRole('dialog')
-  expect(within(detail).getByText('0.0022')).toBeInTheDocument()
-  expect(within(detail).getByText('0.006')).toBeInTheDocument()
+  expect(within(detail).getByText('1')).toBeInTheDocument()
+  expect(within(detail).getByText('2')).toBeInTheDocument()
 })
 
 it.each([
@@ -245,7 +270,7 @@ it.each([
   )
 })
 
-it('recalculates the progress when remaining quota is edited', () => {
+it('recalculates the progress when the point limit is edited', () => {
   const { rerender } = render(
     <I18nextProvider i18n={i18n}>
       <ApiKeyQuotaCell apiKey={key} now={now} />
@@ -254,14 +279,11 @@ it('recalculates the progress when remaining quota is edited', () => {
   expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '40')
   rerender(
     <I18nextProvider i18n={i18n}>
-      <ApiKeyQuotaCell
-        apiKey={{ ...key, remain_quota: 90_000_000 }}
-        now={now}
-      />
+      <ApiKeyQuotaCell apiKey={{ ...key, point_limit: '300' }} now={now} />
     </I18nextProvider>
   )
   expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '60')
-  expect(screen.getByText('180')).toBeInTheDocument()
+  expect(screen.getByText('300')).toBeInTheDocument()
 })
 
 it('opens details with the keyboard and restores focus when Escape closes them', async () => {
@@ -283,8 +305,8 @@ it('opens details with the keyboard and restores focus when Escape closes them',
   expect(button).toHaveFocus()
 })
 
-it('keeps a long amount within its column while showing the full amount in details', async () => {
-  renderQuota({ ...key, remain_quota: 123456789000000, used_quota: 0 })
+it('keeps a long point value within its column and shows the full value in details', async () => {
+  renderQuota({ ...key, point_limit: '246913578', used_points: '0' })
   const button = screen.getByRole('button')
   expect(button).toHaveClass('w-full', 'min-w-0')
   expect(within(button).getByText('246,913,578')).toHaveClass('truncate')
@@ -360,9 +382,9 @@ it('combines creation and last use while keeping expiry, models and IP restricti
   ).toBeInTheDocument()
   const timeCell = screen.getByRole('cell', { name: /Created.*Last Used/ })
   expect(within(timeCell).getByText('Last Used')).toBeInTheDocument()
-  const quotaHeader = screen.getByRole('columnheader', { name: 'Quota ($)' })
+  const quotaHeader = screen.getByRole('columnheader', { name: 'Point limit' })
   const quotaTrigger = screen.getByRole('button', {
-    name: /Remaining 80; Remaining percentage 40%; Used amount 120/,
+    name: /Point limit 200; Used points 120/,
   })
   expect(quotaHeader).not.toHaveClass('pr-8')
   expect(quotaTrigger.closest('td')).not.toHaveClass('pr-8')
@@ -458,9 +480,11 @@ it('keeps full mobile information without group or quota section headings', asyn
     await renderKeysPage()
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
     expect(screen.queryByText('额度 ($)')).not.toBeInTheDocument()
-    expect(screen.getByText('($)')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /剩余 80;/ })).toBeInTheDocument()
-    expect(screen.getByText('80')).toBeInTheDocument()
+    expect(screen.queryByText('($)')).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /积分额度 200;/ })
+    ).toBeInTheDocument()
+    expect(screen.getByText('200')).toBeInTheDocument()
     expect(screen.getByText('120')).toBeInTheDocument()
     expect(screen.getByText(zh.translation['Created'])).toBeInTheDocument()
     expect(screen.getByText(zh.translation['Last Used'])).toBeInTheDocument()
@@ -487,16 +511,16 @@ it('keeps mobile quota readable and opens complete model and IP restrictions by 
   }))
   await renderKeysPage(1, {
     name: 'production-with-a-long-key-name',
-    used_quota: 2245080000,
-    unlimited_quota: true,
+    used_points: '4490160',
+    point_limit: '0',
     model_limits_enabled: true,
     model_limits: 'model-alpha,model-beta-with-a-long-name',
     allow_ips: '192.0.2.1\n2001:db8::1',
   })
   const quota = screen.getByRole('button', {
-    name: /Unlimited; Used amount 4,490.16/,
+    name: /Unlimited; Used points 4,490,160/,
   })
-  expect(quota).toHaveTextContent('Remaining($)UnlimitedUsed amount4,490.16')
+  expect(quota).toHaveTextContent('Point limitUnlimitedUsed points4,490,160')
   expect(quota.parentElement).toHaveClass('w-full')
   expect(quota.parentElement).not.toHaveClass('max-w-45')
   expect(quota.querySelector('[data-slot="api-key-quota-values"]')).toHaveClass(
@@ -507,7 +531,7 @@ it('keeps mobile quota readable and opens complete model and IP restrictions by 
     'text-sm',
     'font-normal'
   )
-  expect(within(quota).getByText('4,490.16')).toHaveClass(
+  expect(within(quota).getByText('4,490,160')).toHaveClass(
     'tabular-nums',
     'text-sm',
     'font-normal',

@@ -303,7 +303,7 @@
     "+{{count}} more": "thêm {{count}} mục",
     "| Based on": "| Dựa trên",
     "0 means data is kept permanently": "0 nghĩa là dữ liệu được giữ vĩnh viễn",
-    "0 means unlimited": "0 có nghĩa là không giới hạn",
+    "0 means unlimited": "0 nghĩa là không giới hạn",
     "1 Day": "1 ngày",
     "1 day ago": "1 ngày trước",
     "1 hour": "1 giờ",
@@ -8076,6 +8076,17 @@
     "Current available and frozen balances come from your points accounts.": "Số dư khả dụng và đóng băng lấy từ tài khoản điểm của bạn.",
     "Pending invitation rewards are excluded from available points until release.": "Thưởng giới thiệu đang chờ không tính vào điểm khả dụng cho đến khi được giải phóng.",
     "Processing and frozen invitation rewards become available only after release.": "Thưởng giới thiệu đang xử lý và đóng băng chỉ khả dụng sau khi được giải phóng.",
-    "Invitation rewards": "Thưởng giới thiệu"
+    "Invitation rewards": "Thưởng giới thiệu",
+    "Point Limit": "Hạn mức điểm",
+    "Point limit": "Hạn mức điểm",
+    "Used points": "Điểm đã dùng",
+    "Remaining points": "Điểm còn lại",
+    "Limit this API key by consumed points": "Giới hạn khóa API theo điểm đã tiêu thụ",
+    "0 means unlimited. 1 RMB equals 1,000 points.": "0 nghĩa là không giới hạn. 1 RMB bằng 1.000 điểm.",
+    "Point limit must be a non-negative int64 integer string": "Hạn mức điểm phải là số nguyên không âm",
+    "Enter a point limit to convert this key from its legacy money limit. The money limit will become unlimited.": "Nhập hạn mức điểm để chuyển khóa này từ giới hạn tiền cũ. Giới hạn tiền sẽ thành không giới hạn.",
+    "Not set (legacy money limit retained)": "Chưa đặt (giữ giới hạn tiền cũ)",
+    "Set a point limit when editing this key to replace its legacy money limit.": "Đặt hạn mức điểm khi sửa khóa này để thay thế giới hạn tiền cũ.",
+    "Point usage is cumulative; editing the limit does not reset used points.": "Điểm đã dùng được cộng dồn; sửa hạn mức không đặt lại điểm đã dùng."
   }
 }

@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 
-import type { ApiKey } from '../../types'
+import { apiKeySchema, type ApiKey } from '../../types'
 
 const { createInstance } = await import('i18next')
 const { I18nextProvider, initReactI18next } = await import('react-i18next')
@@ -153,7 +153,9 @@ function findButton(text: string, required = true): HTMLButtonElement | null {
   return button ?? null
 }
 
-function getControlByLabel(labelText: 'Name' | 'Quantity'): HTMLInputElement
+function getControlByLabel(
+  labelText: 'Name' | 'Quantity' | 'Point limit'
+): HTMLInputElement
 function getControlByLabel(labelText: 'Group'): HTMLButtonElement
 function getControlByLabel(labelText: 'Auto group order'): HTMLElement
 function getControlByLabel(labelText: string): HTMLElement {
@@ -203,6 +205,102 @@ afterEach(() => {
     renderedDrawer.queryClient.clear()
     renderedDrawer = null
   }
+})
+
+describe('API key point input', () => {
+  test('requires manual point input before converting a legacy key on save', async () => {
+    installApiFixtures([])
+    const legacy = apiKeySchema.parse({
+      id: 13,
+      name: 'legacy',
+      key: '',
+      status: 1,
+      remain_quota: 12345,
+      used_quota: 40,
+      unlimited_quota: false,
+      expired_time: -1,
+      created_time: 1,
+      accessed_time: 0,
+      group: 'default',
+      auto_groups: [],
+      cross_group_retry: false,
+      model_limits_enabled: false,
+      model_limits: '',
+      allow_ips: '',
+      allow_user_quota_query: true,
+    })
+    const getFixture = apiClient.get
+    vi.spyOn(apiClient, 'get').mockImplementation((url) =>
+      url === '/api/token/13'
+        ? Promise.resolve({ data: { success: true, data: legacy } })
+        : getFixture(url)
+    )
+    const put = vi
+      .spyOn(api, 'put')
+      .mockResolvedValue({ data: { success: true } })
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    renderedDrawer = { queryClient }
+    render(
+      <QueryClientProvider client={queryClient}>
+        <I18nextProvider i18n={i18n}>
+          <ApiKeysProvider>
+            <ApiKeysMutateDrawer
+              open
+              currentRow={legacy}
+              onOpenChange={() => {}}
+            />
+          </ApiKeysProvider>
+        </I18nextProvider>
+      </QueryClientProvider>
+    )
+    await waitFor(() => expect(findButton('Save changes', true)).toBeEnabled())
+    expect(getControlByLabel('Point limit')).toHaveValue('')
+    expect(
+      screen.getByText(
+        'Enter a point limit to convert this key from its legacy money limit. The money limit will become unlimited.'
+      )
+    ).toBeInTheDocument()
+    fireEvent.click(findButton('Save changes', true))
+    expect(
+      await screen.findByText(
+        'Point limit must be a non-negative int64 integer string'
+      )
+    ).toBeInTheDocument()
+    expect(put).not.toHaveBeenCalled()
+    changeInput(getControlByLabel('Point limit'), '1000')
+    fireEvent.click(findButton('Save changes', true))
+    await waitFor(() =>
+      expect(put).toHaveBeenCalledWith(
+        '/api/token/',
+        expect.objectContaining({
+          id: 13,
+          point_limit: '1000',
+          remain_quota: 0,
+          unlimited_quota: true,
+        })
+      )
+    )
+  })
+
+  test('hides the money input and saves exact point limits with unlimited money quota', async () => {
+    const createdPayloads: Array<Record<string, unknown>> = []
+    installApiFixtures(createdPayloads)
+    await renderCreateDrawer()
+    expect(screen.queryByLabelText(/Remaining Quota/)).not.toBeInTheDocument()
+    const points = getControlByLabel('Point limit')
+    expect(points).toHaveValue('0')
+    changeInput(points, '9007199254740993')
+    changeInput(getControlByLabel('Name'), 'points-key')
+    fireEvent.click(findButton('Save changes', true))
+    await waitFor(() => expect(createdPayloads).toHaveLength(1))
+    expect(createdPayloads[0]).toMatchObject({
+      point_limit: '9007199254740993',
+      remain_quota: 0,
+      unlimited_quota: true,
+    })
+  })
 })
 
 describe('API keys mutate drawer Auto group integration', () => {
@@ -287,6 +385,9 @@ describe('API key expiry across editing sessions', () => {
     async (finish) => {
       installApiFixtures([])
       const first: ApiKey = {
+        point_limit_enabled: true,
+        point_limit: '0',
+        used_points: '0',
         id: 1,
         name: 'expiring',
         key: '',

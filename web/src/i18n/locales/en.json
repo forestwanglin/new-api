@@ -8077,6 +8077,17 @@
     "Current available and frozen balances come from your points accounts.": "Current available and frozen balances come from your points accounts.",
     "Pending invitation rewards are excluded from available points until release.": "Pending invitation rewards are excluded from available points until release.",
     "Processing and frozen invitation rewards become available only after release.": "Processing and frozen invitation rewards become available only after release.",
-    "Invitation rewards": "Invitation rewards"
+    "Invitation rewards": "Invitation rewards",
+    "Point Limit": "Point Limit",
+    "Point limit": "Point limit",
+    "Used points": "Used points",
+    "Remaining points": "Remaining points",
+    "Limit this API key by consumed points": "Limit this API key by consumed points",
+    "0 means unlimited. 1 RMB equals 1,000 points.": "0 means unlimited. 1 RMB equals 1,000 points.",
+    "Point limit must be a non-negative int64 integer string": "Point limit must be a non-negative int64 integer string",
+    "Enter a point limit to convert this key from its legacy money limit. The money limit will become unlimited.": "Enter a point limit to convert this key from its legacy money limit. The money limit will become unlimited.",
+    "Not set (legacy money limit retained)": "Not set (legacy money limit retained)",
+    "Set a point limit when editing this key to replace its legacy money limit.": "Set a point limit when editing this key to replace its legacy money limit.",
+    "Point usage is cumulative; editing the limit does not reset used points.": "Point usage is cumulative; editing the limit does not reset used points."
   }
 }

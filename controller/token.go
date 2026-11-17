@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -32,9 +33,37 @@ func (input *tokenAutoGroupsInput) UnmarshalJSON(data []byte) error {
 	return common.Unmarshal(data, &input.Groups)
 }
 
+type tokenPointLimitInput struct {
+	Set   bool
+	Value int64
+}
+
+func (input *tokenPointLimitInput) UnmarshalJSON(data []byte) error {
+	input.Set = true
+	var value string
+	if err := common.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	if value == "" || len(value) > 19 {
+		return fmt.Errorf("Point limit must be a non-negative int64 integer string")
+	}
+	for _, digit := range value {
+		if digit < '0' || digit > '9' {
+			return fmt.Errorf("Point limit must be a non-negative int64 integer string")
+		}
+	}
+	limit, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		return fmt.Errorf("Point limit must be a non-negative int64 integer string")
+	}
+	input.Value = limit
+	return nil
+}
+
 type tokenRequest struct {
 	model.Token
 	AutoGroups tokenAutoGroupsInput `json:"auto_groups"`
+	PointLimit tokenPointLimitInput `json:"point_limit"`
 	// 指针区分“未传”和显式 false：新建时未传即开启，更新时未传则保留原值。
 	AllowUserQuotaQuery *bool `json:"allow_user_quota_query"`
 }
@@ -42,6 +71,8 @@ type tokenRequest struct {
 type tokenResponse struct {
 	*model.Token
 	AutoGroups []string `json:"auto_groups"`
+	PointLimit string   `json:"point_limit"`
+	UsedPoints string   `json:"used_points"`
 }
 
 func maxTokenQuota() int {
@@ -68,15 +99,25 @@ func buildMaskedTokenResponse(token *model.Token) *tokenResponse {
 	if len(autoGroups) == 0 {
 		autoGroups = nil
 	}
-	return &tokenResponse{Token: &maskedToken, AutoGroups: autoGroups}
+	return &tokenResponse{Token: &maskedToken, AutoGroups: autoGroups, PointLimit: strconv.FormatInt(token.PointLimit, 10), UsedPoints: "0"}
 }
 
-func buildMaskedTokenResponses(tokens []*model.Token) []*tokenResponse {
-	maskedTokens := make([]*tokenResponse, 0, len(tokens))
+func buildMaskedTokenResponses(userID int, tokens []*model.Token) ([]*tokenResponse, error) {
+	ids := make([]int, 0, len(tokens))
 	for _, token := range tokens {
-		maskedTokens = append(maskedTokens, buildMaskedTokenResponse(token))
+		ids = append(ids, token.Id)
 	}
-	return maskedTokens
+	used, err := model.GetTokenUsedPoints(userID, ids)
+	if err != nil {
+		return nil, err
+	}
+	responses := make([]*tokenResponse, 0, len(tokens))
+	for _, token := range tokens {
+		response := buildMaskedTokenResponse(token)
+		response.UsedPoints = strconv.FormatInt(used[token.Id], 10)
+		responses = append(responses, response)
+	}
+	return responses, nil
 }
 
 func getTokenRequestUserGroup(c *gin.Context) (string, error) {
@@ -139,7 +180,12 @@ func GetAllTokens(c *gin.Context) {
 	}
 	total, _ := model.CountUserTokens(userId)
 	pageInfo.SetTotal(int(total))
-	pageInfo.SetItems(buildMaskedTokenResponses(tokens))
+	responses, err := buildMaskedTokenResponses(userId, tokens)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	pageInfo.SetItems(responses)
 	common.ApiSuccess(c, pageInfo)
 }
 
@@ -156,7 +202,12 @@ func SearchTokens(c *gin.Context) {
 		return
 	}
 	pageInfo.SetTotal(int(total))
-	pageInfo.SetItems(buildMaskedTokenResponses(tokens))
+	responses, err := buildMaskedTokenResponses(userId, tokens)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	pageInfo.SetItems(responses)
 	common.ApiSuccess(c, pageInfo)
 }
 
@@ -172,7 +223,12 @@ func GetToken(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	common.ApiSuccess(c, buildMaskedTokenResponse(token))
+	responses, err := buildMaskedTokenResponses(userId, []*model.Token{token})
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, responses[0])
 }
 
 func GetTokenAutoGroups(c *gin.Context) {
@@ -304,6 +360,11 @@ func AddToken(c *gin.Context) {
 		return
 	}
 	token := request.Token
+	token.PointLimitEnabled = false
+	if request.PointLimit.Set {
+		token.PointLimitEnabled, token.PointLimit = true, request.PointLimit.Value
+		token.RemainQuota, token.UnlimitedQuota = 0, true
+	}
 	if len(token.Name) > 50 {
 		common.ApiErrorT(c, "Token name is too long")
 		return
@@ -356,6 +417,8 @@ func AddToken(c *gin.Context) {
 		ExpiredTime:        token.ExpiredTime,
 		RemainQuota:        token.RemainQuota,
 		UnlimitedQuota:     token.UnlimitedQuota,
+		PointLimitEnabled:  token.PointLimitEnabled,
+		PointLimit:         token.PointLimit,
 		ModelLimitsEnabled: token.ModelLimitsEnabled,
 		ModelLimits:        token.ModelLimits,
 		AllowIps:           token.AllowIps,
@@ -409,6 +472,9 @@ func UpdateToken(c *gin.Context) {
 		return
 	}
 	token := request.Token
+	if statusOnly == "" && request.PointLimit.Set {
+		token.RemainQuota, token.UnlimitedQuota = 0, true
+	}
 	params := tokenAuditParams(c)
 	if token.Id > 0 {
 		params["id"] = token.Id
@@ -453,6 +519,15 @@ func UpdateToken(c *gin.Context) {
 		cleanToken.ExpiredTime = token.ExpiredTime
 		cleanToken.RemainQuota = token.RemainQuota
 		cleanToken.UnlimitedQuota = token.UnlimitedQuota
+		if request.PointLimit.Set {
+			cleanToken.PointLimitEnabled, cleanToken.PointLimit = true, request.PointLimit.Value
+		}
+		if cleanToken.PointLimitEnabled {
+			cleanToken.RemainQuota, cleanToken.UnlimitedQuota = 0, true
+			if cleanToken.Status == common.TokenStatusExhausted {
+				cleanToken.Status = common.TokenStatusEnabled
+			}
+		}
 		cleanToken.ModelLimitsEnabled = token.ModelLimitsEnabled
 		cleanToken.ModelLimits = token.ModelLimits
 		cleanToken.AllowIps = token.AllowIps
@@ -469,6 +544,11 @@ func UpdateToken(c *gin.Context) {
 				return
 			}
 		}
+	}
+	used, err := model.GetTokenUsedPoints(userId, []int{cleanToken.Id})
+	if err != nil {
+		common.ApiError(c, err)
+		return
 	}
 	if statusOnly != "" {
 		err = cleanToken.SelectUpdate()
@@ -492,6 +572,7 @@ func UpdateToken(c *gin.Context) {
 			{"expired_time", previous.ExpiredTime != cleanToken.ExpiredTime},
 			{"remain_quota", previous.RemainQuota != cleanToken.RemainQuota},
 			{"unlimited_quota", previous.UnlimitedQuota != cleanToken.UnlimitedQuota},
+			{"point_limit", previous.PointLimit != cleanToken.PointLimit || previous.PointLimitEnabled != cleanToken.PointLimitEnabled},
 			{"model_limits_enabled", previous.ModelLimitsEnabled != cleanToken.ModelLimitsEnabled},
 			{"model_limits", previous.ModelLimits != cleanToken.ModelLimits},
 			{"allow_ips", (previous.AllowIps == nil) != (cleanToken.AllowIps == nil) ||
@@ -507,11 +588,13 @@ func UpdateToken(c *gin.Context) {
 		}
 		params["changed_fields"] = changedFields
 	}
+	response := buildMaskedTokenResponse(cleanToken)
+	response.UsedPoints = strconv.FormatInt(used[cleanToken.Id], 10)
 	common.SetContextKey(c, constant.ContextKeyTokenAuditSucceeded, true)
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
-		"data":    buildMaskedTokenResponse(cleanToken),
+		"data":    response,
 	})
 }
 

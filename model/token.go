@@ -10,6 +10,11 @@ import (
 	"gorm.io/gorm"
 )
 
+var (
+	ErrTokenPointLimit        = errors.New("API key point limit is exhausted")
+	ErrTokenPointLimitInvalid = errors.New("invalid API key point limit")
+)
+
 type Token struct {
 	Id                 int            `json:"id"`
 	UserId             int            `json:"user_id" gorm:"index"`
@@ -21,6 +26,9 @@ type Token struct {
 	ExpiredTime        int64          `json:"expired_time" gorm:"bigint;default:-1"` // -1 means never expired
 	RemainQuota        int            `json:"remain_quota" gorm:"default:0"`
 	UnlimitedQuota     bool           `json:"unlimited_quota"`
+	PointLimitEnabled  bool           `json:"point_limit_enabled"`
+	PointLimit         int64          `json:"-" gorm:"type:bigint;not null;default:0"`
+	ReservedPoints     int64          `json:"-" gorm:"type:bigint;not null;default:0"`
 	ModelLimitsEnabled bool           `json:"model_limits_enabled"`
 	ModelLimits        string         `json:"model_limits" gorm:"type:text"`
 	AllowIps           *string        `json:"allow_ips" gorm:"default:''"`
@@ -111,6 +119,37 @@ func GetAllUserTokens(userId int, startIdx int, num int) ([]*Token, error) {
 	var err error
 	err = DB.Where("user_id = ?", userId).Order("id desc").Limit(num).Offset(startIdx).Find(&tokens).Error
 	return tokens, err
+}
+
+// GetTokenUsedPoints returns exact cumulative point charges for API keys.
+// Caller ownership is enforced by both the token lookup and billing-row join.
+func GetTokenUsedPoints(userID int, tokenIDs []int) (map[int]int64, error) {
+	used := make(map[int]int64, len(tokenIDs))
+	if len(tokenIDs) == 0 {
+		return used, nil
+	}
+	var calls []struct {
+		TokenID int
+		Points  int64
+	}
+	if err := DB.Model(&PointCallBilling{}).
+		Select("point_call_billings.token_id, point_call_billings.points").
+		Joins("JOIN tokens ON tokens.id = point_call_billings.token_id").
+		Where("tokens.user_id = ? AND point_call_billings.user_id = ? AND point_call_billings.token_id IN ?", userID, userID, tokenIDs).
+		Scan(&calls).Error; err != nil {
+		return nil, err
+	}
+	for _, call := range calls {
+		if call.Points < 0 {
+			return nil, ErrTokenPointLimitInvalid
+		}
+		total, err := pointAdd(used[call.TokenID], call.Points)
+		if err != nil {
+			return nil, err
+		}
+		used[call.TokenID] = total
+	}
+	return used, nil
 }
 
 // sanitizeLikePattern 校验并清洗用户输入的 LIKE 搜索模式。
@@ -241,7 +280,7 @@ func ValidateUserToken(key string) (token *Token, err error) {
 			}
 			return token, ErrTokenInvalid
 		}
-		if !token.UnlimitedQuota && token.RemainQuota <= 0 {
+		if !token.PointLimitEnabled && !token.UnlimitedQuota && token.RemainQuota <= 0 {
 			if !common.RedisEnabled {
 				token.Status = common.TokenStatusExhausted
 				err := token.SelectUpdate()
@@ -322,13 +361,138 @@ func (token *Token) Update() (err error) {
 	if cacheErr := invalidateTokenCacheForMutation(token.Key); cacheErr != nil {
 		common.SysLog(common.LogText("failed to invalidate token cache before update: %s", cacheErr.Error()))
 	}
-	err = DB.Model(token).Select("name", "status", "expired_time", "remain_quota", "unlimited_quota",
-		"model_limits_enabled", "model_limits", "allow_ips", "group", "cross_group_retry", "auto_groups",
-		"allow_user_quota_query").Updates(token).Error
+	err = DB.Transaction(func(tx *gorm.DB) error {
+		if token.PointLimitEnabled && common.UsingMainDatabase(common.DatabaseTypeSQLite) {
+			if err := tx.Model(&Token{}).Where("id = ?", token.Id).UpdateColumn("accessed_time", gorm.Expr("accessed_time")).Error; err != nil {
+				return err
+			}
+		}
+		if token.PointLimitEnabled {
+			var user User
+			if err := lockForUpdate(tx).Select("id").First(&user, token.UserId).Error; err != nil {
+				return err
+			}
+		}
+		current, err := lockTokenQuotaTx(tx, token.Id)
+		if err != nil {
+			return err
+		}
+		if current.UserId != token.UserId || token.PointLimit < 0 {
+			return ErrTokenPointLimitInvalid
+		}
+		if current.PointLimitEnabled && !token.PointLimitEnabled {
+			token.PointLimitEnabled = true
+			token.PointLimit = current.PointLimit
+		}
+		if token.PointLimitEnabled {
+			token.UnlimitedQuota, token.RemainQuota = true, 0
+		}
+		return tx.Model(token).Select("name", "status", "expired_time", "remain_quota", "unlimited_quota", "point_limit_enabled", "point_limit",
+			"model_limits_enabled", "model_limits", "allow_ips", "group", "cross_group_retry", "auto_groups",
+			"allow_user_quota_query").Updates(token).Error
+	})
 	if err == nil {
 		invalidateTokenQuotaAfterCommit(token.Key)
 	}
 	return err
+}
+
+func tokenUsedPointsTx(tx *gorm.DB, tokenID int) (int64, error) {
+	var calls []PointCallBilling
+	if err := lockForUpdate(tx).Select("points").Where("token_id = ?", tokenID).Find(&calls).Error; err != nil {
+		return 0, err
+	}
+	var used int64
+	for _, call := range calls {
+		if call.Points < 0 {
+			return 0, ErrTokenPointLimitInvalid
+		}
+		var err error
+		used, err = pointAdd(used, call.Points)
+		if err != nil {
+			return 0, err
+		}
+	}
+	return used, nil
+}
+
+// ReserveTokenPointLimitTx reserves the increment over this call's prior hold
+// under the same row lock used by legacy API-key quota admission.
+func ReserveTokenPointLimitTx(tx *gorm.DB, tokenID int, callID string, nextReserved int64) (bool, error) {
+	if tokenID <= 0 || callID == "" || nextReserved < 0 {
+		return false, ErrTokenPointLimitInvalid
+	}
+	token, err := lockTokenQuotaTx(tx, tokenID)
+	if err != nil {
+		return false, err
+	}
+	if !token.PointLimitEnabled || token.Status != common.TokenStatusEnabled || token.ExpiredTime != -1 && token.ExpiredTime < common.GetTimestamp() {
+		return false, ErrTokenPointLimit
+	}
+	var call PointCallBilling
+	if err := lockForUpdate(tx).Select("token_reserved_points").First(&call, "id = ? AND token_id = ?", callID, tokenID).Error; err != nil {
+		return false, err
+	}
+	if token.ReservedPoints < 0 || call.TokenReservedPoints < 0 {
+		return false, ErrTokenPointLimitInvalid
+	}
+	reservedElsewhere := token.ReservedPoints - call.TokenReservedPoints
+	if reservedElsewhere < 0 {
+		return false, ErrTokenPointLimitInvalid
+	}
+	used, err := tokenUsedPointsTx(tx, tokenID)
+	if err != nil {
+		return false, err
+	}
+	requested, err := pointAdd(used, reservedElsewhere)
+	if err == nil {
+		requested, err = pointAdd(requested, nextReserved)
+	}
+	if err != nil {
+		return false, err
+	}
+	if token.PointLimit > 0 && (requested > token.PointLimit || nextReserved == 0 && used >= token.PointLimit) {
+		return false, ErrTokenPointLimit
+	}
+	delta := nextReserved - call.TokenReservedPoints
+	newReserved, err := pointAdd(token.ReservedPoints, delta)
+	if err != nil || newReserved < 0 {
+		return false, ErrTokenPointLimitInvalid
+	}
+	if err := tx.Model(&PointCallBilling{}).Where("id = ?", callID).Update("token_reserved_points", nextReserved).Error; err != nil {
+		return false, err
+	}
+	if err := tx.Model(&Token{}).Where("id = ?", tokenID).Update("reserved_points", newReserved).Error; err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// AdjustTokenPointReservationTx releases or adjusts only a call-owned hold.
+func AdjustTokenPointReservationTx(tx *gorm.DB, tokenID int, callID string, nextReserved int64) error {
+	if tokenID <= 0 || callID == "" || nextReserved < 0 {
+		return ErrTokenPointLimitInvalid
+	}
+	tx = tx.Unscoped().Session(&gorm.Session{})
+	token, err := lockTokenQuotaTx(tx, tokenID)
+	if err != nil {
+		return err
+	}
+	var call PointCallBilling
+	if err := lockForUpdate(tx).Select("token_reserved_points").First(&call, "id = ? AND token_id = ?", callID, tokenID).Error; err != nil {
+		return err
+	}
+	if token.ReservedPoints < 0 || call.TokenReservedPoints < 0 {
+		return ErrTokenPointLimitInvalid
+	}
+	newReserved, err := pointAdd(token.ReservedPoints, nextReserved-call.TokenReservedPoints)
+	if err != nil || newReserved < 0 {
+		return ErrTokenPointLimitInvalid
+	}
+	if err := tx.Model(&PointCallBilling{}).Where("id = ?", callID).Update("token_reserved_points", nextReserved).Error; err != nil {
+		return err
+	}
+	return tx.Model(&Token{}).Where("id = ?", tokenID).Update("reserved_points", newReserved).Error
 }
 
 func (token *Token) SelectUpdate() (err error) {

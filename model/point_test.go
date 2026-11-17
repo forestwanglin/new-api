@@ -496,7 +496,38 @@ func testPointCallFinancialLifecycle(t *testing.T, dialect string) {
 	// Connection closed by database teardown after dropping fixtures.
 	require.NoError(t, db.AutoMigrate(&User{}, &Token{}))
 	require.NoError(t, migratePoints(db))
-	require.NoError(t, migratePoints(db))
+	// Representative previous schema: preserve quota/history while adding only
+	// mode, reservation fields and the token history index, twice.
+	legacy := Token{UserId: 1, Key: "upgrade-point-key", RemainQuota: 37, UsedQuota: 9, Status: common.TokenStatusEnabled, ExpiredTime: -1}
+	require.NoError(t, db.Create(&legacy).Error)
+	require.NoError(t, db.Create(&PointCallBilling{ID: "upgrade-call", UserID: 1, TokenID: legacy.Id, Points: 3, Rate: "1", Unit: "1000", Model: "gpt-test", Allocations: "[]"}).Error)
+	for _, field := range []string{"PointLimitEnabled", "PointLimit", "ReservedPoints"} {
+		require.NoError(t, db.Migrator().DropColumn(&Token{}, field))
+	}
+	for _, field := range []string{"TokenPointMode", "TokenReservedPoints"} {
+		require.NoError(t, db.Migrator().DropColumn(&PointCallBilling{}, field))
+	}
+	if db.Migrator().HasIndex(&PointCallBilling{}, "TokenID") {
+		require.NoError(t, db.Migrator().DropIndex(&PointCallBilling{}, "TokenID"))
+	}
+	for range 2 {
+		require.NoError(t, db.AutoMigrate(&Token{}))
+		require.NoError(t, migratePoints(db))
+	}
+	require.NoError(t, db.First(&legacy, legacy.Id).Error)
+	assert.False(t, legacy.PointLimitEnabled)
+	assert.Zero(t, legacy.PointLimit)
+	assert.Zero(t, legacy.ReservedPoints)
+	assert.Equal(t, 37, legacy.RemainQuota)
+	assert.Equal(t, 9, legacy.UsedQuota)
+	assert.False(t, legacy.UnlimitedQuota)
+	assert.True(t, db.Migrator().HasIndex(&PointCallBilling{}, "TokenID"))
+	oldCall, err := GetPointCall("upgrade-call")
+	require.NoError(t, err)
+	assert.Nil(t, oldCall.TokenPointMode)
+	assert.EqualValues(t, 3, oldCall.Points)
+	duplicate := Token{UserId: 1, Key: legacy.Key}
+	require.Error(t, db.Create(&duplicate).Error, "key uniqueness survives upgrade")
 	user := User{Username: "point-call", Quota: -100}
 	require.NoError(t, db.Create(&user).Error)
 	token := Token{UserId: user.Id, Key: "point-call-key", RemainQuota: 100, Status: common.TokenStatusEnabled, ExpiredTime: -1}
@@ -561,6 +592,150 @@ func testPointCallFinancialLifecycle(t *testing.T, dialect string) {
 		assert.Zero(t, f.RemainingPoints)
 		assert.Equal(t, PointFreezeClosed, f.Status)
 	}
+
+	// A point cap shares the existing hold/settlement/refund transaction.
+	pointToken := Token{UserId: user.Id, Key: "point-cap-key", PointLimitEnabled: true, PointLimit: 10, UnlimitedQuota: true, Status: common.TokenStatusEnabled, ExpiredTime: -1}
+	require.NoError(t, db.Create(&pointToken).Error)
+	require.NoError(t, CreatePointCall("cap-a", user.Id, pointToken.Id, "gpt-test", "1", "1000"))
+	require.NoError(t, CreatePointCall("cap-b", user.Id, pointToken.Id, "gpt-test", "1", "1000"))
+	require.NoError(t, ReservePointCall("cap-a", "cap-a:reserve", 7, true))
+	require.NoError(t, ReservePointCall("cap-a", "cap-a:reserve", 7, true), "reserve event replay is idempotent")
+	require.ErrorIs(t, ReservePointCall("cap-b", "cap-b:reserve", 4, true), ErrTokenPointLimit)
+	_, err = SetPointCallTarget("cap-a", "cap-a:charge", 12, true, false, nil)
+	require.NoError(t, err, "observed usage above cap is still fully charged")
+	require.NoError(t, db.First(&pointToken, pointToken.Id).Error)
+	assert.Zero(t, pointToken.ReservedPoints)
+	used, err := GetTokenUsedPoints(user.Id, []int{pointToken.Id})
+	require.NoError(t, err)
+	assert.EqualValues(t, 12, used[pointToken.Id])
+	require.ErrorIs(t, ReservePointCall("cap-b", "cap-b:after-charge", 1, true), ErrTokenPointLimit)
+	require.ErrorIs(t, ReservePointCall("cap-b", "cap-b:zero-estimate", 0, true), ErrTokenPointLimit)
+	_, err = SetPointCallTarget("cap-a", "cap-a:refund", 0, true, false, nil)
+	require.NoError(t, err)
+	require.NoError(t, ReservePointCall("cap-b", "cap-b:retry", 4, true))
+	_, err = SetPointCallTarget("cap-b", "cap-b:refund", 0, true, false, nil)
+	require.NoError(t, err)
+	_, err = SetPointCallTarget("cap-b", "cap-b:refund", 0, true, false, nil)
+	require.NoError(t, err)
+	require.NoError(t, db.First(&pointToken, pointToken.Id).Error)
+	assert.Zero(t, pointToken.ReservedPoints)
+	// Existing account-funding failure rolls back key/call cap holds as well.
+	pointToken.PointLimit = 0
+	require.NoError(t, pointToken.Update())
+	require.NoError(t, CreatePointCall("cap-no-funds", user.Id, pointToken.Id, "gpt-test", "1", "1000"))
+	require.ErrorIs(t, ReservePointCall("cap-no-funds", "cap-no-funds:reserve", 16, true), ErrInsufficientPoints)
+	require.NoError(t, db.First(&pointToken, pointToken.Id).Error)
+	assert.Zero(t, pointToken.ReservedPoints)
+	failedCall, err := GetPointCall("cap-no-funds")
+	require.NoError(t, err)
+	assert.Zero(t, failedCall.TokenReservedPoints)
+	pointToken.PointLimit = 10
+	require.NoError(t, pointToken.Update())
+	// Exact equality is valid. Incremental booking retains only the unused hold.
+	require.NoError(t, CreatePointCall("cap-equal", user.Id, pointToken.Id, "gpt-test", "1", "1000"))
+	require.NoError(t, ReservePointCall("cap-equal", "cap-equal:reserve", 10, true))
+	_, err = SetPointCallTarget("cap-equal", "cap-equal:partial", 4, false, false, nil)
+	require.NoError(t, err)
+	require.NoError(t, db.First(&pointToken, pointToken.Id).Error)
+	assert.EqualValues(t, 6, pointToken.ReservedPoints)
+	_, err = SetPointCallTarget("cap-equal", "cap-equal:fee", 1, false, true, nil)
+	require.NoError(t, err)
+	require.NoError(t, db.First(&pointToken, pointToken.Id).Error)
+	assert.EqualValues(t, 5, pointToken.ReservedPoints, "an incremental fee consumes this call's existing hold")
+	_, err = SetPointCallTarget("cap-equal", "cap-equal:partial-refund", 2, false, false, nil)
+	require.NoError(t, err)
+	_, err = SetPointCallTarget("cap-equal", "cap-equal:partial-refund", 2, false, false, nil)
+	require.NoError(t, err, "replay must not change the key hold twice")
+	require.NoError(t, db.First(&pointToken, pointToken.Id).Error)
+	assert.EqualValues(t, 5, pointToken.ReservedPoints, "refunds preserve the remaining owned hold")
+	used, err = GetTokenUsedPoints(user.Id, []int{pointToken.Id})
+	require.NoError(t, err)
+	assert.EqualValues(t, 3, used[pointToken.Id], "usage includes the base remainder and fee")
+	_, err = SetPointCallTarget("cap-equal", "cap-equal:fee-refund", 0, false, true, nil)
+	require.NoError(t, err)
+	_, err = SetPointCallTarget("cap-equal", "cap-equal:refund", 0, true, false, nil)
+	require.NoError(t, err)
+	// Two concurrent admissions cannot allocate more than the same key's cap.
+	for _, id := range []string{"cap-race-a", "cap-race-b"} {
+		require.NoError(t, CreatePointCall(id, user.Id, pointToken.Id, "gpt-test", "1", "1000"))
+	}
+	if dialect != "sqlite" {
+		sqlDB.SetMaxOpenConns(4)
+	}
+	start := make(chan struct{})
+	results := make(chan error, 2)
+	for _, id := range []string{"cap-race-a", "cap-race-b"} {
+		go func() { <-start; results <- ReservePointCall(id, id+":reserve", 7, true) }()
+	}
+	close(start)
+	first, second := <-results, <-results
+	assert.True(t, first == nil && errors.Is(second, ErrTokenPointLimit) || second == nil && errors.Is(first, ErrTokenPointLimit), "exactly one admission succeeds: %v / %v", first, second)
+	require.NoError(t, db.First(&pointToken, pointToken.Id).Error)
+	assert.EqualValues(t, 7, pointToken.ReservedPoints)
+	for _, id := range []string{"cap-race-a", "cap-race-b"} {
+		_, err = SetPointCallTarget(id, id+":refund", 0, true, false, nil)
+		require.NoError(t, err)
+	}
+	sqlDB.SetMaxOpenConns(1)
+	require.NoError(t, db.First(&pointToken, pointToken.Id).Error)
+	assert.Zero(t, pointToken.ReservedPoints)
+	// A legacy call keeps its financial mode across full-edit conversion.
+	conversion := Token{UserId: user.Id, Key: "conversion-point-key", RemainQuota: 50, Status: common.TokenStatusEnabled, ExpiredTime: -1}
+	require.NoError(t, db.Create(&conversion).Error)
+	require.NoError(t, CreatePointCall("legacy-inflight", user.Id, conversion.Id, "gpt-test", "1", "1000"))
+	require.NoError(t, ReservePointCall("legacy-inflight", "legacy-inflight:reserve", 3, false))
+	conversion.PointLimitEnabled, conversion.PointLimit = true, 10
+	require.NoError(t, conversion.Update())
+	require.NoError(t, db.First(&conversion, conversion.Id).Error)
+	assert.True(t, conversion.PointLimitEnabled)
+	windowToken := Token{UserId: user.Id, Key: "window-key", RemainQuota: 50, Status: common.TokenStatusEnabled, ExpiredTime: -1}
+	require.NoError(t, db.Create(&windowToken).Error)
+	require.NoError(t, CreatePointCall("window-call", user.Id, windowToken.Id, "gpt-test", "1", "1000"))
+	windowToken.PointLimitEnabled, windowToken.PointLimit = true, 2
+	require.NoError(t, windowToken.Update())
+	require.NoError(t, ReservePointCall("window-call", "window-call:reserve", 2, true))
+	windowCall, err := GetPointCall("window-call")
+	require.NoError(t, err)
+	require.NotNil(t, windowCall.TokenPointMode)
+	require.True(t, *windowCall.TokenPointMode)
+	_, err = SetPointCallTarget("window-call", "window-call:refund", 0, true, false, nil)
+	require.NoError(t, err)
+	require.NoError(t, CreatePointCall("converted-inflight", user.Id, conversion.Id, "gpt-test", "1", "1000"))
+	require.NoError(t, ReservePointCall("converted-inflight", "converted-inflight:reserve", 4, true))
+	_, err = SetPointCallTarget("legacy-inflight", "legacy-inflight:refund", 0, true, false, nil)
+	require.NoError(t, err)
+	require.NoError(t, db.First(&conversion, conversion.Id).Error)
+	assert.EqualValues(t, 4, conversion.ReservedPoints, "legacy refund preserves the new call's hold")
+	require.NoError(t, conversion.Delete())
+	_, err = SetPointCallTarget("converted-inflight", "converted-inflight:refund", 0, true, false, nil)
+	require.NoError(t, err, "deleted key tombstone releases its own hold")
+	require.NoError(t, db.Unscoped().First(&conversion, conversion.Id).Error)
+	assert.Zero(t, conversion.ReservedPoints)
+	// Lifetime totals use stored per-call ceil/rate snapshots, then net refunds.
+	historyToken := Token{UserId: user.Id, Key: "history-point-key", PointLimitEnabled: true, PointLimit: 3, UnlimitedQuota: true, Status: common.TokenStatusEnabled, ExpiredTime: -1}
+	require.NoError(t, db.Create(&historyToken).Error)
+	for i, rate := range []string{"1", "2"} {
+		id := fmt.Sprintf("history-%d", i)
+		require.NoError(t, CreatePointCall(id, user.Id, historyToken.Id, "gpt-test", rate, "10000"))
+		require.NoError(t, ReservePointCall(id, id+":reserve", 1, true))
+		_, err = SetPointCallTarget(id, id+":charge", 1, true, false, nil)
+		require.NoError(t, err)
+	}
+	used, err = GetTokenUsedPoints(user.Id, []int{historyToken.Id})
+	require.NoError(t, err)
+	assert.EqualValues(t, 2, used[historyToken.Id], "sum recorded rounded points rather than recalculate aggregate quota")
+	for i := range 2 {
+		id := fmt.Sprintf("history-%d", i)
+		_, err = SetPointCallTarget(id, id+":refund", 0, true, false, nil)
+		require.NoError(t, err)
+	}
+	// Checked int64 totals fail closed, never wrap into available budget.
+	require.NoError(t, db.Create(&PointCallBilling{ID: "overflow-history-a", UserID: user.Id, TokenID: historyToken.Id, Points: math.MaxInt64, Rate: "1", Unit: "1000", Model: "gpt-test", Allocations: "[]"}).Error)
+	require.NoError(t, db.Create(&PointCallBilling{ID: "overflow-history-b", UserID: user.Id, TokenID: historyToken.Id, Points: 1, Rate: "1", Unit: "1000", Model: "gpt-test", Allocations: "[]"}).Error)
+	_, err = GetTokenUsedPoints(user.Id, []int{historyToken.Id})
+	require.Error(t, err)
+	require.NoError(t, CreatePointCall("overflow-admission", user.Id, historyToken.Id, "gpt-test", "1", "1000"))
+	require.Error(t, ReservePointCall("overflow-admission", "overflow-admission:reserve", 1, true))
 
 	// Dispatch intent and holds commit together; a failed marker must not leave
 	// a successful token/points reservation without a returned session.

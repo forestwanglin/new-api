@@ -71,7 +71,7 @@ func newPointsBillingSession(c *gin.Context, info *relaycommon.RelayInfo, quota 
 	return session, nil
 }
 func pointsBillingAPIError(err error) *types.NewAPIError {
-	if errors.Is(err, model.ErrInsufficientPoints) {
+	if errors.Is(err, model.ErrInsufficientPoints) || errors.Is(err, model.ErrTokenPointLimit) {
 		return types.NewErrorWithStatusCode(err, types.ErrorCodeInsufficientUserQuota, http.StatusForbidden, types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
 	}
 	return types.NewError(err, types.ErrorCodeUpdateDataError, types.ErrOptionWithSkipRetry())

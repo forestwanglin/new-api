@@ -23,25 +23,27 @@ var (
 )
 
 type PointCallBilling struct {
-	ID            string `gorm:"primaryKey;type:varchar(64)"`
-	UserID        int    `gorm:"not null;index"`
-	TokenID       int
-	ChannelID     int
-	Group         string `gorm:"type:varchar(64)"`
-	Model         string `gorm:"type:varchar(255);not null"`
-	Rate          string `gorm:"type:varchar(128);not null"`
-	Unit          string `gorm:"type:varchar(128);not null"`
-	Allocations   string `gorm:"type:text;not null"`
-	ReservedQuota int64
-	TokenQuota    int64
-	BookedQuota   int64
-	FeeQuota      int64
-	Points        int64
-	Revision      int64
-	State         string `gorm:"type:varchar(32);index"`
-	Dispatch      string `gorm:"type:varchar(32);index"`
-	CreatedAt     int64  `gorm:"autoCreateTime:milli"`
-	UpdatedAt     int64  `gorm:"autoUpdateTime:milli;index"`
+	ID                  string `gorm:"primaryKey;type:varchar(64)"`
+	UserID              int    `gorm:"not null;index"`
+	TokenID             int    `gorm:"index"`
+	TokenPointMode      *bool
+	TokenReservedPoints int64 `gorm:"type:bigint;not null;default:0"`
+	ChannelID           int
+	Group               string `gorm:"type:varchar(64)"`
+	Model               string `gorm:"type:varchar(255);not null"`
+	Rate                string `gorm:"type:varchar(128);not null"`
+	Unit                string `gorm:"type:varchar(128);not null"`
+	Allocations         string `gorm:"type:text;not null"`
+	ReservedQuota       int64
+	TokenQuota          int64
+	BookedQuota         int64
+	FeeQuota            int64
+	Points              int64
+	Revision            int64
+	State               string `gorm:"type:varchar(32);index"`
+	Dispatch            string `gorm:"type:varchar(32);index"`
+	CreatedAt           int64  `gorm:"autoCreateTime:milli"`
+	UpdatedAt           int64  `gorm:"autoUpdateTime:milli;index"`
 }
 
 type pointCallAllocation struct {
@@ -287,6 +289,11 @@ func CreatePointCall(id string, userID, tokenID int, model, rate, unit string) e
 		return e
 	}
 	return DB.Transaction(func(tx *gorm.DB) error {
+		if common.UsingMainDatabase(common.DatabaseTypeSQLite) {
+			if e := tx.Model(&User{}).Where("id = ?", userID).UpdateColumn("quota", gorm.Expr("quota")).Error; e != nil {
+				return e
+			}
+		}
 		var user User
 		if e := lockForUpdate(tx).Select("id").First(&user, userID).Error; e != nil {
 			return e
@@ -302,6 +309,7 @@ func CreatePointCall(id string, userID, tokenID int, model, rate, unit string) e
 		if !errors.Is(e, gorm.ErrRecordNotFound) {
 			return e
 		}
+
 		var types []PointType
 		var rules []PointModelRule
 		if e := tx.Order("consume_priority DESC, id ASC").Find(&types).Error; e != nil {
@@ -390,14 +398,37 @@ func ReservePointCall(id, event string, target int, unlimited bool) error {
 		if e != nil {
 			return e
 		}
-		// Token is locked before point accounts even when the points check will fail.
-		if c.TokenID > 0 && int64(target) > c.TokenQuota {
-			ok, e := ReserveTokenQuotaTx(tx, c.TokenID, target-int(c.TokenQuota), unlimited)
-			if e != nil {
-				return e
+		// Snapshot at first admission, after user/call locks and before accounts.
+		if c.TokenID > 0 {
+			if c.TokenPointMode == nil {
+				mode := false
+				if c.ReservedQuota == 0 && c.Dispatch == "unsubmitted" {
+					token, err := lockTokenQuotaTx(tx, c.TokenID)
+					if err != nil {
+						return err
+					}
+					mode = token.PointLimitEnabled
+				}
+				c.TokenPointMode = &mode
 			}
-			if !ok {
-				return errors.New("token quota is not enough")
+			if *c.TokenPointMode {
+				next := max(points-c.Points, int64(0))
+				ok, err := ReserveTokenPointLimitTx(tx, c.TokenID, c.ID, max(c.TokenReservedPoints, next))
+				if err != nil {
+					return err
+				}
+				if !ok {
+					return ErrTokenPointLimit
+				}
+				c.TokenReservedPoints = max(c.TokenReservedPoints, next)
+			} else if int64(target) > c.TokenQuota {
+				ok, err := ReserveTokenQuotaTx(tx, c.TokenID, target-int(c.TokenQuota), unlimited)
+				if err != nil {
+					return err
+				}
+				if !ok {
+					return errors.New("token quota is not enough")
+				}
 			}
 		}
 		accounts, e := pointCallAccounts(tx, c.UserID, c.ID, a)
@@ -470,7 +501,9 @@ func ReservePointCall(id, event string, target int, unlimited bool) error {
 			return ErrInsufficientPoints
 		}
 		c.ReservedQuota = int64(target)
-		c.TokenQuota = int64(target)
+		if c.TokenPointMode == nil || !*c.TokenPointMode {
+			c.TokenQuota = int64(target)
+		}
 		if c.Dispatch == "unsubmitted" {
 			c.Dispatch = "dispatching"
 		}
@@ -561,6 +594,16 @@ func SetPointCallTarget(id, event string, target int, final, fee bool, guard fun
 		if c.TokenID > 0 {
 			if e := AdjustTokenQuotaTx(tx, c.TokenID, int(c.TokenQuota-total)); e != nil {
 				return e
+			}
+			if c.TokenPointMode != nil && *c.TokenPointMode {
+				next := max(c.TokenReservedPoints-max(delta, int64(0)), int64(0))
+				if final {
+					next = 0
+				}
+				if e := AdjustTokenPointReservationTx(tx, c.TokenID, c.ID, next); e != nil {
+					return e
+				}
+				c.TokenReservedPoints = next
 			}
 		}
 		c.TokenQuota = total

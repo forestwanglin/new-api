@@ -35,6 +35,9 @@ const t = ((key: string, options?: Record<string, unknown>) => {
 }) as TFunction
 
 const baseApiKey: ApiKey = {
+  point_limit_enabled: true,
+  point_limit: '0',
+  used_points: '0',
   id: 1,
   name: 'test',
   key: 'sk-test',
@@ -208,4 +211,62 @@ describe('API key user quota query form mapping', () => {
       )
     }
   )
+})
+
+describe('API key point limit mapping', () => {
+  test('creates a key with an exact point limit and unlimited legacy money quota', () => {
+    const defaults = getApiKeyFormDefaultValues(false)
+    const payload = transformFormDataToPayload({
+      ...defaults,
+      point_limit: '9007199254740993',
+    })
+    expect(payload.point_limit).toBe('9007199254740993')
+    expect(payload.remain_quota).toBe(0)
+    expect(payload.unlimited_quota).toBe(true)
+  })
+
+  test('requires manual point input when editing a legacy money-limited key', () => {
+    const defaults = transformApiKeyToFormDefaults({
+      ...baseApiKey,
+      point_limit_enabled: false,
+      unlimited_quota: false,
+      remain_quota: 12345,
+    })
+    expect(defaults.point_limit).toBe('')
+    const result = getApiKeyFormSchema(t).safeParse(defaults)
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(
+        result.error.issues.some((issue) => issue.path[0] === 'point_limit')
+      ).toBe(true)
+    }
+  })
+
+  test.each(['', '-1', '1.5', '1e3', '9223372036854775808'])(
+    'rejects invalid point limit %s',
+    (point_limit) => {
+      expect(
+        getApiKeyFormSchema(t).safeParse({
+          ...getApiKeyFormDefaultValues(false),
+          name: 'test',
+          point_limit,
+        }).success
+      ).toBe(false)
+    }
+  )
+
+  test('loads a point-mode key without converting or rounding its point limit', () => {
+    const key = apiKeySchema.parse({
+      ...baseApiKey,
+      point_limit_enabled: true,
+      point_limit: '9007199254740993',
+      used_points: '8',
+    })
+    expect(transformApiKeyToFormDefaults(key).point_limit).toBe(
+      '9007199254740993'
+    )
+    expect(
+      transformFormDataToPayload(transformApiKeyToFormDefaults(key)).point_limit
+    ).toBe('9007199254740993')
+  })
 })

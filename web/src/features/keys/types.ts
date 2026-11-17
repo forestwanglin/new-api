@@ -47,6 +47,9 @@ export const apiKeySchema = z.object({
   model_limits: z.string().nullish().default(''),
   allow_ips: z.string().nullish().default(''),
   allow_user_quota_query: z.boolean().optional().default(false),
+  point_limit_enabled: z.boolean().optional().default(false),
+  point_limit: z.string().optional().default('0'),
+  used_points: z.string().optional().default('0'),
 })
 
 export type ApiKey = z.infer<typeof apiKeySchema>
@@ -96,6 +99,7 @@ export interface ApiKeyFormData {
   group: string
   auto_groups: string[]
   cross_group_retry: boolean
+  point_limit: string
 }
 
 export interface TokenAutoGroupsConfig {

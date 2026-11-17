@@ -107,7 +107,7 @@ func openTokenControllerTestDB(t *testing.T) *gorm.DB {
 func migrateTokenControllerTestDB(t *testing.T, db *gorm.DB) {
 	t.Helper()
 
-	if err := db.AutoMigrate(&model.Token{}); err != nil {
+	if err := db.AutoMigrate(&model.Token{}, &model.PointCallBilling{}, &model.User{}); err != nil {
 		t.Fatalf("failed to migrate token table: %v", err)
 	}
 }
@@ -736,7 +736,7 @@ func TestAPITokenAuditDatabaseMatrix(t *testing.T) {
 				db, _ := newAuditTestDatabase(t, database.name, dsn)
 				model.DB = db
 				common.SetDatabaseTypes(database.typ, database.typ)
-				require.NoError(t, db.AutoMigrate(&model.User{}, &model.UserSession{}, &model.Token{}))
+				require.NoError(t, db.AutoMigrate(&model.User{}, &model.UserSession{}, &model.Token{}, &model.PointCallBilling{}))
 				// Initialize production column quoting as well as the existing audit table.
 				require.NoError(t, model.InitLogDB())
 				if separateLog {
@@ -1014,4 +1014,80 @@ func verifyAPITokenAudit(t *testing.T) {
 		require.NoError(t, model.DB.Model(&model.Token{}).Where("name = ?", "audit-down").Count(&count).Error)
 		assert.EqualValues(t, 1, count)
 	})
+}
+
+func TestTokenPointLimitManagement(t *testing.T) {
+	db := setupTokenControllerTestDB(t)
+	require.NoError(t, db.Create(&model.User{Id: 1, Username: "point-owner"}).Error)
+	ctx, recorder := newAuthenticatedContext(t, http.MethodPost, "/api/token/", map[string]any{
+		"name": "point-key", "expired_time": -1, "point_limit": "1000", "remain_quota": 99,
+		"reserved_points": 999, "used_points": "999",
+	}, 1)
+	AddToken(ctx)
+	require.True(t, decodeAPIResponse(t, recorder).Success, recorder.Body.String())
+	var token model.Token
+	require.NoError(t, db.Where("name = ?", "point-key").First(&token).Error)
+	assert.True(t, token.PointLimitEnabled)
+	assert.EqualValues(t, 1000, token.PointLimit)
+	assert.True(t, token.UnlimitedQuota, "point cap disables the legacy money cap")
+	assert.Zero(t, token.RemainQuota)
+	assert.Zero(t, token.ReservedPoints, "client cannot set financial counters")
+	for _, value := range []any{"", "-1", "1.2", "1e3", "9223372036854775808", " 1", nil, 1000} {
+		ctx, recorder = newAuthenticatedContext(t, http.MethodPost, "/api/token/", map[string]any{"name": "invalid", "point_limit": value}, 1)
+		AddToken(ctx)
+		assert.False(t, decodeAPIResponse(t, recorder).Success, "invalid limit: %v", value)
+	}
+	legacy := seedToken(t, db, 1, "legacy", "legacy-point-conversion")
+	require.NoError(t, db.Model(legacy).Updates(map[string]any{"remain_quota": 17, "unlimited_quota": false}).Error)
+	for _, call := range []model.PointCallBilling{
+		{ID: "history-a", UserID: 1, TokenID: legacy.Id, Points: 9007199254740993, Model: "gpt-test", Rate: "1", Unit: "1000", Allocations: "[]"},
+		{ID: "history-b", UserID: 1, TokenID: legacy.Id, Points: 1, Model: "gpt-test", Rate: "2", Unit: "10000", Allocations: "[]"},
+	} {
+		require.NoError(t, db.Create(&call).Error)
+	}
+	// Status-only requests never convert, even when carrying a point field.
+	ctx, recorder = newAuthenticatedContext(t, http.MethodPut, "/api/token/?status_only=true", map[string]any{"id": legacy.Id, "status": common.TokenStatusDisabled, "point_limit": "0"}, 1)
+	UpdateToken(ctx)
+	require.True(t, decodeAPIResponse(t, recorder).Success, recorder.Body.String())
+	require.NoError(t, db.First(legacy, legacy.Id).Error)
+	assert.False(t, legacy.PointLimitEnabled)
+	assert.Equal(t, 17, legacy.RemainQuota)
+	ctx, recorder = newAuthenticatedContext(t, http.MethodPut, "/api/token/", map[string]any{"id": legacy.Id, "name": "converted", "expired_time": -1, "point_limit": "9223372036854775807", "remain_quota": 88}, 1)
+	UpdateToken(ctx)
+	require.True(t, decodeAPIResponse(t, recorder).Success, recorder.Body.String())
+	var response struct {
+		PointLimit string `json:"point_limit"`
+		UsedPoints string `json:"used_points"`
+		Key        string `json:"key"`
+	}
+	require.NoError(t, common.Unmarshal(decodeAPIResponse(t, recorder).Data, &response))
+	assert.Equal(t, "9223372036854775807", response.PointLimit)
+	assert.Equal(t, "9007199254740994", response.UsedPoints)
+	assert.NotEqual(t, legacy.Key, response.Key)
+	require.NoError(t, db.First(legacy, legacy.Id).Error)
+	assert.True(t, legacy.PointLimitEnabled, "full edit persists point mode")
+	assert.EqualValues(t, 9223372036854775807, legacy.PointLimit)
+	ctx, recorder = newAuthenticatedContext(t, http.MethodPut, "/api/token/", map[string]any{"id": legacy.Id, "name": "old-client", "expired_time": -1, "point_limit_enabled": false, "remain_quota": 1}, 1)
+	UpdateToken(ctx)
+	require.True(t, decodeAPIResponse(t, recorder).Success, recorder.Body.String())
+	require.NoError(t, db.First(legacy, legacy.Id).Error)
+	assert.True(t, legacy.PointLimitEnabled, "omission cannot downgrade an enabled cap")
+	assert.EqualValues(t, 9223372036854775807, legacy.PointLimit)
+	assert.True(t, legacy.UnlimitedQuota)
+	assert.Zero(t, legacy.RemainQuota)
+	used, err := model.GetTokenUsedPoints(2, []int{legacy.Id})
+	require.NoError(t, err)
+	assert.Empty(t, used, "projection is scoped to the authenticated owner")
+	// A projection failure is returned before mutating or reporting audit success.
+	require.NoError(t, db.Callback().Row().Before("gorm:row").Register("test:points-read-failure", func(tx *gorm.DB) {
+		if tx.Statement.Table == "point_call_billings" {
+			tx.AddError(errors.New("injected points read failure"))
+		}
+	}))
+	ctx, recorder = newAuthenticatedContext(t, http.MethodPut, "/api/token/", map[string]any{"id": legacy.Id, "name": "must-not-save", "expired_time": -1, "point_limit": "5"}, 1)
+	UpdateToken(ctx)
+	assert.False(t, decodeAPIResponse(t, recorder).Success)
+	require.NoError(t, db.Callback().Row().Remove("test:points-read-failure"))
+	require.NoError(t, db.First(legacy, legacy.Id).Error)
+	assert.Equal(t, "old-client", legacy.Name)
 }
