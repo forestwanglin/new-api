@@ -47,7 +47,7 @@ export function ProfileDropdown() {
   const user = useAuthStore((state) => state.auth.user)
   const { displayName, roleLabel } = useUserDisplay(user)
   const isSuperAdmin = user?.role === ROLE.SUPER_ADMIN
-  const isSecurityVisible = useIsSidebarModuleVisible('/security')
+  const isSecurityVisible = useIsSidebarModuleVisible('/security-access')
   const avatarName = user?.username || displayName
   const avatarFallback = getUserAvatarFallback(avatarName)
   const avatarFallbackStyle = useMemo(
@@ -112,13 +112,13 @@ export function ProfileDropdown() {
 
           <DropdownMenuSeparator />
 
-          <DropdownMenuItem onClick={() => navigate({ to: '/profile' })}>
+          <DropdownMenuItem onClick={() => navigate({ to: '/personal-profile' })}>
             <User className='size-4' />
             {t('Profile')}
           </DropdownMenuItem>
 
           {isSecurityVisible && (
-            <DropdownMenuItem onClick={() => navigate({ to: '/security' })}>
+            <DropdownMenuItem onClick={() => navigate({ to: '/security-access' })}>
               <ShieldCheck className='size-4' />
               {t('Security & Access')}
             </DropdownMenuItem>
