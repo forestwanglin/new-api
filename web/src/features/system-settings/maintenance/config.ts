@@ -76,6 +76,7 @@ export const SIDEBAR_MODULES_DEFAULT: SidebarModulesAdminConfig = {
     my_subscription: true,
     personal: true,
     security: true,
+    security_access: true,
   },
   admin: {
     enabled: true,

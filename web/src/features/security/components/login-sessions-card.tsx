@@ -58,7 +58,7 @@ import { LoginSessionItem } from './login-session-item'
 
 const sessionQueryKey = ['profile', 'login-sessions'] as const
 
-export function LoginSessionsCard() {
+export function LoginSessionsCard(props: { variant?: 'demo' } = {}) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -167,7 +167,11 @@ export function LoginSessionsCard() {
         {sessions.map((session, index) => (
           <div key={session.sid}>
             {index > 0 && <Separator />}
-            <LoginSessionItem session={session} onRevoke={setRevokeTarget} />
+            <LoginSessionItem
+              session={session}
+              onRevoke={setRevokeTarget}
+              variant={props.variant}
+            />
           </div>
         ))}
       </div>
@@ -176,11 +180,21 @@ export function LoginSessionsCard() {
 
   return (
     <>
-      <Card data-card-hover='false'>
+      <Card
+        data-card-hover='false'
+        className={props.variant === 'demo' ? 'sa-devices' : undefined}
+      >
         <CardHeader>
-          <CardTitle>{t('Login sessions')}</CardTitle>
+          <CardTitle>
+            {t(props.variant === 'demo' ? 'Login devices' : 'Login sessions')}
+          </CardTitle>
           <CardDescription>
-            {t('Review and sign out devices currently using your account.')}
+            {props.variant === 'demo' && sessionsQuery.isSuccess
+              ? t(
+                  'There are {{count}} devices signed in. Sign out any unfamiliar devices.',
+                  { count: sessions.length }
+                )
+              : t('Review and sign out devices currently using your account.')}
           </CardDescription>
           <CardAction>
             <Button

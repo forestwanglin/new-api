@@ -136,6 +136,7 @@ describe('security sidebar visibility', () => {
       'My subscription',
       'Personal Profile',
       'Security & Access',
+      'Security & Access',
     ])
     expect(
       result.current
@@ -155,7 +156,7 @@ describe('security sidebar visibility', () => {
       expect(
         result.current
           .flatMap((group) => group.items)
-          .some((item) => item.title === 'Security & Access')
+          .some((item) => item.url === '/security')
       ).toBe(false)
     }
   )
@@ -168,7 +169,7 @@ describe('security sidebar visibility', () => {
     expect(
       result.current
         .flatMap((group) => group.items)
-        .some((item) => item.title === 'Security & Access')
+        .some((item) => item.url === '/security')
     ).toBe(true)
   })
 })
@@ -456,5 +457,40 @@ describe('retired console navigation entries', () => {
     expect(urls).not.toContain('/dashboard/overview')
     expect(urls).not.toContain('/profile')
     expect(urls).toContain('/personal-profile')
+  })
+})
+
+describe('independent security access entry', () => {
+  it('appends the independent page while preserving the legacy security destination', () => {
+    const { result } = sidebarFor()
+    const urls = result.current
+      .find((group) => group.id === 'personal')
+      ?.items.map((item) => item.url)
+    expect(urls?.slice(-2)).toEqual(['/security', '/security-access'])
+  })
+  it.each([
+    [{ personal: { enabled: true, security_access: false } }, undefined],
+    [undefined, { personal: { enabled: true, security_access: false } }],
+  ])(
+    'hides only the new security page when its module is disabled (%j, %j)',
+    (admin, user) => {
+      const { result } = sidebarFor(admin, user)
+      const urls = result.current
+        .flatMap((group) => group.items)
+        .map((item) => item.url)
+      expect(urls).not.toContain('/security-access')
+      expect(urls).toContain('/security')
+    }
+  )
+  it('defaults old admin configurations to showing the new module and preserves explicit false', () => {
+    const config = parseSidebarModulesAdmin(
+      '{"personal":{"enabled":true,"security":true}}'
+    )
+    expect(config.personal.security_access).toBe(true)
+    config.personal.security_access = false
+    expect(
+      parseSidebarModulesAdmin(serializeSidebarModulesAdmin(config)).personal
+        .security_access
+    ).toBe(false)
   })
 })

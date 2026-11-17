@@ -31,10 +31,15 @@ import { loginMethodLabel, sessionDevice } from './login-session-utils'
 
 interface LoginSessionItemProps {
   session: LoginSession
+  variant?: 'demo'
   onRevoke: (session: LoginSession) => void
 }
 
-export function LoginSessionItem({ session, onRevoke }: LoginSessionItemProps) {
+export function LoginSessionItem({
+  session,
+  onRevoke,
+  variant,
+}: LoginSessionItemProps) {
   const { t, i18n } = useTranslation()
   const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
   const maxTouchPoints =
@@ -43,7 +48,13 @@ export function LoginSessionItem({ session, onRevoke }: LoginSessionItemProps) {
       : 0
 
   return (
-    <div className='flex flex-col gap-3 py-4 sm:flex-row sm:items-center'>
+    <div
+      className={
+        variant === 'demo'
+          ? 'sa-device'
+          : 'flex flex-col gap-3 py-4 sm:flex-row sm:items-center'
+      }
+    >
       <div className='bg-muted flex size-10 shrink-0 items-center justify-center rounded-lg'>
         <HugeiconsIcon icon={LaptopIcon} className='size-5' strokeWidth={2} />
       </div>
@@ -76,14 +87,16 @@ export function LoginSessionItem({ session, onRevoke }: LoginSessionItemProps) {
           })}
         </p>
       </div>
-      <Button
-        type='button'
-        variant={session.current ? 'outline' : 'ghost'}
-        size='sm'
-        onClick={() => onRevoke(session)}
-      >
-        {session.current ? t('Sign out') : t('Revoke')}
-      </Button>
+      {(variant !== 'demo' || !session.current) && (
+        <Button
+          type='button'
+          variant={session.current ? 'outline' : 'ghost'}
+          size='sm'
+          onClick={() => onRevoke(session)}
+        >
+          {session.current ? t('Sign out') : t('Revoke')}
+        </Button>
+      )}
     </div>
   )
 }

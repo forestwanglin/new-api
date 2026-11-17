@@ -1,5 +1,13 @@
 {
   "translation": {
+    "Access Tokens": "Access Tokens",
+    "Manage your bound phone and login devices to protect your account and assets.": "Manage your bound phone and login devices to protect your account and assets.",
+    "Login devices": "Login devices",
+    "Manage your bound phone for quick sign-in with verification codes.": "Manage your bound phone for quick sign-in with verification codes.",
+    "WeChat binding": "WeChat binding",
+    "Close account": "Close account",
+    "Request account deletion": "Request account deletion",
+    "There are {{count}} devices signed in. Sign out any unfamiliar devices.": "There are {{count}} devices signed in. Sign out any unfamiliar devices.",
     "Personal Profile": "Personal Profile",
     "Preferred language": "Preferred language",
     "11-digit mainland China phone number": "11-digit mainland China phone number",

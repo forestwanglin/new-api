@@ -1,5 +1,13 @@
 {
   "translation": {
+    "Access Tokens": "Токены доступа",
+    "Manage your bound phone and login devices to protect your account and assets.": "Управляйте привязанным телефоном и устройствами для защиты аккаунта и средств.",
+    "Login devices": "Устройства входа",
+    "Manage your bound phone for quick sign-in with verification codes.": "Управляйте телефоном для быстрого входа по коду.",
+    "WeChat binding": "Привязка WeChat",
+    "Close account": "Закрыть аккаунт",
+    "Request account deletion": "Запросить удаление",
+    "There are {{count}} devices signed in. Sign out any unfamiliar devices.": "Выполнен вход на {{count}} устройствах. Отключите незнакомые устройства.",
     "Personal Profile": "Личный профиль",
     "Preferred language": "Предпочитаемый язык",
     "11-digit mainland China phone number": "Номер телефона материкового Китая из 11 цифр",

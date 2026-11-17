@@ -1,5 +1,13 @@
 {
   "translation": {
+    "Access Tokens": "Jetons d’accès",
+    "Manage your bound phone and login devices to protect your account and assets.": "Gérez votre téléphone et vos appareils pour protéger votre compte et vos actifs.",
+    "Login devices": "Appareils connectés",
+    "Manage your bound phone for quick sign-in with verification codes.": "Gérez votre téléphone pour vous connecter rapidement avec un code.",
+    "WeChat binding": "Liaison WeChat",
+    "Close account": "Fermer le compte",
+    "Request account deletion": "Demander la suppression",
+    "There are {{count}} devices signed in. Sign out any unfamiliar devices.": "{{count}} appareils sont connectés. Déconnectez tout appareil inconnu.",
     "Personal Profile": "Profil personnel",
     "Preferred language": "Langue préférée",
     "11-digit mainland China phone number": "Numéro mobile chinois à 11 chiffres",

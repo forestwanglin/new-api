@@ -57,6 +57,7 @@ import { Route as AuthenticatedPointsWalletIndexRouteImport } from './routes/_au
 import { Route as AuthenticatedPointsIndexRouteImport } from './routes/_authenticated/points/index'
 import { Route as AuthenticatedProfileIndexRouteImport } from './routes/_authenticated/profile/index'
 import { Route as AuthenticatedRedemptionCodesIndexRouteImport } from './routes/_authenticated/redemption-codes/index'
+import { Route as AuthenticatedSecurityAccessIndexRouteImport } from './routes/_authenticated/security-access/index'
 import { Route as AuthenticatedSecurityIndexRouteImport } from './routes/_authenticated/security/index'
 import { Route as AuthenticatedSubscriptionsIndexRouteImport } from './routes/_authenticated/subscriptions/index'
 import { Route as AuthenticatedSystemInfoIndexRouteImport } from './routes/_authenticated/system-info/index'
@@ -342,6 +343,12 @@ const AuthenticatedRedemptionCodesIndexRoute =
     path: '/redemption-codes/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedSecurityAccessIndexRoute =
+  AuthenticatedSecurityAccessIndexRouteImport.update({
+    id: '/security-access/',
+    path: '/security-access/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedSecurityIndexRoute =
   AuthenticatedSecurityIndexRouteImport.update({
     id: '/security/',
@@ -558,6 +565,7 @@ export interface FileRoutesByFullPath {
   '/points/': typeof AuthenticatedPointsIndexRoute
   '/profile/': typeof AuthenticatedProfileIndexRoute
   '/redemption-codes/': typeof AuthenticatedRedemptionCodesIndexRoute
+  '/security-access/': typeof AuthenticatedSecurityAccessIndexRoute
   '/security/': typeof AuthenticatedSecurityIndexRoute
   '/subscriptions/': typeof AuthenticatedSubscriptionsIndexRoute
   '/system-info/': typeof AuthenticatedSystemInfoIndexRoute
@@ -633,6 +641,7 @@ export interface FileRoutesByTo {
   '/points': typeof AuthenticatedPointsIndexRoute
   '/profile': typeof AuthenticatedProfileIndexRoute
   '/redemption-codes': typeof AuthenticatedRedemptionCodesIndexRoute
+  '/security-access': typeof AuthenticatedSecurityAccessIndexRoute
   '/security': typeof AuthenticatedSecurityIndexRoute
   '/subscriptions': typeof AuthenticatedSubscriptionsIndexRoute
   '/system-info': typeof AuthenticatedSystemInfoIndexRoute
@@ -712,6 +721,7 @@ export interface FileRoutesById {
   '/_authenticated/points/': typeof AuthenticatedPointsIndexRoute
   '/_authenticated/profile/': typeof AuthenticatedProfileIndexRoute
   '/_authenticated/redemption-codes/': typeof AuthenticatedRedemptionCodesIndexRoute
+  '/_authenticated/security-access/': typeof AuthenticatedSecurityAccessIndexRoute
   '/_authenticated/security/': typeof AuthenticatedSecurityIndexRoute
   '/_authenticated/subscriptions/': typeof AuthenticatedSubscriptionsIndexRoute
   '/_authenticated/system-info/': typeof AuthenticatedSystemInfoIndexRoute
@@ -790,6 +800,7 @@ export interface FileRouteTypes {
     | '/points/'
     | '/profile/'
     | '/redemption-codes/'
+    | '/security-access/'
     | '/security/'
     | '/subscriptions/'
     | '/system-info/'
@@ -865,6 +876,7 @@ export interface FileRouteTypes {
     | '/points'
     | '/profile'
     | '/redemption-codes'
+    | '/security-access'
     | '/security'
     | '/subscriptions'
     | '/system-info'
@@ -943,6 +955,7 @@ export interface FileRouteTypes {
     | '/_authenticated/points/'
     | '/_authenticated/profile/'
     | '/_authenticated/redemption-codes/'
+    | '/_authenticated/security-access/'
     | '/_authenticated/security/'
     | '/_authenticated/subscriptions/'
     | '/_authenticated/system-info/'
@@ -1332,6 +1345,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRedemptionCodesIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/security-access/': {
+      id: '/_authenticated/security-access/'
+      path: '/security-access'
+      fullPath: '/security-access/'
+      preLoaderRoute: typeof AuthenticatedSecurityAccessIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/security/': {
       id: '/_authenticated/security/'
       path: '/security'
@@ -1644,6 +1664,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedPointsIndexRoute: typeof AuthenticatedPointsIndexRoute
   AuthenticatedProfileIndexRoute: typeof AuthenticatedProfileIndexRoute
   AuthenticatedRedemptionCodesIndexRoute: typeof AuthenticatedRedemptionCodesIndexRoute
+  AuthenticatedSecurityAccessIndexRoute: typeof AuthenticatedSecurityAccessIndexRoute
   AuthenticatedSecurityIndexRoute: typeof AuthenticatedSecurityIndexRoute
   AuthenticatedSubscriptionsIndexRoute: typeof AuthenticatedSubscriptionsIndexRoute
   AuthenticatedSystemInfoIndexRoute: typeof AuthenticatedSystemInfoIndexRoute
@@ -1683,6 +1704,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedProfileIndexRoute: AuthenticatedProfileIndexRoute,
   AuthenticatedRedemptionCodesIndexRoute:
     AuthenticatedRedemptionCodesIndexRoute,
+  AuthenticatedSecurityAccessIndexRoute: AuthenticatedSecurityAccessIndexRoute,
   AuthenticatedSecurityIndexRoute: AuthenticatedSecurityIndexRoute,
   AuthenticatedSubscriptionsIndexRoute: AuthenticatedSubscriptionsIndexRoute,
   AuthenticatedSystemInfoIndexRoute: AuthenticatedSystemInfoIndexRoute,

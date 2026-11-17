@@ -1,5 +1,13 @@
 {
   "translation": {
+    "Access Tokens": "存取權杖",
+    "Manage your bound phone and login devices to protect your account and assets.": "管理綁定手機號與登入裝置，保護帳號與資產安全。",
+    "Login devices": "登入裝置",
+    "Manage your bound phone for quick sign-in with verification codes.": "管理綁定手機號，使用驗證碼快速登入。",
+    "WeChat binding": "微信綁定",
+    "Close account": "註銷帳號",
+    "Request account deletion": "申請註銷",
+    "There are {{count}} devices signed in. Sign out any unfamiliar devices.": "目前共 {{count}} 台裝置登入，發現異常可立即登出。",
     "Personal Profile": "個人資料",
     "Preferred language": "偏好語言",
     "11-digit mainland China phone number": "中國大陸 11 位手機號",

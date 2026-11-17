@@ -132,6 +132,11 @@ export function useSidebarData(badges: SidebarBadges = {}): SidebarData {
             url: '/security',
             icon: ShieldCheck,
           },
+          {
+            title: t('Security & Access'),
+            url: '/security-access',
+            icon: ShieldCheck,
+          },
         ],
       },
       {

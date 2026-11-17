@@ -144,6 +144,13 @@ export function SidebarModulesCard() {
           title: t('Security & Access'),
           description: t('Manage your security settings and account access'),
         },
+        {
+          key: 'security_access',
+          title: t('Security & Access'),
+          description: t(
+            'Manage your bound phone and login devices to protect your account and assets.'
+          ),
+        },
       ],
     },
   ]

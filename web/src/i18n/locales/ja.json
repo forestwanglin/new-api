@@ -1,5 +1,13 @@
 {
   "translation": {
+    "Access Tokens": "アクセストークン",
+    "Manage your bound phone and login devices to protect your account and assets.": "電話番号とログイン端末を管理し、アカウントと資産を保護します。",
+    "Login devices": "ログイン端末",
+    "Manage your bound phone for quick sign-in with verification codes.": "連携した電話番号を管理し、認証コードですばやくログインします。",
+    "WeChat binding": "WeChat連携",
+    "Close account": "アカウントの削除",
+    "Request account deletion": "削除を申請",
+    "There are {{count}} devices signed in. Sign out any unfamiliar devices.": "現在{{count}}台の端末がログインしています。不明な端末はログアウトできます。",
     "Personal Profile": "個人プロフィール",
     "Preferred language": "優先言語",
     "11-digit mainland China phone number": "中国本土の11桁の携帯電話番号",

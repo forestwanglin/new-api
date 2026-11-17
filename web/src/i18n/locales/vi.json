@@ -1,5 +1,13 @@
 {
   "translation": {
+    "Access Tokens": "Mã truy cập",
+    "Manage your bound phone and login devices to protect your account and assets.": "Quản lý số điện thoại và thiết bị đăng nhập để bảo vệ tài khoản và tài sản.",
+    "Login devices": "Thiết bị đăng nhập",
+    "Manage your bound phone for quick sign-in with verification codes.": "Quản lý số điện thoại để đăng nhập nhanh bằng mã xác minh.",
+    "WeChat binding": "Liên kết WeChat",
+    "Close account": "Đóng tài khoản",
+    "Request account deletion": "Yêu cầu xóa tài khoản",
+    "There are {{count}} devices signed in. Sign out any unfamiliar devices.": "Hiện có {{count}} thiết bị đăng nhập. Đăng xuất thiết bị lạ.",
     "Personal Profile": "Hồ sơ cá nhân",
     "Preferred language": "Ngôn ngữ ưu tiên",
     "11-digit mainland China phone number": "Số điện thoại Trung Quốc đại lục gồm 11 chữ số",

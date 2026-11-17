@@ -148,6 +148,12 @@ export function SidebarModulesSection({
         title: t('Security & Access'),
         description: t('Manage your security settings and account access'),
       },
+      security_access: {
+        title: t('Security & Access'),
+        description: t(
+          'Manage your bound phone and login devices to protect your account and assets.'
+        ),
+      },
     },
     admin: {
       channel: {
