@@ -8100,6 +8100,8 @@
     "{{count}} calls · {{percent}} of calls": "{{count}} 次調用 · 占 {{percent}}",
     "{{points}} points · {{percent}} of spend": "{{points}} 積分 · 占 {{percent}}",
     "Deleted key": "已刪除的金鑰",
-    "points": "積分"
+    "points": "積分",
+    "Text Models": "文字模型",
+    "Video Models": "影片模型"
   }
 }

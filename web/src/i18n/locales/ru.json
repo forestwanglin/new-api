@@ -8102,6 +8102,8 @@
     "{{count}} calls · {{percent}} of calls": "{{count}} вызовов · {{percent}} от вызовов",
     "{{points}} points · {{percent}} of spend": "{{points}} очков · {{percent}} от расходов",
     "Deleted key": "Удалённый ключ",
-    "points": "очков"
+    "points": "очков",
+    "Text Models": "Текстовые модели",
+    "Video Models": "Видеомодели"
   }
 }

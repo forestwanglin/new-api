@@ -189,6 +189,23 @@ export function ModelPlaza() {
     )
   }, [searchedModels, filter, locale])
 
+  const modelSections = [
+    {
+      id: 'text',
+      title: `${scopeLabel} · ${t('Text Models')}`,
+      models: filteredModels.filter(
+        (model) => !model.supported_endpoint_types?.includes('openai-video')
+      ),
+    },
+    {
+      id: 'video',
+      title: `${scopeLabel} · ${t('Video Models')}`,
+      models: filteredModels.filter((model) =>
+        model.supported_endpoint_types?.includes('openai-video')
+      ),
+    },
+  ].filter((section) => section.models.length > 0)
+
   const discounts = models
     .map((model) => getModelDiscountRatio(model, referenceExchangeRate))
     .filter((ratio): ratio is number => ratio !== null && ratio < 1)
@@ -264,17 +281,19 @@ export function ModelPlaza() {
 
             <section
               className='mp-main'
-              aria-labelledby='mp-scope'
+              aria-label={scopeLabel}
               aria-busy={isLoading}
             >
-              <div className='mp-main-head'>
-                <h2 id='mp-scope'>{scopeLabel}</h2>
-                {!isLoading && !error && (
-                  <span className='mp-count'>
-                    {t('{{count}} models', { count: filteredModels.length })}
-                  </span>
-                )}
-              </div>
+              {(isLoading || error || filteredModels.length === 0) && (
+                <div className='mp-main-head'>
+                  <h2 id='mp-scope'>{scopeLabel}</h2>
+                  {!isLoading && !error && (
+                    <span className='mp-count'>
+                      {t('{{count}} models', { count: filteredModels.length })}
+                    </span>
+                  )}
+                </div>
+              )}
 
               {isLoading && <LoadingState />}
               {error && (
@@ -296,77 +315,101 @@ export function ModelPlaza() {
               )}
               {!isLoading && !error && filteredModels.length > 0 && (
                 <>
-                  <table className='mp-table'>
-                    <thead>
-                      <tr>
-                        <th scope='col'>{t('Model Name')}</th>
-                        <th scope='col'>{t('Description')}</th>
-                        <th scope='col'>{t('Type')}</th>
-                        <th scope='col'>{t('Price')}</th>
-                        <th scope='col' className='is-right'>
-                          {t('Discount ratio')}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredModels.map((model) => (
-                        <tr key={model.model_name}>
-                          <td data-label={t('Model Name')}>
-                            <div className='mp-name'>{model.model_name}</div>
-                            <Button
-                              size='sm'
-                              variant='outline'
-                              render={
-                                isAuthenticated ? (
-                                  <Link to='/keys' />
-                                ) : undefined
-                              }
-                              onClick={() => {
-                                if (!isAuthenticated) {
-                                  useLoginModalStore
-                                    .getState()
-                                    .open({ redirectTo: '/keys' })
-                                }
-                              }}
-                            >
-                              {t('Use model')}
-                            </Button>
-                          </td>
-                          <td data-label={t('Description')} className='mp-use'>
-                            {model.description ||
-                              t('No description available.')}
-                          </td>
-                          <td data-label={t('Type')}>
-                            <ModelBillingModeBadge model={model} />
-                          </td>
-                          <td data-label={t('Price')}>
-                            <ModelPriceCell
-                              model={model}
-                              options={{
-                                tokenUnit: 'M',
-                                priceRate,
-                                usdExchangeRate,
-                                originalPriceMultiplier:
-                                  getReferencePriceMultiplier(
-                                    model,
-                                    referenceExchangeRate
-                                  ),
-                              }}
-                            />
-                          </td>
-                          <td
-                            data-label={t('Discount ratio')}
-                            className='is-right'
-                          >
-                            <ModelDiscount
-                              model={model}
-                              referenceExchangeRate={referenceExchangeRate}
-                            />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  {modelSections.map((section) => (
+                    <section
+                      key={section.id}
+                      className='mb-8'
+                      aria-labelledby={`mp-${section.id}-title`}
+                    >
+                      <div className='mp-main-head'>
+                        <h2 id={`mp-${section.id}-title`}>{section.title}</h2>
+                        <span className='mp-count'>
+                          {t('{{count}} models', {
+                            count: section.models.length,
+                          })}
+                        </span>
+                      </div>
+                      <table
+                        className='mp-table'
+                        aria-labelledby={`mp-${section.id}-title`}
+                      >
+                        <thead>
+                          <tr>
+                            <th scope='col'>{t('Model Name')}</th>
+                            <th scope='col'>{t('Description')}</th>
+                            <th scope='col'>{t('Type')}</th>
+                            <th scope='col'>{t('Price')}</th>
+                            <th scope='col' className='is-right'>
+                              {t('Discount ratio')}
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {section.models.map((model) => (
+                            <tr key={model.model_name}>
+                              <td data-label={t('Model Name')}>
+                                <div className='mp-name'>
+                                  {model.model_name}
+                                </div>
+                                <Button
+                                  size='sm'
+                                  variant='outline'
+                                  render={
+                                    isAuthenticated ? (
+                                      <Link to='/keys' />
+                                    ) : undefined
+                                  }
+                                  onClick={() => {
+                                    if (!isAuthenticated) {
+                                      useLoginModalStore
+                                        .getState()
+                                        .open({ redirectTo: '/keys' })
+                                    }
+                                  }}
+                                >
+                                  {t('Use model')}
+                                </Button>
+                              </td>
+                              <td
+                                data-label={t('Description')}
+                                className='mp-use'
+                              >
+                                {model.description ||
+                                  t('No description available.')}
+                              </td>
+                              <td data-label={t('Type')}>
+                                <ModelBillingModeBadge model={model} />
+                              </td>
+                              <td data-label={t('Price')}>
+                                <ModelPriceCell
+                                  model={model}
+                                  options={{
+                                    tokenUnit: 'M',
+                                    priceRate,
+                                    usdExchangeRate,
+                                    originalPriceMultiplier:
+                                      getReferencePriceMultiplier(
+                                        model,
+                                        referenceExchangeRate
+                                      ),
+                                  }}
+                                />
+                              </td>
+                              <td
+                                data-label={t('Discount ratio')}
+                                className='is-right'
+                              >
+                                <ModelDiscount
+                                  model={model}
+                                  referenceExchangeRate={referenceExchangeRate}
+                                />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </section>
+                  ))}
                   <p className='mp-note'>
                     {t(
                       'Prices use the lowest available group rate. Actual charges depend on usage.'

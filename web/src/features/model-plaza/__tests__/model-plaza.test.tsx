@@ -28,6 +28,7 @@ import fr from '@/i18n/locales/fr.json'
 import ja from '@/i18n/locales/ja.json'
 import ru from '@/i18n/locales/ru.json'
 import viLocale from '@/i18n/locales/vi.json'
+import zh from '@/i18n/locales/zh.json'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 import { useLoginModalStore } from '@/stores/login-modal-store'
@@ -705,4 +706,47 @@ it('renders All Models and Domestic Models as uncounted headings and keeps the A
   expect(all).toHaveAttribute('aria-pressed', 'true')
   expect(screen.getByText('deepseek-chat')).toBeVisible()
   expect(screen.getByText('gpt-api-model')).toBeVisible()
+})
+
+it('splits all models into text then video lists and hides empty lists after vendor selection or search', async () => {
+  renderPlaza()
+  const text = await screen.findByRole('table', {
+    name: 'All Models · Text Models',
+  })
+  const video = screen.getByRole('table', { name: 'All Models · Video Models' })
+  expect(screen.getAllByRole('table')).toEqual([text, video])
+  expect(within(text).getByText('deepseek-chat')).toBeVisible()
+  expect(within(text).queryByText('sd2.0-720P')).not.toBeInTheDocument()
+  expect(within(video).getByText('sd2.0-720P')).toBeVisible()
+  const user = userEvent.setup()
+  await user.click(screen.getByRole('button', { name: /^字节跳动/ }))
+  expect(
+    screen.getByRole('table', { name: '字节跳动 · Video Models' })
+  ).toBeVisible()
+  expect(
+    screen.queryByRole('heading', { name: '字节跳动 · Text Models' })
+  ).not.toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: /^DeepSeek/ }))
+  expect(
+    screen.getByRole('table', { name: 'DeepSeek · Text Models' })
+  ).toBeVisible()
+  expect(
+    screen.queryByRole('heading', { name: 'DeepSeek · Video Models' })
+  ).not.toBeInTheDocument()
+  await user.type(
+    screen.getByRole('textbox', { name: 'Search models' }),
+    'no-match'
+  )
+  expect(screen.queryByRole('table')).not.toBeInTheDocument()
+  expect(screen.getByText('No models found')).toBeVisible()
+})
+
+it('translates text and video section titles in Chinese', async () => {
+  i18next.addResourceBundle('zh', 'translation', zh.translation, true, true)
+  await i18next.changeLanguage('zh')
+  renderPlaza()
+  expect(
+    await screen.findByRole('table', { name: /· 文本模型$/ })
+  ).toBeVisible()
+  expect(screen.getByRole('table', { name: /· 视频模型$/ })).toBeVisible()
 })

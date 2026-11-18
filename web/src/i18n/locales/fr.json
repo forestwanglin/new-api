@@ -8100,6 +8100,8 @@
     "{{count}} calls · {{percent}} of calls": "{{count}} appels · {{percent}} des appels",
     "{{points}} points · {{percent}} of spend": "{{points}} points · {{percent}} des dépenses",
     "Deleted key": "Clé supprimée",
-    "points": "points"
+    "points": "points",
+    "Text Models": "Modèles de texte",
+    "Video Models": "Modèles vidéo"
   }
 }

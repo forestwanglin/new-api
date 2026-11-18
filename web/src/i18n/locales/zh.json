@@ -8101,6 +8101,8 @@
     "{{count}} calls · {{percent}} of calls": "{{count}} 次调用 · 占 {{percent}}",
     "{{points}} points · {{percent}} of spend": "{{points}} 积分 · 占 {{percent}}",
     "Deleted key": "已删除的密钥",
-    "points": "积分"
+    "points": "积分",
+    "Text Models": "文本模型",
+    "Video Models": "视频模型"
   }
 }

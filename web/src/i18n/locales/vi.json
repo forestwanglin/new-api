@@ -8100,6 +8100,8 @@
     "{{count}} calls · {{percent}} of calls": "{{count}} lượt gọi · {{percent}} tổng",
     "{{points}} points · {{percent}} of spend": "{{points}} điểm · {{percent}} tổng",
     "Deleted key": "Khóa đã xóa",
-    "points": "điểm"
+    "points": "điểm",
+    "Text Models": "Mô hình văn bản",
+    "Video Models": "Mô hình video"
   }
 }
