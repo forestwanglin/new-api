@@ -271,3 +271,78 @@ it('uses the latest invitation at image verification and keeps it frozen through
     expect.any(Object)
   )
 })
+
+it.each([true, false])(
+  'keeps the image and answer after SMS sending succeeds=%s until explicit refresh',
+  async (success) => {
+    vi.spyOn(api, 'post').mockImplementation(async (path) => {
+      if (path === '/api/phone/captcha/verify') {
+        return { data: { success: true, data: { send_token: 'permit' } } }
+      }
+      return success
+        ? {
+            data: { success: true, data: { sms_token: 'sms', retry_after: 0 } },
+          }
+        : { data: { success: false, message: 'Delivery failed' } }
+    })
+    const view = fixture()
+    await fill(view)
+    await waitFor(() => expect(view.send).toBeEnabled())
+    const image = screen.getByRole('img', { name: 'Image verification code' })
+    const source = image.getAttribute('src')
+    await view.user.click(view.send)
+    if (!success) {
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Delivery failed'
+      )
+    }
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Refresh image code' })
+      ).toBeEnabled()
+    )
+    expect(view.send).toBeDisabled()
+    expect(view.answer).toHaveValue('12345')
+    expect(image).toHaveAttribute('src', source)
+    expect(api.get).toHaveBeenCalledTimes(1)
+    expect(view.answer).toHaveAttribute('readonly')
+    await view.user.click(
+      screen.getByRole('button', { name: 'Refresh image code' })
+    )
+    await waitFor(() => expect(view.answer).toHaveValue(''))
+    expect(api.get).toHaveBeenCalledTimes(2)
+    await view.user.type(view.answer, '54321')
+    await waitFor(() => expect(view.send).toBeEnabled())
+  }
+)
+
+it('keeps the displayed image and answer when SMS login fails after sending', async () => {
+  vi.spyOn(api, 'post').mockImplementation(async (path) => {
+    if (path === '/api/phone/captcha/verify') {
+      return { data: { success: true, data: { send_token: 'permit' } } }
+    }
+    if (path === '/api/phone/sms/send') {
+      return {
+        data: { success: true, data: { sms_token: 'sms', retry_after: 90 } },
+      }
+    }
+    return { data: { success: false, message: 'Wrong SMS code' } }
+  })
+  const view = fixture()
+  await fill(view)
+  await waitFor(() => expect(view.send).toBeEnabled())
+  const source = screen
+    .getByRole('img', { name: 'Image verification code' })
+    .getAttribute('src')
+  await view.user.click(view.send)
+  await view.user.type(screen.getByLabelText('SMS verification code'), '123456')
+  await view.user.click(
+    screen.getByRole('button', { name: 'Register / Sign in' })
+  )
+  expect(await screen.findByRole('alert')).toHaveTextContent('Wrong SMS code')
+  expect(view.answer).toHaveValue('12345')
+  expect(
+    screen.getByRole('img', { name: 'Image verification code' })
+  ).toHaveAttribute('src', source)
+  expect(api.get).toHaveBeenCalledTimes(1)
+})

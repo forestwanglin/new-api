@@ -1220,6 +1220,16 @@
 - 扩大验证：`GOTOOLCHAIN=go1.26.10 GOWORK=off make test` 未全绿；`TestAccessTokenLifecycleAndLateRequests`、`TestAccessTokenCreationChecksGrantBeforeConsumingProof`、`TestAccessTokenUpdateRenamesFreelyAndChangesGrantOnlyWithProof`、`TestUserPointBalancesAPI` 的 fixture 缺失 `external_identity_claims`，`TestOpenAIChatSamplingCompatibility` 有 4 个既有失败子例（`GPT5.1_explicit_none`、`GPT5.4_snapshot_none`、`explicit_zero_values`、`GPT6.1_terra_none_keeps_sampling`），另有 `TestAccessTokenRouteRulesCoverEveryDashboardRoute`、`TestAccessTokenVerificationScopesAreAllListed` 和 `TestAdaptorMasksDialedHostsInDialFailure/channel_proxy_host` 失败。通过 Go overlay 将本次四个 Go 文件恢复为 HEAD 后逐项复测，全部复现相同失败。未修改这些无关路径。`relaykit/` 与 `tokenkit/` 分别执行 `GOWORK=off go test ./...`，均因 `proxy.golang.org` 下载已有依赖返回 EOF 而未能完成，未修改依赖或模块文件。
 - 风险与未覆盖：生产发布前需评估新增索引的 DDL 锁影响；本次不修改生产数据库或发布应用，线上效果需发布后复核。固定流水驱动仍需扫描符合条件的历史记录，深分页和大规模精确计数的成本并未消除。旧表验证使用保留旧结构/数据、移除新增索引的等价 schema，未还原完整发布库，未实测 MySQL 5.7/PostgreSQL 9.6。小样本 EXPLAIN 验证当前正确计划，不能稳定复现生产数据分布下的错误计划；根因性能证据来自生产只读 SQL 对照。
 
+### Z084 获取手机验证码后保留图片验证码
+
+- 需求与原因：点击获取手机验证码后自动清空图片及已输入的图片验证码，容易让用户误以为尚未完成验证。
+- 变更内容：手机号登录、微信绑定手机号及个人资料/安全访问页的绑定、换绑流程在短信发送成功或失败后保留原图片与答案；已尝试的图片只读并提示刷新，手动点击图片才清空并换新后继续获取。切换手机号、验证步骤和关闭弹窗时仍沿用原有失效规则。
+- 影响面：`web/src/features/auth/components/phone-auth-form.tsx`、`web/src/features/personal-profile/phone-change-dialog.tsx` 及各自的 `__tests__/`；**上游自有文件**：无，以上均为 fork 自有文件。
+- 与上游差异：调整 fork 手机验证码流程的展示状态；不修改后端认证接口、验证码有效期、单次消费与限流规则。
+- 开关与默认值：无新增配置或依赖，所有复用上述组件的入口默认生效。
+- 验证：`bun run test src/features/auth/components/__tests__/phone-auth-form.test.tsx src/features/auth/components/__tests__/login-modal.test.tsx src/features/personal-profile/__tests__/phone-change.test.tsx src/features/personal-profile/__tests__/page.test.tsx src/features/security-access/__tests__/page.test.tsx`：5 文件 49 用例全部通过；覆盖成功/失败保留、短信登录失败保留、禁止旧挑战重放、主动刷新恢复获取及共享入口。`bun run typecheck`（1,643 文件）、四个变更 TSX 的 `oxlint` / `oxfmt --check`、`git diff --check` 通过，独立审查无阻断。
+- 风险与未覆盖：原图片保留仅供展示，重发前需手动刷新图片并填写新答案。参考 OWASP Authentication / Session Management Cheat Sheets 保留服务端认证与防重放边界；未进行线上发布。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 

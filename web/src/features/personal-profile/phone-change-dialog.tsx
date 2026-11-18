@@ -39,6 +39,7 @@ export function PhoneChangeDialog(props: Props) {
   const [code, setCode] = useState('')
   const [captchaAnswer, setCaptchaAnswer] = useState('')
   const [smsToken, setSMSToken] = useState('')
+  const [usedChallenge, setUsedChallenge] = useState('')
   const [verificationToken, setVerificationToken] = useState('')
   const verificationExpiresAt = useRef(0)
   const [expired, setExpired] = useState(false)
@@ -60,10 +61,12 @@ export function PhoneChangeDialog(props: Props) {
     void captcha.refetch()
   }
 
-  useEffect(
-    () => setCaptchaAnswer(''),
-    [captcha.data?.challenge_token, step, props.open, security.sessionKey]
-  )
+  const imageUsed = usedChallenge === captcha.data?.challenge_token
+
+  useEffect(() => {
+    setCaptchaAnswer('')
+    setUsedChallenge('')
+  }, [captcha.data?.challenge_token, step, props.open, security.sessionKey])
 
   useEffect(() => {
     setStep(props.status.bound ? 'old' : 'new')
@@ -118,26 +121,25 @@ export function PhoneChangeDialog(props: Props) {
       !captcha.data ||
       captcha.isFetching ||
       captcha.isError ||
+      imageUsed ||
       !/^\d{5}$/.test(captchaAnswer)
     ) {
       return
     }
     setExpired(false)
     const result = await security.run(async (signal) => {
-      try {
-        return {
-          ...(await sendPhoneCode(
-            step,
-            phone,
-            verificationToken,
-            captcha.data.challenge_token,
-            captchaAnswer,
-            signal
-          )),
-          notification_warning: false,
-        }
-      } finally {
-        if (!signal.aborted) refreshCaptcha()
+      // Delivery attempts consume the image even when the outcome is unknown.
+      setUsedChallenge(captcha.data.challenge_token)
+      return {
+        ...(await sendPhoneCode(
+          step,
+          phone,
+          verificationToken,
+          captcha.data.challenge_token,
+          captchaAnswer,
+          signal
+        )),
+        notification_warning: false,
       }
     })
     if (!result) return
@@ -259,6 +261,7 @@ export function PhoneChangeDialog(props: Props) {
               maxLength={5}
               placeholder={t('Enter image code')}
               value={captchaAnswer}
+              readOnly={imageUsed}
               disabled={security.pending || captcha.isFetching}
               onChange={(event) =>
                 setCaptchaAnswer(
@@ -286,6 +289,7 @@ export function PhoneChangeDialog(props: Props) {
               )}
             </Button>
           </div>
+          {imageUsed && <p className='pp-hint'>{t('Refresh image code')}</p>}
           {captcha.error && (
             <p className='pp-error' role='alert'>
               {getServerErrorMessage(captcha.error)}
@@ -330,6 +334,7 @@ export function PhoneChangeDialog(props: Props) {
                   security.pending ||
                   captcha.isFetching ||
                   captcha.isError ||
+                  imageUsed ||
                   !captcha.data ||
                   !/^\d{5}$/.test(captchaAnswer) ||
                   resend.isActive ||

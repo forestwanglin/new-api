@@ -51,6 +51,7 @@ export function PhoneAuthForm(props: PhoneAuthFormProps) {
   const id = useId()
   const [sendToken, setSendToken] = useState('')
   const [smsToken, setSMSToken] = useState('')
+  const [sentChallenge, setSentChallenge] = useState('')
   const sendAffiliateCode = useRef('')
   const smsAffiliateCode = useRef('')
   const [retryAt, setRetryAt] = useState(0)
@@ -187,6 +188,7 @@ export function PhoneAuthForm(props: PhoneAuthFormProps) {
         const permit = sendToken
         const affiliateCode = sendAffiliateCode.current
         setSendToken('')
+        setSentChallenge(captcha.data.challenge_token)
         const result = await request<{
           sms_token: string
           retry_after: number
@@ -196,8 +198,6 @@ export function PhoneAuthForm(props: PhoneAuthFormProps) {
           setSMSToken(result.sms_token)
           setRetryAt(Date.now() + result.retry_after * 1000)
           setNow(Date.now())
-          form.setValue('answer', '')
-          void refetchCaptcha()
         }
       } else {
         const result = await request<unknown>('/api/phone/login', {
@@ -213,14 +213,13 @@ export function PhoneAuthForm(props: PhoneAuthFormProps) {
       markServerErrorHandled(failure)
       if (active.current && !operation.current?.signal.aborted) {
         setError(getServerErrorMessage(failure))
-        form.setValue('answer', '')
         setSendToken('')
-        void refetchCaptcha()
       }
     },
     meta: { errorToast: false },
   })
 
+  const imageUsed = sentChallenge === captcha.data?.challenge_token
   const remaining = Math.max(0, Math.ceil((retryAt - now) / 1000))
   const invalidateImage = () => {
     imageOperation.current?.abort()
@@ -289,6 +288,7 @@ export function PhoneAuthForm(props: PhoneAuthFormProps) {
           inputMode='numeric'
           autoComplete='off'
           maxLength={5}
+          readOnly={imageUsed}
           placeholder={t('Enter image code')}
           {...form.register('answer', {
             onChange: () => {
@@ -345,9 +345,11 @@ export function PhoneAuthForm(props: PhoneAuthFormProps) {
         </Button>
       </div>
       <p className='auth-helper' role='status'>
-        {sendToken
-          ? t('Image verified')
-          : t('Verify the image code before requesting an SMS code')}
+        {imageUsed && t('Refresh image code')}
+        {!imageUsed &&
+          (sendToken
+            ? t('Image verified')
+            : t('Verify the image code before requesting an SMS code'))}
       </p>
       {!props.enabled && (
         <p className='auth-helper'>
