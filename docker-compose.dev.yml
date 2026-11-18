@@ -32,6 +32,13 @@ services:
       - REDIS_CONN_STRING=redis://redis
       - TZ=Asia/Shanghai
       - BATCH_UPDATE_ENABLED=true
+      # Stable signing key for the dev environment. Without this, SessionSecret is a random UUID on every
+      # backend start, which invalidates every existing refresh token (HMAC mismatch -> 401) and logs the
+      # developer out on each `docker compose ... up -d --build new-api`.
+      - SESSION_SECRET=0f19ed32c765f85def83eb21c872d4f9865d6d183ebbd2d0
+      # Dev-friendly critical rate limit. The production default is 20 requests / 20 min / IP, which a single
+      # developer (multiple tabs + reloads) easily exceeds, locking them out of refresh AND login (429).
+      - CRITICAL_RATE_LIMIT=200
       # Local HTTP dev mode: keep Secure=false and leave TRUSTED_URL unset. This disables the refresh/logout OriginGuard so the :5173 -> :3000 dev proxy works.
       - SESSION_COOKIE_SECURE=false
       # For HTTPS only: set Secure=true and list every exact trusted HTTPS browser Origin. This does not configure relay CORS.
