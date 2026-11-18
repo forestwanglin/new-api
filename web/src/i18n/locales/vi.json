@@ -8087,6 +8087,19 @@
     "Enter a point limit to convert this key from its legacy money limit. The money limit will become unlimited.": "Nhập hạn mức điểm để chuyển khóa này từ giới hạn tiền cũ. Giới hạn tiền sẽ thành không giới hạn.",
     "Not set (legacy money limit retained)": "Chưa đặt (giữ giới hạn tiền cũ)",
     "Set a point limit when editing this key to replace its legacy money limit.": "Đặt hạn mức điểm khi sửa khóa này để thay thế giới hạn tiền cũ.",
-    "Point usage is cumulative; editing the limit does not reset used points.": "Điểm đã dùng được cộng dồn; sửa hạn mức không đặt lại điểm đã dùng."
+    "Point usage is cumulative; editing the limit does not reset used points.": "Điểm đã dùng được cộng dồn; sửa hạn mức không đặt lại điểm đã dùng.",
+    "This Month at a Glance": "Tổng quan tháng này",
+    "Statistics by calendar month; the charts below still use the selected range.": "Thống kê theo tháng dương lịch; các biểu đồ bên dưới vẫn dùng khoảng đã chọn.",
+    "This Month's Spend": "Chi tiêu tháng này",
+    "This Month's Points": "Điểm tháng này",
+    "Most Used Model": "Mô hình dùng nhiều nhất",
+    "Most Expensive Key": "Khóa tốn nhất",
+    "No calls this month yet": "Tháng này chưa có lượt gọi",
+    "No consumption this month yet": "Tháng này chưa có mức tiêu thụ",
+    "{{count}} requests": "{{count}} yêu cầu",
+    "{{count}} calls · {{percent}} of calls": "{{count}} lượt gọi · {{percent}} tổng",
+    "{{points}} points · {{percent}} of spend": "{{points}} điểm · {{percent}} tổng",
+    "Deleted key": "Khóa đã xóa",
+    "points": "điểm"
   }
 }

@@ -35,6 +35,20 @@ export interface QuotaDataItem {
   quota?: number
 }
 
+// 本月速览（自然月口径，与页面所选周期无关）。
+// quota 为额度（前端按系统货币格式化）；points 为积分；total_calls 为调用次数。
+export interface MonthlySummary {
+  quota: number
+  points: number
+  total_calls: number
+  top_model?: { model_name: string; count: number } | null
+  top_token?: {
+    token_id: number
+    token_name?: string
+    points: number
+  } | null
+}
+
 export interface FlowQuotaDataItem {
   user_id?: number
   username?: string

@@ -8089,6 +8089,19 @@
     "Enter a point limit to convert this key from its legacy money limit. The money limit will become unlimited.": "Введите лимит баллов для этого ключа. Прежний денежный лимит станет неограниченным.",
     "Not set (legacy money limit retained)": "Не задан (прежний денежный лимит сохранён)",
     "Set a point limit when editing this key to replace its legacy money limit.": "При редактировании задайте лимит баллов для замены прежнего денежного лимита.",
-    "Point usage is cumulative; editing the limit does not reset used points.": "Расход баллов накапливается; изменение лимита не сбрасывает использованные баллы."
+    "Point usage is cumulative; editing the limit does not reset used points.": "Расход баллов накапливается; изменение лимита не сбрасывает использованные баллы.",
+    "This Month at a Glance": "Обзор за месяц",
+    "Statistics by calendar month; the charts below still use the selected range.": "Статистика по календарному месяцу; графики ниже по-прежнему используют выбранный диапазон.",
+    "This Month's Spend": "Расходы за месяц",
+    "This Month's Points": "Очки за месяц",
+    "Most Used Model": "Самая используемая модель",
+    "Most Expensive Key": "Самый дорогой ключ",
+    "No calls this month yet": "Вызовов в этом месяце пока нет",
+    "No consumption this month yet": "Расходов в этом месяце пока нет",
+    "{{count}} requests": "{{count}} запросов",
+    "{{count}} calls · {{percent}} of calls": "{{count}} вызовов · {{percent}} от вызовов",
+    "{{points}} points · {{percent}} of spend": "{{points}} очков · {{percent}} от расходов",
+    "Deleted key": "Удалённый ключ",
+    "points": "очков"
   }
 }

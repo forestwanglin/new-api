@@ -85,6 +85,12 @@ const LazyLogStatCards = lazy(() =>
   }))
 )
 
+const LazyMonthlyOverview = lazy(() =>
+  import('./components/models/monthly-overview').then((m) => ({
+    default: m.MonthlyOverview,
+  }))
+)
+
 const LazyModelCharts = lazy(() =>
   import('./components/models/model-charts').then((m) => ({
     default: m.ModelCharts,
@@ -139,6 +145,33 @@ function LogStatCardsFallback() {
       </div>
       <div className='border-t px-3 py-2'>
         <Skeleton className='h-4 w-full max-w-md' />
+      </div>
+    </div>
+  )
+}
+
+function MonthlyOverviewFallback() {
+  const keys = ['spend', 'points', 'model', 'token']
+  return (
+    <div className='general-card overflow-hidden rounded-lg border'>
+      <div className='flex items-center gap-2 border-b px-4 py-3 sm:px-5'>
+        <Skeleton className='size-7 rounded-md' />
+        <div className='space-y-1.5'>
+          <Skeleton className='h-4 w-32' />
+          <Skeleton className='h-3 w-48' />
+        </div>
+      </div>
+      <div className='grid grid-cols-2 gap-3 p-4 sm:p-5 lg:grid-cols-4'>
+        {keys.map((key) => (
+          <div key={key} className='rounded-xl border bg-muted/40 p-4'>
+            <div className='flex items-center gap-2'>
+              <Skeleton className='size-7 rounded-md' />
+              <Skeleton className='h-3.5 w-20' />
+            </div>
+            <Skeleton className='mt-3 h-6 w-24' />
+            <Skeleton className='mt-1.5 h-3.5 w-32' />
+          </div>
+        ))}
       </div>
     </div>
   )
@@ -250,6 +283,7 @@ export function Dashboard() {
 
   const meta = SECTION_META[activeSection] ?? SECTION_META.overview
   const isAdmin = Boolean(userRole && userRole >= ROLE.ADMIN)
+  const isRoot = Boolean(userRole && userRole >= ROLE.SUPER_ADMIN)
   const visibleSections = useMemo(
     () =>
       DASHBOARD_SECTION_IDS.filter(
@@ -362,6 +396,11 @@ export function Dashboard() {
                     filters={modelFilters}
                     onDataUpdate={handleDataUpdate}
                   />
+                </Suspense>
+              </FadeIn>
+              <FadeIn delay={0.05}>
+                <Suspense fallback={<MonthlyOverviewFallback />}>
+                  <LazyMonthlyOverview isRoot={isRoot} />
                 </Suspense>
               </FadeIn>
               {isAdmin && (

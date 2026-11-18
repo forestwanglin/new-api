@@ -8088,6 +8088,19 @@
     "Enter a point limit to convert this key from its legacy money limit. The money limit will become unlimited.": "请输入积分额度，将此 Key 从原金额限制转换为积分限制。金额限制将改为不限制。",
     "Not set (legacy money limit retained)": "未设置（保留原金额限制）",
     "Set a point limit when editing this key to replace its legacy money limit.": "编辑此 Key 时设置积分额度，以替换原金额限制。",
-    "Point usage is cumulative; editing the limit does not reset used points.": "积分用量累计计算；编辑额度不会重置已用积分。"
+    "Point usage is cumulative; editing the limit does not reset used points.": "积分用量累计计算；编辑额度不会重置已用积分。",
+    "This Month at a Glance": "本月速览",
+    "Statistics by calendar month; the charts below still use the selected range.": "按自然月统计，直接回答最关心的四件事；下方图表仍为所选周期口径。",
+    "This Month's Spend": "本月花费金额",
+    "This Month's Points": "本月花费积分",
+    "Most Used Model": "最常用模型",
+    "Most Expensive Key": "最烧钱密钥",
+    "No calls this month yet": "本月还没有调用记录",
+    "No consumption this month yet": "本月还没有消耗记录",
+    "{{count}} requests": "{{count}} 次请求",
+    "{{count}} calls · {{percent}} of calls": "{{count}} 次调用 · 占 {{percent}}",
+    "{{points}} points · {{percent}} of spend": "{{points}} 积分 · 占 {{percent}}",
+    "Deleted key": "已删除的密钥",
+    "points": "积分"
   }
 }

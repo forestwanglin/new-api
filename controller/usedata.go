@@ -123,3 +123,63 @@ func GetUserFlowQuotaDates(c *gin.Context) {
 	})
 	return
 }
+
+// parseMonthlyRange 解析本月速览的时间范围（Unix 秒）。
+// start 必填且 > 0；end 可选，缺省为当前时间；范围上限 400 天防滥用。
+func parseMonthlyRange(c *gin.Context) (int64, int64, bool) {
+	startTimestamp, err := strconv.ParseInt(c.Query("start_timestamp"), 10, 64)
+	if err != nil || startTimestamp <= 0 {
+		common.ApiErrorMsg(c, "invalid start_timestamp")
+		return 0, 0, false
+	}
+	endTimestamp, _ := strconv.ParseInt(c.Query("end_timestamp"), 10, 64)
+	if endTimestamp == 0 {
+		endTimestamp = common.GetTimestamp()
+	}
+	if endTimestamp < startTimestamp {
+		common.ApiErrorMsg(c, "invalid time range")
+		return 0, 0, false
+	}
+	if endTimestamp-startTimestamp > 400*86400 {
+		common.ApiErrorMsg(c, "time range too large")
+		return 0, 0, false
+	}
+	return startTimestamp, endTimestamp, true
+}
+
+// GetMonthlySummary 本月速览（root 看全量）。
+func GetMonthlySummary(c *gin.Context) {
+	start, end, ok := parseMonthlyRange(c)
+	if !ok {
+		return
+	}
+	summary, err := model.GetMonthlySummary(0, start, end)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data":    summary,
+	})
+}
+
+// GetMonthlySummarySelf 本月速览（当前用户自己）。
+func GetMonthlySummarySelf(c *gin.Context) {
+	userId := c.GetInt("id")
+	start, end, ok := parseMonthlyRange(c)
+	if !ok {
+		return
+	}
+	summary, err := model.GetMonthlySummary(userId, start, end)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data":    summary,
+	})
+}

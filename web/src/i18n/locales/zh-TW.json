@@ -8087,6 +8087,19 @@
     "Enter a point limit to convert this key from its legacy money limit. The money limit will become unlimited.": "請輸入積分額度，將此 Key 從原金額限制轉換為積分限制。金額限制將改為不限制。",
     "Not set (legacy money limit retained)": "未設定（保留原金額限制）",
     "Set a point limit when editing this key to replace its legacy money limit.": "編輯此 Key 時設定積分額度，以取代原金額限制。",
-    "Point usage is cumulative; editing the limit does not reset used points.": "積分用量累計計算；編輯額度不會重設已用積分。"
+    "Point usage is cumulative; editing the limit does not reset used points.": "積分用量累計計算；編輯額度不會重設已用積分。",
+    "This Month at a Glance": "本月速覽",
+    "Statistics by calendar month; the charts below still use the selected range.": "按自然月統計，直接回答最關心的四件事；下方圖表仍為所選週期口徑。",
+    "This Month's Spend": "本月花費金額",
+    "This Month's Points": "本月花費積分",
+    "Most Used Model": "最常用模型",
+    "Most Expensive Key": "最燒錢金鑰",
+    "No calls this month yet": "本月還沒有調用記錄",
+    "No consumption this month yet": "本月還沒有消耗記錄",
+    "{{count}} requests": "{{count}} 次請求",
+    "{{count}} calls · {{percent}} of calls": "{{count}} 次調用 · 占 {{percent}}",
+    "{{points}} points · {{percent}} of spend": "{{points}} 積分 · 占 {{percent}}",
+    "Deleted key": "已刪除的金鑰",
+    "points": "積分"
   }
 }

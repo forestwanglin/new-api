@@ -8088,6 +8088,19 @@
     "Enter a point limit to convert this key from its legacy money limit. The money limit will become unlimited.": "Enter a point limit to convert this key from its legacy money limit. The money limit will become unlimited.",
     "Not set (legacy money limit retained)": "Not set (legacy money limit retained)",
     "Set a point limit when editing this key to replace its legacy money limit.": "Set a point limit when editing this key to replace its legacy money limit.",
-    "Point usage is cumulative; editing the limit does not reset used points.": "Point usage is cumulative; editing the limit does not reset used points."
+    "Point usage is cumulative; editing the limit does not reset used points.": "Point usage is cumulative; editing the limit does not reset used points.",
+    "This Month at a Glance": "This Month at a Glance",
+    "Statistics by calendar month; the charts below still use the selected range.": "Statistics by calendar month; the charts below still use the selected range.",
+    "This Month's Spend": "This Month's Spend",
+    "This Month's Points": "This Month's Points",
+    "Most Used Model": "Most Used Model",
+    "Most Expensive Key": "Most Expensive Key",
+    "No calls this month yet": "No calls this month yet",
+    "No consumption this month yet": "No consumption this month yet",
+    "{{count}} requests": "{{count}} requests",
+    "{{count}} calls · {{percent}} of calls": "{{count}} calls · {{percent}} of calls",
+    "{{points}} points · {{percent}} of spend": "{{points}} points · {{percent}} of spend",
+    "Deleted key": "Deleted key",
+    "points": "points"
   }
 }

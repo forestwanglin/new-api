@@ -8087,6 +8087,19 @@
     "Enter a point limit to convert this key from its legacy money limit. The money limit will become unlimited.": "ポイント上限を入力すると、このキーの従来の金額制限がポイント制限に変わります。金額制限は無制限になります。",
     "Not set (legacy money limit retained)": "未設定（従来の金額制限を維持）",
     "Set a point limit when editing this key to replace its legacy money limit.": "このキーの編集時にポイント上限を設定すると、従来の金額制限が置き換わります。",
-    "Point usage is cumulative; editing the limit does not reset used points.": "使用ポイントは累積されます。上限を編集しても使用済みポイントはリセットされません。"
+    "Point usage is cumulative; editing the limit does not reset used points.": "使用ポイントは累積されます。上限を編集しても使用済みポイントはリセットされません。",
+    "This Month at a Glance": "今月ひと目で",
+    "Statistics by calendar month; the charts below still use the selected range.": "暦月単位で集計。下のチャートは選択期間の口径のままです。",
+    "This Month's Spend": "今月の支出",
+    "This Month's Points": "今月のポイント",
+    "Most Used Model": "最もよく使われるモデル",
+    "Most Expensive Key": "最も高価なキー",
+    "No calls this month yet": "今月はまだ呼び出し記録がありません",
+    "No consumption this month yet": "今月はまだ消費記録がありません",
+    "{{count}} requests": "{{count}} リクエスト",
+    "{{count}} calls · {{percent}} of calls": "{{count}} 回 · 全体の {{percent}}",
+    "{{points}} points · {{percent}} of spend": "{{points}} ポイント · 全体の {{percent}}",
+    "Deleted key": "削除されたキー",
+    "points": "ポイント"
   }
 }

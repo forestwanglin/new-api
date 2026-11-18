@@ -40,9 +40,9 @@ type PointCallBilling struct {
 	FeeQuota            int64
 	Points              int64
 	Revision            int64
-	State               string `gorm:"type:varchar(32);index"`
+	State               string `gorm:"type:varchar(32);index;index:idx_pcb_state_created,priority:1"`
 	Dispatch            string `gorm:"type:varchar(32);index"`
-	CreatedAt           int64  `gorm:"autoCreateTime:milli"`
+	CreatedAt           int64  `gorm:"autoCreateTime:milli;index:idx_pcb_state_created,priority:2"`
 	UpdatedAt           int64  `gorm:"autoUpdateTime:milli;index"`
 }
 

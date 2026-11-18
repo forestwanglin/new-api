@@ -20,6 +20,7 @@ import { api } from '@/lib/api'
 
 import type {
   FlowQuotaDataItem,
+  MonthlySummary,
   QuotaDataItem,
   UptimeGroupResult,
 } from './types'
@@ -45,6 +46,22 @@ export async function getUserQuotaDates(
 ) {
   const endpoint = isAdmin ? '/api/data' : '/api/data/self'
   const res = await api.get<{ success: boolean; data: QuotaDataItem[] }>(
+    endpoint,
+    { params }
+  )
+  return res.data
+}
+
+// 本月速览（自然月口径）。isRoot 决定端点：root 看全量，其余看自己。
+// start_timestamp / end_timestamp 为 Unix 秒。
+export async function getMonthlySummary(
+  params: { start_timestamp: number; end_timestamp: number },
+  isRoot = false
+) {
+  const endpoint = isRoot
+    ? '/api/data/monthly-summary'
+    : '/api/data/monthly-summary/self'
+  const res = await api.get<{ success: boolean; data: MonthlySummary }>(
     endpoint,
     { params }
   )
