@@ -151,7 +151,13 @@
   margin-top: 20px;
 }
 .invitation-page .iv-tier {
-  --tier-color: #668bbd;
+  --tier-light: #668bbd;
+  --tier-dark: #003a9b;
+  --tier-color: color-mix(
+    in srgb,
+    var(--tier-light) calc(100% - var(--tier-progress, 0%)),
+    var(--tier-dark) var(--tier-progress, 0%)
+  );
   --tier-height: 6px;
   display: flex;
   flex-direction: column;
@@ -162,11 +168,6 @@
   border-radius: 0;
   background: transparent;
   text-align: center;
-  --tier-color: color-mix(
-    in srgb,
-    #668bbd calc(100% - var(--tier-progress, 0%)),
-    #003a9b var(--tier-progress, 0%)
-  );
 }
 .invitation-page .iv-tier-people {
   font-size: 14px;
@@ -195,6 +196,10 @@
   height: var(--tier-height);
   background: var(--tier-color);
   border-radius: 3px;
+}
+.dark .invitation-page .iv-tier {
+  --tier-light: #a7c7ff;
+  --tier-dark: #5b89d8;
 }
 @media (max-width: 420px) {
   .invitation-page .iv-reward-split {

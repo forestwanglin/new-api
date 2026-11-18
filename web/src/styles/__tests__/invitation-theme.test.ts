@@ -78,3 +78,22 @@ it('restores light surfaces when switching out of dark mode', () => {
   expect(getComputedStyle(input).backgroundColor).toBe('rgb(255, 255, 255)')
   expect(getComputedStyle(page).getPropertyValue('--tx').trim()).toBe('#0f172a')
 })
+
+it('uses a readable progressive tier palette when switching themes', () => {
+  const tier = document.createElement('div')
+  tier.className = 'iv-tier'
+  page.append(tier)
+  expect(getComputedStyle(tier).getPropertyValue('--tier-light').trim()).toBe(
+    '#668bbd'
+  )
+  expect(getComputedStyle(tier).getPropertyValue('--tier-dark').trim()).toBe(
+    '#003a9b'
+  )
+  document.documentElement.classList.add('dark')
+  expect(getComputedStyle(tier).getPropertyValue('--tier-light').trim()).toBe(
+    '#a7c7ff'
+  )
+  expect(getComputedStyle(tier).getPropertyValue('--tier-dark').trim()).toBe(
+    '#5b89d8'
+  )
+})
