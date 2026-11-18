@@ -25,6 +25,14 @@ export function tierLabel(
 export function rateText(bps: number) {
   return `${bps / 100}%`
 }
+export function tierColorProgress(index: number, count: number) {
+  if (count <= 1) return 0
+  return Math.round((index / (count - 1)) * 100)
+}
+export function tierMeterHeight(index: number, count: number) {
+  if (count <= 1) return 6
+  return Math.round(6 + (12 * index) / (count - 1))
+}
 export function invitationTime(value: string, dateOnly = false) {
   const result = formatTimestampToDate(Number(value), 'milliseconds')
   return dateOnly ? result.slice(0, 10) : result

@@ -92,7 +92,7 @@ export function InvitationCampaignAdmin() {
         {t('Invitation campaigns')}
       </SectionPageLayout.Title>
       <SectionPageLayout.Content>
-        <div className='mx-auto flex w-full max-w-6xl flex-col gap-5'>
+        <div className='mx-auto flex w-full max-w-6xl flex-col gap-6'>
           {q.isPending && <LoadingState />}
           {q.isError && <ErrorState onRetry={() => void q.refetch()} />}
           {types.isError && (
@@ -101,63 +101,87 @@ export function InvitationCampaignAdmin() {
               onRetry={() => void types.refetch()}
             />
           )}
-          <p>
-            {t('Time zone')}: {Intl.DateTimeFormat().resolvedOptions().timeZone}
-          </p>
-          <section className='rounded-lg border p-5'>
-            <h2 className='font-semibold'>
-              {editing ? t('Edit campaign') : t('New campaign')}
-            </h2>
-            <div className='mt-3 grid gap-3 sm:grid-cols-2'>
-              <Input
-                aria-label={t('Campaign code')}
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                placeholder={t('Campaign code')}
-              />
-              <Input
-                type='number'
-                aria-label={t('Campaign period')}
-                placeholder={t(
-                  'Campaign period (e.g. 1 for the first campaign)'
-                )}
-                value={period}
-                onChange={(e) => setPeriod(e.target.value)}
-              />
-              <Input
-                aria-label={t('Campaign name')}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder={t('Campaign name')}
-              />
-              <Input
-                aria-label={t('Freeze days')}
-                type='number'
-                min='1'
-                max='365'
-                value={freeze}
-                onChange={(e) => setFreeze(e.target.value)}
-                placeholder={t('Freeze days')}
-              />
-              <select
-                className='rounded-md border p-2'
-                aria-label={t('Reward point type')}
-                value={type}
-                onChange={(e) => setType(e.target.value)}
-              >
-                <option value=''>{t('Select point type')}</option>
-                {types.data?.map((pt) => (
-                  <option key={pt.id} value={String(pt.id)}>
-                    {pt.name} ({pt.code})
-                  </option>
-                ))}
-              </select>
-              <label className='flex items-center gap-2'>
+          <header className='border-border/60 bg-muted/20 rounded-xl border px-5 py-4'>
+            <div className='flex flex-wrap items-start justify-between gap-3'>
+              <div>
+                <p className='text-muted-foreground text-sm'>
+                  {t('Invitation campaigns')}
+                </p>
+                <h2 className='mt-1 text-xl font-semibold tracking-tight'>
+                  {editing ? t('Edit campaign') : t('New campaign')}
+                </h2>
+              </div>
+              <span className='text-muted-foreground rounded-full border px-3 py-1 text-xs'>
+                {t('Time zone')}:{' '}
+                {Intl.DateTimeFormat().resolvedOptions().timeZone}
+              </span>
+            </div>
+          </header>
+          <section className='rounded-xl border p-5 shadow-xs'>
+            <div className='flex flex-wrap items-baseline justify-between gap-2'>
+              <label className='flex items-center gap-2 text-sm'>
                 <Checkbox checked={visible} onCheckedChange={setVisible} />
                 <span>{t('Visible')}</span>
               </label>
+            </div>
+            <div
+              className='mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3'
+              data-slot='campaign-fields'
+            >
               <label>
-                {t('Starts at')}
+                <span className='text-muted-foreground mb-1 block text-xs'>
+                  {t('Campaign code')}
+                </span>
+                <Input
+                  aria-label={t('Campaign code')}
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  placeholder={t('Campaign code')}
+                />
+              </label>
+              <label>
+                <span className='text-muted-foreground mb-1 block text-xs'>
+                  {t('Campaign period')}
+                </span>
+                <Input
+                  type='number'
+                  aria-label={t('Campaign period')}
+                  placeholder={t(
+                    'Campaign period (e.g. 1 for the first campaign)'
+                  )}
+                  value={period}
+                  onChange={(e) => setPeriod(e.target.value)}
+                />
+              </label>
+              <label>
+                <span className='text-muted-foreground mb-1 block text-xs'>
+                  {t('Campaign name')}
+                </span>
+                <Input
+                  aria-label={t('Campaign name')}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder={t('Campaign name')}
+                />
+              </label>
+              <label>
+                <span className='text-muted-foreground mb-1 block text-xs'>
+                  {t('Freeze days')}
+                </span>
+                <Input
+                  aria-label={t('Freeze days')}
+                  type='number'
+                  min='1'
+                  max='365'
+                  value={freeze}
+                  onChange={(e) => setFreeze(e.target.value)}
+                  placeholder={t('Freeze days')}
+                />
+              </label>
+              <label>
+                <span className='text-muted-foreground mb-1 block text-xs'>
+                  {t('Starts at')}
+                </span>
                 <Input
                   type='datetime-local'
                   value={start}
@@ -165,22 +189,28 @@ export function InvitationCampaignAdmin() {
                 />
               </label>
               <label>
-                {t('Ends at')}
+                <span className='text-muted-foreground mb-1 block text-xs'>
+                  {t('Ends at')}
+                </span>
                 <Input
                   type='datetime-local'
                   value={end}
                   onChange={(e) => setEnd(e.target.value)}
                 />
               </label>
-              <label>
-                {t('Description')}
+              <label className='sm:col-span-2 lg:col-span-1'>
+                <span className='text-muted-foreground mb-1 block text-xs'>
+                  {t('Description')}
+                </span>
                 <Input
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                 />
               </label>
-              <label>
-                {t('Campaign rules')}
+              <label className='sm:col-span-2'>
+                <span className='text-muted-foreground mb-1 block text-xs'>
+                  {t('Campaign rules')}
+                </span>
                 <textarea
                   className='w-full rounded border p-2'
                   value={rules}
@@ -188,56 +218,104 @@ export function InvitationCampaignAdmin() {
                 />
               </label>
             </div>
-            <div className='mt-3 space-y-2'>
-              {tiers.map((tier, i) => (
-                <div className='flex gap-2' key={tierKeys[i]}>
-                  <Input
-                    aria-label={t('Minimum effective friends')}
-                    type='number'
-                    min='0'
-                    value={tier.min_effective_friends}
-                    onChange={(e) =>
-                      setTiers(
-                        tiers.map((v, j) =>
-                          j === i
-                            ? {
-                                ...v,
-                                min_effective_friends: Number(e.target.value),
-                              }
-                            : v
-                        )
-                      )
-                    }
-                  />
-                  <Input
-                    aria-label={t('Reward basis points')}
-                    type='number'
-                    min='0'
-                    max='10000'
-                    value={tier.rate_bps}
-                    onChange={(e) =>
-                      setTiers(
-                        tiers.map((v, j) =>
-                          j === i
-                            ? { ...v, rate_bps: Number(e.target.value) }
-                            : v
-                        )
-                      )
-                    }
-                  />
-                  <Button
-                    variant='outline'
-                    onClick={() => {
-                      setTiers(tiers.filter((_, j) => j !== i))
-                      setTierKeys(tierKeys.filter((_, j) => j !== i))
-                    }}
-                  >
-                    {t('Remove')}
-                  </Button>
+            <div className='border-border/60 bg-muted/20 mt-6 rounded-lg border p-4'>
+              <div className='flex flex-wrap items-baseline justify-between gap-2'>
+                <div>
+                  <h3 className='font-semibold'>{t('Reward tiers')}</h3>
+                  <p className='text-muted-foreground mt-1 text-sm'>
+                    {t('Effective friends determine your reward rate')}
+                  </p>
                 </div>
-              ))}
-              <p>{t('100 basis points = 1%')}</p>
-              <p>
+                <span className='text-muted-foreground text-xs'>
+                  {t('100 basis points = 1%')}
+                </span>
+              </div>
+              <label className='mt-4 block max-w-sm'>
+                <span className='text-muted-foreground mb-1 block text-xs'>
+                  {t('Reward point type')}
+                </span>
+                <select
+                  className='bg-background w-full rounded-md border p-2'
+                  aria-label={t('Reward point type')}
+                  value={type}
+                  onChange={(e) => setType(e.target.value)}
+                >
+                  <option value=''>{t('Select point type')}</option>
+                  {types.data?.map((pt) => (
+                    <option key={pt.id} value={String(pt.id)}>
+                      {pt.name} ({pt.code})
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className='mt-4 space-y-3'>
+                {tiers.map((tier, i) => (
+                  <div
+                    className='bg-background flex flex-wrap items-end gap-3 rounded-lg border p-3'
+                    key={tierKeys[i]}
+                  >
+                    <span className='text-muted-foreground w-6 pb-2 text-sm font-semibold'>
+                      {i + 1}
+                    </span>
+                    <label className='min-w-36 flex-1'>
+                      <span className='text-muted-foreground mb-1 block text-xs'>
+                        {t('Minimum effective friends')}
+                      </span>
+                      <Input
+                        aria-label={t('Minimum effective friends')}
+                        type='number'
+                        min='0'
+                        value={tier.min_effective_friends}
+                        onChange={(e) =>
+                          setTiers(
+                            tiers.map((v, j) =>
+                              j === i
+                                ? {
+                                    ...v,
+                                    min_effective_friends: Number(
+                                      e.target.value
+                                    ),
+                                  }
+                                : v
+                            )
+                          )
+                        }
+                      />
+                    </label>
+                    <label className='min-w-36 flex-1'>
+                      <span className='text-muted-foreground mb-1 block text-xs'>
+                        {t('Reward basis points')}
+                      </span>
+                      <Input
+                        aria-label={t('Reward basis points')}
+                        type='number'
+                        min='0'
+                        max='10000'
+                        value={tier.rate_bps}
+                        onChange={(e) =>
+                          setTiers(
+                            tiers.map((v, j) =>
+                              j === i
+                                ? { ...v, rate_bps: Number(e.target.value) }
+                                : v
+                            )
+                          )
+                        }
+                      />
+                    </label>
+                    <Button
+                      variant='outline'
+                      onClick={() => {
+                        setTiers(tiers.filter((_, j) => j !== i))
+                        setTierKeys(tierKeys.filter((_, j) => j !== i))
+                      }}
+                    >
+                      {t('Remove')}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              <p className='text-muted-foreground mt-4 text-sm'>
                 {t('Reward preview for CNY 100')}:{' '}
                 {tiers.map(formatInvitationTierPreview).join(' / ')}
               </p>
@@ -255,7 +333,7 @@ export function InvitationCampaignAdmin() {
               </Button>
             </div>
             <Button
-              className='mt-3'
+              className='mt-5'
               onClick={() => save.mutate()}
               disabled={
                 !name ||
@@ -276,16 +354,32 @@ export function InvitationCampaignAdmin() {
               description={getServerErrorMessage(save.error ?? action.error)}
             />
           )}
-          <section className='rounded-lg border p-5'>
+          <section className='rounded-xl border p-5 shadow-xs'>
+            <div className='mb-4 flex flex-wrap items-baseline justify-between gap-2'>
+              <div>
+                <h3 className='font-semibold'>{t('Campaign history')}</h3>
+              </div>
+              <span className='text-muted-foreground text-sm'>
+                {q.data?.total ?? '0'}
+              </span>
+            </div>
             {q.data?.items.map((c) => (
               <div
                 key={c.id}
-                className='flex flex-wrap items-center justify-between gap-2 border-b py-3'
+                className='border-border/60 flex flex-col gap-3 border-b py-4 last:border-b-0 lg:flex-row lg:items-center lg:justify-between'
               >
-                <span>
-                  {c.name} · {t(c.status)} · {c.freeze_days}
-                  {t(' days')}
-                  <span className='text-muted-foreground ml-2 text-sm'>
+                <div className='min-w-0'>
+                  <div className='flex flex-wrap items-center gap-2'>
+                    <strong className='truncate'>{c.name}</strong>
+                    <span className='rounded-full border px-2 py-0.5 text-xs'>
+                      {t(c.status)}
+                    </span>
+                    <span className='text-muted-foreground text-xs'>
+                      {c.freeze_days}
+                      {t(' days')}
+                    </span>
+                  </div>
+                  <span className='text-muted-foreground mt-1 block text-sm'>
                     {new Date(Number(c.starts_at)).toLocaleString()} –{' '}
                     {new Date(Number(c.ends_at)).toLocaleString()}
                   </span>
@@ -296,8 +390,8 @@ export function InvitationCampaignAdmin() {
                       )}
                     </span>
                   )}
-                </span>
-                <div className='flex gap-2'>
+                </div>
+                <div className='flex flex-wrap gap-2'>
                   <Button
                     disabled={c.status !== 'draft'}
                     variant='outline'

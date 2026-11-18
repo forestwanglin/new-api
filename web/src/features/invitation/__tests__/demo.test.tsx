@@ -75,6 +75,37 @@ it('anonymous page shows configured tiers and rules while hiding all private mod
   )
   expect(useLoginModalStore.getState().isOpen).toBe(true)
 })
+it('applies progressive color and meter positions to every rendered tier', async () => {
+  const fiveTierCampaign = {
+    ...campaign,
+    tiers: [
+      { min_effective_friends: 0, rate_bps: 250 },
+      { min_effective_friends: 2, rate_bps: 400 },
+      { min_effective_friends: 4, rate_bps: 550 },
+      { min_effective_friends: 6, rate_bps: 700 },
+      { min_effective_friends: 8, rate_bps: 850 },
+    ],
+  }
+  vi.mocked(api.get).mockImplementation(async (url) => ({
+    data: {
+      success: true,
+      data: url.endsWith('/current')
+        ? fiveTierCampaign
+        : { page: 1, page_size: 20, total: '1', items: [fiveTierCampaign] },
+    },
+  }))
+
+  const { container } = mount()
+  await screen.findByText('0—1 friends')
+  const tiers = [...container.querySelectorAll<HTMLElement>('.iv-tier')]
+  expect(tiers).toHaveLength(5)
+  expect(
+    tiers.map((tier) => tier.style.getPropertyValue('--tier-progress'))
+  ).toEqual(['0%', '25%', '50%', '75%', '100%'])
+  expect(
+    tiers.map((tier) => tier.style.getPropertyValue('--tier-height'))
+  ).toEqual(['6px', '9px', '12px', '15px', '18px'])
+})
 it('all activities opens a dialog with actual tiers and closes with Escape', async () => {
   mount()
   await userEvent.click(

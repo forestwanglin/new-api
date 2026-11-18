@@ -162,14 +162,11 @@
   border-radius: 0;
   background: transparent;
   text-align: center;
-}
-.invitation-page .iv-tier:nth-child(2) {
-  --tier-color: #3c7edb;
-  --tier-height: 12px;
-}
-.invitation-page .iv-tier:nth-child(3) {
-  --tier-color: #0052d9;
-  --tier-height: 18px;
+  --tier-color: color-mix(
+    in srgb,
+    #668bbd calc(100% - var(--tier-progress, 0%)),
+    #003a9b var(--tier-progress, 0%)
+  );
 }
 .invitation-page .iv-tier-people {
   font-size: 14px;
@@ -208,6 +205,18 @@
   }
   .invitation-page .iv-tier-rate {
     font-size: 25px;
+  }
+}
+@media (max-width: 640px) {
+  .invitation-page .iv-reward-split {
+    display: flex;
+    justify-content: flex-start;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    padding-bottom: 4px;
+  }
+  .invitation-page .iv-tier {
+    flex: 0 0 min(110px, 28vw);
   }
 }
 .invitation-page .iv-share-footer {

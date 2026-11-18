@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { LoadingState } from '@/components/loading-state'
@@ -6,7 +6,14 @@ import { Button } from '@/components/ui/button'
 
 import { formatPoints, type Campaign, type getSummary } from './api'
 import { CampaignRules } from './campaign-rules'
-import { campaignTiers, invitationTime, rateText, tierLabel } from './display'
+import {
+  campaignTiers,
+  invitationTime,
+  rateText,
+  tierColorProgress,
+  tierMeterHeight,
+  tierLabel,
+} from './display'
 
 type Summary = Awaited<ReturnType<typeof getSummary>>
 export function CampaignPanel(props: {
@@ -109,7 +116,16 @@ export function CampaignPanel(props: {
               aria-label={t('Effective friends and reward rates')}
             >
               {tiers.map((tier, i) => (
-                <div className='iv-tier' key={tier.min_effective_friends}>
+                <div
+                  className='iv-tier'
+                  key={tier.min_effective_friends}
+                  style={
+                    {
+                      '--tier-progress': `${tierColorProgress(i, tiers.length)}%`,
+                      '--tier-height': `${tierMeterHeight(i, tiers.length)}px`,
+                    } as CSSProperties
+                  }
+                >
                   <span className='iv-tier-people'>
                     {tierLabel(tier, tiers[i + 1], t)}
                   </span>

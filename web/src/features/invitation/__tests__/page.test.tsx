@@ -172,6 +172,84 @@ it('visibility checkbox has a label and toggles with pointer and keyboard', asyn
   await userEvent.keyboard('[Space]')
   expect(checkbox).toBeChecked()
 })
+it('shows labeled campaign fields with paired dates and reward type before tiers', async () => {
+  vi.mocked(api.get).mockImplementation(async (url) => ({
+    data: {
+      success: true,
+      data:
+        url === '/api/points/types'
+          ? [{ id: 1, name: 'General', code: 'general' }]
+          : empty,
+    },
+  }))
+  mount(<InvitationCampaignAdmin />)
+
+  for (const label of [
+    'Campaign code',
+    'Campaign period',
+    'Campaign name',
+    'Freeze days',
+    'Starts at',
+    'Ends at',
+    'Description',
+    'Campaign rules',
+    'Reward point type',
+    'Minimum effective friends',
+    'Reward basis points',
+  ]) {
+    const field = screen.getAllByLabelText(label)[0]
+    const visibleLabel = [...screen.getAllByText(label)].find((element) =>
+      element.closest('label')?.contains(field)
+    )
+    expect(visibleLabel).toBeDefined()
+    if (!visibleLabel) throw new Error(`Visible label is missing: ${label}`)
+    expect(field).toBeVisible()
+    expect(visibleLabel).toBeVisible()
+    expect(
+      visibleLabel.compareDocumentPosition(field) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+  }
+
+  const startsAt = screen.getByLabelText('Starts at')
+  const endsAt = screen.getByLabelText('Ends at')
+  const fields = startsAt.closest('[data-slot="campaign-fields"]')
+  expect(fields).not.toBeNull()
+  if (!fields) throw new Error('Campaign fields container is missing')
+  expect(fields).toContainElement(endsAt)
+  const labels = [...fields.querySelectorAll('label')]
+  const startsLabel = startsAt.closest('label')
+  const endsLabel = endsAt.closest('label')
+  if (
+    !(
+      startsLabel instanceof HTMLLabelElement &&
+      endsLabel instanceof HTMLLabelElement
+    )
+  ) {
+    throw new Error('Campaign date labels are missing')
+  }
+  expect(labels.indexOf(startsLabel) + 1).toBe(labels.indexOf(endsLabel))
+  expect(fields).toHaveClass('sm:grid-cols-2')
+
+  const pointTypeLabel = screen
+    .getByLabelText('Reward point type')
+    .closest('label')
+  const firstTierLabel = screen
+    .getAllByLabelText('Minimum effective friends')[0]
+    .closest('label')
+  if (
+    !(
+      pointTypeLabel instanceof HTMLLabelElement &&
+      firstTierLabel instanceof HTMLLabelElement
+    )
+  ) {
+    throw new Error('Reward type and tier labels are missing')
+  }
+  expect(
+    pointTypeLabel.compareDocumentPosition(firstTierLabel) &
+      Node.DOCUMENT_POSITION_FOLLOWING
+  ).toBeTruthy()
+})
 it('anonymous confirm opens login and never binds on login failure or cancellation', async () => {
   mount(<InvitationPage initialInvitation='forest' />)
   expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
