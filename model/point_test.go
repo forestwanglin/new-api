@@ -501,7 +501,7 @@ func testPointCallFinancialLifecycle(t *testing.T, dialect string) {
 	legacy := Token{UserId: 1, Key: "upgrade-point-key", RemainQuota: 37, UsedQuota: 9, Status: common.TokenStatusEnabled, ExpiredTime: -1}
 	require.NoError(t, db.Create(&legacy).Error)
 	require.NoError(t, db.Create(&PointCallBilling{ID: "upgrade-call", UserID: 1, TokenID: legacy.Id, Points: 3, Rate: "1", Unit: "1000", Model: "gpt-test", Allocations: "[]"}).Error)
-	for _, field := range []string{"PointLimitEnabled", "PointLimit", "ReservedPoints"} {
+	for _, field := range []string{"PointLimitEnabled", "PointLimit", "ReservedPoints", "UsedPoints", "UsedPointsVersion"} {
 		require.NoError(t, db.Migrator().DropColumn(&Token{}, field))
 	}
 	for _, field := range []string{"TokenPointMode", "TokenReservedPoints"} {
@@ -513,11 +513,14 @@ func testPointCallFinancialLifecycle(t *testing.T, dialect string) {
 	for range 2 {
 		require.NoError(t, db.AutoMigrate(&Token{}))
 		require.NoError(t, migratePoints(db))
+		require.NoError(t, migrateTokenPointCounters(db))
 	}
 	require.NoError(t, db.First(&legacy, legacy.Id).Error)
 	assert.False(t, legacy.PointLimitEnabled)
 	assert.Zero(t, legacy.PointLimit)
 	assert.Zero(t, legacy.ReservedPoints)
+	assert.EqualValues(t, 3, legacy.UsedPoints)
+	assert.Equal(t, tokenUsedPointsVersion, legacy.UsedPointsVersion)
 	assert.Equal(t, 37, legacy.RemainQuota)
 	assert.Equal(t, 9, legacy.UsedQuota)
 	assert.False(t, legacy.UnlimitedQuota)
@@ -732,8 +735,10 @@ func testPointCallFinancialLifecycle(t *testing.T, dialect string) {
 	// Checked int64 totals fail closed, never wrap into available budget.
 	require.NoError(t, db.Create(&PointCallBilling{ID: "overflow-history-a", UserID: user.Id, TokenID: historyToken.Id, Points: math.MaxInt64, Rate: "1", Unit: "1000", Model: "gpt-test", Allocations: "[]"}).Error)
 	require.NoError(t, db.Create(&PointCallBilling{ID: "overflow-history-b", UserID: user.Id, TokenID: historyToken.Id, Points: 1, Rate: "1", Unit: "1000", Model: "gpt-test", Allocations: "[]"}).Error)
+	require.NoError(t, db.Model(&Token{}).Where("id = ?", historyToken.Id).Update("used_points_version", 0).Error)
+	require.Error(t, migrateTokenPointCounters(db), "overflowing historical totals block migration")
 	_, err = GetTokenUsedPoints(user.Id, []int{historyToken.Id})
-	require.Error(t, err)
+	require.Error(t, err, "incomplete backfill never projects a fabricated zero")
 	require.NoError(t, CreatePointCall("overflow-admission", user.Id, historyToken.Id, "gpt-test", "1", "1000"))
 	require.Error(t, ReservePointCall("overflow-admission", "overflow-admission:reserve", 1, true))
 
@@ -802,6 +807,8 @@ func testPointCallFinancialLifecycle(t *testing.T, dialect string) {
 	// A financial SQL error rolls back quota/key/points, leaving a durable target.
 	require.NoError(t, CreatePointCall("recover", user.Id, token.Id, "gpt-test", "1", "1000"))
 	require.NoError(t, ReservePointCall("recover", "recover:reserve", 2, false))
+	usedBeforeRollback, err := GetTokenUsedPoints(user.Id, []int{token.Id})
+	require.NoError(t, err)
 	const callback = "point_call:fail_ledger"
 	require.NoError(t, db.Callback().Create().Before("gorm:create").Register(callback, func(tx *gorm.DB) {
 		if tx.Statement.Schema != nil && tx.Statement.Schema.Name == "PointLedger" {
@@ -811,6 +818,9 @@ func testPointCallFinancialLifecycle(t *testing.T, dialect string) {
 	_, err = SetPointCallTarget("recover", "recover:actual", 3, true, false, nil)
 	require.Error(t, err)
 	require.NoError(t, db.Callback().Create().Remove(callback))
+	usedAfterRollback, err := GetTokenUsedPoints(user.Id, []int{token.Id})
+	require.NoError(t, err)
+	assert.Equal(t, usedBeforeRollback, usedAfterRollback, "failed financial mutation rolls back the token counter")
 	c, err := GetPointCall("recover")
 	require.NoError(t, err)
 	assert.Zero(t, c.BookedQuota)

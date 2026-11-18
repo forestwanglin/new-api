@@ -548,8 +548,14 @@ func updatePointsAwareVideoTask(ctx context.Context, adaptor TaskPollingAdaptor,
 		} else {
 			won, claimErr = model.TryClaimPointsTaskPoll(task, now, now+60000)
 		}
-		if claimErr != nil || !won {
+		if claimErr != nil {
 			return claimErr
+		}
+		if !won {
+			if correction {
+				return model.ErrStaleTaskOutcome
+			}
+			return nil
 		}
 		defer model.ReleasePointsTaskPoll(task)
 	}

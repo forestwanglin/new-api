@@ -98,6 +98,7 @@ function pendingResponse<T>() {
 }
 
 afterEach(() => {
+  vi.useRealTimers()
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
   window.sessionStorage.clear()
@@ -761,48 +762,69 @@ it('verifies a token grant change with the bound phone SMS code', async () => {
   )
 })
 
-it('keeps SMS verification disabled after delivery failure and permits an explicit retry', async () => {
-  const user = userEvent.setup()
-  vi.spyOn(api, 'get').mockResolvedValue({
-    data: {
-      success: true,
-      data: {
-        scope: 'access_token.generate',
-        methods: [{ method: 'sms', available: true }],
-        phone_masked: '138****8000',
-        oauth_providers: [],
-        password_encryption_enabled: false,
-      },
-    },
-  })
-  const post = vi
-    .spyOn(api, 'post')
-    .mockRejectedValueOnce(new Error('SMS delivery failed'))
-    .mockResolvedValue({
+it.each([false, true])(
+  'keeps verification disabled and honors server rejection cooldown=%s before explicit retry',
+  async (withCooldown) => {
+    const user = userEvent.setup()
+    vi.spyOn(api, 'get').mockResolvedValue({
       data: {
         success: true,
-        data: { sms_token: 'retry-flow', retry_after: 90 },
+        data: {
+          scope: 'access_token.generate',
+          methods: [{ method: 'sms', available: true }],
+          phone_masked: '138****8000',
+          oauth_providers: [],
+          password_encryption_enabled: false,
+        },
       },
     })
-  render(
-    <Harness
-      onResult={vi.fn()}
-      operation={{
-        scope: 'access_token.generate',
-        context: { scopes: ['profile:read'], expires_at: 0 },
-      }}
-    />
-  )
-  await user.click(screen.getByRole('button', { name: 'Protected action' }))
-  await user.click(await screen.findByRole('button', { name: 'Send code' }))
-  await waitFor(() =>
+    const post = vi
+      .spyOn(api, 'post')
+      .mockImplementationOnce(async () => {
+        if (!withCooldown) throw new Error('SMS delivery failed')
+        return {
+          data: {
+            success: false,
+            message: 'SMS delivery failed',
+            data: { code: 'SMS_DELIVERY_FAILED', retry_after: 2 },
+          },
+        }
+      })
+      .mockResolvedValue({
+        data: {
+          success: true,
+          data: { sms_token: 'retry-flow', retry_after: 90 },
+        },
+      })
+    render(
+      <Harness
+        onResult={vi.fn()}
+        operation={{
+          scope: 'access_token.generate',
+          context: { scopes: ['profile:read'], expires_at: 0 },
+        }}
+      />
+    )
+    await user.click(screen.getByRole('button', { name: 'Protected action' }))
+    const send = await screen.findByRole('button', { name: 'Send code' })
+    vi.useFakeTimers()
+    fireEvent.click(send)
+    await act(async () => vi.advanceTimersByTimeAsync(0))
+    expect(screen.getByRole('button', { name: 'Verify' })).toBeDisabled()
+    expect(post).toHaveBeenCalledTimes(1)
+    if (withCooldown) {
+      expect(
+        screen.getByRole('button', { name: 'Resend in 2s' })
+      ).toBeDisabled()
+      await act(async () => vi.advanceTimersByTimeAsync(2000))
+    }
     expect(screen.getByRole('button', { name: 'Send code' })).toBeEnabled()
-  )
-  expect(screen.getByRole('button', { name: 'Verify' })).toBeDisabled()
-  await user.click(screen.getByRole('button', { name: 'Send code' }))
-  await waitFor(() => expect(post).toHaveBeenCalledTimes(2))
-  expect(screen.getByRole('button', { name: 'Verify' })).toBeDisabled()
-})
+    fireEvent.click(screen.getByRole('button', { name: 'Send code' }))
+    await act(async () => vi.advanceTimersByTimeAsync(0))
+    expect(post).toHaveBeenCalledTimes(2)
+    expect(screen.getByRole('button', { name: 'Verify' })).toBeDisabled()
+  }
+)
 
 it('ignores SMS delivery completing after cancellation', async () => {
   const user = userEvent.setup()

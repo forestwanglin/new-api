@@ -229,7 +229,10 @@ func TestPhoneSMSResendInvalidatesOldCodeAndFailedSendConsumesPermit(t *testing.
 	_, err = SendPhoneSMS(permit, "browser", "192.0.2.1")
 	require.Error(t, err)
 	require.Equal(t, 1, calls)
-	http.DefaultClient = &http.Client{Transport: phoneSMSRoundTripper(func(r *http.Request) (*http.Response, error) { calls++; return nil, errors.New("timeout") })}
+	http.DefaultClient = &http.Client{Transport: phoneSMSRoundTripper(func(r *http.Request) (*http.Response, error) {
+		calls++
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"Code":"isv.AMOUNT_NOT_ENOUGH"}`)), Header: http.Header{}}, nil
+	})}
 	failed, _, err := createPhoneFlow(phoneSendPurpose, "browser", phoneFlowPayload{Phone: "13900139000"}, time.Minute)
 	require.NoError(t, err)
 	_, err = SendPhoneSMS(failed, "browser", "192.0.2.1")
@@ -261,7 +264,7 @@ func TestPhoneNewRegistrationUsesPhoneUsernamePrefix(t *testing.T) {
 	require.NoError(t, err)
 	user, err := CompletePhoneLogin(token, "123456", "browser")
 	require.NoError(t, err)
-	require.Equal(t, "phone_2", user.Username)
+	require.Regexp(t, `^phone_[0-9A-Za-z]{14}$`, user.Username)
 
 	var persisted model.User
 	require.NoError(t, model.DB.First(&persisted, user.Id).Error)

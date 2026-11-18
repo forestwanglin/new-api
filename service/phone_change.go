@@ -12,6 +12,7 @@ import (
 )
 
 const phoneChangeSMSPurpose = "phone_change_sms_v2"
+const phoneChangeSendPurpose = "phone_change_send_v1"
 const phoneChangeOldPurpose = "phone_change_old_v2"
 const phoneChangeReadyPurpose = "phone_change_ready_v2"
 
@@ -29,6 +30,8 @@ type phoneChangePayload struct {
 	Digest           string               `json:"digest,omitempty"`
 	BindingContact   *phoneBindingContact `json:"binding_contact,omitempty"`
 	BindingExpiresAt int64                `json:"binding_expires_at,omitempty"`
+	SendAttempts     int                  `json:"send_attempts,omitempty"`
+	PrimaryFlowID    int64                `json:"primary_flow_id,omitempty"`
 }
 
 func getCurrentPhone(tx *gorm.DB, userID int) (string, error) {
@@ -73,7 +76,7 @@ func newPhoneChangeFlow(purpose string, payload phoneChangePayload, ttl time.Dur
 func readPhoneChangeFlow(identity AuthIdentity, token, purpose string) (*model.AuthFlow, phoneChangePayload, error) {
 	flow, err := model.GetAuthFlow(token, model.AuthFlowMatch{Purpose: purpose, UserId: identity.UserID, SessionId: identity.SessionID})
 	var payload phoneChangePayload
-	if err != nil || common.UnmarshalJsonStr(flow.Payload, &payload) != nil || payload.Identity != identity {
+	if err != nil || purpose == phoneChangeSMSPurpose && !smsFlowVerifiable(flow) || common.UnmarshalJsonStr(flow.Payload, &payload) != nil || payload.Identity != identity {
 		return nil, payload, ErrVerificationFailed
 	}
 	return flow, payload, nil
@@ -108,6 +111,12 @@ func validatePhoneChangeWithTx(tx *gorm.DB, payload phoneChangePayload) error {
 }
 
 func SendPhoneChangeCode(identity AuthIdentity, step, phone, verifiedToken, ip, captchaToken, captchaAnswer string) (string, error) {
+	return SendPhoneChangeCodeWithRetry(identity, step, phone, verifiedToken, ip, captchaToken, captchaAnswer, "")
+}
+
+// A retry authorization replaces only the previously verified CAPTCHA. The
+// current session, target and original operation authorization are rechecked.
+func SendPhoneChangeCodeWithRetry(identity AuthIdentity, step, phone, verifiedToken, ip, captchaToken, captchaAnswer, retryToken string) (string, error) {
 	if !PhoneSMSConfigured() {
 		return "", ErrVerificationUnavailable
 	}
@@ -120,7 +129,7 @@ func SendPhoneChangeCode(identity AuthIdentity, step, phone, verifiedToken, ip, 
 		return "", err
 	}
 	payload := phoneChangePayload{Identity: identity, Original: original, Step: step}
-	var oldFlow *model.AuthFlow
+	var primaryFlow *model.AuthFlow
 	if step == "old" {
 		if !status.Bound {
 			return "", ErrVerificationFailed
@@ -131,14 +140,14 @@ func SendPhoneChangeCode(identity AuthIdentity, step, phone, verifiedToken, ip, 
 			return "", common.NewMessage("Enter a valid mainland China phone number")
 		}
 		if status.Bound {
-			oldFlow, payload, err = readPhoneChangeFlow(identity, verifiedToken, phoneChangeOldPurpose)
+			primaryFlow, payload, err = readPhoneChangeFlow(identity, verifiedToken, phoneChangeOldPurpose)
 			if err != nil {
 				return "", err
 			}
 			payload.Step = "new"
 			payload.Phone = phone
 		} else {
-			_, payload, err = readPhoneChangeFlow(identity, verifiedToken, phoneBindingPurpose)
+			primaryFlow, payload, err = readPhoneChangeFlow(identity, verifiedToken, phoneBindingPurpose)
 			if err != nil {
 				return "", err
 			}
@@ -155,50 +164,88 @@ func SendPhoneChangeCode(identity AuthIdentity, step, phone, verifiedToken, ip, 
 	} else {
 		return "", ErrVerificationFailed
 	}
-	_, captcha, err := readPhoneChangeFlow(identity, captchaToken, phoneChangeImagePurpose)
+
+	if primaryFlow != nil {
+		payload.PrimaryFlowID = primaryFlow.Id
+	}
+	authorizationToken, authorizationPurpose := captchaToken, phoneChangeImagePurpose
+	var authorization *model.AuthFlow
+	if retryToken != "" {
+		var retryPayload phoneChangePayload
+		authorization, retryPayload, err = readPhoneChangeFlow(identity, retryToken, phoneChangeSendPurpose)
+		if err != nil {
+			return "", err
+		}
+		if retryPayload.Step != payload.Step || retryPayload.Phone != payload.Phone || retryPayload.Original != payload.Original || retryPayload.PrimaryFlowID != payload.PrimaryFlowID || retryPayload.BindingExpiresAt != payload.BindingExpiresAt || retryPayload.SendAttempts >= 3 {
+			return "", ErrVerificationFailed
+		}
+		payload.SendAttempts = retryPayload.SendAttempts
+		authorizationToken, authorizationPurpose = retryToken, phoneChangeSendPurpose
+	} else {
+		var captcha phoneChangePayload
+		authorization, captcha, err = readPhoneChangeFlow(identity, captchaToken, phoneChangeImagePurpose)
+		if err != nil {
+			return "", ErrPhoneVerification
+		}
+		if err := model.AttemptAuthFlow(captchaToken, phoneChangeImagePurpose, 1); err != nil {
+			return "", ErrPhoneVerification
+		}
+		if subtle.ConstantTimeCompare([]byte(captcha.Digest), []byte(phoneCodeDigest(strings.TrimSpace(captchaAnswer)))) != 1 {
+			return "", ErrPhoneVerification
+		}
+	}
+	code, digest, err := newSMSCode()
 	if err != nil {
-		return "", ErrPhoneVerification
+		return "", err
 	}
-	if err := model.AttemptAuthFlow(captchaToken, phoneChangeImagePurpose, 1); err != nil {
-		return "", ErrPhoneVerification
+	payload.Digest, payload.SendAttempts = digest, payload.SendAttempts+1
+	encoded, err := common.Marshal(payload)
+	if err != nil {
+		return "", err
 	}
-	if subtle.ConstantTimeCompare([]byte(captcha.Digest), []byte(phoneCodeDigest(strings.TrimSpace(captchaAnswer)))) != 1 {
-		return "", ErrPhoneVerification
+	expires := time.Now().Add(5 * time.Minute)
+	if payload.BindingExpiresAt != 0 && expires.After(time.Unix(payload.BindingExpiresAt, 0)) {
+		expires = time.Unix(payload.BindingExpiresAt, 0)
 	}
-	_, err = model.ConsumeAuthFlowWithAction(captchaToken, model.AuthFlowMatch{Purpose: phoneChangeImagePurpose, UserId: identity.UserID, SessionId: identity.SessionID}, func(tx *gorm.DB, _ *model.AuthFlow) error {
+	var token string
+	var verification *model.AuthFlow
+	_, err = model.ConsumeAuthFlowWithAction(authorizationToken, model.AuthFlowMatch{Purpose: authorizationPurpose, UserId: identity.UserID, SessionId: identity.SessionID}, func(tx *gorm.DB, _ *model.AuthFlow) error {
 		if err := validatePhoneChangeWithTx(tx, payload); err != nil {
 			return err
 		}
-		if oldFlow != nil {
+		if primaryFlow != nil {
 			var count int64
-			if err := tx.Model(&model.AuthFlow{}).Where("id = ? AND consumed_at IS NULL AND expires_at > ?", oldFlow.Id, time.Now()).Count(&count).Error; err != nil {
+			if err := tx.Model(&model.AuthFlow{}).Where("id = ? AND consumed_at IS NULL AND expires_at > ?", primaryFlow.Id, time.Now()).Count(&count).Error; err != nil {
 				return err
 			}
 			if count != 1 {
 				return ErrVerificationFailed
 			}
 		}
-		return reservePhoneSend(tx, payload.Phone, ip)
+		if err := reservePhoneSend(tx, payload.Phone, ip); err != nil {
+			return err
+		}
+		var err error
+		token, verification, err = prepareSMSFlowWithTx(tx, model.AuthFlowCreate{Purpose: phoneChangeSMSPurpose, UserId: identity.UserID, SessionId: identity.SessionID, Payload: string(encoded), ExpiresAt: expires})
+		return err
 	})
 	if err != nil {
 		return "", err
 	}
-	code, err := randomPhoneDigits(6)
-	if err != nil {
-		return "", err
+	var retry *model.AuthFlowCreate
+	if payload.SendAttempts < 3 {
+		payload.Digest = ""
+		encoded, err = common.Marshal(payload)
+		if err != nil {
+			return "", err
+		}
+		retryExpires := authorization.ExpiresAt
+		if payload.BindingExpiresAt != 0 && retryExpires.After(time.Unix(payload.BindingExpiresAt, 0)) {
+			retryExpires = time.Unix(payload.BindingExpiresAt, 0)
+		}
+		retry = &model.AuthFlowCreate{Purpose: phoneChangeSendPurpose, UserId: identity.UserID, SessionId: identity.SessionID, Payload: string(encoded), ExpiresAt: retryExpires}
 	}
-	if err := SendAliyunSMS(payload.Phone, code); err != nil {
-		return "", ErrBindingSMSDelivery
-	}
-	payload.Digest, err = common.Password2Hash(phoneCodeDigest(code))
-	if err != nil {
-		return "", err
-	}
-	// A resend invalidates only this session's phone-change codes, never login codes.
-	if err := model.DB.Model(&model.AuthFlow{}).Where("purpose = ? AND user_id = ? AND session_id = ? AND consumed_at IS NULL", phoneChangeSMSPurpose, identity.UserID, identity.SessionID).Update("consumed_at", time.Now()).Error; err != nil {
-		return "", err
-	}
-	return newPhoneChangeFlow(phoneChangeSMSPurpose, payload, 5*time.Minute)
+	return dispatchPreparedSMS(payload.Phone, code, token, verification, retry)
 }
 
 func VerifyPhoneChangeCode(identity AuthIdentity, step, token, phone, code string) (string, error) {

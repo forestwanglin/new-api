@@ -28,6 +28,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { markServerErrorHandled } from '@/lib/handle-server-error'
 import { getServerErrorMessage } from '@/lib/server-error-message'
+import { getSMSDeliveryRecovery } from '@/lib/sms-delivery'
 
 import { getAffiliateCode } from '../lib/storage'
 import { getPhoneCaptcha, phoneAuthRequest } from '../phone-api'
@@ -50,6 +51,7 @@ export function PhoneAuthForm(props: PhoneAuthFormProps) {
   const { t } = useTranslation()
   const id = useId()
   const [sendToken, setSendToken] = useState('')
+  const [sendExpiresAt, setSendExpiresAt] = useState(0)
   const [smsToken, setSMSToken] = useState('')
   const [sentChallenge, setSentChallenge] = useState('')
   const sendAffiliateCode = useRef('')
@@ -98,6 +100,9 @@ export function PhoneAuthForm(props: PhoneAuthFormProps) {
   useEffect(() => {
     const challenge = captcha.data
     setSendToken('')
+    setSendExpiresAt(0)
+    operation.current?.abort()
+    setSMSToken('')
     setImageVerifying(false)
     if (
       !props.enabled ||
@@ -183,37 +188,55 @@ export function PhoneAuthForm(props: PhoneAuthFormProps) {
           controller.signal
         )
       setError('')
-      if (kind === 'send') {
-        // Sending is single-use, including provider failures and timeouts.
-        const permit = sendToken
-        const affiliateCode = sendAffiliateCode.current
-        setSendToken('')
-        setSentChallenge(captcha.data.challenge_token)
-        const result = await request<{
-          sms_token: string
-          retry_after: number
-        }>('/api/phone/sms/send', { send_token: permit })
-        if (!controller.signal.aborted && active.current) {
-          smsAffiliateCode.current = affiliateCode
-          setSMSToken(result.sms_token)
-          setRetryAt(Date.now() + result.retry_after * 1000)
-          setNow(Date.now())
+      try {
+        if (kind === 'send') {
+          // Each attempt consumes its permit; explicit rejection may issue a new one.
+          if (
+            !sendToken ||
+            (sendExpiresAt > 0 && Date.now() >= sendExpiresAt)
+          ) {
+            return
+          }
+          const permit = sendToken
+          const affiliateCode = sendAffiliateCode.current
+          setSendToken('')
+          setSendExpiresAt(0)
+          setSentChallenge(captcha.data.challenge_token)
+          setSMSToken('')
+          const result = await request<{
+            sms_token: string
+            retry_after: number
+          }>('/api/phone/sms/send', { send_token: permit })
+          if (!controller.signal.aborted && active.current) {
+            smsAffiliateCode.current = affiliateCode
+            setSMSToken(result.sms_token)
+            setRetryAt(Date.now() + result.retry_after * 1000)
+            setNow(Date.now())
+          }
+        } else {
+          const result = await request<unknown>('/api/phone/login', {
+            sms_token: smsToken,
+            code,
+          })
+          if (!controller.signal.aborted && active.current) {
+            await props.onResult(result, smsAffiliateCode.current)
+          }
         }
-      } else {
-        const result = await request<unknown>('/api/phone/login', {
-          sms_token: smsToken,
-          code,
-        })
+      } catch (failure) {
+        markServerErrorHandled(failure)
         if (!controller.signal.aborted && active.current) {
-          await props.onResult(result, smsAffiliateCode.current)
+          setError(getServerErrorMessage(failure))
+          if (kind === 'send') {
+            const recovery = getSMSDeliveryRecovery(failure)
+            setSendToken(recovery?.retryToken ?? '')
+            setSendExpiresAt(recovery?.expiresAt ?? 0)
+            if (recovery) {
+              setRetryAt(Date.now() + recovery.retryAfter * 1000)
+              setNow(Date.now())
+            }
+          }
         }
-      }
-    },
-    onError: (failure) => {
-      markServerErrorHandled(failure)
-      if (active.current && !operation.current?.signal.aborted) {
-        setError(getServerErrorMessage(failure))
-        setSendToken('')
+        throw failure
       }
     },
     meta: { errorToast: false },
@@ -225,6 +248,7 @@ export function PhoneAuthForm(props: PhoneAuthFormProps) {
     imageOperation.current?.abort()
     setImageVerifying(false)
     setSendToken('')
+    setSendExpiresAt(0)
   }
   const replaceUsedImage = () => {
     const token = captcha.data?.challenge_token
@@ -334,6 +358,7 @@ export function PhoneAuthForm(props: PhoneAuthFormProps) {
           disabled={
             !props.enabled ||
             !sendToken ||
+            (sendExpiresAt > 0 && now >= sendExpiresAt) ||
             imageVerifying ||
             action.isPending ||
             remaining > 0
@@ -345,8 +370,8 @@ export function PhoneAuthForm(props: PhoneAuthFormProps) {
         </Button>
       </div>
       <p className='auth-helper' role='status'>
-        {imageUsed && t('Refresh image code')}
-        {!imageUsed &&
+        {imageUsed && !sendToken && t('Refresh image code')}
+        {(!imageUsed || Boolean(sendToken)) &&
           (sendToken
             ? t('Image verified')
             : t('Verify the image code before requesting an SMS code'))}

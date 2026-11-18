@@ -403,23 +403,34 @@ func GetAllUnFinishSyncTasks(limit int) []*Task {
 	return tasks
 }
 
-// GetSettledTasksForBillingReconcile returns successfully finished tasks whose
-// billing may still need a difference settlement, newest first. The model name
-// and the upstream usage block live in JSON columns whose serialization differs
-// per database driver, so callers filter those in Go instead of in SQL.
-func GetSettledTasksForBillingReconcile(submittedAfter int64, limit int) ([]*Task, error) {
-	if limit <= 0 {
-		limit = 200
-	}
+// ClaimSettledTasksForBillingReconcile rotates a bounded batch of completed
+// candidates through the existing settlement retry queue. Unapplied outcomes
+// are excluded so legacy reconciliation cannot take their recovery lease.
+// Accepting a new points outcome resets retry_at, superseding this lease.
+func ClaimSettledTasksForBillingReconcile(ctx context.Context, submittedAfter, finishedBefore int64, limit int) ([]*Task, error) {
+	limit = min(max(limit, 1), 200)
+	now := time.Now().UnixMilli()
 	var tasks []*Task
-	err := DB.Model(&Task{}).
-		Where("status = ?", TaskStatusSuccess).
-		Where("quota > ?", 0).
-		Where("submit_time >= ?", submittedAfter).
-		Order("id DESC").
-		Limit(limit).
-		Find(&tasks).Error
-	return tasks, err
+	err := DB.WithContext(ctx).Where("status = ? AND quota > 0 AND submit_time >= ? AND finish_time > 0 AND finish_time <= ?", TaskStatusSuccess, submittedAfter, finishedBefore).
+		Where("outcome_version = applied_outcome_version AND settlement_retry_at <= ?", now).
+		Order("settlement_retry_at ASC, id ASC").Limit(limit).Find(&tasks).Error
+	if err != nil {
+		return nil, err
+	}
+	claimed := make([]*Task, 0, len(tasks))
+	for _, task := range tasks {
+		result := DB.WithContext(ctx).Model(&Task{}).
+			Where("id = ? AND status = ? AND outcome_version = ? AND applied_outcome_version = ? AND settlement_retry_at = ?", task.ID, TaskStatusSuccess, task.OutcomeVersion, task.OutcomeVersion, task.SettlementRetryAt).
+			Update("settlement_retry_at", now+time.Minute.Milliseconds())
+		if result.Error != nil {
+			return nil, result.Error
+		}
+		if result.RowsAffected == 1 {
+			task.SettlementRetryAt = now + time.Minute.Milliseconds()
+			claimed = append(claimed, task)
+		}
+	}
+	return claimed, nil
 }
 
 // HasUnfinishedSyncTasks reports whether at least one async (Suno/video) task is

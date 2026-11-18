@@ -346,3 +346,46 @@ it('keeps the displayed image and answer when SMS login fails after sending', as
   ).toHaveAttribute('src', source)
   expect(api.get).toHaveBeenCalledTimes(1)
 })
+
+it('retains a bounded retry permit after explicit rejection and sends only on another click', async () => {
+  const post = vi.spyOn(api, 'post').mockImplementation(async (path) => {
+    if (path === '/api/phone/captcha/verify') {
+      return { data: { success: true, data: { send_token: 'permit' } } }
+    }
+    return {
+      data: {
+        success: false,
+        message: 'Delivery failed',
+        data: {
+          code: 'SMS_DELIVERY_FAILED',
+          retry_token: 'retry-permit',
+          retry_after: 1,
+          retry_expires_at: Math.floor(Date.now() / 1000) + 120,
+        },
+      },
+    }
+  })
+  const view = fixture()
+  await fill(view)
+  await waitFor(() => expect(view.send).toBeEnabled())
+  vi.useFakeTimers()
+  fireEvent.click(view.send)
+  await act(async () => vi.advanceTimersByTimeAsync(0))
+  expect(screen.getByRole('alert')).toHaveTextContent('Delivery failed')
+  expect(view.send).toBeDisabled()
+  expect(post).toHaveBeenCalledTimes(2)
+  await act(async () => vi.advanceTimersByTimeAsync(2000))
+  expect(view.send).toBeEnabled()
+  fireEvent.click(view.send)
+  await act(async () => vi.advanceTimersByTimeAsync(0))
+  expect(post).toHaveBeenLastCalledWith(
+    '/api/phone/sms/send',
+    { send_token: 'retry-permit' },
+    expect.any(Object)
+  )
+  await act(async () => vi.advanceTimersByTimeAsync(121000))
+  expect(view.send).toBeDisabled()
+  expect(post).toHaveBeenCalledTimes(3)
+  fireEvent.change(view.phone, { target: { value: '13900139000' } })
+  expect(view.send).toBeDisabled()
+})

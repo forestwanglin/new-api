@@ -26,16 +26,16 @@ func aliyunEscape(value string) string { return strings.ReplaceAll(url.QueryEsca
 
 func SendAliyunSMS(phone, code string) error {
 	if !PhoneSMSConfigured() {
-		return common.NewMessage("Phone login is not configured. Please contact your administrator.")
+		return &smsProviderError{rejected: true}
 	}
 	settings := system_setting.GetPhoneSettings()
 	nonce, err := randomPhoneDigits(32)
 	if err != nil {
-		return err
+		return &smsProviderError{rejected: true}
 	}
 	template, err := common.Marshal(map[string]string{"code": code})
 	if err != nil {
-		return err
+		return &smsProviderError{rejected: true}
 	}
 	params := url.Values{"AccessKeyId": {os.Getenv("ALIYUN_SMS_ACCESS_KEY_ID")}, "Action": {"SendSms"}, "Format": {"JSON"}, "Version": {"2017-05-25"}, "RegionId": {settings.Region}, "SignatureMethod": {"HMAC-SHA1"}, "SignatureVersion": {"1.0"}, "SignatureNonce": {nonce}, "Timestamp": {time.Now().UTC().Format("2006-01-02T15:04:05Z")}, "PhoneNumbers": {phone}, "SignName": {settings.SignName}, "TemplateCode": {settings.TemplateCode}, "TemplateParam": {string(template)}}
 	if securityToken := os.Getenv("ALIYUN_SMS_SECURITY_TOKEN"); securityToken != "" {
@@ -46,21 +46,33 @@ func SendAliyunSMS(phone, code string) error {
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://dysmsapi.aliyuncs.com/", strings.NewReader(params.Encode()))
 	if err != nil {
-		return err
+		return &smsProviderError{rejected: true}
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return common.NewMessage("SMS delivery failed. Please try again later.")
+		return &smsProviderError{}
 	}
 	defer res.Body.Close()
 	var result struct {
 		Code string `json:"Code"`
 	}
-	if res.StatusCode != http.StatusOK || common.DecodeJson(io.LimitReader(res.Body, 64*1024), &result) != nil || result.Code != "OK" {
-		return common.NewMessage("SMS delivery failed. Please try again later.")
+	if res.StatusCode >= http.StatusInternalServerError || common.DecodeJson(io.LimitReader(res.Body, 64*1024), &result) != nil {
+		return &smsProviderError{}
 	}
-	return nil
+	if res.StatusCode == http.StatusOK && result.Code == "OK" {
+		return nil
+	}
+	// Only documented rejection codes establish that no message was accepted.
+	// An arbitrary HTTP 4xx, unknown code or malformed response is ambiguous.
+	switch result.Code {
+	case "isv.BUSINESS_LIMIT_CONTROL", "isv.OUT_OF_SERVICE", "isv.AMOUNT_NOT_ENOUGH",
+		"isv.SMS_TEMPLATE_ILLEGAL", "isv.SMS_SIGNATURE_ILLEGAL", "isv.INVALID_PARAMETERS",
+		"isv.TEMPLATE_MISSING_PARAMETERS":
+		return &smsProviderError{rejected: true}
+	default:
+		return &smsProviderError{}
+	}
 }
 
 func aliyunSMSRequestSignature(params url.Values, secret string) string {

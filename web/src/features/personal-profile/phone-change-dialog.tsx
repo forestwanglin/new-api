@@ -11,6 +11,7 @@ import { useAccountSecurity } from '@/features/security/hooks/use-account-securi
 import { SupportDialog } from '@/features/subscriptions-custom/support-dialog'
 import { useCountdown } from '@/hooks/use-countdown'
 import { getServerErrorMessage } from '@/lib/server-error-message'
+import { getSMSDeliveryRecovery } from '@/lib/sms-delivery'
 
 import {
   changePhone,
@@ -39,6 +40,10 @@ export function PhoneChangeDialog(props: Props) {
   const [code, setCode] = useState('')
   const [captchaAnswer, setCaptchaAnswer] = useState('')
   const [smsToken, setSMSToken] = useState('')
+  const [deliveryRetry, setDeliveryRetry] = useState<{
+    token: string
+    expiresAt: number
+  }>()
   const [usedChallenge, setUsedChallenge] = useState('')
   const [verificationToken, setVerificationToken] = useState('')
   const verificationExpiresAt = useRef(0)
@@ -56,16 +61,29 @@ export function PhoneChangeDialog(props: Props) {
     gcTime: 0,
     refetchOnWindowFocus: false,
   })
+  useEffect(() => {
+    if (!deliveryRetry) return
+    const timer = window.setTimeout(
+      () => setDeliveryRetry(undefined),
+      Math.max(0, deliveryRetry.expiresAt - Date.now())
+    )
+    return () => window.clearTimeout(timer)
+  }, [deliveryRetry])
   const refreshCaptcha = () => {
+    setDeliveryRetry(undefined)
     setCaptchaAnswer('')
     void captcha.refetch()
   }
 
+  const canRetryDelivery = Boolean(
+    deliveryRetry?.token && deliveryRetry.expiresAt > Date.now()
+  )
   const imageUsed = usedChallenge === captcha.data?.challenge_token
 
   useEffect(() => {
     setCaptchaAnswer('')
     setUsedChallenge('')
+    setDeliveryRetry(undefined)
   }, [captcha.data?.challenge_token, step, props.open, security.sessionKey])
 
   useEffect(() => {
@@ -93,7 +111,10 @@ export function PhoneChangeDialog(props: Props) {
   }, [props.open, step])
 
   const close = (open: boolean) => {
-    if (!open) security.cancel()
+    if (!open) {
+      setDeliveryRetry(undefined)
+      security.cancel()
+    }
     props.onOpenChange(open)
   }
   const resetExpiredVerification = () => {
@@ -106,6 +127,7 @@ export function PhoneChangeDialog(props: Props) {
       toast.error(t('Security verification has expired. Please verify again.'))
       return true
     }
+    setDeliveryRetry(undefined)
     setStep('old')
     setVerificationToken('')
     verificationExpiresAt.current = 0
@@ -116,30 +138,54 @@ export function PhoneChangeDialog(props: Props) {
     return true
   }
   const send = async () => {
+    const retryToken =
+      deliveryRetry && deliveryRetry.expiresAt > Date.now()
+        ? deliveryRetry.token
+        : undefined
     if (
       resetExpiredVerification() ||
       !captcha.data ||
       captcha.isFetching ||
       captcha.isError ||
-      imageUsed ||
-      !/^\d{5}$/.test(captchaAnswer)
+      resend.isActive ||
+      (!retryToken && (imageUsed || !/^\d{5}$/.test(captchaAnswer)))
     ) {
       return
     }
     setExpired(false)
+    setSMSToken('')
+    setCode('')
     const result = await security.run(async (signal) => {
       // Delivery attempts consume the image even when the outcome is unknown.
       setUsedChallenge(captcha.data.challenge_token)
-      return {
-        ...(await sendPhoneCode(
-          step,
-          phone,
-          verificationToken,
-          captcha.data.challenge_token,
-          captchaAnswer,
-          signal
-        )),
-        notification_warning: false,
+      setDeliveryRetry(undefined)
+      try {
+        return {
+          ...(await sendPhoneCode(
+            step,
+            phone,
+            verificationToken,
+            retryToken ? '' : captcha.data.challenge_token,
+            retryToken ? '' : captchaAnswer,
+            signal,
+            retryToken
+          )),
+          notification_warning: false,
+        }
+      } catch (error) {
+        if (!signal.aborted) {
+          const recovery = getSMSDeliveryRecovery(error)
+          if (recovery) {
+            resend.start(recovery.retryAfter)
+            if (recovery.retryToken) {
+              setDeliveryRetry({
+                token: recovery.retryToken,
+                expiresAt: recovery.expiresAt,
+              })
+            }
+          }
+        }
+        throw error
       }
     })
     if (!result) return
@@ -166,6 +212,7 @@ export function PhoneChangeDialog(props: Props) {
     if (step === 'old') {
       setVerificationToken(result.token)
       verificationExpiresAt.current = verificationStartedAt + 10 * 60 * 1000
+      setDeliveryRetry(undefined)
       setStep('new')
       setSMSToken('')
       setCode('')
@@ -242,6 +289,7 @@ export function PhoneChangeDialog(props: Props) {
             value={step === 'old' ? props.status.phone_masked : phone}
             placeholder={t('11-digit mainland China phone number')}
             onChange={(event) => {
+              setDeliveryRetry(undefined)
               setPhone(event.target.value)
               setSMSToken('')
               setCode('')
@@ -289,7 +337,9 @@ export function PhoneChangeDialog(props: Props) {
               )}
             </Button>
           </div>
-          {imageUsed && <p className='pp-hint'>{t('Refresh image code')}</p>}
+          {imageUsed && !canRetryDelivery && (
+            <p className='pp-hint'>{t('Refresh image code')}</p>
+          )}
           {captcha.error && (
             <p className='pp-error' role='alert'>
               {getServerErrorMessage(captcha.error)}
@@ -334,9 +384,9 @@ export function PhoneChangeDialog(props: Props) {
                   security.pending ||
                   captcha.isFetching ||
                   captcha.isError ||
-                  imageUsed ||
                   !captcha.data ||
-                  !/^\d{5}$/.test(captchaAnswer) ||
+                  (!canRetryDelivery &&
+                    (imageUsed || !/^\d{5}$/.test(captchaAnswer))) ||
                   resend.isActive ||
                   (step === 'new' && !/^1[3-9]\d{9}$/.test(phone))
                 }

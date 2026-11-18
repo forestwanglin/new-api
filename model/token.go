@@ -29,6 +29,8 @@ type Token struct {
 	PointLimitEnabled  bool           `json:"point_limit_enabled"`
 	PointLimit         int64          `json:"-" gorm:"type:bigint;not null;default:0"`
 	ReservedPoints     int64          `json:"-" gorm:"type:bigint;not null;default:0"`
+	UsedPoints         int64          `json:"-" gorm:"type:bigint;not null;default:0"`
+	UsedPointsVersion  int            `json:"-" gorm:"not null;default:0"`
 	ModelLimitsEnabled bool           `json:"model_limits_enabled"`
 	ModelLimits        string         `json:"model_limits" gorm:"type:text"`
 	AllowIps           *string        `json:"allow_ips" gorm:"default:''"`
@@ -41,6 +43,13 @@ type Token struct {
 	AllowUserQuotaQuery bool   `json:"allow_user_quota_query"`
 	CacheExpiresAt      int64  `json:"-" gorm:"-"`
 	CacheMAC            string `json:"-" gorm:"-"`
+}
+
+// BeforeCreate initializes a new key without trusting caller-supplied counters.
+// Existing rows gain version zero during schema migration and require backfill.
+func (token *Token) BeforeCreate(_ *gorm.DB) error {
+	token.UsedPoints, token.UsedPointsVersion = 0, tokenUsedPointsVersion
+	return nil
 }
 
 func (token *Token) GetAutoGroups() ([]string, error) {
@@ -121,33 +130,22 @@ func GetAllUserTokens(userId int, startIdx int, num int) ([]*Token, error) {
 	return tokens, err
 }
 
-// GetTokenUsedPoints returns exact cumulative point charges for API keys.
-// Caller ownership is enforced by both the token lookup and billing-row join.
+// GetTokenUsedPoints returns exact cumulative point charges from the primary
+// token rows. Ownership remains part of the query; historical calls are audit.
 func GetTokenUsedPoints(userID int, tokenIDs []int) (map[int]int64, error) {
 	used := make(map[int]int64, len(tokenIDs))
 	if len(tokenIDs) == 0 {
 		return used, nil
 	}
-	var calls []struct {
-		TokenID int
-		Points  int64
-	}
-	if err := DB.Model(&PointCallBilling{}).
-		Select("point_call_billings.token_id, point_call_billings.points").
-		Joins("JOIN tokens ON tokens.id = point_call_billings.token_id").
-		Where("tokens.user_id = ? AND point_call_billings.user_id = ? AND point_call_billings.token_id IN ?", userID, userID, tokenIDs).
-		Scan(&calls).Error; err != nil {
+	var tokens []Token
+	if err := DB.Select("id", "used_points", "used_points_version").Where("user_id = ? AND id IN ?", userID, tokenIDs).Find(&tokens).Error; err != nil {
 		return nil, err
 	}
-	for _, call := range calls {
-		if call.Points < 0 {
+	for _, token := range tokens {
+		if token.UsedPointsVersion != tokenUsedPointsVersion || token.UsedPoints < 0 {
 			return nil, ErrTokenPointLimitInvalid
 		}
-		total, err := pointAdd(used[call.TokenID], call.Points)
-		if err != nil {
-			return nil, err
-		}
-		used[call.TokenID] = total
+		used[token.Id] = token.UsedPoints
 	}
 	return used, nil
 }
@@ -397,25 +395,6 @@ func (token *Token) Update() (err error) {
 	return err
 }
 
-func tokenUsedPointsTx(tx *gorm.DB, tokenID int) (int64, error) {
-	var calls []PointCallBilling
-	if err := lockForUpdate(tx).Select("points").Where("token_id = ?", tokenID).Find(&calls).Error; err != nil {
-		return 0, err
-	}
-	var used int64
-	for _, call := range calls {
-		if call.Points < 0 {
-			return 0, ErrTokenPointLimitInvalid
-		}
-		var err error
-		used, err = pointAdd(used, call.Points)
-		if err != nil {
-			return 0, err
-		}
-	}
-	return used, nil
-}
-
 // ReserveTokenPointLimitTx reserves the increment over this call's prior hold
 // under the same row lock used by legacy API-key quota admission.
 func ReserveTokenPointLimitTx(tx *gorm.DB, tokenID int, callID string, nextReserved int64) (bool, error) {
@@ -440,19 +419,20 @@ func ReserveTokenPointLimitTx(tx *gorm.DB, tokenID int, callID string, nextReser
 	if reservedElsewhere < 0 {
 		return false, ErrTokenPointLimitInvalid
 	}
-	used, err := tokenUsedPointsTx(tx, tokenID)
-	if err != nil {
-		return false, err
+	if token.UsedPointsVersion != tokenUsedPointsVersion || token.UsedPoints < 0 {
+		return false, ErrTokenPointLimitInvalid
 	}
-	requested, err := pointAdd(used, reservedElsewhere)
-	if err == nil {
-		requested, err = pointAdd(requested, nextReserved)
-	}
-	if err != nil {
-		return false, err
-	}
-	if token.PointLimit > 0 && (requested > token.PointLimit || nextReserved == 0 && used >= token.PointLimit) {
-		return false, ErrTokenPointLimit
+	if token.PointLimit > 0 {
+		requested, err := pointAdd(token.UsedPoints, reservedElsewhere)
+		if err == nil {
+			requested, err = pointAdd(requested, nextReserved)
+		}
+		if err != nil {
+			return false, err
+		}
+		if requested > token.PointLimit || nextReserved == 0 && token.UsedPoints >= token.PointLimit {
+			return false, ErrTokenPointLimit
+		}
 	}
 	delta := nextReserved - call.TokenReservedPoints
 	newReserved, err := pointAdd(token.ReservedPoints, delta)

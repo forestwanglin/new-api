@@ -1,5 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
+  act,
+  fireEvent,
   cleanup,
   render as renderView,
   screen,
@@ -467,4 +469,93 @@ it('blocks SMS when refreshing an existing image fails instead of reusing the ol
     screen.getByRole('button', { name: 'Refresh image code' })
   ).toBeEnabled()
   expect(post).not.toHaveBeenCalled()
+})
+
+it('retries a rejected SMS with server authorization after cooldown without reusing the image', async () => {
+  const post = vi.spyOn(api, 'post').mockResolvedValue({
+    data: {
+      success: false,
+      message: 'Delivery failed',
+      data: {
+        code: 'SMS_DELIVERY_FAILED',
+        retry_token: 'retry-permit',
+        retry_after: 1,
+        retry_expires_at: Math.floor(Date.now() / 1000) + 120,
+      },
+    },
+  })
+  const user = userEvent.setup()
+  render(
+    <PhoneChangeDialog
+      open
+      status={{
+        bound: true,
+        phone_masked: '138****8000',
+        verification_required: false,
+      }}
+      onOpenChange={vi.fn()}
+      onSuccess={vi.fn()}
+    />
+  )
+  const answer = screen.getByLabelText('Image verification code')
+  await waitFor(() => expect(answer).toBeEnabled())
+  await user.type(answer, '12345')
+  vi.useFakeTimers()
+  fireEvent.click(screen.getByRole('button', { name: 'Get code' }))
+  await act(async () => vi.advanceTimersByTimeAsync(0))
+  expect(screen.getByRole('alert')).toHaveTextContent('Delivery failed')
+  expect(post).toHaveBeenCalledTimes(1)
+  await act(async () => vi.advanceTimersByTimeAsync(2000))
+  expect(screen.getByRole('button', { name: 'Get code' })).toBeEnabled()
+  fireEvent.click(screen.getByRole('button', { name: 'Get code' }))
+  await act(async () => vi.advanceTimersByTimeAsync(0))
+  expect(post).toHaveBeenLastCalledWith(
+    '/api/user/phone/change/send',
+    expect.objectContaining({
+      retry_token: 'retry-permit',
+      captcha_token: '',
+      captcha_answer: '',
+    }),
+    expect.any(Object)
+  )
+})
+
+it('clears failed-send retry authorization when the target changes', async () => {
+  const post = vi.spyOn(api, 'post').mockResolvedValue({
+    data: {
+      success: false,
+      message: 'Delivery failed',
+      data: {
+        code: 'SMS_DELIVERY_FAILED',
+        retry_token: 'old-target',
+        retry_after: 0,
+        retry_expires_at: Math.floor(Date.now() / 1000) + 120,
+      },
+    },
+  })
+  const user = userEvent.setup()
+  render(
+    <PhoneChangeDialog
+      open
+      status={{ bound: false, phone_masked: '', verification_required: true }}
+      bindingAuthorization={{
+        token: 'binding',
+        expires_at: Date.now() / 1000 + 600,
+      }}
+      onOpenChange={vi.fn()}
+      onSuccess={vi.fn()}
+    />
+  )
+  await user.type(screen.getByLabelText('New phone number'), '13900139000')
+  const answer = screen.getByLabelText('Image verification code')
+  await waitFor(() => expect(answer).toBeEnabled())
+  await user.type(answer, '12345')
+  await user.click(screen.getByRole('button', { name: 'Get code' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Delivery failed')
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: 'Get code' })).toBeEnabled()
+  )
+  await user.type(screen.getByLabelText('New phone number'), '{Backspace}1')
+  expect(screen.getByRole('button', { name: 'Get code' })).toBeDisabled()
+  expect(post).toHaveBeenCalledTimes(1)
 })

@@ -1045,6 +1045,9 @@ func TestTokenPointLimitManagement(t *testing.T) {
 	} {
 		require.NoError(t, db.Create(&call).Error)
 	}
+	// The fixture represents a fully migrated historical counter. Runtime
+	// projections never reconstruct consumption from audit history.
+	require.NoError(t, db.Model(&model.Token{}).Where("id = ?", legacy.Id).Update("used_points", int64(9007199254740994)).Error)
 	// Status-only requests never convert, even when carrying a point field.
 	ctx, recorder = newAuthenticatedContext(t, http.MethodPut, "/api/token/?status_only=true", map[string]any{"id": legacy.Id, "status": common.TokenStatusDisabled, "point_limit": "0"}, 1)
 	UpdateToken(ctx)
@@ -1079,15 +1082,15 @@ func TestTokenPointLimitManagement(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, used, "projection is scoped to the authenticated owner")
 	// A projection failure is returned before mutating or reporting audit success.
-	require.NoError(t, db.Callback().Row().Before("gorm:row").Register("test:points-read-failure", func(tx *gorm.DB) {
-		if tx.Statement.Table == "point_call_billings" {
+	require.NoError(t, db.Callback().Query().Before("gorm:query").Register("test:points-read-failure", func(tx *gorm.DB) {
+		if tx.Statement.Table == "tokens" && strings.Contains(strings.Join(tx.Statement.Selects, ","), "used_points") {
 			tx.AddError(errors.New("injected points read failure"))
 		}
 	}))
 	ctx, recorder = newAuthenticatedContext(t, http.MethodPut, "/api/token/", map[string]any{"id": legacy.Id, "name": "must-not-save", "expired_time": -1, "point_limit": "5"}, 1)
 	UpdateToken(ctx)
 	assert.False(t, decodeAPIResponse(t, recorder).Success)
-	require.NoError(t, db.Callback().Row().Remove("test:points-read-failure"))
+	require.NoError(t, db.Callback().Query().Remove("test:points-read-failure"))
 	require.NoError(t, db.First(legacy, legacy.Id).Error)
 	assert.Equal(t, "old-client", legacy.Name)
 }

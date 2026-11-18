@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"testing"
 	"time"
 
@@ -122,7 +123,7 @@ func TestReconcileArkSeedanceTaskBillingIsIdempotentAndTwoWay(t *testing.T) {
 	// A second pass finds nothing to move.
 	summary, err = ReconcileArkSeedanceTaskBillingOnce(context.Background())
 	require.NoError(t, err)
-	assert.Equal(t, 1, summary.Scanned)
+	assert.Equal(t, 0, summary.Scanned)
 	assert.Equal(t, 0, summary.Eligible)
 	assert.Equal(t, 0, summary.Settled)
 	assert.Equal(t, 626_175, reloadTask(t, task.ID).Quota)
@@ -157,8 +158,8 @@ func TestReconcileArkSeedanceTaskBillingSkipsIneligibleTasks(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 0, summary.Settled)
 	assert.Equal(t, 0, summary.Eligible)
-	assert.Equal(t, 5, summary.Scanned)
-	assert.Equal(t, 5, summary.Skipped)
+	assert.Equal(t, 4, summary.Scanned)
+	assert.Equal(t, 4, summary.Skipped)
 	for _, testCase := range []struct {
 		task       *model.Task
 		wantQuota  int
@@ -262,7 +263,8 @@ func TestPointsTaskRecoveryReplaysAcceptedFailureWithoutStaleRecharge(t *testing
 	assert.Equal(t, 20, pending.Quota, "task marker rolls back with failed financial transaction")
 	assert.True(t, model.HasUnfinishedSyncTasks(), "accepted terminal finance wakes recovery")
 
-	recoverPointsTaskSettlements(context.Background())
+	_, err = ReconcileArkSeedanceTaskBillingOnce(context.Background())
+	require.NoError(t, err)
 	settled := reloadTask(t, task.ID)
 	assert.Zero(t, settled.Quota)
 	assert.Equal(t, settled.OutcomeVersion, settled.AppliedOutcomeVersion)
@@ -280,4 +282,205 @@ func TestPointsTaskRecoveryReplaysAcceptedFailureWithoutStaleRecharge(t *testing
 	assert.False(t, adjustPointsTask(context.Background(), &stale, 10, "stale correction"))
 	recoverPointsTaskSettlements(context.Background())
 	assert.Equal(t, 100, getUserQuota(t, 801), "old success and duplicate recovery cannot recharge")
+}
+
+func TestReconcileArkSeedancePointsAlreadyAppliedNeverFetches(t *testing.T) {
+	truncate(t)
+	seedUser(t, 871, 1000)
+	seedToken(t, 871, 871, "points-reconcile-no-fetch", 1000)
+	seedChannel(t, 871)
+	task := seedReconcileTask(t, 871, 871, 871, 20, "default", `{"usage":{"completion_tokens":20}}`)
+	task.PrivateData.PointsBillingID = "already-applied-call"
+	task.PrivateData.UpstreamTaskID = "already-applied-upstream"
+	task.OutcomeVersion, task.AppliedOutcomeVersion = 1, 1
+	require.NoError(t, model.DB.Save(task).Error)
+	adaptor := &taskPollingFetchAdaptor{}
+	previousFactory := GetTaskAdaptorFunc
+	GetTaskAdaptorFunc = func(constant.TaskPlatform) TaskPollingAdaptor { return adaptor }
+	t.Cleanup(func() { GetTaskAdaptorFunc = previousFactory })
+	for range 2 {
+		_, err := ReconcileArkSeedanceTaskBillingOnce(context.Background())
+		require.NoError(t, err)
+	}
+	assert.Zero(t, adaptor.fetchCount(), "periodic recovery must not ask upstream for new facts")
+	current := reloadTask(t, task.ID)
+	assert.EqualValues(t, 1, current.OutcomeVersion)
+	assert.EqualValues(t, 1, current.AppliedOutcomeVersion)
+	assert.Equal(t, 20, current.Quota)
+}
+
+func TestReconcileArkSeedanceVisitsOlderCandidatesBeyondBatch(t *testing.T) {
+	truncate(t)
+	withArkSeedanceRatios(t)
+	seedUser(t, 872, 10_000_000)
+	seedToken(t, 872, 872, "reconcile-past-first-batch", 10_000_000)
+	seedChannel(t, 872)
+	task := seedReconcileTask(t, 872, 872, 872, 100, "Seedance mini 企业", `{"usage":{"completion_tokens":108900}}`)
+	newer := make([]model.Task, arkSeedanceReconcileBatchSize+1)
+	for i := range newer {
+		newer[i] = model.Task{TaskID: fmt.Sprintf("other-reconcile-%d", i), UserId: 872, Quota: 1,
+			Status: model.TaskStatusSuccess, SubmitTime: task.SubmitTime, FinishTime: task.FinishTime,
+			Properties: model.Properties{OriginModelName: "other-model"}}
+	}
+	require.NoError(t, model.DB.Create(&newer).Error)
+	for range 2 {
+		_, err := ReconcileArkSeedanceTaskBillingOnce(context.Background())
+		require.NoError(t, err)
+	}
+	assert.Equal(t, 626_175, reloadTask(t, task.ID).Quota)
+}
+
+func TestRefreshPointsTaskOutcomeReportsBusyCorrection(t *testing.T) {
+	truncate(t)
+	seedUser(t, 873, 1000)
+	seedToken(t, 873, 873, "reconcile-busy", 1000)
+	seedChannel(t, 873)
+	task := seedReconcileTask(t, 873, 873, 873, 20, "default", `{}`)
+	task.PrivateData.PointsBillingID = "busy-correction-call"
+	task.PrivateData.UpstreamTaskID = "busy-correction-upstream"
+	task.OutcomeVersion, task.AppliedOutcomeVersion = 1, 1
+	require.NoError(t, model.DB.Save(task).Error)
+	now := time.Now().UnixMilli()
+	won, err := model.TryClaimPointsTaskCorrection(task, now, now+60000)
+	require.NoError(t, err)
+	require.True(t, won)
+	adaptor := &taskPollingFetchAdaptor{}
+	previousFactory := GetTaskAdaptorFunc
+	GetTaskAdaptorFunc = func(constant.TaskPlatform) TaskPollingAdaptor { return adaptor }
+	t.Cleanup(func() { GetTaskAdaptorFunc = previousFactory })
+	assert.ErrorIs(t, refreshPointsTaskOutcome(context.Background(), task), model.ErrStaleTaskOutcome)
+	assert.Zero(t, adaptor.fetchCount())
+}
+
+type reconcileCorrectionAdaptor struct {
+	scriptedPollingAdaptor
+	fetches     int
+	quota       int
+	beforeFetch func(*model.Task)
+}
+
+func (a *reconcileCorrectionAdaptor) FetchTask(baseURL, key string, task *model.Task, proxy string) (*http.Response, error) {
+	a.fetches++
+	if a.beforeFetch != nil {
+		a.beforeFetch(task)
+	}
+	return a.scriptedPollingAdaptor.FetchTask(baseURL, key, task, proxy)
+}
+func (a *reconcileCorrectionAdaptor) AdjustBillingOnComplete(*model.Task, *relaycommon.TaskInfo) int {
+	return a.quota
+}
+
+func TestCorrectArkSeedanceTaskBillingPreservesDifferenceSettlementAndReplay(t *testing.T) {
+	truncate(t)
+	pointsModels := []any{&model.PointType{}, &model.PointModelRule{}, &model.PointAccount{}, &model.PointTransaction{}, &model.PointLedger{}, &model.PointFreeze{}, &model.PointCallBilling{}, &model.PointCallEvent{}, &model.PointCallOperation{}}
+	require.NoError(t, model.DB.AutoMigrate(pointsModels...))
+	t.Cleanup(func() {
+		for i := len(pointsModels) - 1; i >= 0; i-- {
+			require.NoError(t, model.DB.Migrator().DropTable(pointsModels[i]))
+		}
+	})
+	seedUser(t, 874, 100)
+	seedToken(t, 874, 874, "manual-correction-token", 1000)
+	seedChannel(t, 874)
+	typ := model.PointType{Code: "CORRECTION", Name: "Correction points", ConsumePriority: 100}
+	require.NoError(t, model.DB.Create(&typ).Error)
+	require.NoError(t, model.DB.Create(&model.PointModelRule{PointTypeId: typ.Id, MatchType: model.PointMatchExact, MatchValue: reconcileTestModel, Enabled: true}).Error)
+	account := model.PointAccount{UserId: 874, PointTypeId: typ.Id, AvailablePoints: 100}
+	require.NoError(t, model.DB.Create(&account).Error)
+	require.NoError(t, model.CreatePointCall("manual-correction-call", 874, 874, reconcileTestModel, "1", "1000"))
+	require.NoError(t, model.ReservePointCall("manual-correction-call", "manual-correction:reserve", 20, false))
+	task := seedReconcileTask(t, 874, 874, 874, 20, "default", `{}`)
+	task.PrivateData.PointsBillingID = "manual-correction-call"
+	task.PrivateData.UpstreamTaskID = "manual-correction-upstream"
+	task.PrivateData.PointsOutcome = &relaycommon.TaskInfo{Status: string(model.TaskStatusSuccess), TotalTokens: 20}
+	task.OutcomeVersion = 1
+	require.NoError(t, model.DB.Save(task).Error)
+	_, err := settlePointsTask(task, 20, "manual-correction:initial")
+	require.NoError(t, err)
+	assert.Equal(t, 80, getUserQuota(t, 874))
+
+	adaptor := &reconcileCorrectionAdaptor{quota: 10, scriptedPollingAdaptor: scriptedPollingAdaptor{
+		parse: &relaycommon.TaskInfo{Status: string(model.TaskStatusSuccess), TotalTokens: 10, Url: "https://example.com/corrected.mp4"},
+	}}
+	previousFactory := GetTaskAdaptorFunc
+	GetTaskAdaptorFunc = func(constant.TaskPlatform) TaskPollingAdaptor { return adaptor }
+	t.Cleanup(func() { GetTaskAdaptorFunc = previousFactory })
+	first, err := CorrectArkSeedanceTaskBilling(context.Background(), task.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 1, first.Settled)
+	assert.EqualValues(t, -10, first.AdjustedQuota)
+	corrected := reloadTask(t, task.ID)
+	assert.EqualValues(t, 2, corrected.OutcomeVersion)
+	assert.Equal(t, corrected.OutcomeVersion, corrected.AppliedOutcomeVersion)
+	assert.Equal(t, 10, corrected.Quota)
+	assert.Equal(t, 90, getUserQuota(t, 874))
+	require.NoError(t, model.DB.First(&account, account.Id).Error)
+	assert.EqualValues(t, 90, account.AvailablePoints)
+
+	second, err := CorrectArkSeedanceTaskBilling(context.Background(), task.ID)
+	require.NoError(t, err)
+	assert.Zero(t, second.AdjustedQuota)
+	assert.Equal(t, 2, adaptor.fetches, "each explicit operation can fetch once")
+	assert.EqualValues(t, 2, reloadTask(t, task.ID).OutcomeVersion)
+	assert.Equal(t, 90, getUserQuota(t, 874))
+	_, err = ReconcileArkSeedanceTaskBillingOnce(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, 2, adaptor.fetches, "periodic reconciliation never performs a third correction")
+
+	require.NoError(t, model.DB.Model(task).Update("status", model.TaskStatusFailure).Error)
+	_, err = CorrectArkSeedanceTaskBilling(context.Background(), task.ID)
+	assert.ErrorIs(t, err, ErrTaskBillingCorrectionIneligible)
+	assert.Equal(t, 2, adaptor.fetches, "manual correction cannot reopen failed/refunded tasks")
+}
+
+func TestCorrectArkSeedanceTaskBillingRejectsLostCorrectionLease(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		updates map[string]any
+	}{
+		{"expired", map[string]any{"poll_lease_until": time.Now().Add(-time.Second).UnixMilli()}},
+		{"fenced", map[string]any{"poll_fence": 100}},
+		{"terminal_changed", map[string]any{"status": model.TaskStatusFailure}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			truncate(t)
+			seedUser(t, 875, 1000)
+			seedToken(t, 875, 875, "correction-lost-lease", 1000)
+			seedChannel(t, 875)
+			task := seedReconcileTask(t, 875, 875, 875, 20, "default", `{}`)
+			task.PrivateData.PointsBillingID = "lost-lease-call"
+			task.PrivateData.UpstreamTaskID = "lost-lease-upstream"
+			task.OutcomeVersion, task.AppliedOutcomeVersion = 1, 1
+			require.NoError(t, model.DB.Save(task).Error)
+			adaptor := &reconcileCorrectionAdaptor{quota: 10, scriptedPollingAdaptor: scriptedPollingAdaptor{
+				parse: &relaycommon.TaskInfo{Status: string(model.TaskStatusSuccess), TotalTokens: 10},
+			}, beforeFetch: func(current *model.Task) {
+				require.NoError(t, model.DB.Model(&model.Task{}).Where("id = ?", current.ID).Updates(tc.updates).Error)
+			}}
+			previousFactory := GetTaskAdaptorFunc
+			GetTaskAdaptorFunc = func(constant.TaskPlatform) TaskPollingAdaptor { return adaptor }
+			t.Cleanup(func() { GetTaskAdaptorFunc = previousFactory })
+			summary, err := CorrectArkSeedanceTaskBilling(context.Background(), task.ID)
+			require.ErrorIs(t, err, model.ErrStaleTaskOutcome)
+			assert.Zero(t, summary.Settled)
+			assert.Equal(t, 1, summary.Failed)
+			assert.Zero(t, summary.AdjustedQuota)
+			current := reloadTask(t, task.ID)
+			assert.EqualValues(t, 1, current.OutcomeVersion)
+			assert.Equal(t, 20, current.Quota)
+		})
+	}
+}
+
+func TestRefreshPointsTaskOutcomeRejectsChangedEligibility(t *testing.T) {
+	truncate(t)
+	seedUser(t, 876, 1000)
+	seedToken(t, 876, 876, "correction-changed-eligibility", 1000)
+	seedChannel(t, 876)
+	task := seedReconcileTask(t, 876, 876, 876, 20, "default", `{}`)
+	task.PrivateData.PointsBillingID = "changed-eligibility-call"
+	task.OutcomeVersion, task.AppliedOutcomeVersion = 1, 1
+	require.NoError(t, model.DB.Save(task).Error)
+	require.NoError(t, model.DB.Model(task).Update("status", model.TaskStatusFailure).Error)
+	assert.ErrorIs(t, refreshPointsTaskOutcome(context.Background(), task), ErrTaskBillingCorrectionIneligible)
 }

@@ -1230,6 +1230,19 @@
 - 验证：`bun run test src/features/auth/components/__tests__/phone-auth-form.test.tsx src/features/auth/components/__tests__/login-modal.test.tsx src/features/personal-profile/__tests__/phone-change.test.tsx src/features/personal-profile/__tests__/page.test.tsx src/features/security-access/__tests__/page.test.tsx`：5 文件 49 用例全部通过；覆盖成功/失败保留、短信登录失败保留、禁止旧挑战重放、主动刷新恢复获取及共享入口。`bun run typecheck`（1,643 文件）、四个变更 TSX 的 `oxlint` / `oxfmt --check`、`git diff --check` 通过，独立审查无阻断。
 - 风险与未覆盖：原图片保留仅供展示，重发前需手动刷新图片并填写新答案。参考 OWASP Authentication / Session Management Cheat Sheets 保留服务端认证与防重放边界；未进行线上发布。
 
+### Z085 API Key 累计计数、任务补偿与短信注册并发加固
+
+- 需求与原因：修复审查 #1/#2/#3/#5：Key 历史账单逐请求扫描、Seedance 周期重复拉取、短信失败无法恢复，以及手机号并发注册用户名冲突。
+- 变更内容：`tokens.used_points/used_points_version` 保存权威累计消费；启动按 Token 分批回填，结算/退款/手续费与累计列同事务，重放不重复累加。无限额 Key 跳过上限运算，准入及列表不再扫描历史流水。周期任务仅重放已接受待应用 outcome，不 GET 已结算积分任务；旧额度任务仍按存量 usage 补差，候选使用现有 retry 租约公平轮转。新增 root/session-only `POST /api/system-task/task-billing/:task_id/correct`，数字参数为本地任务行 ID，复用 fencing、OriginGuard、CriticalRateLimit、DisableCache 与 `task.billing_correct` 成功/失败审计；忙碌、过期和失效 fence 返回 409。
+- 短信契约：授权消费、配额占用、旧码失效和摘要准备在 HTTP 前原子落库，发送在事务外。明确拒绝撤销验证 flow，并通过 `data.code=SMS_DELIVERY_FAILED` 返回冷却和可选单次 `retry_token/retry_expires_at`；保留原授权绝对期限、最多 3 次发送及既有冷却/配额。顶层旧错误码保持兼容。未知结果（含超时/5xx）按用户明确选择返回可验证 token，仍保留冷却且不自动重发；只有结果状态持久化成功后返回 token。登录/改绑前端保留有界重试授权，编辑/刷新/关闭/会话变化清除；Access Token 验证失败也应用冷却。已登录绑定微信的独立短信策略保持原有行为。用户名改为 `phone_` 加 14 位 CSPRNG 字符，仅用户名唯一冲突重试完整事务（最多 3 次），验证码猜测记一次、提交后奖励一次。
+- 影响面：`model/{token,token_points,main,point_call_billing,task,task_points_outcome,auth_flow}.go`；`service/{task_billing_reconcile,task_polling,aliyun_sms,phone_auth,phone_change,access_token_contact,phone_registration_username,sms_send_recovery}.go`；`controller/{system_task,phone_auth,phone_change,secure_verification,sms_send_recovery}.go`；路由/权限声明、手机验证前端、共享安全验证错误传播及对应回归测试。
+- **上游自有文件**（按 `origin/main` 存在性核查）：`controller/{secure_verification,system_task,token_test}.go`、`middleware/access_token_routes.go`、`model/{auth_flow,main,task,task_cas_test,token}.go`、`router/api-router.go`、`service/task_polling.go`、`web/src/features/auth/secure-verification/hooks/use-secure-verification.ts` 及 `__tests__/verification-flow.test.tsx`、`web/src/lib/secure-verification.ts`。其余本条新增/修改文件为 fork 自有文件。
+- 与上游差异：保留既有财务和安全证明事务，在 fork 的积分任务与手机号流程加入累计列、显式纠正及有界失败恢复；没有新增运行依赖、配置或部署脚本变更。
+- **部署强提示**：启动回填前必须停止并排空所有旧版财务 writer，不能混合滚动写入；version 0 未完成回填时拒绝准入/投影/结算，不能把伪零值暴露为实际消费。每个 Token 的计数与版本原子提交，重启仅恢复未完成 Token，不覆盖已启用计数。回退旧二进制后累计列不会被维护，重新启用前必须重新建立核对基线。保留新列不等于计数仍正确。本次没有执行生产迁移或发布。
+- 验证：Go 构建、`go vet ./model/... ./service/... ./controller/... ./middleware/... ./router/...`、完整 `model/service/middleware` 测试通过。SQLite **3.50.4**、MySQL **8.4.13**、PostgreSQL **16.16** 隔离库通过计数生命周期/迁移/退款/重放/并发、任务 outcome/fencing/公平扫描、短信准备回滚/并发单用/unknown/拒绝重试，以及用户名冲突/并发矩阵。复核命令：配置 `TEST_MYSQL_DSN/TEST_POSTGRES_DSN` 指向各自专用隔离库，分别运行 `go test ./model -run 'TestTokenPointsCounterDatabaseMatrix|TestPointCallFinancialLifecycle' -count=1 -v`、`go test ./model -run '^TestPointsTaskOutcomeDatabaseMatrix$' -count=1 -v`、`go test ./service -run '^TestSMSRecoveryDatabaseMatrix$' -count=1 -v`、`go test ./service -run '^TestPhoneRegistration' -count=1 -v`。计数新增列覆盖 fresh、代表性旧 schema 升级两次及唯一约束/数据保留，不等同完整发行版生产库重放。前端相关 8 文件 **87 用例**、typecheck、定向 lint/format、生产构建通过。
+- 扩大检查限制：完整 controller/router 仍有基线失败：三个 `TestAccessToken*` fixture 缺 `external_identity_claims`，`TestOpenAIChatSamplingCompatibility` 的四个 sampling 子例，`TestAccessTokenRouteRulesCoverEveryDashboardRoute` 的 8 个既有声明缺项、`TestAccessTokenVerificationScopesAreAllListed`、`TestUserPointBalancesAPI`。均在原始 `41e279ba` 独立复现。全量 model 共用外库时 payment/admin-phone 夹具要求空库，分别用独立空库运行三库矩阵后通过，不能把该冲突计为业务通过。
+- 安全参考与未覆盖：核查 OWASP Authentication / Session Management Cheat Sheets 和 ASVS **5.0.0** 中 V6.3.1、V6.5、V6.6.2、V6.6.3 的限流、单用、期限与请求绑定控制；阿里云 SendSms 不提供幂等发送保证，仅官方已确认拒绝码可分类为未接收。不是完整 ASVS 合规结论。未进行真实短信投递、线上浏览器验证、最低版本 MySQL 5.7/PostgreSQL 9.6 或完整生产快照升级；HTTP 后进程崩溃的 sending flow 保持不可验证，用户等待后显式重新发送，不自动补发。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 
@@ -1239,6 +1252,7 @@
 
 | 区域 | 文件 | 关联条目 |
 |---|---|---|
+| 计费与短信恢复加固 | `controller/{secure_verification,system_task,token_test}.go`、`middleware/access_token_routes.go`、`model/{auth_flow,main,task,task_cas_test,token}.go`、`router/api-router.go`、`service/task_polling.go`、共享验证 hook 和 `web/src/lib/secure-verification.ts` | Z085 |
 | API Key 积分限额 | `controller/{token,token_test}.go`、`middleware/auth.go`、`model/{token,quota_reserve,token_cache,token_auto_groups_cache_test}.go`、API Key 表单/列表/类型及测试、七种 locale | Z080 |
 | 常规七页 Demo 样式 | `web/src/components/layout/components/section-page-layout.tsx` 及测试、dashboard 各图表/卡片及入口、keys 列表及入口、usage-logs 筛选/表格/审计及入口、`web/src/styles/index.css`（完整范围见 Z079） | Z079 |
 | 手机图片验证码和首页导航 | controller/service phone_change、共享手机图片渲染、router/api-router.go、middleware/access_token_routes.go、共用手机号弹窗、顶部导航与安全访问局部样式及相关测试 | Z077 |

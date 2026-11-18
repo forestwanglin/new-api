@@ -44,6 +44,7 @@ type phoneFlowPayload struct {
 	Digest        string `json:"digest,omitempty"`
 	BindFlowID    int64  `json:"bind_flow_id,omitempty"`
 	AuthVersion   int64  `json:"auth_version,omitempty"`
+	SendAttempts  int    `json:"send_attempts,omitempty"`
 }
 
 func phoneCodeDigest(code string) string {
@@ -112,7 +113,7 @@ func renderPhoneImage(answer string) (string, error) {
 
 func readPhoneFlow(token, purpose, browser string) (*model.AuthFlow, phoneFlowPayload, error) {
 	flow, err := model.GetAuthFlow(token, model.AuthFlowMatch{Purpose: purpose, SessionId: browser})
-	if err != nil {
+	if err != nil || purpose == phoneSMSPurpose && !smsFlowVerifiable(flow) {
 		return nil, phoneFlowPayload{}, ErrPhoneVerification
 	}
 	var payload phoneFlowPayload
@@ -213,37 +214,51 @@ func reservePhoneSend(tx *gorm.DB, phone, ip string) error {
 }
 
 func SendPhoneSMS(permit, browser, ip string) (string, error) {
-	_, payload, err := readPhoneFlow(permit, phoneSendPurpose, browser)
+	permitFlow, payload, err := readPhoneFlow(permit, phoneSendPurpose, browser)
 	if err != nil {
 		return "", err
+	}
+	if payload.SendAttempts >= 3 {
+		return "", ErrPhoneVerification
 	}
 	if payload.BindFlowID != 0 {
 		if _, _, err := readWeChatPhoneFlowByID(payload.BindFlowID, browser); err != nil {
 			return "", err
 		}
 	}
-	_, err = model.ConsumeAuthFlowWithAction(permit, model.AuthFlowMatch{Purpose: phoneSendPurpose, SessionId: browser}, func(tx *gorm.DB, _ *model.AuthFlow) error { return reservePhoneSend(tx, payload.Phone, ip) })
+	code, digest, err := newSMSCode()
 	if err != nil {
 		return "", err
 	}
-	code, err := randomPhoneDigits(6)
+	payload.Digest = digest
+	payload.SendAttempts++
+	encoded, err := common.Marshal(payload)
 	if err != nil {
 		return "", err
 	}
-	// Never retry the provider call: an ambiguous timeout may already have sent it.
-	if err := SendAliyunSMS(payload.Phone, code); err != nil {
-		return "", err
-	}
-	payload.Digest, err = common.Password2Hash(phoneCodeDigest(code))
+	var token string
+	var verification *model.AuthFlow
+	_, err = model.ConsumeAuthFlowWithAction(permit, model.AuthFlowMatch{Purpose: phoneSendPurpose, SessionId: browser}, func(tx *gorm.DB, _ *model.AuthFlow) error {
+		if err := reservePhoneSend(tx, payload.Phone, ip); err != nil {
+			return err
+		}
+		var err error
+		token, verification, err = prepareSMSFlowWithTx(tx, model.AuthFlowCreate{Purpose: phoneSMSPurpose, Provider: payload.Phone, SessionId: browser, Payload: string(encoded), ExpiresAt: time.Now().Add(5 * time.Minute)})
+		return err
+	})
 	if err != nil {
 		return "", err
 	}
-	// A resend invalidates older codes in this browser for the same number.
-	if err := model.DB.Model(&model.AuthFlow{}).Where("purpose = ? AND provider = ? AND session_id = ? AND consumed_at IS NULL", phoneSMSPurpose, payload.Phone, browser).Update("consumed_at", time.Now()).Error; err != nil {
-		return "", err
+	var retry *model.AuthFlowCreate
+	if payload.SendAttempts < 3 {
+		payload.Digest = ""
+		encoded, err = common.Marshal(payload)
+		if err != nil {
+			return "", err
+		}
+		retry = &model.AuthFlowCreate{Purpose: phoneSendPurpose, Provider: payload.Phone, SessionId: browser, Payload: string(encoded), ExpiresAt: permitFlow.ExpiresAt}
 	}
-	token, _, err := createPhoneFlow(phoneSMSPurpose, browser, payload, 5*time.Minute)
-	return token, err
+	return dispatchPreparedSMS(payload.Phone, code, token, verification, retry)
 }
 
 func CompletePhoneLogin(token, code, browser string) (*model.User, error) {
@@ -267,57 +282,65 @@ func CompletePhoneLogin(token, code, browser string) (*model.User, error) {
 	}
 	var user model.User
 	created := false
-	_, err = model.ConsumeAuthFlowWithAction(token, model.AuthFlowMatch{Purpose: phoneSMSPurpose, SessionId: browser}, func(tx *gorm.DB, _ *model.AuthFlow) error {
-		if bindFlow != nil {
-			// Consume the bound primary identity together with the SMS proof and claim.
-			result := tx.Model(&model.AuthFlow{}).Where("id = ? AND purpose = ? AND session_id = ? AND consumed_at IS NULL AND expires_at > ?", bindFlow.Id, WeChatPhonePurpose, browser, time.Now()).Update("consumed_at", time.Now())
-			if result.Error != nil {
-				return result.Error
-			}
-			if result.RowsAffected != 1 {
-				return ErrPhoneVerification
-			}
-			bound, err := model.BindPhoneForPrimaryAuthWithTx(tx, bindFlow.UserId, bindPayload.AuthVersion, payload.Phone)
-			if err != nil {
-				if errors.Is(err, model.ErrExternalIdentityAlreadyClaimed) {
-					return ErrPhoneOwned
+	for attempt := range 3 {
+		user, created = model.User{}, false
+		_, err = model.ConsumeAuthFlowWithAction(token, model.AuthFlowMatch{Purpose: phoneSMSPurpose, SessionId: browser}, func(tx *gorm.DB, _ *model.AuthFlow) error {
+			if bindFlow != nil {
+				// Consume the bound primary identity together with the SMS proof and claim.
+				result := tx.Model(&model.AuthFlow{}).Where("id = ? AND purpose = ? AND session_id = ? AND consumed_at IS NULL AND expires_at > ?", bindFlow.Id, WeChatPhonePurpose, browser, time.Now()).Update("consumed_at", time.Now())
+				if result.Error != nil {
+					return result.Error
 				}
+				if result.RowsAffected != 1 {
+					return ErrPhoneVerification
+				}
+				bound, err := model.BindPhoneForPrimaryAuthWithTx(tx, bindFlow.UserId, bindPayload.AuthVersion, payload.Phone)
+				if err != nil {
+					if errors.Is(err, model.ErrExternalIdentityAlreadyClaimed) {
+						return ErrPhoneOwned
+					}
+					return err
+				}
+				user = *bound
+				return nil
+			}
+			var claim model.ExternalIdentityClaim
+			findErr := tx.Where("provider = ? AND subject = ?", "phone", payload.Phone).Take(&claim).Error
+			if findErr == nil {
+				return tx.First(&user, claim.UserId).Error
+			}
+			if !errors.Is(findErr, gorm.ErrRecordNotFound) {
+				return findErr
+			}
+			if !common.RegisterEnabled {
+				return common.NewMessage("New user registration has been disabled by administrator")
+			}
+			inviterID, err := ResolveAffiliateInviter(tx, payload.AffiliateCode)
+			if err != nil {
 				return err
 			}
-			user = *bound
+			suffix, err := common.GenerateRandomCharsKey(14)
+			if err != nil {
+				return err
+			}
+			user = model.User{Username: "phone_" + suffix, DisplayName: "Phone User", Role: common.RoleCommonUser, Status: common.UserStatusEnabled, AuthVersion: 1, InviterId: inviterID}
+			if err := user.InsertWithTx(tx, inviterID); err != nil {
+				return err
+			}
+			if err := model.ClaimExternalIdentityWithTx(tx, "phone", payload.Phone, user.Id); err != nil {
+				return ErrPhoneOwned
+			}
+			created = true
 			return nil
+		})
+		if err == nil {
+			break
 		}
-		var claim model.ExternalIdentityClaim
-		findErr := tx.Where("provider = ? AND subject = ?", "phone", payload.Phone).Take(&claim).Error
-		if findErr == nil {
-			return tx.First(&user, claim.UserId).Error
+		// ConsumeAuthFlowWithAction has rolled back before another transaction
+		// begins; PostgreSQL cannot reuse a transaction after a unique violation.
+		if attempt == 2 || !isPhoneRegistrationUsernameConflict(err) {
+			return nil, err
 		}
-		if !errors.Is(findErr, gorm.ErrRecordNotFound) {
-			return findErr
-		}
-		if !common.RegisterEnabled {
-			return common.NewMessage("New user registration has been disabled by administrator")
-		}
-		inviterID, err := ResolveAffiliateInviter(tx, payload.AffiliateCode)
-		if err != nil {
-			return err
-		}
-		var latestUser model.User
-		if err := tx.Unscoped().Select("id").Last(&latestUser).Error; err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-			return err
-		}
-		user = model.User{Username: "phone_" + strconv.Itoa(latestUser.Id+1), DisplayName: "Phone User", Role: common.RoleCommonUser, Status: common.UserStatusEnabled, AuthVersion: 1, InviterId: inviterID}
-		if err := user.InsertWithTx(tx, inviterID); err != nil {
-			return err
-		}
-		if err := model.ClaimExternalIdentityWithTx(tx, "phone", payload.Phone, user.Id); err != nil {
-			return ErrPhoneOwned
-		}
-		created = true
-		return nil
-	})
-	if err != nil {
-		return nil, err
 	}
 	if created {
 		user.FinishInsert(user.InviterId)

@@ -53,7 +53,8 @@ export function sendPhoneCode(
   verificationToken: string,
   captchaToken: string,
   captchaAnswer: string,
-  signal: AbortSignal
+  signal: AbortSignal,
+  retryToken?: string
 ) {
   return authResult<PhoneCodeResult>(
     api.post(
@@ -64,6 +65,7 @@ export function sendPhoneCode(
         verification_token: verificationToken,
         captcha_token: captchaToken,
         captcha_answer: captchaAnswer,
+        ...(retryToken ? { retry_token: retryToken } : {}),
       },
       {
         ...authRequestOptions,

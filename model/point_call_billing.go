@@ -592,6 +592,9 @@ func SetPointCallTarget(id, event string, target int, final, fee bool, guard fun
 			}
 		}
 		if c.TokenID > 0 {
+			if e := adjustTokenUsedPointsTx(tx, c.TokenID, delta); e != nil {
+				return e
+			}
 			if e := AdjustTokenQuotaTx(tx, c.TokenID, int(c.TokenQuota-total)); e != nil {
 				return e
 			}

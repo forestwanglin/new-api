@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/QuantumNous/new-api/service"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 func CreateLogCleanupSystemTask(c *gin.Context) {
@@ -141,4 +143,36 @@ func GetSystemTask(c *gin.Context) {
 		"message": "",
 		"data":    task.ToResponse(),
 	})
+}
+
+// CorrectTaskBilling permits one root-initiated, fenced read of fresh upstream
+// facts. task_id is the local numeric row ID, not the provider's task identity.
+func CorrectTaskBilling(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param("task_id"), 10, 64)
+	if err != nil || id <= 0 {
+		common.ApiErrorStatus(c, http.StatusBadRequest, common.NewMessage("Invalid request"))
+		return
+	}
+	summary, err := service.CorrectArkSeedanceTaskBilling(c.Request.Context(), id)
+	params := map[string]any{"task_id": id, "success": err == nil, "adjusted_quota": summary.AdjustedQuota}
+	defer func() {
+		const action = "task.billing_correct"
+		audit := &model.AuditRequestInfo{Method: c.Request.Method, Route: c.FullPath(), Path: c.FullPath(), Status: c.Writer.Status(), Success: err == nil}
+		model.RecordOperationAuditLog(c.GetInt("id"), c.GetInt("role"), auditContentEN(action, params), c.ClientIP(), action, params, auditOperatorInfo(c), audit, c)
+		markAuditLogged(c)
+	}()
+	if err != nil {
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			common.ApiErrorStatus(c, http.StatusNotFound, common.NewMessage("Invalid request"))
+		case errors.Is(err, service.ErrTaskBillingCorrectionIneligible):
+			common.ApiErrorStatus(c, http.StatusBadRequest, common.NewMessage("Invalid request"))
+		case errors.Is(err, model.ErrStaleTaskOutcome):
+			common.ApiErrorStatus(c, http.StatusConflict, common.NewMessage("Operation failed"))
+		default:
+			common.ApiErrorStatus(c, http.StatusBadGateway, common.NewMessage("Operation failed"))
+		}
+		return
+	}
+	common.ApiSuccess(c, summary)
 }

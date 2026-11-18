@@ -222,12 +222,13 @@ func TestAccessTokenSMSRejectsInvalidCeremonies(t *testing.T) {
 			if scenario == "delivery" {
 				calls := 0
 				http.DefaultClient = &http.Client{Transport: contactSMSHTTP(func(*http.Request) (*http.Response, error) { calls++; return nil, fmt.Errorf("provider timeout") })}
-				_, err := service.SendAccessTokenSMS(identity, op, "192.0.2.1")
-				require.ErrorIs(t, err, service.ErrBindingSMSDelivery)
+				token, err := service.SendAccessTokenSMS(identity, op, "192.0.2.1")
+				require.NoError(t, err)
+				require.NotEmpty(t, token)
 				assert.Equal(t, 1, calls)
 				var count int64
 				require.NoError(t, model.DB.Model(&model.AuthFlow{}).Where("purpose = ?", "access_token_sms").Count(&count).Error)
-				assert.Zero(t, count)
+				assert.EqualValues(t, 1, count, "unknown outcome retains the persisted verification code")
 				return
 			}
 			response := securityEnrollmentRequest("POST", "/api/verify/sms/send", `{"scope":"access_token.generate","context":`+contactCreateContext+`}`, "", identity, SendVerificationSMS)

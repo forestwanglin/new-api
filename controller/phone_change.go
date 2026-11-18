@@ -11,6 +11,7 @@ import (
 )
 
 type phoneChangeRequest struct {
+	RetryToken        string `json:"retry_token"`
 	CaptchaToken      string `json:"captcha_token"`
 	CaptchaAnswer     string `json:"captcha_answer"`
 	Step              string `json:"step"`
@@ -78,7 +79,7 @@ func SendPhoneChangeCode(c *gin.Context) {
 		common.ApiErrorT(c, "Invalid parameters")
 		return
 	}
-	token, err := service.SendPhoneChangeCode(identity, request.Step, request.Phone, request.VerificationToken, c.ClientIP(), request.CaptchaToken, request.CaptchaAnswer)
+	token, err := service.SendPhoneChangeCodeWithRetry(identity, request.Step, request.Phone, request.VerificationToken, c.ClientIP(), request.CaptchaToken, request.CaptchaAnswer, request.RetryToken)
 	if err != nil {
 		writePhoneChangeError(c, err)
 		return

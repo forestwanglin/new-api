@@ -475,6 +475,7 @@ func TestPointsTaskOutcomeDatabaseMatrix(t *testing.T) {
 			require.NoError(t, db.First(&legacy, 9).Error)
 			assert.Equal(t, 30, legacy.Quota)
 			assert.Zero(t, legacy.OutcomeVersion)
+			t.Run("billing_reconcile_queue", testTaskBillingReconcileQueue)
 			legacy.Status = TaskStatusInProgress
 			require.NoError(t, db.Model(&legacy).Update("status", legacy.Status).Error)
 
@@ -524,6 +525,29 @@ func TestPointsTaskOutcomeDatabaseMatrix(t *testing.T) {
 			assert.False(t, won)
 			assert.Equal(t, acceptedVersion, task.OutcomeVersion)
 			require.NoError(t, ReleasePointsTaskPoll(task))
+
+			for _, tc := range []struct {
+				name    string
+				updates map[string]any
+			}{
+				{"expired_correction", map[string]any{"poll_lease_until": time.Now().Add(-time.Second).UnixMilli()}},
+				{"stale_correction_fence", map[string]any{"poll_fence": 100}},
+				{"changed_correction_status", map[string]any{"status": TaskStatusFailure}},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					candidate := &Task{TaskID: tc.name, Status: TaskStatusSuccess,
+						PrivateData: TaskPrivateData{PointsBillingID: "rejected-correction", PointsOutcome: &commonRelay.TaskInfo{Status: string(TaskStatusSuccess), TotalTokens: 20}}}
+					require.NoError(t, db.Create(candidate).Error)
+					now := time.Now().UnixMilli()
+					claimed, err := TryClaimPointsTaskCorrection(candidate, now, now+60000)
+					require.NoError(t, err)
+					require.True(t, claimed)
+					require.NoError(t, db.Model(&Task{}).Where("id = ?", candidate.ID).Updates(tc.updates).Error)
+					accepted, err := candidate.AcceptPointsTaskCorrection()
+					assert.ErrorIs(t, err, ErrStaleTaskOutcome, "even an identical response requires a current lease")
+					assert.False(t, accepted)
+				})
+			}
 
 			// The public task representation must not leak private financial
 			// identity, polling fences or accepted usage provenance.
@@ -706,4 +730,48 @@ func TestPointsTaskListsMarkUnappliedTerminalOutcomesPending(t *testing.T) {
 		assert.Equal(t, "20", pending.PointsBilling.Items[0].Points)
 		assert.Equal(t, "committed", applied.PointsBilling.Status)
 	}
+}
+
+// testTaskBillingReconcileQueue is shared by the real-database outcome matrix.
+func testTaskBillingReconcileQueue(t *testing.T) {
+	now := time.Now().Unix()
+	tasks := []Task{
+		{TaskID: "queue-legacy", Status: TaskStatusSuccess, Quota: 20, SubmitTime: now - 3600, FinishTime: now - 1800},
+		{TaskID: "queue-applied", Status: TaskStatusSuccess, Quota: 20, SubmitTime: now - 3600, FinishTime: now - 1800,
+			OutcomeVersion: 1, AppliedOutcomeVersion: 1, PrivateData: TaskPrivateData{PointsBillingID: "queue-call"}},
+		{TaskID: "queue-pending", Status: TaskStatusSuccess, Quota: 20, SubmitTime: now - 3600, FinishTime: now - 1800,
+			OutcomeVersion: 1, PrivateData: TaskPrivateData{PointsBillingID: "pending-queue-call"}},
+	}
+	require.NoError(t, DB.Create(&tasks).Error)
+	t.Cleanup(func() {
+		require.NoError(t, DB.Where("task_id IN ?", []string{"queue-legacy", "queue-applied", "queue-pending"}).Delete(&Task{}).Error)
+	})
+	ctx := context.Background()
+	first, err := ClaimSettledTasksForBillingReconcile(ctx, now-86400, now-600, 1)
+	require.NoError(t, err)
+	require.Len(t, first, 1)
+	assert.Equal(t, tasks[0].ID, first[0].ID)
+	second, err := ClaimSettledTasksForBillingReconcile(ctx, now-86400, now-600, 1)
+	require.NoError(t, err)
+	require.Len(t, second, 1)
+	assert.Equal(t, tasks[1].ID, second[0].ID, "the first completed task cannot occupy every batch")
+	none, err := ClaimSettledTasksForBillingReconcile(ctx, now-86400, now-600, 200)
+	require.NoError(t, err)
+	assert.Empty(t, none, "known unapplied points outcomes must be excluded")
+
+	// A fresh accepted correction clears the scanning lease atomically, so
+	// periodic legacy scanning cannot delay newly pending points recovery.
+	applied := second[0]
+	nowMillis := time.Now().UnixMilli()
+	won, err := TryClaimPointsTaskCorrection(applied, nowMillis, nowMillis+60000)
+	require.NoError(t, err)
+	require.True(t, won)
+	applied.PrivateData.PointsOutcome = &commonRelay.TaskInfo{Status: string(TaskStatusSuccess), TotalTokens: 21}
+	won, err = applied.AcceptPointsTaskCorrection()
+	require.NoError(t, err)
+	require.True(t, won)
+	pending, err := GetPointsTasksPendingSettlement(ctx, 200)
+	require.NoError(t, err)
+	require.Len(t, pending, 2)
+	assert.Equal(t, []int64{tasks[1].ID, tasks[2].ID}, []int64{pending[0].ID, pending[1].ID})
 }

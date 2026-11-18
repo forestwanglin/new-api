@@ -90,6 +90,9 @@ func SendPhoneSMS(c *gin.Context) {
 	}
 	token, err := service.SendPhoneSMS(req.SendToken, browser, c.ClientIP())
 	if err != nil {
+		if writeSMSDeliveryRecovery(c, err) {
+			return
+		}
 		common.ApiError(c, err)
 		return
 	}

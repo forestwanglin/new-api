@@ -86,16 +86,25 @@ func updatePointsTaskOutcome(t *Task, fromStatus TaskStatus, correction bool) (b
 		}
 		if current.PrivateData.PointsBillingID != t.PrivateData.PointsBillingID ||
 			current.Status != fromStatus || current.OutcomeVersion != t.OutcomeVersion || current.PollFence != t.PollFence {
+			if correction {
+				return ErrStaleTaskOutcome
+			}
 			return nil
 		}
 		terminal := current.Status == TaskStatusSuccess || current.Status == TaskStatusFailure
 		if terminal && (!correction || current.Status != TaskStatusSuccess || t.Status != TaskStatusSuccess) {
+			if correction {
+				return ErrStaleTaskOutcome
+			}
 			return nil
 		}
 		if correction && (!terminal || t.PollLeaseUntil == 0 || t.PrivateData.PointsOutcome == nil) {
-			return nil
+			return ErrStaleTaskOutcome
 		}
 		if t.PollLeaseUntil != 0 && (current.PollLeaseUntil != t.PollLeaseUntil || current.PollLeaseUntil <= time.Now().UnixMilli()) {
+			if correction {
+				return ErrStaleTaskOutcome
+			}
 			return nil
 		}
 		if current.OutcomeVersion == math.MaxInt64 || current.PollFence == math.MaxInt64 {

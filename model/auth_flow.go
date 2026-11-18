@@ -149,6 +149,12 @@ func CreateAuthFlow(input AuthFlowCreate) (string, *AuthFlow, error) {
 	return createAuthFlowWithTx(DB, input)
 }
 
+// CreateAuthFlowWithTx prepares a flow atomically with the caller's authorization
+// and durable send-rate reservations. It does not commit the transaction.
+func CreateAuthFlowWithTx(tx *gorm.DB, input AuthFlowCreate) (string, *AuthFlow, error) {
+	return createAuthFlowWithTx(tx, input)
+}
+
 func createAuthFlowWithTx(tx *gorm.DB, input AuthFlowCreate) (string, *AuthFlow, error) {
 	if strings.TrimSpace(input.Purpose) == "" || input.ExpiresAt.IsZero() || !input.ExpiresAt.After(time.Now()) {
 		return "", nil, ErrAuthFlowInvalid

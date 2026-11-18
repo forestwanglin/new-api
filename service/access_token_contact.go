@@ -149,25 +149,7 @@ func SendAccessTokenSMS(identity AuthIdentity, operation VerificationOperation, 
 	if err != nil {
 		return "", err
 	}
-	if err := model.DB.Transaction(func(tx *gorm.DB) error {
-		if err := model.ValidateAuthSessionWithTx(tx, identity); err != nil {
-			return err
-		}
-		if err := validateAccessTokenContactWithTx(tx, identity, VerificationMethodSMS, string(contactPayload)); err != nil {
-			return err
-		}
-		return reservePhoneSend(tx, contact.Subject, ip)
-	}); err != nil {
-		return "", err
-	}
-	code, err := randomPhoneDigits(6)
-	if err != nil {
-		return "", err
-	}
-	if err := SendAliyunSMS(contact.Subject, code); err != nil {
-		return "", ErrBindingSMSDelivery
-	}
-	digest, err := common.Password2Hash(phoneCodeDigest(code))
+	code, digest, err := newSMSCode()
 	if err != nil {
 		return "", err
 	}
@@ -175,11 +157,27 @@ func SendAccessTokenSMS(identity AuthIdentity, operation VerificationOperation, 
 	if err != nil {
 		return "", err
 	}
-	if err := model.DB.Model(&model.AuthFlow{}).Where("purpose = ? AND user_id = ? AND session_id = ? AND consumed_at IS NULL", accessTokenSMSPurpose, identity.UserID, identity.SessionID).Update("consumed_at", time.Now()).Error; err != nil {
+	var token string
+	var verification *model.AuthFlow
+	if err := model.DB.Transaction(func(tx *gorm.DB) error {
+		if err := model.ValidateAuthSessionWithTx(tx, identity); err != nil {
+			return err
+		}
+		if err := validateAccessTokenContactWithTx(tx, identity, VerificationMethodSMS, string(contactPayload)); err != nil {
+			return err
+		}
+		if err := reservePhoneSend(tx, contact.Subject, ip); err != nil {
+			return err
+		}
+		var err error
+		token, verification, err = prepareSMSFlowWithTx(tx, model.AuthFlowCreate{Purpose: accessTokenSMSPurpose, UserId: identity.UserID, SessionId: identity.SessionID, Payload: string(payload), ExpiresAt: time.Now().Add(5 * time.Minute)})
+		return err
+	}); err != nil {
 		return "", err
 	}
-	token, _, err := model.CreateAuthFlow(model.AuthFlowCreate{Purpose: accessTokenSMSPurpose, UserId: identity.UserID, SessionId: identity.SessionID, Payload: string(payload), ExpiresAt: time.Now().Add(5 * time.Minute)})
-	return token, err
+	// This path is already authorized by the session and exact operation. It
+	// requires no CAPTCHA retry grant; each explicit resend rechecks both.
+	return dispatchPreparedSMS(contact.Subject, code, token, verification, nil)
 }
 
 func verifyAccessTokenSMS(identity AuthIdentity, operation VerificationOperation, token, code string) (*SecurityProof, error) {
@@ -189,7 +187,7 @@ func verifyAccessTokenSMS(identity AuthIdentity, operation VerificationOperation
 	}
 	match := model.AuthFlowMatch{Purpose: accessTokenSMSPurpose, UserId: identity.UserID, SessionId: identity.SessionID}
 	flow, err := model.GetAuthFlow(token, match)
-	if err != nil {
+	if err != nil || !smsFlowVerifiable(flow) {
 		return nil, ErrVerificationFailed
 	}
 	var payload accessTokenSMSPayload

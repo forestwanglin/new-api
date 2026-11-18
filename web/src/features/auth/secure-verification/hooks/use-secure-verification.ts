@@ -20,6 +20,7 @@ import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 
 import { useCountdown } from '@/hooks/use-countdown'
 import { AuthOperationError } from '@/lib/secure-verification'
+import { getSMSDeliveryRecovery } from '@/lib/sms-delivery'
 import type { AuthBundle } from '@/stores/auth-store'
 
 import type { PasskeyDomains } from '../../passkey/assertion'
@@ -383,6 +384,8 @@ export function useSecureVerification() {
       startSMSCountdown(result.retry_after)
     } catch (error) {
       if (pending.current === current) {
+        const recovery = getSMSDeliveryRecovery(error)
+        if (recovery) startSMSCountdown(recovery.retryAfter)
         dispatch({
           type: 'error',
           error: AuthOperationError.from(error).message,

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"math"
 	"strings"
 	"time"
@@ -62,12 +63,13 @@ func ReconcileArkSeedanceTaskBillingOnce(ctx context.Context) (TaskBillingReconc
 
 func reconcileArkSeedanceTaskBilling(ctx context.Context, now int64) (TaskBillingReconcileSummary, error) {
 	summary := TaskBillingReconcileSummary{}
-	tasks, err := model.GetSettledTasksForBillingReconcile(now-arkSeedanceReconcileLookbackSeconds, arkSeedanceReconcileBatchSize)
+	recoverPointsTaskSettlements(ctx)
+	settleBefore := now - arkSeedanceReconcileGraceSeconds
+	tasks, err := model.ClaimSettledTasksForBillingReconcile(ctx, now-arkSeedanceReconcileLookbackSeconds, settleBefore, arkSeedanceReconcileBatchSize)
 	if err != nil {
 		return summary, err
 	}
 	summary.Scanned = len(tasks)
-	settleBefore := now - arkSeedanceReconcileGraceSeconds
 	for _, task := range tasks {
 		if ctx.Err() != nil {
 			// The system task runner cancels the context when the lease is lost.
@@ -78,24 +80,9 @@ func reconcileArkSeedanceTaskBilling(ctx context.Context, now int64) (TaskBillin
 			continue
 		}
 		if task.PrivateData.PointsBillingID != "" {
-			if !strings.HasPrefix(strings.ToLower(taskModelName(task)), arkSeedanceModelPrefix) {
-				summary.Skipped++
-				continue
-			}
-			summary.Eligible++
-			before := task.Quota
-			if err := refreshPointsTaskOutcome(ctx, task); err != nil {
-				summary.Failed++
-				logger.LogWarn(ctx, common.LogText("failed to refresh points task billing outcome %s: %v", task.TaskID, err))
-				continue
-			}
-			current, err := model.GetPointsTaskOutcome(ctx, task.ID)
-			if err != nil || current.AppliedOutcomeVersion < current.OutcomeVersion {
-				summary.Failed++
-				continue
-			}
-			summary.Settled++
-			summary.AdjustedQuota += int64(current.Quota - before)
+			// Accepted points outcomes have their own durable recovery above.
+			// A periodic pass must never fetch new facts for settled outcomes.
+			summary.Skipped++
 			continue
 		}
 		actualQuota, ok := arkSeedanceActualQuota(task)
@@ -258,6 +245,44 @@ func settleAcceptedPointsTask(ctx context.Context, task *model.Task) {
 	}
 }
 
+var ErrTaskBillingCorrectionIneligible = errors.New("task is not eligible for billing correction")
+
+// CorrectArkSeedanceTaskBilling is an explicit administrative correction. Normal
+// recovery only reapplies accepted outcomes and never calls this entry point.
+func CorrectArkSeedanceTaskBilling(ctx context.Context, id int64) (TaskBillingReconcileSummary, error) {
+	summary := TaskBillingReconcileSummary{}
+	if id <= 0 {
+		return summary, ErrTaskBillingCorrectionIneligible
+	}
+	task, err := model.GetPointsTaskOutcome(ctx, id)
+	if err != nil {
+		return summary, err
+	}
+	summary.Scanned = 1
+	if task.PrivateData.PointsBillingID == "" || task.Status != model.TaskStatusSuccess ||
+		!strings.HasPrefix(strings.ToLower(taskModelName(task)), arkSeedanceModelPrefix) {
+		return summary, ErrTaskBillingCorrectionIneligible
+	}
+	summary.Eligible = 1
+	before := task.Quota
+	if err := refreshPointsTaskOutcome(ctx, task); err != nil {
+		summary.Failed = 1
+		return summary, err
+	}
+	current, err := model.GetPointsTaskOutcome(ctx, task.ID)
+	if err != nil {
+		summary.Failed = 1
+		return summary, err
+	}
+	if current.AppliedOutcomeVersion < current.OutcomeVersion {
+		summary.Failed = 1
+		return summary, model.ErrStaleTaskOutcome
+	}
+	summary.Settled = 1
+	summary.AdjustedQuota = int64(current.Quota) - int64(before)
+	return summary, nil
+}
+
 // refreshPointsTaskOutcome performs a fresh, exclusively fenced upstream read
 // for an explicit reconciliation correction. Stored scan data is never treated
 // as newer authoritative evidence. Failed/refunded tasks are not reopened.
@@ -267,18 +292,18 @@ func refreshPointsTaskOutcome(ctx context.Context, scanned *model.Task) error {
 		return err
 	}
 	if task.PrivateData.PointsBillingID == "" || task.Status != model.TaskStatusSuccess {
-		return nil
+		return ErrTaskBillingCorrectionIneligible
 	}
 	if task.AppliedOutcomeVersion < task.OutcomeVersion {
 		settleAcceptedPointsTask(ctx, task)
 		return nil
 	}
 	if GetTaskAdaptorFunc == nil {
-		return nil
+		return ErrTaskBillingCorrectionIneligible
 	}
 	adaptor := GetTaskAdaptorFunc(task.Platform)
 	if adaptor == nil {
-		return nil
+		return ErrTaskBillingCorrectionIneligible
 	}
 	ch, err := model.CacheGetChannel(task.ChannelId)
 	if err != nil {
@@ -291,7 +316,7 @@ func refreshPointsTaskOutcome(ctx context.Context, scanned *model.Task) error {
 	adaptor.Init(info)
 	upstreamID := task.GetUpstreamTaskID()
 	if upstreamID == "" {
-		return nil
+		return ErrTaskBillingCorrectionIneligible
 	}
 	return updatePointsAwareVideoTask(ctx, adaptor, ch, upstreamID, map[string]*model.Task{upstreamID: task}, true)
 }

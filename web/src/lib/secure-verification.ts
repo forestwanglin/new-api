@@ -79,7 +79,8 @@ export async function authResult<T>(
         getServerErrorMessageKey(response) ||
           getServerMessage(response) ||
           fallback,
-        response.code
+        response.code,
+        { cause: response }
       )
     }
     return response.data
