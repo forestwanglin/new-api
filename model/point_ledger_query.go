@@ -1,7 +1,11 @@
 package model
 
 import (
+	"context"
 	"errors"
+	"time"
+
+	"github.com/QuantumNous/new-api/common"
 
 	"gorm.io/gorm"
 )
@@ -59,16 +63,31 @@ type PointLedgerPage struct {
 }
 
 func GetPointLedger(filter PointLedgerFilter, admin bool) (*PointLedgerPage, error) {
+	return GetPointLedgerWithContext(context.Background(), filter, admin)
+}
+
+// GetPointLedgerWithContext shares one bounded query budget across the directory,
+// count and list, and stops database work when the caller cancels the request.
+func GetPointLedgerWithContext(ctx context.Context, filter PointLedgerFilter, admin bool) (*PointLedgerPage, error) {
 	if filter.Page < 1 || filter.PageSize < 1 || filter.PageSize > 100 || (filter.Page-1) > int(^uint(0)>>1)/filter.PageSize || (!admin && filter.UserID <= 0) {
 		return nil, errors.New("invalid point ledger pagination or scope")
 	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	db := DB.WithContext(ctx)
 	page := &PointLedgerPage{Page: filter.Page, PageSize: filter.PageSize, Items: []PointLedgerItem{}, PointTypes: []PointLedgerType{}}
-	if err := DB.Model(&PointType{}).Select("id, code, name").Order("consume_priority ASC, id ASC").Find(&page.PointTypes).Error; err != nil {
+	if err := db.Model(&PointType{}).Select("id, code, name").Order("consume_priority ASC, id ASC").Find(&page.PointTypes).Error; err != nil {
 		return nil, err
 	}
-	query := DB.Table("point_ledger AS ledger").
-		Joins("JOIN point_accounts AS account ON account.id = ledger.account_id").
-		Joins("JOIN point_transactions AS txn ON txn.id = ledger.transaction_id AND txn.user_id = account.user_id")
+	join := "JOIN"
+	if common.UsingMainDatabase(common.DatabaseTypeMySQL) {
+		// MySQL can otherwise join all user transactions to all account ledger
+		// rows before checking transaction_id. Drive both lookups by ledger IDs.
+		join = "STRAIGHT_JOIN"
+	}
+	query := db.Table("point_ledger AS ledger").
+		Joins(join + " point_accounts AS account ON account.id = ledger.account_id").
+		Joins(join + " point_transactions AS txn ON txn.id = ledger.transaction_id AND txn.user_id = account.user_id")
 	if filter.UserID > 0 {
 		query = query.Where("account.user_id = ? AND txn.user_id = ?", filter.UserID, filter.UserID)
 	}

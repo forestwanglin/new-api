@@ -3,10 +3,12 @@ package controller
 import (
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/gin-gonic/gin"
 )
@@ -75,8 +77,10 @@ func getPointLedger(c *gin.Context, admin bool) {
 	if !admin {
 		filter.UserID = int64(c.GetInt("id"))
 	}
-	result, err := model.GetPointLedger(filter, admin)
+	started := time.Now()
+	result, err := model.GetPointLedgerWithContext(c.Request.Context(), filter, admin)
 	if err != nil {
+		logger.LogError(c.Request.Context(), common.LogText("failed to load point ledger after %s: %s", time.Since(started), err.Error()))
 		common.ApiErrorT(c, "Failed to load point ledger")
 		return
 	}

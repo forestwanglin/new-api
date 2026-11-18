@@ -1,6 +1,7 @@
 package router
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -8,8 +9,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/controller"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/gin-gonic/gin"
@@ -176,14 +179,26 @@ func TestPointLedgerDatabaseMatrix(t *testing.T) {
 				require.False(t, db.Migrator().HasTable(table), "requires an empty isolated test database")
 			}
 			require.NoError(t, db.AutoMigrate(tables...))
+			assert.True(t, db.Migrator().HasIndex(&model.PointLedger{}, "idx_point_ledger_created_id"), "fresh databases need the history ordering index")
 			t.Cleanup(func() {
 				for _, table := range tables {
 					require.NoError(t, db.Migrator().DropTable(table))
 				}
 			})
-			oldDB := model.DB
+			oldDB, oldType := model.DB, common.MainDatabaseType()
 			model.DB = db
-			t.Cleanup(func() { model.DB = oldDB })
+			common.SetMainDatabaseType(common.DatabaseType(dialect))
+			t.Cleanup(func() {
+				model.DB = oldDB
+				common.SetMainDatabaseType(oldType)
+			})
+			var version string
+			versionSQL := "SELECT version()"
+			if dialect == "sqlite" {
+				versionSQL = "SELECT sqlite_version()"
+			}
+			require.NoError(t, db.Raw(versionSQL).Scan(&version).Error)
+			t.Logf("database version: %s", version)
 			typ := model.PointType{Id: 1, Code: "GENERAL", Name: "General"}
 			require.NoError(t, db.Create(&typ).Error)
 			// Live balances deliberately differ from historical snapshots.
@@ -202,6 +217,19 @@ func TestPointLedgerDatabaseMatrix(t *testing.T) {
 				{Id: 7, AccountId: 1, TransactionId: 99, AccountVersion: 5, CreatedAt: 3000},
 			}
 			require.NoError(t, db.Create(&rows).Error)
+			// Removing only the additive index reproduces the previous ledger
+			// schema while retaining real data and all pre-existing constraints.
+			require.NoError(t, db.Migrator().DropIndex(&model.PointLedger{}, "idx_point_ledger_created_id"))
+			for range 2 {
+				require.NoError(t, db.AutoMigrate(&model.PointLedger{}))
+				assert.True(t, db.Migrator().HasIndex(&model.PointLedger{}, "idx_point_ledger_created_id"))
+				assert.True(t, db.Migrator().HasIndex(&model.PointLedger{}, "idx_point_ledger_account_version"))
+			}
+			var preserved []model.PointLedger
+			require.NoError(t, db.Order("id").Find(&preserved).Error)
+			assert.Equal(t, rows, preserved, "adding the ordering index must preserve every historical snapshot")
+			err = db.Create(&model.PointLedger{Id: 99, AccountId: 1, AccountVersion: 1, TransactionId: 1, CreatedAt: 4000}).Error
+			require.Error(t, err, "existing account/version uniqueness must survive the upgrade")
 			self, err := model.GetPointLedger(model.PointLedgerFilter{UserID: 1, Page: 1, PageSize: 20}, false)
 			require.NoError(t, err)
 			require.Len(t, self.Items, 4)
@@ -228,9 +256,50 @@ func TestPointLedgerDatabaseMatrix(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, filtered.Items, 1)
 			assert.EqualValues(t, 1, filtered.Total)
+			var historyQueries []struct {
+				sql  string
+				args []any
+			}
+			if dialect == "mysql" {
+				capture := func(tx *gorm.DB) {
+					historyQueries = append(historyQueries, struct {
+						sql  string
+						args []any
+					}{tx.Statement.SQL.String(), append([]any(nil), tx.Statement.Vars...)})
+				}
+				require.NoError(t, db.Callback().Query().After("gorm:query").Register("ledger_test:capture_plan", capture))
+				require.NoError(t, db.Callback().Row().After("gorm:row").Register("ledger_test:capture_plan", capture))
+			}
 			all, err := model.GetPointLedger(model.PointLedgerFilter{Page: 1, PageSize: 20}, true)
 			require.NoError(t, err)
 			assert.EqualValues(t, 5, all.Total)
+			if dialect == "mysql" {
+				require.NoError(t, db.Callback().Query().Remove("ledger_test:capture_plan"))
+				require.NoError(t, db.Callback().Row().Remove("ledger_test:capture_plan"))
+				var planCount int
+				for _, query := range historyQueries {
+					if !strings.Contains(query.sql, "FROM point_ledger AS ledger") {
+						continue
+					}
+					var plan []struct {
+						Table string
+						Type  string
+						Key   *string
+					}
+					require.NoError(t, db.Raw("EXPLAIN "+query.sql, query.args...).Scan(&plan).Error)
+					require.NotEmpty(t, plan)
+					assert.Equal(t, "ledger", plan[0].Table, "history must drive from ledger, avoiding account/transaction cross-products")
+					for _, step := range plan {
+						if step.Table == "txn" {
+							assert.Equal(t, "eq_ref", step.Type)
+							require.NotNil(t, step.Key)
+							assert.Equal(t, "PRIMARY", *step.Key, "one primary-key transaction lookup per ledger row")
+						}
+					}
+					planCount++
+				}
+				assert.Equal(t, 2, planCount, "verify actual plans for both count and list queries")
+			}
 			other, err := model.GetPointLedger(model.PointLedgerFilter{UserID: 2, Page: 1, PageSize: 20}, true)
 			require.NoError(t, err)
 			require.Len(t, other.Items, 1)
@@ -245,9 +314,64 @@ func TestPointLedgerDatabaseMatrix(t *testing.T) {
 				require.NoError(t, db.Table(table).Count(&count).Error)
 				assert.Equal(t, want, count, fmt.Sprintf("query must not write %s", table))
 			}
+			for _, phase := range []string{"count", "list"} {
+				t.Run("cancel_before_"+phase, func(t *testing.T) {
+					ctx, cancel := context.WithCancel(context.Background())
+					defer cancel()
+					require.NoError(t, db.Callback().Query().After("gorm:query").Register("ledger_test:cancel", func(tx *gorm.DB) {
+						if (phase == "count" && tx.Statement.Table == "point_types") ||
+							(phase == "list" && strings.HasPrefix(tx.Statement.SQL.String(), "SELECT count(*)")) {
+							cancel()
+						}
+					}))
+					defer func() { require.NoError(t, db.Callback().Query().Remove("ledger_test:cancel")) }()
+					page, err := model.GetPointLedgerWithContext(ctx, model.PointLedgerFilter{Page: 1, PageSize: 20}, true)
+					require.ErrorIs(t, err, context.Canceled, "each database phase must honor the request context")
+					assert.Nil(t, page, "cancellation must not return a partial successful page")
+				})
+			}
 			require.NoError(t, db.Migrator().DropTable(&model.PointLedger{}))
 			_, err = model.GetPointLedger(model.PointLedgerFilter{UserID: 1, Page: 1, PageSize: 20}, false)
 			require.Error(t, err, "query failure must not become a fabricated empty page")
+		})
+	}
+}
+
+// Cancellation must reach the database instead of returning a successful empty page.
+func TestPointLedgerRequestCancellation(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "canceled-ledger.db")), &gorm.Config{})
+	require.NoError(t, err)
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, sqlDB.Close()) })
+	require.NoError(t, db.AutoMigrate(&model.PointType{}, &model.PointAccount{}, &model.PointTransaction{}, &model.PointLedger{}, &model.User{}))
+	oldDB, oldType := model.DB, common.MainDatabaseType()
+	model.DB = db
+	common.SetMainDatabaseType(common.DatabaseTypeSQLite)
+	t.Cleanup(func() {
+		model.DB = oldDB
+		common.SetMainDatabaseType(oldType)
+	})
+	engine := gin.New()
+	engine.GET("/ledger", controller.GetAdminPointLedger)
+	for _, expired := range []bool{false, true} {
+		t.Run(fmt.Sprintf("expired=%t", expired), func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			if expired {
+				cancel()
+				ctx, cancel = context.WithDeadline(context.Background(), time.Unix(1, 0))
+			}
+			cancel()
+			req := httptest.NewRequest(http.MethodGet, "/ledger", nil).WithContext(ctx)
+			w := httptest.NewRecorder()
+			engine.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+			var response pointAdminResponse
+			require.NoError(t, common.Unmarshal(w.Body.Bytes(), &response))
+			assert.False(t, response.Success, "a canceled or expired query must fail, not report an empty history")
+			assert.NotContains(t, w.Body.String(), "context canceled")
+			assert.NotContains(t, w.Body.String(), "deadline exceeded")
 		})
 	}
 }

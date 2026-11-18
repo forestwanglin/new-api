@@ -1209,6 +1209,17 @@
 - 验证：`go test ./controller -run 'TestAccessTokenContactPriorityAndScopeIsolation|TestAccessTokenUpdateContactProofChangesGrant|TestSecurityEnrollmentAccessTokenMethodPolicy' -count=1`、`go test ./controller -run 'TestAccessToken(WeChat|SMS|OldFactor|OldMFA|ContactDisabled|ContactRejects|RevokeWeChat)' -count=1`、`go test ./service -run 'AccessToken|Verification|Security' -count=1` → 均通过；前端 `bun run typecheck`、`bunx vitest run src/features/auth/secure-verification`（32 个用例）通过，`oxlint` 对改动文件无新增告警。
 - 风险与未覆盖：联系人验证仅在 session 登录下可用，个人访问令牌（PAT）调用仍返回 `SECURITY_ACTION_FORBIDDEN`；未运行完整 SQLite、MySQL、PostgreSQL 数据库矩阵（改动不涉及数据库结构）。
 
+### Z083 积分流水查询执行计划与超时保护
+
+- 需求与原因：管理员无筛选查询积分流水时，MySQL 将账户、用户交易和账户流水按低效顺序关联，约万条流水出现分钟级等待。
+- 变更内容：MySQL 的计数和列表查询以流水为驱动表，通过 `STRAIGHT_JOIN` 按账户、交易主键关联；SQLite/PostgreSQL 保留普通 JOIN。流水模型增加 `(created_at, id)` 排序索引；查询共享请求上下文及 5 秒预算，失败记录服务端错误与耗时，客户端沿用通用错误响应。
+- 影响面：`model/point_ledger_query.go`、`model/point.go`、`controller/point_ledger.go`、`router/point_ledger_test.go`；**上游自有文件**：无，以上为 fork 自有文件。
+- 与上游差异：延续 Z037 独立积分流水查询，保留精确总数、历史快照、全部筛选条件、账户/交易归属校验及原有 `GetPointLedger` 调用兼容性。
+- 开关与默认值：无新增依赖或配置；查询预算默认 5 秒，请求更早取消或过期时沿用请求期限；新增索引随主库既有迁移创建。
+- 验证：使用 Go 1.26.10，`TEST_MYSQL_DSN` / `TEST_POSTGRES_DSN` 指向专用隔离库；`go test ./router -run '^TestPointLedger' -count=1` 与 `go test ./model -run '^TestPointsDatabaseMatrix$' -count=1 -v` 在真实 SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 17.11 全部通过。覆盖原 API/过滤契约、目录/计数/列表阶段取消、过期请求、fresh 索引、模拟旧 schema 增量迁移两次、历史快照及唯一性保留；MySQL 实际 EXPLAIN 验证计数和列表均从 ledger 驱动、txn 使用主键 eq_ref。`GOTOOLCHAIN=go1.26.10 GOWORK=off go build ./...`、`go vet ./model ./controller ./router`、格式与 `git diff --check` 通过，独立审查无阻断。
+- 扩大验证：`GOTOOLCHAIN=go1.26.10 GOWORK=off make test` 未全绿；`TestAccessTokenLifecycleAndLateRequests`、`TestAccessTokenCreationChecksGrantBeforeConsumingProof`、`TestAccessTokenUpdateRenamesFreelyAndChangesGrantOnlyWithProof`、`TestUserPointBalancesAPI` 的 fixture 缺失 `external_identity_claims`，`TestOpenAIChatSamplingCompatibility` 有 4 个既有失败子例（`GPT5.1_explicit_none`、`GPT5.4_snapshot_none`、`explicit_zero_values`、`GPT6.1_terra_none_keeps_sampling`），另有 `TestAccessTokenRouteRulesCoverEveryDashboardRoute`、`TestAccessTokenVerificationScopesAreAllListed` 和 `TestAdaptorMasksDialedHostsInDialFailure/channel_proxy_host` 失败。通过 Go overlay 将本次四个 Go 文件恢复为 HEAD 后逐项复测，全部复现相同失败。未修改这些无关路径。`relaykit/` 与 `tokenkit/` 分别执行 `GOWORK=off go test ./...`，均因 `proxy.golang.org` 下载已有依赖返回 EOF 而未能完成，未修改依赖或模块文件。
+- 风险与未覆盖：生产发布前需评估新增索引的 DDL 锁影响；本次不修改生产数据库或发布应用，线上效果需发布后复核。固定流水驱动仍需扫描符合条件的历史记录，深分页和大规模精确计数的成本并未消除。旧表验证使用保留旧结构/数据、移除新增索引的等价 schema，未还原完整发布库，未实测 MySQL 5.7/PostgreSQL 9.6。小样本 EXPLAIN 验证当前正确计划，不能稳定复现生产数据分布下的错误计划；根因性能证据来自生产只读 SQL 对照。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 

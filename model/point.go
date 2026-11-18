@@ -96,7 +96,7 @@ type PointTransaction struct {
 // PointLedger is the audit entry for an account version. Persistence alone does
 // not enforce immutability or balance invariants; future write services must.
 type PointLedger struct {
-	Id              int64  `json:"id" gorm:"primaryKey"`
+	Id              int64  `json:"id" gorm:"primaryKey;index:idx_point_ledger_created_id,priority:2"`
 	TransactionId   int64  `json:"transaction_id" gorm:"not null;index:idx_point_ledger_transaction"`
 	AccountId       int64  `json:"account_id" gorm:"not null;uniqueIndex:idx_point_ledger_account_version,priority:1"`
 	AccountVersion  int64  `json:"account_version" gorm:"not null;uniqueIndex:idx_point_ledger_account_version,priority:2"`
@@ -107,7 +107,7 @@ type PointLedger struct {
 	AvailableAfter  int64  `json:"available_after" gorm:"not null"`
 	FrozenBefore    int64  `json:"frozen_before" gorm:"not null"`
 	FrozenAfter     int64  `json:"frozen_after" gorm:"not null"`
-	CreatedAt       int64  `json:"created_at" gorm:"autoCreateTime:milli"`
+	CreatedAt       int64  `json:"created_at" gorm:"autoCreateTime:milli;index:idx_point_ledger_created_id,priority:1"`
 }
 
 func (PointLedger) TableName() string { return "point_ledger" }
