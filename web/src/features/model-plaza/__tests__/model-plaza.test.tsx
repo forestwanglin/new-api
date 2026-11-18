@@ -177,12 +177,12 @@ it('counts every API model including video under its vendor and combines vendor 
   const user = userEvent.setup()
   renderPlaza()
   const sidebar = screen.getByRole('complementary', { name: 'Vendors' })
-  const deepseek = await within(sidebar).findByRole('button', {
-    name: /DeepSeek/,
+  const byteDance = await within(sidebar).findByRole('button', {
+    name: /字节跳动/,
   })
-  expect(within(deepseek).getByText('2')).toBeVisible()
-  await user.click(deepseek)
-  expect(deepseek).toHaveAttribute('aria-pressed', 'true')
+  expect(within(byteDance).getByText('1')).toBeVisible()
+  await user.click(byteDance)
+  expect(byteDance).toHaveAttribute('aria-pressed', 'true')
   expect(screen.getByText('sd2.0-720P')).toBeVisible()
   expect(screen.queryByText('gpt-api-model')).not.toBeInTheDocument()
   await user.type(
@@ -370,7 +370,7 @@ it('updates category and vendor counts for search without hiding categories with
   expect(within(domestic).getByText('1')).toBeVisible()
   expect(
     within(
-      within(sidebar).getByRole('button', { name: /^DeepSeek/ })
+      within(sidebar).getByRole('button', { name: /^字节跳动/ })
     ).getByText('1')
   ).toBeVisible()
   expect(
@@ -651,5 +651,45 @@ it.each(['zhCN', 'zhTW'])(
     cleanup()
     await i18next.changeLanguage('en')
     i18next.removeResourceBundle(language, 'translation')
+  }
+)
+
+it.each([true, false])(
+  'groups Seedance prefixes under ByteDance with existing vendor metadata: %s',
+  async (hasVendor) => {
+    const names = [
+      'sd2.0-480P',
+      'seedance-2.5',
+      'doubao-seedance-2-0-fast',
+      'SD2.0-1080P',
+    ]
+    vi.spyOn(api, 'get').mockResolvedValue({
+      data: {
+        ...pricing,
+        data: [
+          ...names.map((model_name) => ({
+            ...pricing.data[0],
+            model_name,
+            vendor_id: 22,
+          })),
+          { ...pricing.data[0], model_name: 'custom-unrelated', vendor_id: 22 },
+        ],
+        vendors: hasVendor
+          ? [...pricing.vendors, { id: 33, name: '字节跳动' }]
+          : pricing.vendors,
+      },
+    })
+    renderPlaza()
+    const vendor = await screen.findByRole('button', { name: /^字节跳动/ })
+    await userEvent.click(vendor)
+    for (const name of names) {
+      expect(screen.getByText(name)).toBeVisible()
+    }
+    expect(screen.queryByText('custom-unrelated')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /^OpenAI/ }))
+    expect(screen.getByText('custom-unrelated')).toBeVisible()
+    for (const name of names) {
+      expect(screen.queryByText(name)).not.toBeInTheDocument()
+    }
   }
 )

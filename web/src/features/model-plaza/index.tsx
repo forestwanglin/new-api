@@ -84,17 +84,36 @@ export function ModelPlaza() {
     const openAI = vendors.find(
       (vendor) => vendor.name.trim().toLowerCase() === 'openai'
     )
-    // The review endpoint is an OpenAI model even when its API metadata is absent or stale.
-    return pricingModels.map((model) =>
-      model.model_name === 'codex-auto-review'
-        ? {
-            ...model,
-            vendor_id: openAI?.id,
-            vendor_name: 'OpenAI',
-            vendor_icon: openAI?.icon,
-          }
-        : model
+    const byteDance = vendors.find((vendor) =>
+      [
+        '字节跳动',
+        '字节系列',
+        'bytedance',
+        'doubao',
+        '豆包',
+        '火山引擎',
+      ].includes(vendor.name.trim().toLowerCase())
     )
+    // The review endpoint is an OpenAI model even when its API metadata is absent or stale.
+    return pricingModels.map((model) => {
+      if (model.model_name === 'codex-auto-review') {
+        return {
+          ...model,
+          vendor_id: openAI?.id,
+          vendor_name: 'OpenAI',
+          vendor_icon: openAI?.icon,
+        }
+      }
+      if (/^(?:sd2\.0-|seedance-|doubao-seedance-)/i.test(model.model_name)) {
+        return {
+          ...model,
+          vendor_id: byteDance?.id,
+          vendor_name: '字节跳动',
+          vendor_icon: byteDance?.icon,
+        }
+      }
+      return model
+    })
   }, [pricingModels, vendors])
   const [keyword, setKeyword] = useState('')
   const [filter, setFilter] = useState<ModelFilter>({
