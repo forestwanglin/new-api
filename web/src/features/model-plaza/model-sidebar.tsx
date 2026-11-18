@@ -48,34 +48,42 @@ export function ModelSidebar(props: ModelSidebarProps) {
   return (
     <aside className='mp-side' aria-label={t('Vendors')}>
       <div className='mp-group'>
-        <Button
-          type='button'
-          variant='ghost'
-          className={`mp-item${allSelected ? ' is-active' : ''}`}
-          aria-pressed={allSelected}
-          onClick={() => props.onChange({ category: null, vendorId: null })}
-        >
-          <span className='mp-item-name'>{t('All Models')}</span>
-          <span className='mp-item-count'>{props.count}</span>
-        </Button>
+        <h3 className='mp-group-head'>{t('All Models')}</h3>
+        <div className='mp-items mp-vendors'>
+          <Button
+            type='button'
+            variant='ghost'
+            className={`mp-item${allSelected ? ' is-active' : ''}`}
+            aria-pressed={allSelected}
+            onClick={() => props.onChange({ category: null, vendorId: null })}
+          >
+            <span className='mp-dot' aria-hidden='true' />
+            <span className='mp-item-name'>{t('All Models')}</span>
+            <span className='mp-item-count'>{props.count}</span>
+          </Button>
+        </div>
       </div>
       {props.groups.map((group) => {
         const selected =
           props.filter.category === group.id && props.filter.vendorId === null
         return (
           <div className='mp-group' key={group.id}>
-            <Button
-              type='button'
-              variant='ghost'
-              className={`mp-item mp-category${selected ? ' is-active' : ''}`}
-              aria-pressed={selected}
-              onClick={() =>
-                props.onChange({ category: group.id, vendorId: null })
-              }
-            >
-              <span className='mp-item-name'>{group.label}</span>
-              <span className='mp-item-count'>{group.count}</span>
-            </Button>
+            {group.id === 'domestic' ? (
+              <h3 className='mp-group-head'>{group.label}</h3>
+            ) : (
+              <Button
+                type='button'
+                variant='ghost'
+                className={`mp-item mp-category${selected ? ' is-active' : ''}`}
+                aria-pressed={selected}
+                onClick={() =>
+                  props.onChange({ category: group.id, vendorId: null })
+                }
+              >
+                <span className='mp-item-name'>{group.label}</span>
+                <span className='mp-item-count'>{group.count}</span>
+              </Button>
+            )}
             {group.id !== 'other' && (
               <div className='mp-items mp-vendors'>
                 {group.vendors.map((vendor) => {

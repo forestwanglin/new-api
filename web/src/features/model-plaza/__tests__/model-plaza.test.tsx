@@ -262,30 +262,19 @@ it('reloads group-scoped models after login instead of retaining the anonymous c
   )
 })
 
-it('groups API vendors into clickable domestic and overseas categories', async () => {
+it('keeps domestic vendors selectable beneath the domestic heading', async () => {
   const user = userEvent.setup()
   renderPlaza()
   const sidebar = screen.getByRole('complementary', { name: 'Vendors' })
-  const domestic = await within(sidebar).findByRole('button', {
-    name: /^Domestic Models/,
-  })
-  const overseas = within(sidebar).getByRole('button', {
-    name: /^Overseas Models/,
-  })
-  expect(within(domestic).getByText('2')).toBeVisible()
-  expect(within(overseas).getByText('2')).toBeVisible()
   expect(
-    within(sidebar).queryByRole('button', { name: /^Other Models/ })
-  ).not.toBeInTheDocument()
-  await user.click(domestic)
-  expect(domestic).toHaveAttribute('aria-pressed', 'true')
-  expect(screen.getByRole('heading', { name: 'Domestic Models' })).toBeVisible()
+    await within(sidebar).findByRole('heading', { name: 'Domestic Models' })
+  ).toBeVisible()
+  await user.click(within(sidebar).getByRole('button', { name: /^DeepSeek/ }))
   expect(screen.getByText('deepseek-chat')).toBeVisible()
-  expect(screen.getByText('sd2.0-720P')).toBeVisible()
-  expect(screen.queryByText('gpt-api-model')).not.toBeInTheDocument()
-  await user.click(overseas)
-  expect(overseas).toHaveAttribute('aria-pressed', 'true')
-  expect(domestic).toHaveAttribute('aria-pressed', 'false')
+  expect(screen.queryByText('sd2.0-720P')).not.toBeInTheDocument()
+  await user.click(
+    within(sidebar).getByRole('button', { name: /^Overseas Models/ })
+  )
   expect(screen.getByText('gpt-api-model')).toBeVisible()
   expect(screen.queryByText('deepseek-chat')).not.toBeInTheDocument()
 })
@@ -309,12 +298,12 @@ it('uses vendor aliases without binding classification to a fixed database ID', 
   const user = userEvent.setup()
   renderPlaza()
   const domestic = await screen.findByRole('button', {
-    name: /^Domestic Models/,
+    name: /^zHiPu/,
   })
-  expect(within(domestic).getByText('2')).toBeVisible()
+  expect(within(domestic).getByText('1')).toBeVisible()
   await user.click(domestic)
   expect(screen.getByText('alias-domestic')).toBeVisible()
-  expect(screen.getByText('chinese-domestic')).toBeVisible()
+  expect(screen.queryByText('chinese-domestic')).not.toBeInTheDocument()
   expect(screen.queryByText('alias-overseas')).not.toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: /^claude/ }))
   expect(screen.getByText('alias-overseas')).toBeVisible()
@@ -359,15 +348,14 @@ it('updates category and vendor counts for search without hiding categories with
   const user = userEvent.setup()
   renderPlaza()
   const sidebar = screen.getByRole('complementary', { name: 'Vendors' })
-  const domestic = await within(sidebar).findByRole('button', {
-    name: /^Domestic Models/,
+  const domestic = await within(sidebar).findByRole('heading', {
+    name: 'Domestic Models',
   })
-  await user.click(domestic)
   await user.type(
     screen.getByRole('textbox', { name: 'Search models' }),
     'video'
   )
-  expect(within(domestic).getByText('1')).toBeVisible()
+  expect(domestic).toHaveTextContent(/^Domestic Models$/)
   expect(
     within(
       within(sidebar).getByRole('button', { name: /^字节跳动/ })
@@ -398,11 +386,11 @@ it('updates category and vendor counts for search without hiding categories with
   expect(screen.getByText('gpt-api-model')).toBeVisible()
 })
 
-it('allows keyboard selection of a category and keeps it selected when search has no matches', async () => {
+it('allows keyboard selection of a vendor and keeps it selected when search has no matches', async () => {
   const user = userEvent.setup()
   renderPlaza()
   const domestic = await screen.findByRole('button', {
-    name: /^Domestic Models/,
+    name: /^DeepSeek/,
   })
   domestic.focus()
   await user.keyboard('{Enter}')
@@ -457,7 +445,7 @@ it('keeps the headline lowest discount across all models when the list is filter
   expect(promotion).toHaveTextContent('93% OFF')
   await userEvent
     .setup()
-    .click(screen.getByRole('button', { name: /^Domestic Models/ }))
+    .click(screen.getByRole('button', { name: /^DeepSeek/ }))
   expect(screen.queryByText('gpt-api-model')).not.toBeInTheDocument()
   expect(promotion).toHaveTextContent('93% OFF')
   expect(
@@ -584,17 +572,19 @@ it('names the codex-auto-review vendor OpenAI when the response has no OpenAI ve
   expect(screen.getByText('codex-auto-review')).toBeVisible()
 })
 
-it('removes category dots while keeping vendor dots and category selection', async () => {
+it('keeps dots on selectable model and vendor children', async () => {
   renderPlaza()
   await screen.findByRole('row', { name: /deepseek-chat/ })
-  for (const name of [/^All Models/, /^Domestic Models/, /^Overseas Models/]) {
+  for (const name of [/^All Models/, /^DeepSeek/]) {
     expect(
       screen.getByRole('button', { name }).querySelector('.mp-dot')
-    ).toBeNull()
+    ).not.toBeNull()
   }
   expect(
-    screen.getByRole('button', { name: /DeepSeek/ }).querySelector('.mp-dot')
-  ).not.toBeNull()
+    screen
+      .getByRole('button', { name: /^Overseas Models/ })
+      .querySelector('.mp-dot')
+  ).toBeNull()
 })
 
 it.each(['en', 'fr', 'ru', 'ja', 'vi'])(
@@ -693,3 +683,26 @@ it.each([true, false])(
     }
   }
 )
+
+it('renders All Models and Domestic Models as uncounted headings and keeps the All Models child selectable', async () => {
+  renderPlaza()
+  const sidebar = screen.getByRole('complementary', { name: 'Vendors' })
+  const allHeading = within(sidebar).getByRole('heading', {
+    name: 'All Models',
+  })
+  const domesticHeading = await within(sidebar).findByRole('heading', {
+    name: 'Domestic Models',
+  })
+  expect(allHeading).toHaveTextContent(/^All Models$/)
+  expect(domesticHeading).toHaveTextContent(/^Domestic Models$/)
+  expect(
+    within(sidebar).queryByRole('button', { name: /^Domestic Models/ })
+  ).not.toBeInTheDocument()
+  const user = userEvent.setup()
+  await user.click(within(sidebar).getByRole('button', { name: /^DeepSeek/ }))
+  const all = within(sidebar).getByRole('button', { name: /^All Models/ })
+  await user.click(all)
+  expect(all).toHaveAttribute('aria-pressed', 'true')
+  expect(screen.getByText('deepseek-chat')).toBeVisible()
+  expect(screen.getByText('gpt-api-model')).toBeVisible()
+})
