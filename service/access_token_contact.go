@@ -56,8 +56,14 @@ func contactMethodAvailable(contact accessTokenContact) bool {
 	return false
 }
 
+// supportsAccessTokenContactVerification covers the operations that change an
+// access token's grant, so create, update and revoke share one contact policy.
 func supportsAccessTokenContactVerification(scope string) bool {
-	return scope == VerificationScopeAccessTokenGenerate || scope == VerificationScopeAccessTokenRevoke
+	switch scope {
+	case VerificationScopeAccessTokenGenerate, VerificationScopeAccessTokenUpdate, VerificationScopeAccessTokenRevoke:
+		return true
+	}
+	return false
 }
 
 func requireAccessTokenContact(identity AuthIdentity, operation VerificationOperation, method string) (accessTokenContact, VerificationBinding, error) {

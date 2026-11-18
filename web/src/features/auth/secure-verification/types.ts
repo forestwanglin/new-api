@@ -53,6 +53,20 @@ export type SecurityProofScope =
 /** ManageUser actions that change a user's status or role and need step-up. */
 export type AdminUserManageAction = 'disable' | 'enable' | 'promote' | 'demote'
 
+/**
+ * Access-token operations that change a token's grant and therefore verify
+ * through the account's bound WeChat or phone contact when one is bound.
+ */
+export const contactVerificationScopes: readonly string[] = [
+  'access_token.generate',
+  'access_token.update',
+  'access_token.revoke',
+]
+
+export function usesContactVerification(scope: string): boolean {
+  return contactVerificationScopes.includes(scope)
+}
+
 export type VerificationOperation =
   | { scope: 'channel.key.read'; context: { channel_id: number } }
   | {

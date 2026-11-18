@@ -40,13 +40,14 @@ import {
 } from '../passkey/assertion'
 import type { PasskeyOptionsPayload } from '../passkey/types'
 import type { SystemStatus } from '../types'
-import type {
-  SecurityProof,
-  LoginChallenge,
-  SecurityProofScope,
-  VerificationInput,
-  VerificationOperation,
-  VerificationRequirements,
+import {
+  usesContactVerification,
+  type SecurityProof,
+  type LoginChallenge,
+  type SecurityProofScope,
+  type VerificationInput,
+  type VerificationOperation,
+  type VerificationRequirements,
 } from './types'
 
 export async function checkVerificationMethods(
@@ -228,7 +229,7 @@ export async function verify(
       case 'wechat':
       case 'sms':
         if (
-          operation.scope !== 'access_token.generate' &&
+          !usesContactVerification(operation.scope) &&
           !(input.method === 'wechat' && operation.scope === 'phone.binding')
         ) {
           throw new AuthOperationError(
@@ -385,7 +386,7 @@ export async function sendVerificationSMS(
   operation: VerificationOperation,
   signal: AbortSignal
 ): Promise<{ sms_token: string; retry_after: number }> {
-  if (operation.scope !== 'access_token.generate') {
+  if (!usesContactVerification(operation.scope)) {
     throw new AuthOperationError(
       'This verification method is not allowed for this action.'
     )

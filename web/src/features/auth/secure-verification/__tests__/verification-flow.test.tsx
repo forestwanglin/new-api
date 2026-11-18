@@ -695,6 +695,72 @@ it('sends SMS only on click and requires its code before verifying token creatio
   )
 })
 
+it('verifies a token grant change with the bound phone SMS code', async () => {
+  const user = userEvent.setup()
+  const result = vi.fn()
+  const context = { token_id: 7, scopes: ['usage:read'] }
+  vi.spyOn(api, 'get').mockResolvedValue({
+    data: {
+      success: true,
+      data: {
+        scope: 'access_token.update',
+        methods: [{ method: 'sms', available: true }],
+        phone_masked: '138****8000',
+        oauth_providers: [],
+        password_encryption_enabled: false,
+      },
+    },
+  })
+  const post = vi.spyOn(api, 'post').mockImplementation(async (url) => ({
+    data: {
+      success: true,
+      data:
+        url === '/api/verify/sms/send'
+          ? { sms_token: 'update-flow', retry_after: 90 }
+          : {
+              proof_token: 'update-proof',
+              method: 'sms',
+              scope: 'access_token.update',
+              expires_at: Math.floor(Date.now() / 1000) + 300,
+            },
+    },
+  }))
+  render(
+    <Harness
+      onResult={result}
+      operation={{ scope: 'access_token.update', context }}
+    />
+  )
+  await user.click(screen.getByRole('button', { name: 'Protected action' }))
+  await user.click(await screen.findByRole('button', { name: 'Send code' }))
+  expect(post).toHaveBeenCalledWith(
+    '/api/verify/sms/send',
+    expect.objectContaining({ scope: 'access_token.update', context }),
+    expect.anything()
+  )
+  await user.type(
+    await screen.findByRole('textbox', { name: 'SMS verification code' }),
+    '123456'
+  )
+  await user.click(screen.getByRole('button', { name: 'Verify' }))
+  await waitFor(() =>
+    expect(result).toHaveBeenCalledWith(
+      expect.objectContaining({ proof_token: 'update-proof' })
+    )
+  )
+  expect(post).toHaveBeenCalledWith(
+    '/api/verify',
+    expect.objectContaining({
+      method: 'sms',
+      sms_token: 'update-flow',
+      code: '123456',
+      scope: 'access_token.update',
+      context,
+    }),
+    expect.anything()
+  )
+})
+
 it('keeps SMS verification disabled after delivery failure and permits an explicit retry', async () => {
   const user = userEvent.setup()
   vi.spyOn(api, 'get').mockResolvedValue({

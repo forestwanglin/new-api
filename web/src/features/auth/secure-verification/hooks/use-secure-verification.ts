@@ -30,15 +30,16 @@ import {
   verify,
   verifyLogin,
 } from '../api'
-import type {
-  RequestVerificationOptions,
-  RequestLoginVerificationOptions,
-  VerificationRequest,
-  LoginChallenge,
-  SecureVerificationState,
-  SecurityProof,
-  VerificationInput,
-  VerificationRequirements,
+import {
+  usesContactVerification,
+  type RequestVerificationOptions,
+  type RequestLoginVerificationOptions,
+  type VerificationRequest,
+  type LoginChallenge,
+  type SecureVerificationState,
+  type SecurityProof,
+  type VerificationInput,
+  type VerificationRequirements,
 } from '../types'
 
 type VerificationAction =
@@ -355,7 +356,7 @@ export function useSecureVerification() {
     if (
       !current ||
       current.kind !== 'operation' ||
-      current.request.scope !== 'access_token.generate' ||
+      !usesContactVerification(current.request.scope) ||
       current.submitting ||
       smsCountdown.isActive ||
       state.phase !== 'ready' ||

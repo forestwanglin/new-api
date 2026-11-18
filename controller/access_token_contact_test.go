@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -43,16 +44,16 @@ func TestAccessTokenContactPriorityAndScopeIsolation(t *testing.T) {
 			}
 			require.Len(t, requirements.Methods, 1)
 			assert.Equal(t, expected, requirements.Methods[0].Method)
-			for _, scope := range []string{"access_token.update", "account.binding.bind"} {
-				unchanged, err := service.GetVerificationRequirements(identity, scope)
+			for _, scope := range []string{"access_token.update", "access_token.revoke"} {
+				changed, err := service.GetVerificationRequirements(identity, scope)
 				require.NoError(t, err)
-				require.Len(t, unchanged.Methods, 1)
-				assert.Equal(t, "2fa", unchanged.Methods[0].Method)
+				require.Len(t, changed.Methods, 1)
+				assert.Equal(t, expected, changed.Methods[0].Method)
 			}
-			revoked, err := service.GetVerificationRequirements(identity, "access_token.revoke")
+			isolated, err := service.GetVerificationRequirements(identity, "account.binding.bind")
 			require.NoError(t, err)
-			require.Len(t, revoked.Methods, 1)
-			assert.Equal(t, expected, revoked.Methods[0].Method)
+			require.Len(t, isolated.Methods, 1)
+			assert.Equal(t, "2fa", isolated.Methods[0].Method)
 		})
 	}
 }
@@ -143,6 +144,28 @@ func TestAccessTokenRevokeContactProofIsBoundToOperation(t *testing.T) {
 	require.NotEmpty(t, proof.ProofToken)
 	_, err = service.ConsumeOperationProof(proof.ProofToken, identity, service.VerificationOperation{Scope: op.Scope, Context: []byte(`{"token_id":43}`)})
 	require.Error(t, err)
+}
+
+func TestAccessTokenUpdateContactProofChangesGrant(t *testing.T) {
+	user, identity := setupSecurityEnrollmentTest(t)
+	require.NoError(t, model.DB.Create(&model.ExternalIdentityClaim{Provider: "phone", Subject: "13800138000", UserId: user.Id}).Error)
+	code := configureContactSMS(t)
+	_, token := createScopedAccessToken(t, user.Id, 0, "profile:read")
+	context, err := common.Marshal(service.AccessTokenUpdateContext{TokenID: token.Id, Scopes: []string{"usage:read"}})
+	require.NoError(t, err)
+	op := service.VerificationOperation{Scope: service.VerificationScopeAccessTokenUpdate, Context: context}
+	smsToken, err := service.SendAccessTokenSMS(identity, op, "192.0.2.1")
+	require.NoError(t, err)
+	proof, err := service.VerifySecurityInput(identity, service.VerificationInput{Scope: op.Scope, Context: op.Context, Method: service.VerificationMethodSMS, SMSToken: smsToken, Code: *code})
+	require.NoError(t, err)
+	_, err = service.ConsumeOperationProof(proof.ProofToken, identity, service.VerificationOperation{Scope: op.Scope, Context: []byte(`{"token_id":` + strconv.Itoa(token.Id) + `,"scopes":["profile:read"]}`)})
+	require.Error(t, err)
+	response := securityEnrollmentRequest("PATCH", fmt.Sprintf("/api/user/access_tokens/%d", token.Id), `{"name":"renamed","scopes":["usage:read"]}`, proof.ProofToken, identity, withAccessTokenID(UpdateAccessToken, token.Id))
+	require.True(t, decodeSecurityEnrollmentResponse(t, response).Success, response.Body.String())
+	stored, err := model.GetUserAccessToken(user.Id, token.Id)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"usage:read"}, stored.GetScopes())
+	assert.Equal(t, "renamed", stored.Name)
 }
 
 type contactSMSHTTP func(*http.Request) (*http.Response, error)

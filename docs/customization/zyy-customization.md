@@ -1199,6 +1199,16 @@
 - 验证：`go test ./controller -run 'TestAccessToken(ContactPriorityAndScopeIsolation|RevokeContactProofIsBoundToOperation|RevokeWeChatProofIsBoundToOperation|WeChatCodeMustMatchBoundOwnerAndProofIsOneTime|SMSRejectsContextReplayAndChangedPriority|SMSRejectsInvalidCeremonies|ContactDisabledDoesNotFallback|OldFactorProofRejectedAfterContactBinding|OldMFAProofRejectedAfterContactBinding)|TestSecurityEnrollmentAccessTokenMethodPolicy' -count=1`、`go test ./service -run 'TestAccessToken|TestSecurity' -count=1` → 均通过。扩大的 `go test ./service ./controller -run 'TestAccessToken|TestSecurity' -count=1` 因两个现存 controller 测试夹具缺少 `external_identity_claims` 表失败（`TestAccessTokenLifecycleAndLateRequests`、`TestAccessTokenCreationChecksGrantBeforeConsumingProof`），与本次改动无关。
 - 风险与未覆盖：定向测试覆盖 SQLite 测试配置；本轮未运行完整 SQLite、MySQL、PostgreSQL 数据库矩阵。
 
+### Z082 更新访问令牌沿用微信或手机验证码
+
+- 需求与原因：编辑访问令牌授权（`PATCH /api/user/access_tokens/:id`）与创建、撤销共用同一份令牌授权变更流程，二次验证方式需与两者保持一致，避免已绑定微信或手机号的账号在改授权时被迫使用不适用的通用验证方式。
+- 变更内容：`access_token.update` 加入联系人验证支持范围，与 `access_token.generate` / `access_token.revoke` 共用联系人选择（优先已绑定微信，否则已绑定大陆手机号短信）；无联系人时继续使用原有安全验证策略。前端验证弹窗的微信/短信放行条件改为共享判断 `usesContactVerification`，覆盖创建、更新、撤销三个 scope。证明仍绑定 `{token_id, scopes}` 上下文，消费时重新校验当前绑定与优先级，不自动降级。
+- 影响面：`service/access_token_contact.go`、`controller/access_token_contact_test.go`、`controller/security_enrollment_test.go`、`web/src/features/auth/secure-verification/{types,api}.ts`、`web/src/features/auth/secure-verification/hooks/use-secure-verification.ts`、`web/src/features/auth/secure-verification/__tests__/verification-flow.test.tsx`；**上游自有文件**：上述全部文件。
+- 与上游差异：上游只为创建访问令牌提供联系人验证码（本 fork 已在 Z081 扩展到撤销），更新操作仍只使用通用安全验证方式；本定制将联系人验证码扩展到更新。
+- 开关与默认值：无开关；按账号当前绑定状态选择验证方式。
+- 验证：`go test ./controller -run 'TestAccessTokenContactPriorityAndScopeIsolation|TestAccessTokenUpdateContactProofChangesGrant|TestSecurityEnrollmentAccessTokenMethodPolicy' -count=1`、`go test ./controller -run 'TestAccessToken(WeChat|SMS|OldFactor|OldMFA|ContactDisabled|ContactRejects|RevokeWeChat)' -count=1`、`go test ./service -run 'AccessToken|Verification|Security' -count=1` → 均通过；前端 `bun run typecheck`、`bunx vitest run src/features/auth/secure-verification`（32 个用例）通过，`oxlint` 对改动文件无新增告警。
+- 风险与未覆盖：联系人验证仅在 session 登录下可用，个人访问令牌（PAT）调用仍返回 `SECURITY_ACTION_FORBIDDEN`；未运行完整 SQLite、MySQL、PostgreSQL 数据库矩阵（改动不涉及数据库结构）。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 
@@ -1214,7 +1224,7 @@
 | 手机号首次绑定与更换验证策略 | controller phone_change/secure_verification、service phone_change/phone_binding_verification/security_verification、router/api-router.go、middleware/access_token_routes.go、个人资料流程、共享验证 API/类型及关联测试 | Z076 |
 | 独立个人资料与手机号更换 | `router/api-router.go`、`middleware/access_token_routes.go`、`service/security_verification.go`、语言偏好组件、侧栏数据与测试、生成路由和七种 locale | Z073 |
 | 新手引导功能复制 | sidebar data/config、个人/管理员菜单配置、邀请卡片、接入卡片、推荐操作、路由生成文件及七种 locale | Z072 |
-| 创建访问令牌联系人验证 | `controller/secure_verification.go`、`service/security_verification.go`、新增联系人验证 service/测试、`router/api-router.go`、`middleware/access_token_routes.go`、共享验证类型/API/hooks/弹窗与七种 locale | Z071 |
+| 创建访问令牌联系人验证 | `controller/secure_verification.go`、`service/security_verification.go`、新增联系人验证 service/测试、`router/api-router.go`、`middleware/access_token_routes.go`、共享验证类型/API/hooks/弹窗与七种 locale | Z071、Z081、Z082 |
 | 使用日志费用可见性 | `web/src/features/usage-logs/components/columns/common-logs-columns.tsx` | Z064 |
 | 微信绑定二次验证 | `controller/wechat.go`、安全证明 service、`router/api-router.go`、`middleware/access_token_routes.go`、认证入口、微信绑定对话框与七种 locale | Z063 |
 | 邀请入口及认证归因 | `controller/wechat.go`、`web/src/routes/{__root.tsx,(auth)/sign-up.tsx}`；与 fork 自有手机/微信认证扩展联动 | Z061 |
