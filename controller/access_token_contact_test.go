@@ -43,12 +43,16 @@ func TestAccessTokenContactPriorityAndScopeIsolation(t *testing.T) {
 			}
 			require.Len(t, requirements.Methods, 1)
 			assert.Equal(t, expected, requirements.Methods[0].Method)
-			for _, scope := range []string{"access_token.update", "access_token.revoke", "account.binding.bind"} {
+			for _, scope := range []string{"access_token.update", "account.binding.bind"} {
 				unchanged, err := service.GetVerificationRequirements(identity, scope)
 				require.NoError(t, err)
 				require.Len(t, unchanged.Methods, 1)
 				assert.Equal(t, "2fa", unchanged.Methods[0].Method)
 			}
+			revoked, err := service.GetVerificationRequirements(identity, "access_token.revoke")
+			require.NoError(t, err)
+			require.Len(t, revoked.Methods, 1)
+			assert.Equal(t, expected, revoked.Methods[0].Method)
 		})
 	}
 }
@@ -91,6 +95,23 @@ func TestAccessTokenWeChatCodeMustMatchBoundOwnerAndProofIsOneTime(t *testing.T)
 	}
 }
 
+func TestAccessTokenRevokeWeChatProofIsBoundToOperation(t *testing.T) {
+	user, identity := setupSecurityEnrollmentTest(t)
+	require.NoError(t, model.DB.Model(user).Update("wechat_id", "own-wechat").Error)
+	oldEnabled, oldAddress, oldToken := common.WeChatAuthEnabled, common.WeChatServerAddress, common.WeChatServerToken
+	common.WeChatAuthEnabled, common.WeChatServerAddress, common.WeChatServerToken = true, "http://example.test", "test-token"
+	t.Cleanup(func() {
+		common.WeChatAuthEnabled, common.WeChatServerAddress, common.WeChatServerToken = oldEnabled, oldAddress, oldToken
+	})
+	op := service.VerificationOperation{Scope: service.VerificationScopeAccessTokenRevoke, Context: []byte(`{"token_id":42}`)}
+	proof, err := service.CompleteAccessTokenWeChat(identity, op, "own-wechat")
+	require.NoError(t, err)
+	_, err = service.ConsumeOperationProof(proof.ProofToken, identity, service.VerificationOperation{Scope: op.Scope, Context: []byte(`{"token_id":43}`)})
+	require.Error(t, err)
+	_, err = service.ConsumeOperationProof(proof.ProofToken, identity, op)
+	require.NoError(t, err)
+}
+
 func TestAccessTokenSMSRejectsContextReplayAndChangedPriority(t *testing.T) {
 	user, identity := setupSecurityEnrollmentTest(t)
 	require.NoError(t, model.DB.Create(&model.ExternalIdentityClaim{Provider: "phone", Subject: "13800138000", UserId: user.Id}).Error)
@@ -107,6 +128,20 @@ func TestAccessTokenSMSRejectsContextReplayAndChangedPriority(t *testing.T) {
 	require.Error(t, err)
 	require.NoError(t, model.DB.Model(user).Update("wechat_id", "new-wechat").Error)
 	_, err = service.ConsumeOperationProof(proof.ProofToken, identity, op)
+	require.Error(t, err)
+}
+
+func TestAccessTokenRevokeContactProofIsBoundToOperation(t *testing.T) {
+	user, identity := setupSecurityEnrollmentTest(t)
+	require.NoError(t, model.DB.Create(&model.ExternalIdentityClaim{Provider: "phone", Subject: "13800138000", UserId: user.Id}).Error)
+	code := configureContactSMS(t)
+	op := service.VerificationOperation{Scope: service.VerificationScopeAccessTokenRevoke, Context: []byte(`{"token_id":42}`)}
+	token, err := service.SendAccessTokenSMS(identity, op, "192.0.2.1")
+	require.NoError(t, err)
+	proof, err := service.VerifySecurityInput(identity, service.VerificationInput{Scope: op.Scope, Context: op.Context, Method: service.VerificationMethodSMS, SMSToken: token, Code: *code})
+	require.NoError(t, err)
+	require.NotEmpty(t, proof.ProofToken)
+	_, err = service.ConsumeOperationProof(proof.ProofToken, identity, service.VerificationOperation{Scope: op.Scope, Context: []byte(`{"token_id":43}`)})
 	require.Error(t, err)
 }
 

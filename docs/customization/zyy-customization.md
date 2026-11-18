@@ -1189,6 +1189,16 @@
 - 验证：前端 `bun run test -- src/features/keys src/features/dashboard/lib/__tests__/access-guide.test.ts src/features/dashboard/components/overview/access-guide/__tests__/access-guide.test.tsx`（10 文件/115 用例）、`bun run typecheck`、改动文件 Oxlint/Oxfmt、`bun run build` 均通过；后端 `go test ./model -count=1` 通过，积分生命周期与迁移用例在 SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 16.16 隔离库通过（含重复迁移、并发预留、退款/重放、旧调用转换和溢出）；`go test ./service ./middleware` 通过。完整 controller 测试中的 `TestAccessTokenCreationChecksGrantBeforeConsumingProof` 在本任务前后均因缺少 `external_identity_claims` 夹具失败，未改该问题。
 - 风险与未覆盖：历史上没有 `PointCallBilling` 记录的调用无法可靠反推积分；旧二进制无法执行新积分上限；未进行真实生产 API 写入或线上浏览器流程验收。
 
+### Z081 撤销访问令牌优先使用微信或手机验证码
+
+- 需求与原因：用户撤销访问令牌时，复用创建访问令牌的联系人验证偏好，避免已绑定微信或手机号的账号落入不适用的通用验证方式。
+- 变更内容：`access_token.revoke` 与 `access_token.generate` 共用联系人选择及微信/短信证明流程；绑定微信时优先微信，否则使用已绑定手机号短信，无联系人时继续使用原有安全验证策略。证明仍绑定撤销操作上下文，并在消费时重新校验当前绑定。
+- 影响面：`service/access_token_contact.go`、`service/security_verification.go`、`controller/access_token_contact_test.go`、`controller/security_enrollment_test.go`；**上游自有文件**：上述四个文件。
+- 与上游差异：上游策略仅为创建访问令牌提供联系人验证码，撤销操作只使用通用安全验证方式；本定制扩展联系人验证码到撤销操作。
+- 开关与默认值：无开关；按账号当前绑定状态选择验证方式。
+- 验证：`go test ./controller -run 'TestAccessToken(ContactPriorityAndScopeIsolation|RevokeContactProofIsBoundToOperation|RevokeWeChatProofIsBoundToOperation|WeChatCodeMustMatchBoundOwnerAndProofIsOneTime|SMSRejectsContextReplayAndChangedPriority|SMSRejectsInvalidCeremonies|ContactDisabledDoesNotFallback|OldFactorProofRejectedAfterContactBinding|OldMFAProofRejectedAfterContactBinding)|TestSecurityEnrollmentAccessTokenMethodPolicy' -count=1`、`go test ./service -run 'TestAccessToken|TestSecurity' -count=1` → 均通过。扩大的 `go test ./service ./controller -run 'TestAccessToken|TestSecurity' -count=1` 因两个现存 controller 测试夹具缺少 `external_identity_claims` 表失败（`TestAccessTokenLifecycleAndLateRequests`、`TestAccessTokenCreationChecksGrantBeforeConsumingProof`），与本次改动无关。
+- 风险与未覆盖：定向测试覆盖 SQLite 测试配置；本轮未运行完整 SQLite、MySQL、PostgreSQL 数据库矩阵。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 

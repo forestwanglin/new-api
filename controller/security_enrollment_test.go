@@ -253,7 +253,7 @@ func TestSecurityEnrollmentAccessTokenMethodPolicy(t *testing.T) {
 				}
 				require.Len(t, requirements.Methods, count)
 				expectedMethod, expectedAvailable := test.method, test.available
-				if test.wechat && scope == service.VerificationScopeAccessTokenGenerate {
+				if test.wechat && (scope == service.VerificationScopeAccessTokenGenerate || scope == service.VerificationScopeAccessTokenRevoke) {
 					expectedMethod = "wechat"
 					expectedAvailable = common.WeChatAuthEnabled && common.WeChatServerAddress != "" && common.WeChatServerToken != ""
 				}

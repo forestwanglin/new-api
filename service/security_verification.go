@@ -394,7 +394,7 @@ func GetVerificationRequirements(identity AuthIdentity, scope string) (*Verifica
 	if scope == VerificationScopePhoneBinding {
 		return phoneBindingRequirements(identity, state)
 	}
-	if scope == VerificationScopeAccessTokenGenerate {
+	if supportsAccessTokenContactVerification(scope) {
 		contact, err := getAccessTokenContact(model.DB, identity.UserID)
 		if err != nil {
 			return nil, err
@@ -552,7 +552,7 @@ func ConsumeOperationProof(raw string, identity AuthIdentity, operation Verifica
 	if err := ValidateStepUpIdentity(identity); err != nil {
 		return nil, err
 	}
-	if claims.Method == VerificationMethodSMS && operation.Scope != VerificationScopeAccessTokenGenerate {
+	if claims.Method == VerificationMethodSMS && !supportsAccessTokenContactVerification(operation.Scope) {
 		if _, err := requireWeChatBindingSMS(identity, operation); err != nil {
 			return nil, err
 		}
@@ -576,7 +576,7 @@ func ConsumeOperationProof(raw string, identity AuthIdentity, operation Verifica
 		if operation.Scope == VerificationScopePhoneBinding {
 			return validatePhoneBindingContactWithTx(tx, identity, claims.Method, flow.Payload)
 		}
-		if operation.Scope == VerificationScopeAccessTokenGenerate {
+		if supportsAccessTokenContactVerification(operation.Scope) {
 			return validateAccessTokenContactWithTx(tx, identity, claims.Method, flow.Payload)
 		}
 		if claims.Method == VerificationMethodSMS {

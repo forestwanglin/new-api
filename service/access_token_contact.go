@@ -56,8 +56,12 @@ func contactMethodAvailable(contact accessTokenContact) bool {
 	return false
 }
 
+func supportsAccessTokenContactVerification(scope string) bool {
+	return scope == VerificationScopeAccessTokenGenerate || scope == VerificationScopeAccessTokenRevoke
+}
+
 func requireAccessTokenContact(identity AuthIdentity, operation VerificationOperation, method string) (accessTokenContact, VerificationBinding, error) {
-	if operation.Scope != VerificationScopeAccessTokenGenerate {
+	if !supportsAccessTokenContactVerification(operation.Scope) {
 		return accessTokenContact{}, VerificationBinding{}, ErrProofScope
 	}
 	binding, err := BindVerificationOperation(operation)
