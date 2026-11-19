@@ -8102,6 +8102,9 @@
     "Deleted key": "削除されたキー",
     "points": "ポイント",
     "Text Models": "テキストモデル",
-    "Video Models": "動画モデル"
+    "Video Models": "動画モデル",
+    "Current subscription": "現在のサブスクリプション",
+    "Buy": "購入",
+    "Renew": "更新"
   }
 }

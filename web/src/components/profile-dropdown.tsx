@@ -16,9 +16,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
-import { User, LogOut, Settings, ShieldCheck } from 'lucide-react'
-import { useMemo } from 'react'
+import { User, LogOut, Settings, ShieldCheck, ChevronDown } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { SignOutDialog } from '@/components/sign-out-dialog'
@@ -31,23 +32,70 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { getPointsWallet, pointsWalletKey } from '@/features/points-wallet/api'
+import {
+  customSubscriptionSelfKey,
+  getCustomSubscriptionSelf,
+} from '@/features/subscriptions-custom/api'
 import useDialogState from '@/hooks/use-dialog'
 import { useIsSidebarModuleVisible } from '@/hooks/use-sidebar-config'
 import { useUserDisplay } from '@/hooks/use-user-display'
+import { toIntlLocale } from '@/i18n/languages'
 import { getUserAvatarFallback, getUserAvatarStyle } from '@/lib/avatar'
+import { formatNumber } from '@/lib/format'
 import { ROLE } from '@/lib/roles'
 import { useAuthStore } from '@/stores/auth-store'
+
+import '@/styles/profile-dropdown.css'
 
 const avatarFallbackClassName = 'font-semibold text-white'
 
 export function ProfileDropdown() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const [menuOpen, setMenuOpen] = useState(false)
   const navigate = useNavigate()
   const [open, setOpen] = useDialogState()
   const user = useAuthStore((state) => state.auth.user)
-  const { displayName, roleLabel } = useUserDisplay(user)
+  const { displayName, secondaryText } = useUserDisplay(user)
   const isSuperAdmin = user?.role === ROLE.SUPER_ADMIN
   const isSecurityVisible = useIsSidebarModuleVisible('/security-access')
+  const isSubscriptionVisible = useIsSidebarModuleVisible('/my-subscription')
+  const wallet = useQuery({
+    queryKey: pointsWalletKey(user?.id),
+    queryFn: getPointsWallet,
+    enabled: !!user?.id,
+    staleTime: 30000,
+    meta: { errorToast: false },
+  })
+  const subscription = useQuery({
+    queryKey: customSubscriptionSelfKey(user?.id),
+    queryFn: getCustomSubscriptionSelf,
+    enabled: !!user?.id && menuOpen && isSubscriptionVisible,
+    staleTime: 30000,
+    meta: { errorToast: false },
+  })
+  const general = wallet.data?.balances.find((item) => item.code === 'GENERAL')
+  const gpt = wallet.data?.balances.find((item) => item.code === 'GPT')
+  const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
+  const points =
+    !wallet.isError && general && gpt
+      ? formatNumber(
+          BigInt(general.available_points) + BigInt(gpt.available_points),
+          locale
+        )
+      : '—'
+  const active = subscription.data?.items.find(
+    (item) =>
+      item.id === subscription.data.active_subscription_id &&
+      item.status === 'active'
+  )
+  let subscriptionTitle = t('Loading')
+  if (subscription.isError) subscriptionTitle = t('Not available yet')
+  else if (subscription.isSuccess) {
+    subscriptionTitle = active
+      ? active.plan_title || t('Plan {{id}}', { id: active.plan_id })
+      : t('No active subscription')
+  }
   const avatarName = user?.username || displayName
   const avatarFallback = getUserAvatarFallback(avatarName)
   const avatarFallbackStyle = useMemo(
@@ -57,68 +105,82 @@ export function ProfileDropdown() {
 
   return (
     <>
-      <DropdownMenu modal={false}>
+      <DropdownMenu modal={false} open={menuOpen} onOpenChange={setMenuOpen}>
         <DropdownMenuTrigger
-          render={<Button variant='ghost' className='relative size-6 p-0' />}
+          render={
+            <Button variant='outline' className='profile-account-trigger' />
+          }
+          aria-label={`${displayName} · ${t('Remaining points')}: ${points}`}
         >
-          <Avatar className='size-6'>
+          <Avatar className='profile-account-avatar'>
             <AvatarImage
               src={user?.avatar_url}
               alt={`@${displayName}`}
               referrerPolicy='no-referrer'
             />
             <AvatarFallback
-              className={`${avatarFallbackClassName} text-[11px]`}
+              className={`${avatarFallbackClassName} profile-account-avatar-fallback`}
               style={avatarFallbackStyle}
             >
               {avatarFallback}
             </AvatarFallback>
           </Avatar>
+          <span className='profile-account-name'>{displayName}</span>
+          <span className='profile-account-points'>
+            {points} {t('Points')}
+          </span>
+          <ChevronDown className='profile-account-chevron' aria-hidden='true' />
         </DropdownMenuTrigger>
-        <DropdownMenuContent align='end' sideOffset={8} className='w-56'>
-          <div className='flex items-center gap-2 px-1.5 py-1.5'>
-            <Avatar className='size-8'>
-              <AvatarImage
-                src={user?.avatar_url}
-                alt={`@${displayName}`}
-                referrerPolicy='no-referrer'
-              />
-              <AvatarFallback
-                className={`${avatarFallbackClassName} text-xs`}
-                style={avatarFallbackStyle}
-              >
-                {avatarFallback}
-              </AvatarFallback>
-            </Avatar>
-            <div className='flex flex-1 flex-col gap-0.5 overflow-hidden'>
-              <p className='text-foreground truncate text-sm font-medium'>
-                {displayName}
-              </p>
-              <div className='flex items-center gap-1.5'>
-                <span className='text-muted-foreground text-xs'>
-                  {roleLabel}
-                </span>
-                {user?.group && (
-                  <>
-                    <span className='text-muted-foreground text-xs'>·</span>
-                    <span className='text-muted-foreground truncate text-xs'>
-                      {String(user.group)}
-                    </span>
-                  </>
+        <DropdownMenuContent
+          align='end'
+          sideOffset={8}
+          className='profile-account-menu'
+        >
+          <div className='profile-account-head'>
+            <div className='profile-account-title'>{displayName}</div>
+            <div className='profile-account-secondary'>{secondaryText}</div>
+          </div>
+          <div className='profile-account-balance'>
+            <span>{t('Remaining points')}</span>
+            <strong>{points}</strong>
+          </div>
+          {isSubscriptionVisible && (
+            <div className='profile-account-subscription'>
+              <div className='profile-account-subscription-info'>
+                <span>{t('Current subscription')}</span>
+                <strong>{subscriptionTitle}</strong>
+                {!subscription.isError && active && (
+                  <small>
+                    {active.billing_cycle === 'year'
+                      ? t('Yearly')
+                      : t('Monthly')}
+                  </small>
                 )}
               </div>
+              <DropdownMenuItem
+                className='profile-account-subscription-action'
+                disabled={!subscription.isSuccess}
+                render={<Button variant='outline' />}
+                onClick={() =>
+                  navigate({ to: '/subscription', search: { tab: 'plans' } })
+                }
+              >
+                {active ? t('Renew') : t('Buy')}
+              </DropdownMenuItem>
             </div>
-          </div>
+          )}
 
-          <DropdownMenuSeparator />
-
-          <DropdownMenuItem onClick={() => navigate({ to: '/personal-profile' })}>
+          <DropdownMenuItem
+            onClick={() => navigate({ to: '/personal-profile' })}
+          >
             <User className='size-4' />
             {t('Profile')}
           </DropdownMenuItem>
 
           {isSecurityVisible && (
-            <DropdownMenuItem onClick={() => navigate({ to: '/security-access' })}>
+            <DropdownMenuItem
+              onClick={() => navigate({ to: '/security-access' })}
+            >
               <ShieldCheck className='size-4' />
               {t('Security & Access')}
             </DropdownMenuItem>
