@@ -131,6 +131,14 @@ beforeEach(() => {
       return { data: { success: true, price: 1, usd_exchange_rate: 7 } }
     }
     if (url === '/api/model/pricing') return { data: pricing }
+    if (url === '/api/perf-metrics/summary') {
+      return {
+        data: {
+          success: true,
+          data: { models: [], recent_success_series: {} },
+        },
+      }
+    }
     throw new Error(`Unexpected endpoint: ${url}`)
   })
 })
@@ -749,4 +757,53 @@ it('translates text and video section titles in Chinese', async () => {
     await screen.findByRole('table', { name: /· 文本模型$/ })
   ).toBeVisible()
   expect(screen.getByRole('table', { name: /· 视频模型$/ })).toBeVisible()
+})
+
+it('shows 24-hour status for models with traffic and dashes for models without metrics', async () => {
+  await i18next.changeLanguage('en')
+  const get = vi.mocked(api.get)
+  get.mockImplementation(async (url) => {
+    if (url === '/api/status') {
+      return { data: { success: true, price: 1, usd_exchange_rate: 7 } }
+    }
+    if (url === '/api/model/pricing') return { data: pricing }
+    if (url === '/api/perf-metrics/summary') {
+      return {
+        data: {
+          success: true,
+          data: {
+            models: [
+              {
+                model_name: 'deepseek-chat',
+                avg_latency_ms: 800,
+                success_rate: 99.5,
+                avg_tps: 42,
+                recent_success_series: [{ ts: 1, success_rate: 100 }],
+              },
+            ],
+            recent_success_series: {},
+          },
+        },
+      }
+    }
+    throw new Error(`Unexpected endpoint: ${url}`)
+  })
+
+  renderPlaza()
+
+  const textTable = within(
+    await screen.findByRole('table', { name: 'All Models · Text Models' })
+  )
+  expect(textTable.getByRole('columnheader', { name: 'Status' })).toBeVisible()
+  const active = within(
+    await screen.findByRole('row', { name: /deepseek-chat/ })
+  )
+  expect(active.getByText('99.50%')).toBeVisible()
+  expect(active.getByText('800ms · 42.0t/s')).toBeVisible()
+  const idle = within(screen.getByRole('row', { name: /gpt-api-model/ }))
+  expect(idle.getByLabelText('No performance data available')).toBeVisible()
+  expect(get).toHaveBeenCalledWith('/api/perf-metrics/summary', {
+    params: { hours: 24, recent_model: undefined },
+    paramsSerializer: { indexes: null },
+  })
 })

@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -24,6 +25,7 @@ import { ErrorState } from '@/components/error-state'
 import { PublicLayout } from '@/components/layout'
 import { LoadingState } from '@/components/loading-state'
 import { Button } from '@/components/ui/button'
+import { getPerfMetricsSummary } from '@/features/performance-metrics/api'
 import { EmptyState } from '@/features/pricing/components/empty-state'
 import { ModelBillingModeBadge } from '@/features/pricing/components/model-billing-mode-badge'
 import { ModelPriceCell } from '@/features/pricing/components/model-price-cell'
@@ -33,7 +35,10 @@ import { filterBySearch } from '@/features/pricing/lib/filters'
 import { SubscriptionsCustomFooter } from '@/features/subscriptions-custom/footer'
 import { SupportDialog } from '@/features/subscriptions-custom/support-dialog'
 import { normalizeInterfaceLanguage, toIntlLocale } from '@/i18n/languages'
-import { getServerErrorMessage } from '@/lib/server-error-message'
+import {
+  getServerErrorMessage,
+  requireServerSuccess,
+} from '@/lib/server-error-message'
 import { useAuthStore } from '@/stores/auth-store'
 import { useLoginModalStore } from '@/stores/login-modal-store'
 import {
@@ -46,6 +51,7 @@ import {
   getModelVendorKey,
   type ModelCategory,
 } from './categories'
+import { ModelStatusCell } from './components/model-status-cell'
 import {
   formatModelDiscount,
   getModelDiscountRatio,
@@ -115,6 +121,27 @@ export function ModelPlaza() {
       return model
     })
   }, [pricingModels, vendors])
+  // One public summary covers every model with traffic, so filtering and
+  // searching never trigger per-row performance requests.
+  const perfQuery = useQuery({
+    queryKey: ['perf-metrics-summary', 24],
+    queryFn: async () => requireServerSuccess(await getPerfMetricsSummary(24)),
+    enabled: models.length > 0,
+    staleTime: 60 * 1000,
+    retry: false,
+    meta: { errorToast: false },
+  })
+  const perfMap = useMemo(
+    () =>
+      new Map(
+        (perfQuery.data?.data.models ?? []).map((model) => [
+          model.model_name,
+          model,
+        ])
+      ),
+    [perfQuery.data]
+  )
+
   const [keyword, setKeyword] = useState('')
   const [filter, setFilter] = useState<ModelFilter>({
     category: null,
@@ -338,6 +365,7 @@ export function ModelPlaza() {
                             <th scope='col'>{t('Model Name')}</th>
                             <th scope='col'>{t('Description')}</th>
                             <th scope='col'>{t('Type')}</th>
+                            <th scope='col'>{t('Status')}</th>
                             <th scope='col'>{t('Price')}</th>
                             <th scope='col' className='is-right'>
                               {t('Discount ratio')}
@@ -379,6 +407,11 @@ export function ModelPlaza() {
                               </td>
                               <td data-label={t('Type')}>
                                 <ModelBillingModeBadge model={model} />
+                              </td>
+                              <td data-label={t('Status')}>
+                                <ModelStatusCell
+                                  perf={perfMap.get(model.model_name)}
+                                />
                               </td>
                               <td data-label={t('Price')}>
                                 <ModelPriceCell

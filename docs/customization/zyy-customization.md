@@ -1245,6 +1245,15 @@
 - 扩大检查限制：完整 controller/router 仍有基线失败：三个 `TestAccessToken*` fixture 缺 `external_identity_claims`，`TestOpenAIChatSamplingCompatibility` 的四个 sampling 子例，`TestAccessTokenRouteRulesCoverEveryDashboardRoute` 的 8 个既有声明缺项、`TestAccessTokenVerificationScopesAreAllListed`、`TestUserPointBalancesAPI`。均在原始 `41e279ba` 独立复现。全量 model 共用外库时 payment/admin-phone 夹具要求空库，分别用独立空库运行三库矩阵后通过，不能把该冲突计为业务通过。
 - 安全参考与未覆盖：核查 OWASP Authentication / Session Management Cheat Sheets 和 ASVS **5.0.0** 中 V6.3.1、V6.5、V6.6.2、V6.6.3 的限流、单用、期限与请求绑定控制；阿里云 SendSms 不提供幂等发送保证，仅官方已确认拒绝码可分类为未接收。不是完整 ASVS 合规结论。未进行真实短信投递、线上浏览器验证、最低版本 MySQL 5.7/PostgreSQL 9.6 或完整生产快照升级；HTTP 后进程崩溃的 sending flow 保持不可验证，用户等待后显式重新发送，不自动补发。
 
+### Z086 模型页列表展示运行状态
+
+- 需求与原因：顶部菜单「模型」页（`features/model-plaza`）只展示名称、描述、类型、价格和折扣，用户看不到模型真实运行情况。需要在表格列表中加入与模型广场卡片一致的成功率、延迟和吞吐信息。
+- 变更内容：在「类型」和「价格」之间新增「状态」列，使用新增的 `ModelStatusCell` 展示彩色状态点、成功率、最近 24 小时状态条，以及 `延迟 · 吞吐` 次行；无真实流量时显示 `—`，不把缺失值渲染成 0%。`features/model-plaza/index.tsx` 通过一次 `GET /api/perf-metrics/summary?hours=24`（不传 `recent_model`）获取窗口内所有有流量模型的汇总和各自序列，建立映射后按模型名查表，不按行或按过滤结果重复请求；该查询失败时静默降级为 `—`，不影响定价列表与错误重试。移动端沿用现有卡片布局自动显示「状态」标签。
+- 影响面：**上游自有文件**：`web/src/features/model-plaza/index.tsx`、`web/src/features/model-plaza/__tests__/model-plaza.test.tsx`。新增 fork 自有文件 `web/src/features/model-plaza/components/model-status-cell.tsx`。无后端、配置、依赖或部署变更。
+- 与上游差异：上游模型页没有运行状态列；本改动复用现有 perf-metrics 公开接口、格式化函数和成功率分级，不新增接口契约。查询键与数据看板一致（`['perf-metrics-summary', 24]`），可共享 24 小时缓存。
+- 开关与默认值：状态列默认随表格展示；无数据为 `—`。回滚删除该列、`ModelStatusCell` 与页面查询即可恢复。
+- 验证：模型页测试 35 项通过（含新增的状态列渲染与无数据用例）；`bun check -b` 1,646 文件无类型错误；涉及文件 scoped oxlint/oxfmt 通过；`bun run build` 通过。未在登录态真实页面目检桌面/窄屏最终排版与状态条宽度。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 
@@ -1254,6 +1263,7 @@
 
 | 区域 | 文件 | 关联条目 |
 |---|---|---|
+| 模型页列表运行状态 | `web/src/features/model-plaza/index.tsx`、`web/src/features/model-plaza/__tests__/model-plaza.test.tsx` | Z086 |
 | 计费与短信恢复加固 | `controller/{secure_verification,system_task,token_test}.go`、`middleware/access_token_routes.go`、`model/{auth_flow,main,task,task_cas_test,token}.go`、`router/api-router.go`、`service/task_polling.go`、共享验证 hook 和 `web/src/lib/secure-verification.ts` | Z085 |
 | API Key 积分限额 | `controller/{token,token_test}.go`、`middleware/auth.go`、`model/{token,quota_reserve,token_cache,token_auto_groups_cache_test}.go`、API Key 表单/列表/类型及测试、七种 locale | Z080 |
 | 常规七页 Demo 样式 | `web/src/components/layout/components/section-page-layout.tsx` 及测试、dashboard 各图表/卡片及入口、keys 列表及入口、usage-logs 筛选/表格/审计及入口、`web/src/styles/index.css`（完整范围见 Z079） | Z079 |
