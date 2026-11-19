@@ -24,6 +24,8 @@ import { useTranslation } from 'react-i18next'
 import { DataTablePage, useDataTable } from '@/components/data-table'
 import { ErrorState } from '@/components/error-state'
 import { useModelPricing } from '@/features/model-pricing/api'
+import { getPerfMetricsSummaryBatched } from '@/features/performance-metrics/api'
+import type { ModelPerfBadgeData } from '@/features/pricing/components/model-perf-badge'
 import { useMediaQuery } from '@/hooks'
 import { useTableUrlState } from '@/hooks/use-table-url-state'
 import {
@@ -167,7 +169,7 @@ export function ModelsTable() {
     },
   })
 
-  const models = data?.data?.items || []
+  const models = useMemo(() => data?.data?.items || [], [data?.data?.items])
   const totalCount = data?.data?.total || 0
   const vendorCounts = data?.data?.vendor_counts
 
@@ -181,7 +183,56 @@ export function ModelsTable() {
   let pricingState: 'loading' | 'error' | undefined
   if (pricingQuery.isError) pricingState = 'error'
   else if (pricingQuery.isLoading) pricingState = 'loading'
-  const columns = useModelsColumns(vendors, pricingQuery.data, pricingState)
+
+  // Performance is recorded per exact model name, so matched-rule rows have
+  // no usable metric. Fetch one summary for the current page instead of one
+  // request per row.
+  const perfModelNames = useMemo(
+    () =>
+      models
+        .filter((model) => model.name_rule === 0 && model.model_name)
+        .map((model) => model.model_name),
+    [models]
+  )
+  const perfQuery = useQuery({
+    queryKey: ['perf-metrics-summary', 24, perfModelNames],
+    queryFn: async () =>
+      requireServerSuccess(
+        await getPerfMetricsSummaryBatched(perfModelNames, 24)
+      ),
+    enabled: perfModelNames.length > 0,
+    staleTime: 60 * 1000,
+    retry: false,
+  })
+  const perfMap = useMemo(() => {
+    const map = new Map<string, ModelPerfBadgeData>()
+    for (const model of perfQuery.data?.data?.models ?? []) {
+      map.set(model.model_name, {
+        ...model,
+        window_start: perfQuery.data?.data.window_start,
+        window_end: perfQuery.data?.data.window_end,
+      })
+    }
+    for (const [name, series] of Object.entries(
+      perfQuery.data?.data?.recent_success_series ?? {}
+    )) {
+      map.set(name, {
+        avg_latency_ms: Number.NaN,
+        avg_tps: Number.NaN,
+        success_rate: Number.NaN,
+        ...map.get(name),
+        recent_success_series: series,
+      })
+    }
+    return map
+  }, [perfQuery.data])
+
+  const columns = useModelsColumns(
+    vendors,
+    pricingQuery.data,
+    pricingState,
+    perfMap
+  )
 
   // React Table instance
   const { table } = useDataTable({

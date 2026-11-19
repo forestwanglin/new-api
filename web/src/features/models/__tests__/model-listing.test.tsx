@@ -46,6 +46,7 @@ import type {
   ModelPricingEntry,
 } from '@/features/model-pricing/api'
 import { pricingOptions } from '@/features/model-pricing/pricing'
+import type { PerfSummaryAllData } from '@/features/performance-metrics/types'
 import { usePricingColumns } from '@/features/pricing/components/pricing-columns'
 import type { PricingModel } from '@/features/pricing/types'
 import fr from '@/i18n/locales/fr.json'
@@ -123,6 +124,7 @@ async function renderList(
     waitForPricing?: boolean
     initialUrl?: string
     total?: number
+    perf?: PerfSummaryAllData['data']
   } = {}
 ) {
   useAuthStore.getState().auth.setUser({ id: 1, username: 'admin', role: 100 })
@@ -137,6 +139,14 @@ async function renderList(
     }
     if (url === '/api/models/7') {
       return { data: { success: true, data: metadata } }
+    }
+    if (url === '/api/perf-metrics/summary') {
+      return {
+        data: {
+          success: true,
+          data: options.perf ?? { models: [], recent_success_series: {} },
+        },
+      }
     }
     if (url === '/api/option/model_pricing') {
       return {
@@ -855,3 +865,35 @@ it.each([
     }
   }
 )
+
+it('shows 24-hour performance metrics for the models on the current page', async () => {
+  const { get } = await renderList(undefined, {
+    perf: {
+      models: [
+        {
+          model_name: 'catalog-only',
+          avg_latency_ms: 750,
+          success_rate: 99.5,
+          avg_tps: 48,
+        },
+      ],
+      recent_success_series: {
+        'catalog-only': [{ ts: 1, success_rate: 100 }],
+      },
+    },
+  })
+
+  expect(get).toHaveBeenCalledWith('/api/perf-metrics/summary', {
+    params: {
+      hours: 24,
+      recent_model: ['catalog-only', 'channel-only', 'other-channel'],
+    },
+    paramsSerializer: { indexes: null },
+  })
+  expect(
+    screen.getByRole('columnheader', { name: 'Performance' })
+  ).toBeVisible()
+  expect(await screen.findByText('99.50%')).toBeVisible()
+  expect(screen.getByText('750ms')).toBeVisible()
+  expect(screen.getByText('48.0t/s')).toBeVisible()
+})

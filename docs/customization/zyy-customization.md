@@ -1245,6 +1245,15 @@
 - 扩大检查限制：完整 controller/router 仍有基线失败：三个 `TestAccessToken*` fixture 缺 `external_identity_claims`，`TestOpenAIChatSamplingCompatibility` 的四个 sampling 子例，`TestAccessTokenRouteRulesCoverEveryDashboardRoute` 的 8 个既有声明缺项、`TestAccessTokenVerificationScopesAreAllListed`、`TestUserPointBalancesAPI`。均在原始 `41e279ba` 独立复现。全量 model 共用外库时 payment/admin-phone 夹具要求空库，分别用独立空库运行三库矩阵后通过，不能把该冲突计为业务通过。
 - 安全参考与未覆盖：核查 OWASP Authentication / Session Management Cheat Sheets 和 ASVS **5.0.0** 中 V6.3.1、V6.5、V6.6.2、V6.6.3 的限流、单用、期限与请求绑定控制；阿里云 SendSms 不提供幂等发送保证，仅官方已确认拒绝码可分类为未接收。不是完整 ASVS 合规结论。未进行真实短信投递、线上浏览器验证、最低版本 MySQL 5.7/PostgreSQL 9.6 或完整生产快照升级；HTTP 后进程崩溃的 sending flow 保持不可验证，用户等待后显式重新发送，不自动补发。
 
+### Z086 模型管理列表展示运行状态
+
+- 需求与原因：新版模型管理列表只有名称、价格、广场状态等元数据，看不到模型真实运行情况。管理员希望像模型广场卡片一样，直接在列表里看到最近 24 小时的成功率、延迟和吞吐，便于快速发现“有流量但异常”的模型。
+- 变更内容：在 `web/src/features/models/components/models-columns.tsx` 的模型列之后新增 `Performance` 列，复用 `features/pricing/components/model-perf-badge.tsx` 的 `ModelPerfBadge`；`models-table.tsx` 按当前页的精确模型名（`name_rule === 0`）批量请求 `/api/perf-metrics/summary?hours=24`，合并为 `Map<model_name, ModelPerfBadgeData>` 后传给列。`web/src/features/performance-metrics/api.ts` 新增 `getPerfMetricsSummaryBatched`，按 50 个模型名分批请求并合并结果，匹配后端 `perfmetrics.MaxRecentModels`，避免一页 100 条时被参数上限拒绝。名称规则为前缀/包含/后缀的匹配行不按模式名请求，直接显示 `—`；移动端卡片视图隐藏该列。无数据的模型沿用组件的 `—` 展示，不把缺失值渲染成 0%。
+- 影响面：**上游自有文件**：`web/src/features/models/components/{models-table,models-columns}.tsx`、`web/src/features/performance-metrics/api.ts`、`web/src/features/models/__tests__/model-listing.test.tsx`。新增 fork 自有测试 `web/src/features/performance-metrics/__tests__/api.test.ts`。无后端、配置、依赖或部署变更。
+- 与上游差异：上游模型管理页没有性能列；本改动只复用现有 perf-metrics 接口、类型和 `ModelPerfBadge`，不新增接口契约。列表按页汇总查询，避免逐行请求；模型广场卡片的查询键与口径保持一致（24 小时、`staleTime: 60s`、失败不重试）。
+- 开关与默认值：列默认可见、不可排序；分页大小仍允许 10–100，超过 50 个模型时自动拆成多个 summary 请求。回滚删除该列及 batching helper 即可恢复。
+- 验证：相关 5 个测试文件 55 项通过（含新增 batching 单价测试和模型列表列渲染用例）；`bun check -b` 1,646 文件无类型错误；涉及文件 scoped oxlint/oxfmt 通过；`bun run build` 通过。未在登录态真实页面目检成功率/延迟/吞吐的最终排版与窄屏表现。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 
@@ -1254,6 +1263,7 @@
 
 | 区域 | 文件 | 关联条目 |
 |---|---|---|
+| 模型管理列表运行状态 | `web/src/features/models/components/{models-table,models-columns}.tsx`、`web/src/features/performance-metrics/api.ts`、`web/src/features/models/__tests__/model-listing.test.tsx` | Z086 |
 | 计费与短信恢复加固 | `controller/{secure_verification,system_task,token_test}.go`、`middleware/access_token_routes.go`、`model/{auth_flow,main,task,task_cas_test,token}.go`、`router/api-router.go`、`service/task_polling.go`、共享验证 hook 和 `web/src/lib/secure-verification.ts` | Z085 |
 | API Key 积分限额 | `controller/{token,token_test}.go`、`middleware/auth.go`、`model/{token,quota_reserve,token_cache,token_auto_groups_cache_test}.go`、API Key 表单/列表/类型及测试、七种 locale | Z080 |
 | 常规七页 Demo 样式 | `web/src/components/layout/components/section-page-layout.tsx` 及测试、dashboard 各图表/卡片及入口、keys 列表及入口、usage-logs 筛选/表格/审计及入口、`web/src/styles/index.css`（完整范围见 Z079） | Z079 |
