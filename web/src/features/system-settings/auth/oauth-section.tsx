@@ -430,7 +430,7 @@ export function OAuthSection(props: OAuthSectionProps) {
               className='w-full max-w-full min-w-0'
             >
               <div className='w-full min-w-0 overflow-x-auto'>
-                <TabsList className='flex w-max min-w-full justify-start [&>[data-slot=tabs-trigger]]:flex-none'>
+                <TabsList className='grid w-full grid-cols-7'>
                   <TabsTrigger value='github'>{t('GitHub')}</TabsTrigger>
                   <TabsTrigger value='discord'>{t('Discord')}</TabsTrigger>
                   <TabsTrigger value='oidc'>{t('OIDC')}</TabsTrigger>

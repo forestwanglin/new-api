@@ -1256,6 +1256,8 @@
 
 ### Z087 微信服务号网页授权与验证码方式并存
 
+- 样式恢复（2026-11-19）：OAuth 集成页顶部七个 Tab 恢复等宽网格，平铺占满容器；移除按内容宽度排列及禁止伸展的样式。按用户要求未运行测试。
+
 - 需求与原因：在 OAuth 后台新增已认证微信服务号网页授权，网站动态二维码扫码后登录或完成当前账号验证；保留原公众号验证码方式、wechat-server 与各自独立开关。
 - 变更内容：新增服务号配置、服务端授权流程和显式手机确认，二维码与原浏览器取结果权限分离；登录继续现有注册、邀请、手机号绑定与 MFA 流程，绑定及敏感操作继续现有安全证明。旧、新方式共用微信身份归属；保留用户自定义昵称与头像。微信内同设备跳转通过 HttpOnly 所有者 Cookie 恢复授权，非敏感表单草稿按用户/会话限时保存，敏感操作返回后须重新确认，不自动重放。关闭或变更新配置会撤销尚未完成的服务号流程，包括手机号/MFA 待登录、绑定断言和证明；旧模式证明独立检查其开关。
 - 影响面：新增 `controller/wechat_official.go`、`model/wechat_official.go`、`service/wechat_official*.go`、`setting/system_setting/wechat_official.go`、`web/src/features/auth/wechat-official/`、`web/src/routes/wechat-official/` 及回归测试；**上游自有文件**包括 `controller/{misc,option,secure_verification,user,wechat}.go`、`model/{account_security,auth_flow,external_identity_claim,option,user,user_session}.go`、`service/{access_token_contact,account_security,auth_session,login_verification,phone_auth,phone_binding_verification,security_verification,wechat_binding_sms}.go`、`router/api-router.go`、`middleware/access_token_routes.go`，以及前端 OAuth 配置、登录注册、profile API、security dialogs/cards、secure-verification、七语言/static-keys 与生成的路由树。
