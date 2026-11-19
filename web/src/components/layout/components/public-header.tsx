@@ -156,7 +156,7 @@ export function PublicHeader(props: PublicHeaderProps) {
         props.className
       )}
     >
-      <div className='mx-auto h-full max-w-[1200px] px-3 sm:px-7'>
+      <div className='mx-auto h-full max-w-[1440px] px-3 sm:px-7'>
         <nav className='flex h-full min-w-0 items-center gap-2 lg:gap-9'>
           {/* Logo */}
           <div className='flex min-w-0 flex-1 items-center gap-1 lg:flex-none'>
