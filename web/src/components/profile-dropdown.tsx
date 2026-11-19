@@ -57,9 +57,6 @@ export function ProfileDropdown() {
   const [open, setOpen] = useDialogState()
   const user = useAuthStore((state) => state.auth.user)
   const { displayName, secondaryText } = useUserDisplay(user)
-  const nameCharacters = Array.from(displayName)
-  const headerDisplayName =
-    nameCharacters.length > 8 ? `${nameCharacters.slice(0, 5).join('')}...` : displayName
   const isSuperAdmin = user?.role === ROLE.SUPER_ADMIN
   const isSecurityVisible = useIsSidebarModuleVisible('/security-access')
   const isSubscriptionVisible = useIsSidebarModuleVisible('/my-subscription')
@@ -128,7 +125,7 @@ export function ProfileDropdown() {
               {avatarFallback}
             </AvatarFallback>
           </Avatar>
-          <span className='profile-account-name'>{headerDisplayName}</span>
+          <span className='profile-account-name'>{displayName}</span>
           <span className='profile-account-points'>
             {points} {t('Points')}
           </span>

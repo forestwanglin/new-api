@@ -55,7 +55,7 @@
 }
 
 .profile-account-name {
-  max-width: 92px;
+  max-width: 4em;
   overflow: hidden;
   font-size: 14.5px;
   font-weight: 600;
