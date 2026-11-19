@@ -3,7 +3,7 @@
  * Chart series, row status colors, fixed headers and scrollports remain owned
  * by their existing components. Portal surfaces keep their shared theme. */
 .general-console-page {
-  --general-page-bg: var(--background);
+  --general-page-bg: #f8fafd;
   --general-surface: var(--card);
   --general-inset: var(--muted);
   --general-control-line: var(--input);
@@ -23,28 +23,13 @@
   line-height: 1.62;
 }
 
-:root:not(.dark) .general-console-page {
-  --general-page-bg: #f8fafd;
-  --general-surface: #fff;
-  --general-inset: #f8fafc;
-  --general-line: #e3e9f2;
-  --general-control-line: #dce2ea;
-  --background: #fff;
-  --card: #fff;
-  --card-foreground: #0f172a;
-  --foreground: #0f172a;
-  --muted: #f7f8fa;
-  --muted-foreground: #5b6b80;
-  --primary: #2563eb;
-  --primary-foreground: #fff;
-  --secondary: #eff4ff;
-  --secondary-foreground: #1e40af;
-  --accent: #eff4ff;
-  --accent-foreground: #1e40af;
-  --border: #e3e9f2;
-  --input: #dce2ea;
-  --ring: #93b4f7;
-  --table-header: #f7f8fa;
+/* Cards, controls and lines resolve to the active theme tokens above, so the
+ * preset surface bridge and the selected theme color reach these pages. Only
+ * the demo canvas is fixed for the default light theme; presets and dark mode
+ * use the same muted canvas as `.user-page` instead of redefining the palette. */
+:is(.dark, body[data-theme-preset]:not([data-theme-preset='default']))
+  .general-console-page {
+  --general-page-bg: var(--muted);
 }
 
 .general-console-page [data-slot='section-page-header'] {

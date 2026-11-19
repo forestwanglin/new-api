@@ -3,8 +3,8 @@ Copyright (C) 2023-2026 QuantumNous
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as
-published by the Free Software Foundation, either version 3 of the License,
-or (at your option) any later version.
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
 */
 import { readFileSync } from 'node:fs'
 
@@ -14,6 +14,23 @@ const css = readFileSync(
   `${process.cwd()}/src/styles/general-console.css`,
   'utf8'
 )
+const themeTokens = [
+  '--background',
+  '--card',
+  '--foreground',
+  '--primary',
+  '--primary-foreground',
+  '--secondary',
+  '--secondary-foreground',
+  '--muted',
+  '--muted-foreground',
+  '--accent',
+  '--accent-foreground',
+  '--border',
+  '--input',
+  '--ring',
+  '--table-header',
+]
 let stylesheet: HTMLStyleElement
 let page: HTMLDivElement
 let outside: HTMLDivElement
@@ -36,19 +53,45 @@ beforeEach(() => {
 
 afterEach(() => {
   document.documentElement.classList.remove('dark')
+  delete document.body.dataset.themePreset
   stylesheet.remove()
   page.remove()
   outside.remove()
 })
 
-it('applies the demo palette only to an explicitly opted-in page', () => {
-  expect(getComputedStyle(page).getPropertyValue('--primary').trim()).toBe(
-    '#2563eb'
-  )
+it('uses the demo canvas in the default light theme and follows the selected theme otherwise', () => {
   expect(
     getComputedStyle(page).getPropertyValue('--general-page-bg').trim()
   ).toBe('#f8fafd')
-  expect(getComputedStyle(outside).getPropertyValue('--primary')).toBe('')
+  document.body.dataset.themePreset = 'ocean-breeze'
+  expect(
+    getComputedStyle(page).getPropertyValue('--general-page-bg').trim()
+  ).toBe('var(--muted)')
+  document.body.dataset.themePreset = 'default'
+  expect(
+    getComputedStyle(page).getPropertyValue('--general-page-bg').trim()
+  ).toBe('#f8fafd')
+  delete document.body.dataset.themePreset
+  document.documentElement.classList.add('dark')
+  expect(
+    getComputedStyle(page).getPropertyValue('--general-page-bg').trim()
+  ).toBe('var(--muted)')
+})
+
+it('inherits the theme palette instead of redefining it', () => {
+  for (const token of themeTokens) {
+    expect(css).not.toMatch(new RegExp(`${token}\\s*:`))
+  }
+  const style = getComputedStyle(page)
+  expect(style.getPropertyValue('--general-surface').trim()).toBe('var(--card)')
+  expect(style.getPropertyValue('--general-inset').trim()).toBe('var(--muted)')
+  expect(style.getPropertyValue('--general-line').trim()).toBe('var(--border)')
+  expect(style.getPropertyValue('--general-control-line').trim()).toBe(
+    'var(--input)'
+  )
+})
+
+it('applies the demo card treatment only to an explicitly opted-in page', () => {
   expect(
     getComputedStyle(page.querySelector('.general-card') as HTMLElement)
       .borderRadius
@@ -59,15 +102,14 @@ it('applies the demo palette only to an explicitly opted-in page', () => {
   ).toBe('')
 })
 
-it('preserves the active dark palette and restores the demo palette after switching back', () => {
-  document.documentElement.classList.add('dark')
-  expect(getComputedStyle(page).getPropertyValue('--primary')).toBe('')
-  expect(
-    getComputedStyle(page).getPropertyValue('--general-page-bg').trim()
-  ).toBe('var(--background)')
-  document.documentElement.classList.remove('dark')
-  expect(getComputedStyle(page).getPropertyValue('--primary').trim()).toBe(
-    '#2563eb'
+it('derives the onboarding accent border from the primary color', () => {
+  const rule = [...(stylesheet.sheet as CSSStyleSheet).cssRules].find(
+    (entry): entry is CSSStyleRule =>
+      entry instanceof CSSStyleRule &&
+      entry.selectorText === '.general-console-page .general-access-card'
+  )
+  expect(rule?.style.getPropertyValue('border-color')).toBe(
+    'color-mix(in oklch, var(--primary) 25%, var(--general-line))'
   )
 })
 
