@@ -85,6 +85,13 @@
   border-color: color-mix(in oklch, var(--primary) 25%, var(--general-line));
 }
 
+/* Onboarding shows the referral and app-connection blocks side by side, so both
+ * use the dashboard card outline instead of the tinted setup-guide accent. */
+.general-console-page.general-onboarding
+  :is(.general-access-card, [data-slot='card']) {
+  border-color: var(--general-line);
+}
+
 .general-console-page .general-filter-card {
   min-width: 0;
   flex-shrink: 0;
@@ -193,12 +200,17 @@
   box-shadow: var(--general-shadow);
 }
 
-/* Match the point ledger: the header sits on the card surface instead of a
- * separate filled band. The variable keeps sticky headers opaque and pinned
- * header cells on the same surface. */
+/* Dense tables step one shade below the card surface: the header band is
+ * always filled and rows deepen on hover. `--table-header-bg` keeps sticky
+ * headers and pinned header cells opaque. */
 .general-console-page [data-slot='table-header'] {
-  --table-header-bg: var(--general-surface);
-  background-color: var(--general-surface);
+  --table-header-bg: var(--muted);
+  --table-header-hover: var(--muted);
+  background-color: var(--muted);
+}
+
+.general-console-page [data-slot='table-row']:hover {
+  background-color: var(--muted);
 }
 
 .general-console-page [data-slot='table-head'] {

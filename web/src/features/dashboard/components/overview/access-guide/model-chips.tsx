@@ -79,7 +79,10 @@ export function ModelChips(props: ModelChipsProps) {
         )
 
         return (
-          <span key={model.model_name} className='inline-flex items-stretch'>
+          <span
+            key={model.model_name}
+            className='inline-flex items-stretch gap-0.5'
+          >
             <Button
               type='button'
               variant='outline'
@@ -87,8 +90,7 @@ export function ModelChips(props: ModelChipsProps) {
               aria-pressed={active}
               className={cn(
                 'h-8 gap-2 px-2.5',
-                active &&
-                  'border-primary bg-primary/10 rounded-r-none border-r-0 text-foreground'
+                active && 'border-primary bg-primary/10 text-foreground'
               )}
               onClick={() => props.onSelect(model.model_name)}
             >
@@ -102,7 +104,7 @@ export function ModelChips(props: ModelChipsProps) {
                 value={model.model_name}
                 variant='outline'
                 size='sm'
-                className='border-primary bg-primary/10 h-8 rounded-l-none'
+                className='border-primary bg-primary/10 h-8'
                 iconClassName='size-3.5'
                 aria-label={t('Copy model name')}
               />

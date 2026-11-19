@@ -113,18 +113,40 @@ it('derives the onboarding accent border from the primary color', () => {
   )
 })
 
-it('renders table headers on the card surface instead of a filled band', () => {
+it('uses the dashboard card outline for both onboarding blocks', () => {
   const rule = [...(stylesheet.sheet as CSSStyleSheet).cssRules].find(
     (entry): entry is CSSStyleRule =>
       entry instanceof CSSStyleRule &&
+      entry.selectorText.includes('.general-onboarding')
+  )
+  expect(rule?.style.getPropertyValue('border-color')).toBe(
+    'var(--general-line)'
+  )
+})
+
+it('fills table headers and deepens rows on hover', () => {
+  const rules = [...(stylesheet.sheet as CSSStyleSheet).cssRules].filter(
+    (entry): entry is CSSStyleRule => entry instanceof CSSStyleRule
+  )
+  const header = rules.find(
+    (entry) =>
       entry.selectorText === ".general-console-page [data-slot='table-header']"
   )
-  expect(rule?.style.getPropertyValue('background-color')).toBe(
-    'var(--general-surface)'
+  expect(header?.style.getPropertyValue('background-color')).toBe(
+    'var(--muted)'
   )
-  expect(rule?.style.getPropertyValue('--table-header-bg')).toBe(
-    'var(--general-surface)'
+  expect(header?.style.getPropertyValue('--table-header-bg')).toBe(
+    'var(--muted)'
   )
+  expect(header?.style.getPropertyValue('--table-header-hover')).toBe(
+    'var(--muted)'
+  )
+  const row = rules.find(
+    (entry) =>
+      entry.selectorText ===
+      ".general-console-page [data-slot='table-row']:hover"
+  )
+  expect(row?.style.getPropertyValue('background-color')).toBe('var(--muted)')
 })
 
 it('styles the page heading without imposing its typography on panel headings or changing scrolling', () => {

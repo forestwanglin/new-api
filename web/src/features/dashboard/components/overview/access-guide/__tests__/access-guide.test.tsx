@@ -342,6 +342,21 @@ describe('AccessGuideCard', () => {
     )
   })
 
+  test('separates the selected model and its copy button by 2px', async () => {
+    const user = userEvent.setup()
+    tokenList = [makeKey(5)]
+    await renderCard()
+
+    const chip = await screen.findByRole('button', { name: /gpt-4o-mini/ })
+    await user.click(chip)
+
+    const copy = await screen.findByRole('button', { name: 'Copy model name' })
+    expect(copy.parentElement).toBe(chip.parentElement)
+    expect(chip.parentElement).toHaveClass('gap-0.5')
+    expect(chip).not.toHaveClass('rounded-r-none')
+    expect(copy).not.toHaveClass('rounded-l-none')
+  })
+
   test('highlights curl and python samples instead of rendering plain text', async () => {
     const user = userEvent.setup()
     tokenList = [makeKey(5, { name: 'Newest key', group: 'vip' })]

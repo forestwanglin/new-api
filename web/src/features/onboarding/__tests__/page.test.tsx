@@ -227,3 +227,17 @@ test('insets the first card by one pixel so its outer ring stays inside the scro
   expect(card).toHaveClass('ring-1')
   expect(card?.parentElement).toHaveClass('p-px')
 })
+
+test('aligns the referral block with the app connection column on wide screens', async () => {
+  await renderOnboarding()
+  const referral = await screen.findByRole('heading', {
+    name: 'Referral Program',
+  })
+  const app = await screen.findByRole('heading', { name: 'Connect your app' })
+  const referralCard = referral.closest('[data-slot="card"]')
+  const accessCard = app.closest('.general-access-card')
+  const grid = accessCard?.parentElement?.parentElement
+  expect(referralCard?.parentElement).toBe(grid)
+  expect(grid).toHaveClass('xl:grid-cols-[minmax(0,1fr)_22rem]')
+  expect(accessCard?.parentElement).toHaveClass('xl:col-start-1')
+})
