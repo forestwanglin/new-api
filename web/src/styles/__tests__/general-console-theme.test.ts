@@ -113,6 +113,20 @@ it('derives the onboarding accent border from the primary color', () => {
   )
 })
 
+it('renders table headers on the card surface instead of a filled band', () => {
+  const rule = [...(stylesheet.sheet as CSSStyleSheet).cssRules].find(
+    (entry): entry is CSSStyleRule =>
+      entry instanceof CSSStyleRule &&
+      entry.selectorText === ".general-console-page [data-slot='table-header']"
+  )
+  expect(rule?.style.getPropertyValue('background-color')).toBe(
+    'var(--general-surface)'
+  )
+  expect(rule?.style.getPropertyValue('--table-header-bg')).toBe(
+    'var(--general-surface)'
+  )
+})
+
 it('styles the page heading without imposing its typography on panel headings or changing scrolling', () => {
   const heading = page.querySelector<HTMLElement>(
     '[data-slot="section-page-title"]'

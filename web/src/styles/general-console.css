@@ -193,6 +193,14 @@
   box-shadow: var(--general-shadow);
 }
 
+/* Match the point ledger: the header sits on the card surface instead of a
+ * separate filled band. The variable keeps sticky headers opaque and pinned
+ * header cells on the same surface. */
+.general-console-page [data-slot='table-header'] {
+  --table-header-bg: var(--general-surface);
+  background-color: var(--general-surface);
+}
+
 .general-console-page [data-slot='table-head'] {
   padding-block: 12px;
   color: var(--muted-foreground);
