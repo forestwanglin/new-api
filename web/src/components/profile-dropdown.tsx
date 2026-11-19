@@ -32,6 +32,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { getPhoneChangeStatus } from '@/features/personal-profile/api'
 import { getPointsWallet, pointsWalletKey } from '@/features/points-wallet/api'
 import {
   customSubscriptionSelfKey,
@@ -56,10 +57,16 @@ export function ProfileDropdown() {
   const navigate = useNavigate()
   const [open, setOpen] = useDialogState()
   const user = useAuthStore((state) => state.auth.user)
-  const { displayName, secondaryText } = useUserDisplay(user)
+  const { displayName } = useUserDisplay(user)
   const isSuperAdmin = user?.role === ROLE.SUPER_ADMIN
   const isSecurityVisible = useIsSidebarModuleVisible('/security-access')
   const isSubscriptionVisible = useIsSidebarModuleVisible('/my-subscription')
+  const phone = useQuery({
+    queryKey: ['personal-profile-phone', user?.id],
+    queryFn: ({ signal }) => getPhoneChangeStatus(signal),
+    enabled: !!user?.id && menuOpen,
+    meta: { errorToast: false },
+  })
   const wallet = useQuery({
     queryKey: pointsWalletKey(user?.id),
     queryFn: getPointsWallet,
@@ -138,7 +145,9 @@ export function ProfileDropdown() {
         >
           <div className='profile-account-head'>
             <div className='profile-account-title'>{displayName}</div>
-            <div className='profile-account-secondary'>{secondaryText}</div>
+            <div className='profile-account-secondary'>
+              {!phone.isError && phone.data?.bound ? phone.data.phone_masked : ''}
+            </div>
           </div>
           <div className='profile-account-balance'>
             <span>{t('Remaining points')}</span>

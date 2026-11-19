@@ -118,6 +118,7 @@
 }
 
 .profile-account-secondary {
+  min-height: 1.5em;
   margin-top: 3px;
   color: var(--account-secondary);
   font-size: 14px;
