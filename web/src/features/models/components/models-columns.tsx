@@ -35,10 +35,6 @@ import {
   type ModelPricingConfig,
 } from '@/features/model-pricing/api'
 import { modelPricingDisplay } from '@/features/model-pricing/pricing'
-import {
-  ModelPerfBadge,
-  type ModelPerfBadgeData,
-} from '@/features/pricing/components/model-perf-badge'
 import { ModelPriceCell } from '@/features/pricing/components/model-price-cell'
 import { formatTimestampToDate } from '@/lib/format'
 import { getLobeIcon } from '@/lib/lobe-icon'
@@ -53,13 +49,11 @@ import { ModelSquareStatus } from './model-square-status'
 import { useModels } from './models-provider'
 
 const EMPTY_VENDORS: Vendor[] = []
-const EMPTY_PERF: Map<string, ModelPerfBadgeData> = new Map()
 
 export function useModelsColumns(
   vendors: Vendor[] = EMPTY_VENDORS,
   pricing?: ModelPricingConfig,
-  pricingState?: 'loading' | 'error',
-  perfMap: Map<string, ModelPerfBadgeData> = EMPTY_PERF
+  pricingState?: 'loading' | 'error'
 ): ColumnDef<Model>[] {
   const { t } = useTranslation()
   const canPrice = useCanEditModelPricing()
@@ -150,19 +144,6 @@ export function useModelsColumns(
             </div>
           )
         },
-      },
-      {
-        id: 'performance',
-        header: t('Performance'),
-        meta: { label: t('Performance'), mobileHidden: true },
-        size: 225,
-        enableSorting: false,
-        cell: ({ row }) =>
-          row.original.name_rule === 0 ? (
-            <ModelPerfBadge perf={perfMap.get(row.original.model_name)} />
-          ) : (
-            <span className='text-muted-foreground text-xs'>—</span>
-          ),
       },
       {
         id: 'pricing',
@@ -398,14 +379,5 @@ export function useModelsColumns(
         meta: { mobileHidden: true },
       },
     ]
-  }, [
-    t,
-    canPrice,
-    vendorMap,
-    priceMap,
-    pricingState,
-    perfMap,
-    setCurrentRow,
-    setOpen,
-  ])
+  }, [t, canPrice, vendorMap, priceMap, pricingState, setCurrentRow, setOpen])
 }
