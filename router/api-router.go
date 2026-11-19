@@ -38,8 +38,8 @@ func SetApiRouter(router *gin.Engine) {
 		apiRouter.GET("/pricing", middleware.HeaderNavModuleAuth("pricing"), controller.GetPricing)
 		// The public model page shares pricing data without the legacy square's navigation gate.
 		apiRouter.GET("/model/pricing", middleware.TryUserAuth(), controller.GetPricing)
+		// Model status is public data, independent of legacy square navigation settings.
 		perfMetricsRoute := apiRouter.Group("/perf-metrics")
-		perfMetricsRoute.Use(middleware.HeaderNavModulePublicOrUserAuth("pricing"))
 		{
 			perfMetricsRoute.GET("/summary", controller.GetPerfMetricsSummary)
 			perfMetricsRoute.GET("", controller.GetPerfMetrics)
