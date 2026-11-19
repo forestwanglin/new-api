@@ -33,14 +33,12 @@ export function Onboarding() {
     >
       <SectionPageLayout.Title>{t('Getting started')}</SectionPageLayout.Title>
       <SectionPageLayout.Content>
-        <CardStaggerContainer className='grid min-w-0 items-stretch gap-4 p-px xl:grid-cols-[minmax(0,1fr)_22rem]'>
+        <CardStaggerContainer className='flex min-w-0 flex-col gap-4 p-px'>
           <ReferralPanel showStatistics={false} />
-          <CardStaggerContainer className='min-w-0 xl:col-start-1 xl:row-start-2'>
+          <CardStaggerContainer className='grid items-stretch gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]'>
             <AccessGuideCard title={t('Connect your app')} />
-          </CardStaggerContainer>
-          <div className='min-w-0 xl:col-start-2 xl:row-start-2'>
             <RecommendedActionsPanel />
-          </div>
+          </CardStaggerContainer>
         </CardStaggerContainer>
       </SectionPageLayout.Content>
     </SectionPageLayout>

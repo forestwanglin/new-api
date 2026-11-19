@@ -117,11 +117,24 @@ it('uses the dashboard card outline for both onboarding blocks', () => {
   const rule = [...(stylesheet.sheet as CSSStyleSheet).cssRules].find(
     (entry): entry is CSSStyleRule =>
       entry instanceof CSSStyleRule &&
-      entry.selectorText.includes('.general-onboarding')
+      entry.selectorText.includes('.general-onboarding') &&
+      !entry.selectorText.includes('h3')
   )
   expect(rule?.style.getPropertyValue('border-color')).toBe(
     'var(--general-line)'
   )
+})
+
+it('matches the onboarding referral heading to the app connection scale', () => {
+  const rule = [...(stylesheet.sheet as CSSStyleSheet).cssRules].find(
+    (entry): entry is CSSStyleRule =>
+      entry instanceof CSSStyleRule &&
+      entry.selectorText.includes('.general-onboarding') &&
+      entry.selectorText.includes('h3')
+  )
+  expect(rule?.style.fontSize).toBe('18px')
+  expect(rule?.style.fontWeight).toBe('600')
+  expect(rule?.style.lineHeight).toBe('1.5')
 })
 
 it('fills table headers and deepens rows on hover', () => {
