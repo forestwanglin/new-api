@@ -1,116 +1,123 @@
-import { useMutation } from '@tanstack/react-query'
-import { useRef, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { ErrorState } from '@/components/error-state'
+import type { StaticDataTableColumn } from '@/components/data-table'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { getServerErrorMessage } from '@/lib/server-error-message'
+import { useAuthStore } from '@/stores/auth-store'
 
-import { prepareRefund, completeRefund, cancelRefund } from './api'
+import { InvitationAdminTable } from './admin-table'
+import { getAdminRefunds, formatMoneyMinor, type InvitationRefund } from './api'
+import {
+  InvitationOperationDialog,
+  type InvitationOperation,
+} from './refund-dialog'
 
-export function InvitationRefundAdmin() {
+export function InvitationRefundAdmin(props: { active: boolean }) {
   const { t } = useTranslation()
-  const [order, setOrder] = useState('')
-  const [amount, setAmount] = useState('')
-  const [refund, setRefund] = useState('')
-  const [provider, setProvider] = useState('')
-  const [evidence, setEvidence] = useState('')
-  const [result, setResult] = useState('')
-  const requestId = useRef(crypto.randomUUID())
-  const mutation = useMutation({
-    mutationFn: async (action: 'prepare' | 'complete' | 'cancel') => {
-      if (action === 'prepare') {
-        const response = await prepareRefund(order, amount, requestId.current)
-        setRefund(response.id)
-      }
-      if (action === 'complete') {
-        await completeRefund(order, refund, amount, provider, evidence)
-      }
-      if (action === 'cancel') await cancelRefund(order, refund)
-      setResult(t('Refund operation recorded'))
-    },
+  const viewer = useAuthStore((s) => s.auth.user?.id)
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 20 })
+  const [operation, setOperation] = useState<InvitationOperation | null>(null)
+  const q = useQuery({
+    queryKey: ['invitation', 'admin', 'refunds', viewer, pagination],
+    queryFn: () =>
+      getAdminRefunds(pagination.pageIndex + 1, pagination.pageSize),
+    enabled: props.active,
   })
+  const statuses = {
+    PREPARED: t('Pending refund'),
+    SUCCEEDED: t('Completed'),
+    CANCELLED: t('Cancelled'),
+  }
+  const columns: StaticDataTableColumn<InvitationRefund>[] = [
+    { id: 'id', header: t('Refund operation ID'), cell: (r) => r.id },
+    { id: 'order', header: t('Order ID'), cell: (r) => r.order_id },
+    {
+      id: 'campaign',
+      header: t('Campaign name'),
+      cell: (r) => r.campaign_name || '—',
+    },
+    {
+      id: 'amount',
+      header: t('Refund amount'),
+      cell: (r) => `¥${formatMoneyMinor(r.amount_minor)}`,
+    },
+    { id: 'status', header: t('Status'), cell: (r) => statuses[r.status] },
+    {
+      id: 'prepared',
+      header: t('Registration time'),
+      cell: (r) => new Date(Number(r.prepared_at)).toLocaleString(),
+    },
+    {
+      id: 'completed',
+      header: t('Completion time'),
+      cell: (r) =>
+        r.completed_at
+          ? new Date(Number(r.completed_at)).toLocaleString()
+          : '—',
+    },
+    {
+      id: 'cancelled',
+      header: t('Cancellation time'),
+      cell: (r) =>
+        r.cancelled_at
+          ? new Date(Number(r.cancelled_at)).toLocaleString()
+          : '—',
+    },
+    { id: 'provider', header: t('Provider'), cell: (r) => r.provider || '—' },
+    {
+      id: 'evidence',
+      header: t('Verified provider refund ID'),
+      cell: (r) => (
+        <span className='block max-w-56 break-all'>
+          {r.provider_refund_id || '—'}
+        </span>
+      ),
+    },
+    {
+      id: 'actions',
+      header: t('Actions'),
+      cell: (r) =>
+        r.status === 'PREPARED' ? (
+          <div className='flex gap-2'>
+            <Button
+              size='sm'
+              onClick={() => setOperation({ kind: 'complete', refund: r })}
+            >
+              {t('Complete refund')}
+            </Button>
+            <Button
+              size='sm'
+              variant='outline'
+              onClick={() => setOperation({ kind: 'cancel', refund: r })}
+            >
+              {t('Cancel refund')}
+            </Button>
+          </div>
+        ) : (
+          '—'
+        ),
+    },
+  ]
+  if (!props.active) return null
   return (
-    <section className='rounded-lg border p-5'>
-      <h2 className='font-semibold'>{t('Invitation refund registration')}</h2>
-      <p>
-        {t(
-          'Prepare before the provider refund. Complete only after verifying provider evidence. Cancel unsuccessful refunds.'
-        )}
-      </p>
-      <div className='mt-3 grid gap-3 sm:grid-cols-2'>
-        <label>
-          {t('Order ID')}
-          <Input
-            value={order}
-            disabled={mutation.isPending}
-            onChange={(e) => {
-              setOrder(e.target.value)
-              requestId.current = crypto.randomUUID()
-              setRefund('')
-            }}
-          />
-        </label>
-        <label>
-          {t('Refund amount in minor units')}
-          <Input
-            value={amount}
-            disabled={mutation.isPending}
-            onChange={(e) => {
-              setAmount(e.target.value)
-              requestId.current = crypto.randomUUID()
-            }}
-          />
-        </label>
-        <label>
-          {t('Refund operation ID')}
-          <Input value={refund} onChange={(e) => setRefund(e.target.value)} />
-        </label>
-        <label>
-          {t('Provider')}
-          <Input
-            value={provider}
-            maxLength={32}
-            onChange={(e) => setProvider(e.target.value)}
-          />
-        </label>
-        <label>
-          {t('Verified provider refund ID')}
-          <Input
-            value={evidence}
-            maxLength={128}
-            onChange={(e) => setEvidence(e.target.value)}
-          />
-        </label>
-      </div>
-      <div className='mt-3 flex flex-wrap gap-2'>
-        <Button
-          disabled={
-            mutation.isPending || !/^\d+$/.test(order) || !/^\d+$/.test(amount)
-          }
-          onClick={() => mutation.mutate('prepare')}
-        >
-          {t('Prepare refund')}
-        </Button>
-        <Button
-          disabled={mutation.isPending || !refund || !provider || !evidence}
-          onClick={() => mutation.mutate('complete')}
-        >
-          {t('Complete refund')}
-        </Button>
-        <Button
-          variant='outline'
-          disabled={mutation.isPending || !refund}
-          onClick={() => mutation.mutate('cancel')}
-        >
-          {t('Cancel refund')}
-        </Button>
-      </div>
-      {mutation.isError && (
-        <ErrorState description={getServerErrorMessage(mutation.error)} />
+    <>
+      <InvitationAdminTable
+        rows={q.data?.items ?? []}
+        columns={columns}
+        total={q.data?.total ?? '0'}
+        pagination={pagination}
+        onPaginationChange={setPagination}
+        pending={q.isPending}
+        error={q.error}
+        onRetry={() => void q.refetch()}
+      />
+      {operation && (
+        <InvitationOperationDialog
+          operation={operation}
+          onClose={() => setOperation(null)}
+        />
       )}
-      <p role='status'>{result}</p>
-    </section>
+    </>
   )
 }

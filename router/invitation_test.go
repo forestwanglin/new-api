@@ -68,7 +68,7 @@ func TestInvitationRouteAuthorization(t *testing.T) {
 	}
 	for _, route := range []struct{ method, path string }{
 		{"GET", "/self/summary"}, {"GET", "/self/link"}, {"GET", "/self/binding"}, {"GET", "/self/friends"}, {"GET", "/self/rewards"}, {"POST", "/self/binding"},
-		{"GET", "/admin/campaigns"}, {"POST", "/admin/campaigns"}, {"GET", "/admin/campaigns/1"}, {"PUT", "/admin/campaigns/1"}, {"POST", "/admin/campaigns/1/publish"}, {"POST", "/admin/campaigns/1/end"}, {"GET", "/admin/rewards"}, {"POST", "/admin/orders/1/refunds"}, {"POST", "/admin/orders/1/refunds/1/complete"}, {"POST", "/admin/orders/1/refunds/1/cancel"}, {"POST", "/admin/rewards/1/reversal"},
+		{"GET", "/admin/campaigns"}, {"POST", "/admin/campaigns"}, {"GET", "/admin/campaigns/1"}, {"PUT", "/admin/campaigns/1"}, {"POST", "/admin/campaigns/1/publish"}, {"POST", "/admin/campaigns/1/end"}, {"GET", "/admin/rewards"}, {"GET", "/admin/refunds"}, {"POST", "/admin/orders/1/refunds"}, {"POST", "/admin/orders/1/refunds/1/complete"}, {"POST", "/admin/orders/1/refunds/1/cancel"}, {"POST", "/admin/rewards/1/reversal"},
 	} {
 		path := "/api/invitation" + route.path
 		request(route.method, path, "{}", "", http.StatusUnauthorized)
@@ -117,6 +117,24 @@ func TestInvitationRouteAuthorization(t *testing.T) {
 	public = request("GET", "/api/invitation/campaigns", "", "", 200)
 	require.Contains(t, public.Body.String(), `"total":"1"`)
 	request("GET", "/api/invitation/campaigns?p=1&p=2", "", "", 200)
+	// Admin list endpoints retain string precision and expose only the selected campaign.
+	require.NoError(t, db.AutoMigrate(&model.InvitationReward{}, &model.InvitationRefundOperation{}))
+	require.NoError(t, db.Create(&model.InvitationReward{OrderId: 101, CampaignId: 11, CampaignName: "Historical campaign", Status: model.InvitationRewardFrozen}).Error)
+	require.NoError(t, db.Create(&model.InvitationReward{OrderId: 102, CampaignId: 12, CampaignName: "Other campaign", Status: model.InvitationRewardFrozen}).Error)
+	refundEvidence := "verified-evidence"
+	require.NoError(t, db.Create(&model.InvitationRefundOperation{OrderId: 101, OperatorId: 1, AmountMinor: 9007199254740993, RequestId: "hidden-request", Provider: "manual", ProviderRefundId: &refundEvidence, Status: "SUCCEEDED", PreparedAt: 100}).Error)
+	listed := request("GET", "/api/invitation/admin/refunds?p=1&page_size=10", "", tokens[common.RoleAdminUser], 200)
+	require.Contains(t, listed.Body.String(), `"total":"1"`)
+	require.Contains(t, listed.Body.String(), `"amount_minor":"9007199254740993"`)
+	require.Contains(t, listed.Body.String(), `"provider_refund_id":"verified-evidence"`)
+	require.NotContains(t, listed.Body.String(), "hidden-request")
+	require.NotContains(t, listed.Body.String(), "operator_id")
+	filtered := request("GET", "/api/invitation/admin/rewards?campaign_id=11", "", tokens[common.RoleAdminUser], 200)
+	require.Contains(t, filtered.Body.String(), `"campaign_id":"11"`)
+	require.Contains(t, filtered.Body.String(), `"total":"1"`)
+	require.NotContains(t, filtered.Body.String(), "Other campaign")
+	invalidFilter := request("GET", "/api/invitation/self/rewards?campaign_id=11", "", tokens[common.RoleCommonUser], 200)
+	require.Contains(t, invalidFilter.Body.String(), `"code":"INVALID_INVITATION"`)
 	common.SessionCookieSecure = true
 	request("POST", "/api/invitation/self/binding", `{}`, tokens[common.RoleCommonUser], http.StatusForbidden)
 }

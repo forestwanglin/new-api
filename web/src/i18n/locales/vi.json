@@ -8105,6 +8105,26 @@
     "Video Models": "Mô hình video",
     "Current subscription": "Gói đăng ký hiện tại",
     "Buy": "Mua",
-    "Renew": "Gia hạn"
+    "Renew": "Gia hạn",
+    "All campaigns": "Tất cả chiến dịch",
+    "Campaign list": "Danh sách chiến dịch",
+    "Cancellation time": "Thời gian hủy",
+    "Completion time": "Thời gian hoàn tất",
+    "End campaign": "Kết thúc chiến dịch",
+    "Filter by campaign": "Lọc theo chiến dịch",
+    "Invitation reward orders": "Đơn hàng thưởng giới thiệu",
+    "Invitation reward refund registrations": "Danh sách đăng ký hoàn tiền giới thiệu",
+    "Net paid amount": "Số tiền thanh toán ròng",
+    "Only one campaign can be active at a time": "Chỉ một chiến dịch được hoạt động tại một thời điểm",
+    "Original points": "Điểm thưởng ban đầu",
+    "Refund amount": "Số tiền hoàn lại",
+    "Registration time": "Thời gian đăng ký",
+    "Tier thresholds must start at zero and increase": "Ngưỡng phải bắt đầu từ không và tăng dần",
+    "Draft campaign": "Bản nháp",
+    "Upcoming campaign": "Chưa bắt đầu",
+    "Active campaign": "Đang diễn ra",
+    "Ended campaign": "Đã kết thúc",
+    "Reward released": "Đã phát thưởng",
+    "Pending refund": "Chờ hoàn tiền"
   }
 }

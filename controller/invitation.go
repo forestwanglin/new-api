@@ -46,14 +46,22 @@ func invitationError(c *gin.Context, err error) {
 	common.ApiErrorStatus(c, http.StatusOK, common.NewMessage(message), gin.H{"code": code})
 }
 
-func invitationPagination(c *gin.Context) (int, int, bool) {
+func invitationPagination(c *gin.Context, filters ...string) (int, int, bool) {
 	values, err := url.ParseQuery(c.Request.URL.RawQuery)
 	if err != nil {
 		return 0, 0, false
 	}
 	page, size := int64(1), int64(20)
 	for key, v := range values {
-		if len(v) != 1 || (key != "p" && key != "page_size") {
+		if len(v) != 1 {
+			return 0, 0, false
+		}
+		if key != "p" && key != "page_size" {
+			if len(filters) == 1 && key == filters[0] {
+				if _, valid := customSubscriptionInt(v[0], true); valid {
+					continue
+				}
+			}
 			return 0, 0, false
 		}
 		n, ok := customSubscriptionInt(v[0], true)
@@ -399,12 +407,35 @@ func GetInvitationSummary(c *gin.Context) {
 	common.ApiSuccess(c, result)
 }
 func ListInvitationRewards(c *gin.Context) {
+	admin := strings.Contains(c.FullPath(), "/admin/")
+	var filters []string
+	if admin {
+		filters = []string{"campaign_id"}
+	}
+	p, size, ok := invitationPagination(c, filters...)
+	if !ok {
+		invitationError(c, model.ErrInvitationInvalid)
+		return
+	}
+	var campaigns []int64
+	if value := c.Query("campaign_id"); admin && value != "" {
+		id, _ := customSubscriptionInt(value, true)
+		campaigns = append(campaigns, id)
+	}
+	result, err := model.ListInvitationRewards(int64(c.GetInt("id")), admin, p, size, campaigns...)
+	if err != nil {
+		invitationError(c, err)
+		return
+	}
+	common.ApiSuccess(c, result)
+}
+func ListInvitationRefunds(c *gin.Context) {
 	p, size, ok := invitationPagination(c)
 	if !ok {
 		invitationError(c, model.ErrInvitationInvalid)
 		return
 	}
-	result, err := model.ListInvitationRewards(int64(c.GetInt("id")), strings.Contains(c.FullPath(), "/admin/"), p, size)
+	result, err := model.ListInvitationRefunds(p, size)
 	if err != nil {
 		invitationError(c, err)
 		return

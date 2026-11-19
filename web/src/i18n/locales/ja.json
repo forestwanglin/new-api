@@ -8105,6 +8105,26 @@
     "Video Models": "動画モデル",
     "Current subscription": "現在のサブスクリプション",
     "Buy": "購入",
-    "Renew": "更新"
+    "Renew": "更新",
+    "All campaigns": "すべてのキャンペーン",
+    "Campaign list": "キャンペーン一覧",
+    "Cancellation time": "取消日時",
+    "Completion time": "完了日時",
+    "End campaign": "キャンペーンを終了",
+    "Filter by campaign": "キャンペーンで絞り込み",
+    "Invitation reward orders": "招待報酬の注文",
+    "Invitation reward refund registrations": "招待報酬注文の返金登録一覧",
+    "Net paid amount": "正味支払額",
+    "Only one campaign can be active at a time": "同時に有効にできるキャンペーンは1つです",
+    "Original points": "元の報酬ポイント",
+    "Refund amount": "返金額",
+    "Registration time": "登録日時",
+    "Tier thresholds must start at zero and increase": "段階の人数はゼロから始めて増加させてください",
+    "Draft campaign": "下書き",
+    "Upcoming campaign": "開始前",
+    "Active campaign": "開催中",
+    "Ended campaign": "終了",
+    "Reward released": "報酬付与済み",
+    "Pending refund": "返金待ち"
   }
 }

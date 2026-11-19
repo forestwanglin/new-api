@@ -8107,6 +8107,26 @@
     "Video Models": "Видеомодели",
     "Current subscription": "Текущая подписка",
     "Buy": "Купить",
-    "Renew": "Продлить"
+    "Renew": "Продлить",
+    "All campaigns": "Все кампании",
+    "Campaign list": "Список кампаний",
+    "Cancellation time": "Время отмены",
+    "Completion time": "Время завершения",
+    "End campaign": "Завершить кампанию",
+    "Filter by campaign": "Фильтр по кампании",
+    "Invitation reward orders": "Заказы с наградами за приглашения",
+    "Invitation reward refund registrations": "Регистрации возвратов по приглашениям",
+    "Net paid amount": "Чистая сумма оплаты",
+    "Only one campaign can be active at a time": "Одновременно может быть активна только одна кампания",
+    "Original points": "Исходные баллы награды",
+    "Refund amount": "Сумма возврата",
+    "Registration time": "Время регистрации",
+    "Tier thresholds must start at zero and increase": "Пороги должны начинаться с нуля и возрастать",
+    "Draft campaign": "Черновик",
+    "Upcoming campaign": "Предстоящая",
+    "Active campaign": "Активная",
+    "Ended campaign": "Завершена",
+    "Reward released": "Награда начислена",
+    "Pending refund": "Ожидает возврата"
   }
 }

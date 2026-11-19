@@ -18,6 +18,7 @@ type InvitationRewardView struct {
 	OrderId            string                    `json:"order_id"`
 	OrderLabel         string                    `json:"order_label"`
 	InviteeLabel       string                    `json:"invitee_label"`
+	CampaignId         string                    `json:"campaign_id"`
 	CampaignName       string                    `json:"campaign_name"`
 	CampaignVersion    string                    `json:"campaign_version"`
 	PointType          InvitationRewardPointType `json:"point_type"`
@@ -64,14 +65,20 @@ type InvitationSummary struct {
 
 func invitationRewardView(r InvitationReward) InvitationRewardView {
 	s := func(n int64) string { return strconv.FormatInt(n, 10) }
-	return InvitationRewardView{Id: s(r.Id), OrderId: s(r.OrderId), OrderLabel: fmt.Sprintf("Subscription #%d", r.OrderId), InviteeLabel: fmt.Sprintf("Friend #%d", r.InviteeId), CampaignName: r.CampaignName, CampaignVersion: s(r.CampaignVersion), PointType: InvitationRewardPointType{Id: s(r.PointTypeId), Code: r.PointTypeCode, Name: r.PointTypeName}, PaidAmountMinor: s(r.PaidAmountMinor), NetPaidAmountMinor: s(r.NetPaidAmountMinor), RateBps: r.RateBps, EffectiveCount: s(r.EffectiveCount), PaidAt: s(r.PaidAt), ReleaseAt: s(r.ReleaseAt), OriginalPoints: s(r.OriginalPoints), ProcessingPoints: s(r.ProcessingPoints), FrozenPoints: s(r.FrozenPoints), ReleasedPoints: s(r.ReleasedPoints), CancelledPoints: s(r.CancelledPoints), ReversedPoints: s(r.ReversedPoints), ReviewDuePoints: s(r.ReviewDuePoints), Status: r.Status}
+	return InvitationRewardView{Id: s(r.Id), OrderId: s(r.OrderId), OrderLabel: fmt.Sprintf("Subscription #%d", r.OrderId), InviteeLabel: fmt.Sprintf("Friend #%d", r.InviteeId), CampaignId: s(r.CampaignId), CampaignName: r.CampaignName, CampaignVersion: s(r.CampaignVersion), PointType: InvitationRewardPointType{Id: s(r.PointTypeId), Code: r.PointTypeCode, Name: r.PointTypeName}, PaidAmountMinor: s(r.PaidAmountMinor), NetPaidAmountMinor: s(r.NetPaidAmountMinor), RateBps: r.RateBps, EffectiveCount: s(r.EffectiveCount), PaidAt: s(r.PaidAt), ReleaseAt: s(r.ReleaseAt), OriginalPoints: s(r.OriginalPoints), ProcessingPoints: s(r.ProcessingPoints), FrozenPoints: s(r.FrozenPoints), ReleasedPoints: s(r.ReleasedPoints), CancelledPoints: s(r.CancelledPoints), ReversedPoints: s(r.ReversedPoints), ReviewDuePoints: s(r.ReviewDuePoints), Status: r.Status}
 }
-func ListInvitationRewards(userID int64, admin bool, page, pageSize int) (*InvitationRewardPage, error) {
+func ListInvitationRewards(userID int64, admin bool, page, pageSize int, campaignIDs ...int64) (*InvitationRewardPage, error) {
 	if (!admin && userID <= 0) || page < 1 || pageSize < 1 || pageSize > 100 {
 		return nil, ErrInvitationInvalid
 	}
 	result := InvitationRewardPage{Page: page, PageSize: pageSize, Items: []InvitationRewardView{}}
 	query := DB.Model(&InvitationReward{})
+	if len(campaignIDs) > 1 || (len(campaignIDs) == 1 && (campaignIDs[0] <= 0 || !admin)) {
+		return nil, ErrInvitationInvalid
+	}
+	if len(campaignIDs) == 1 {
+		query = query.Where("campaign_id = ?", campaignIDs[0])
+	}
 	if !admin {
 		query = query.Where("inviter_id = ?", userID)
 	}
@@ -168,4 +175,67 @@ func GetInvitationSummary(userID int64) (*InvitationSummary, error) {
 		return nil
 	})
 	return &result, err
+}
+
+// InvitationRefundView exposes refund evidence only through the administrator list.
+type InvitationRefundView struct {
+	Id               string  `json:"id"`
+	OrderId          string  `json:"order_id"`
+	CampaignName     string  `json:"campaign_name"`
+	AmountMinor      string  `json:"amount_minor"`
+	Status           string  `json:"status"`
+	Provider         string  `json:"provider"`
+	ProviderRefundId *string `json:"provider_refund_id"`
+	PreparedAt       string  `json:"prepared_at"`
+	CompletedAt      *string `json:"completed_at"`
+	CancelledAt      *string `json:"cancelled_at"`
+}
+type InvitationRefundPage struct {
+	Page     int                    `json:"page"`
+	PageSize int                    `json:"page_size"`
+	Total    string                 `json:"total"`
+	Items    []InvitationRefundView `json:"items"`
+}
+
+func ListInvitationRefunds(page, pageSize int) (*InvitationRefundPage, error) {
+	if page < 1 || pageSize < 1 || pageSize > 100 {
+		return nil, ErrInvitationInvalid
+	}
+	result := InvitationRefundPage{Page: page, PageSize: pageSize, Items: []InvitationRefundView{}}
+	var total int64
+	if err := DB.Model(&InvitationRefundOperation{}).Count(&total).Error; err != nil {
+		return nil, err
+	}
+	result.Total = strconv.FormatInt(total, 10)
+	var rows []InvitationRefundOperation
+	if err := DB.Order("id DESC").Limit(pageSize).Offset((page - 1) * pageSize).Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	orderIDs := make([]int64, 0, len(rows))
+	for _, r := range rows {
+		orderIDs = append(orderIDs, r.OrderId)
+	}
+	var rewards []InvitationReward
+	if len(orderIDs) > 0 {
+		if err := DB.Select("order_id", "campaign_name").Where("order_id IN ?", orderIDs).Find(&rewards).Error; err != nil {
+			return nil, err
+		}
+	}
+	names := make(map[int64]string, len(rewards))
+	for _, r := range rewards {
+		names[r.OrderId] = r.CampaignName
+	}
+	for _, r := range rows {
+		view := InvitationRefundView{Id: strconv.FormatInt(r.Id, 10), OrderId: strconv.FormatInt(r.OrderId, 10), CampaignName: names[r.OrderId], AmountMinor: strconv.FormatInt(r.AmountMinor, 10), Status: r.Status, Provider: r.Provider, ProviderRefundId: r.ProviderRefundId, PreparedAt: strconv.FormatInt(r.PreparedAt, 10)}
+		if r.CompletedAt != nil {
+			value := strconv.FormatInt(*r.CompletedAt, 10)
+			view.CompletedAt = &value
+		}
+		if r.CancelledAt != nil {
+			value := strconv.FormatInt(*r.CancelledAt, 10)
+			view.CancelledAt = &value
+		}
+		result.Items = append(result.Items, view)
+	}
+	return &result, nil
 }

@@ -8106,6 +8106,26 @@
     "Video Models": "Video Models",
     "Current subscription": "Current subscription",
     "Buy": "Buy",
-    "Renew": "Renew"
+    "Renew": "Renew",
+    "All campaigns": "All campaigns",
+    "Campaign list": "Campaign list",
+    "Cancellation time": "Cancellation time",
+    "Completion time": "Completion time",
+    "End campaign": "End campaign",
+    "Filter by campaign": "Filter by campaign",
+    "Invitation reward orders": "Invitation reward orders",
+    "Invitation reward refund registrations": "Invitation reward refund registrations",
+    "Net paid amount": "Net paid amount",
+    "Only one campaign can be active at a time": "Only one campaign can be active at a time",
+    "Original points": "Original points",
+    "Refund amount": "Refund amount",
+    "Registration time": "Registration time",
+    "Tier thresholds must start at zero and increase": "Tier thresholds must start at zero and increase",
+    "Draft campaign": "Draft campaign",
+    "Upcoming campaign": "Upcoming campaign",
+    "Active campaign": "Active campaign",
+    "Ended campaign": "Ended campaign",
+    "Reward released": "Reward released",
+    "Pending refund": "Pending refund"
   }
 }

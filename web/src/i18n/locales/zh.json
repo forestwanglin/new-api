@@ -8106,6 +8106,26 @@
     "Video Models": "视频模型",
     "Current subscription": "当前订阅",
     "Buy": "购买",
-    "Renew": "续费"
+    "Renew": "续费",
+    "All campaigns": "全部活动",
+    "Campaign list": "活动列表",
+    "Cancellation time": "取消时间",
+    "Completion time": "完成时间",
+    "End campaign": "结束活动",
+    "Filter by campaign": "按活动筛选",
+    "Invitation reward orders": "邀请奖励订单",
+    "Invitation reward refund registrations": "邀请奖励订单退款登记列表",
+    "Net paid amount": "净实付金额",
+    "Only one campaign can be active at a time": "同一时间只能开启一个活动",
+    "Original points": "原始奖励积分",
+    "Refund amount": "退款金额",
+    "Registration time": "登记时间",
+    "Tier thresholds must start at zero and increase": "档位人数须从零开始并递增",
+    "Draft campaign": "草稿",
+    "Upcoming campaign": "未开始",
+    "Active campaign": "进行中",
+    "Ended campaign": "已结束",
+    "Reward released": "已发放",
+    "Pending refund": "待退款"
   }
 }

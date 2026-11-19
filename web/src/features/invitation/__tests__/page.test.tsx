@@ -6,6 +6,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
@@ -164,9 +165,10 @@ it('visibility checkbox has a label and toggles with pointer and keyboard', asyn
     data: { success: true, data: url === '/api/points/types' ? [] : empty },
   }))
   mount(<InvitationCampaignAdmin />)
+  await userEvent.click(screen.getByRole('button', { name: 'New campaign' }))
   const checkbox = screen.getByRole('checkbox', { name: 'Visible' })
   expect(checkbox).toBeChecked()
-  await userEvent.click(screen.getByText('Visible'))
+  await userEvent.click(within(screen.getByRole('dialog')).getByText('Visible'))
   expect(checkbox).not.toBeChecked()
   checkbox.focus()
   await userEvent.keyboard('[Space]')
@@ -184,6 +186,7 @@ it('shows labeled campaign fields with paired dates and reward type before tiers
   }))
   mount(<InvitationCampaignAdmin />)
 
+  await userEvent.click(screen.getByRole('button', { name: 'New campaign' }))
   for (const label of [
     'Campaign code',
     'Campaign period',
@@ -380,9 +383,15 @@ it('invalid tier input keeps the admin preview usable and prevents saving', asyn
     },
   }))
   mount(<InvitationCampaignAdmin />)
+  await userEvent.click(screen.getByRole('button', { name: 'New campaign' }))
   await userEvent.type(screen.getByLabelText('Campaign code'), 'test')
   await userEvent.type(screen.getByLabelText('Campaign name'), 'Test campaign')
-  await userEvent.selectOptions(screen.getByLabelText('Reward point type'), '1')
+  await userEvent.click(
+    screen.getByRole('combobox', { name: 'Reward point type' })
+  )
+  await userEvent.click(
+    await screen.findByRole('option', { name: 'General (general)' })
+  )
   fireEvent.change(screen.getByLabelText('Starts at'), {
     target: { value: '2026-11-16T00:00' },
   })
@@ -390,18 +399,24 @@ it('invalid tier input keeps the admin preview usable and prevents saving', asyn
     target: { value: '2026-12-16T00:00' },
   })
   const rate = screen.getAllByLabelText('Reward basis points')[0]
-  expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+  )
   for (const invalid of ['500.5', '10001', '-1']) {
     fireEvent.change(rate, { target: { value: invalid } })
     expect(screen.getByText(/Reward preview for CNY 100/)).toHaveTextContent(
       '0+: -'
     )
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    )
   }
   fireEvent.change(rate, { target: { value: '700' } })
   expect(screen.getByText(/Reward preview for CNY 100/)).toHaveTextContent(
     '0+: 7000'
   )
-  expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+  )
   expect(api.post).not.toHaveBeenCalled()
 })

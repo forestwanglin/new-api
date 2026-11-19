@@ -70,6 +70,7 @@ export const rewardSchema = z.object({
   order_id: decimal,
   order_label: z.string(),
   invitee_label: z.string(),
+  campaign_id: decimal.optional(),
   campaign_name: z.string(),
   campaign_version: decimal,
   point_type: z.object({ id: decimal, code: z.string(), name: z.string() }),
@@ -153,9 +154,9 @@ export type CampaignInput = Omit<
   Campaign,
   'id' | 'version' | 'status' | 'reward_point_type' | 'published_version'
 >
-export async function getAdminCampaigns(page = 1) {
+export async function getAdminCampaigns(page = 1, pageSize = 20) {
   const r = await api.get('/api/invitation/admin/campaigns', {
-    params: { p: page, page_size: 20 },
+    params: { p: page, page_size: pageSize },
   })
   return pageSchema(campaignSchema).parse(requireServerSuccess(r.data).data)
 }
@@ -179,9 +180,17 @@ export async function campaignAction(
   return campaignSchema.parse(requireServerSuccess(r.data).data)
 }
 
-export async function getAdminRewards(page = 1) {
+export async function getAdminRewards(
+  page = 1,
+  pageSize = 20,
+  campaignId?: string
+) {
   const r = await api.get('/api/invitation/admin/rewards', {
-    params: { p: page, page_size: 20 },
+    params: {
+      p: page,
+      page_size: pageSize,
+      ...(campaignId ? { campaign_id: campaignId } : {}),
+    },
   })
   return pageSchema(rewardSchema).parse(requireServerSuccess(r.data).data)
 }
@@ -271,4 +280,40 @@ export async function getLatestCampaigns(context?: { signal?: AbortSignal }) {
     return ids > 0n ? 1 : -1
   })
   return { total: response.total, items: items.slice(0, 10) }
+}
+
+export const refundSchema = z.object({
+  id: decimal,
+  order_id: decimal,
+  campaign_name: z.string(),
+  amount_minor: decimal,
+  status: z.enum(['PREPARED', 'SUCCEEDED', 'CANCELLED']),
+  provider: z.string(),
+  provider_refund_id: z.string().nullable(),
+  prepared_at: timestamp,
+  completed_at: timestamp.nullable(),
+  cancelled_at: timestamp.nullable(),
+})
+export type InvitationRefund = z.infer<typeof refundSchema>
+export async function getAdminRefunds(page = 1, pageSize = 20) {
+  const r = await api.get('/api/invitation/admin/refunds', {
+    params: { p: page, page_size: pageSize },
+  })
+  return pageSchema(refundSchema).parse(requireServerSuccess(r.data).data)
+}
+export async function getAdminCampaignOptions() {
+  const items: Campaign[] = []
+  let page = 1
+  for (;;) {
+    const result = await getAdminCampaigns(page, 100)
+    if (
+      result.page !== page ||
+      (result.items.length === 0 && BigInt(items.length) < BigInt(result.total))
+    ) {
+      throw new Error('Incomplete invitation campaign list')
+    }
+    items.push(...result.items)
+    if (BigInt(items.length) >= BigInt(result.total)) return items
+    page++
+  }
 }

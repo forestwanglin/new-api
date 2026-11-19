@@ -434,6 +434,7 @@ func SetApiRouter(router *gin.Engine) {
 		invitationAdmin.POST("/campaigns/:id/publish", middleware.SessionCookieOriginGuard(), middleware.CriticalRateLimit(), controller.ChangeInvitationCampaignStatus)
 		invitationAdmin.POST("/campaigns/:id/end", middleware.SessionCookieOriginGuard(), middleware.CriticalRateLimit(), controller.ChangeInvitationCampaignStatus)
 		invitationAdmin.GET("/rewards", controller.ListInvitationRewards)
+		invitationAdmin.GET("/refunds", controller.ListInvitationRefunds)
 		invitationAdmin.POST("/orders/:id/refunds", middleware.SessionCookieOriginGuard(), middleware.CriticalRateLimit(), controller.MutateInvitationRefund)
 		invitationAdmin.POST("/orders/:id/refunds/:refund_id/complete", middleware.SessionCookieOriginGuard(), middleware.CriticalRateLimit(), controller.MutateInvitationRefund)
 		invitationAdmin.POST("/orders/:id/refunds/:refund_id/cancel", middleware.SessionCookieOriginGuard(), middleware.CriticalRateLimit(), controller.MutateInvitationRefund)

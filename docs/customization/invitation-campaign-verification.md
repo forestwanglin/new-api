@@ -17,3 +17,12 @@
 - Full Go controller/router runs still expose existing OpenAI sampling compatibility failures and missing pre-existing phone/WeChat/custom-subscription entries in the PAT route catalogue. Dedicated invitation authorization tests pass.
 - Full frontend suite: 281 files and 3,028 tests passed; one pre-existing `detail-preview` localized pricing test times out after 20 seconds.
 - No production database, real payment provider, refund provider, SMS, or WeChat credential flow was used.
+
+## Administrator console redesign — 2026-11-19
+
+- Three independently paginated tabs use the shared ledger table/footer. Campaign create/edit/copy uses the channel-style right drawer; reward orders filter by campaign ID across all campaign pages. Refund registration history is persisted and includes prepared, succeeded and cancelled records. Existing overlap enforcement and manual provider refund/reversal mutations remain in place.
+- `bun run test src/features/invitation`: 5 files / 36 tests passed. `bun check -b`: 1,650 files / 2 projects passed; invitation scoped oxlint and protected-header-safe formatting checks passed; `bun run build` passed.
+- `go test ./model ./controller ./router -run TestInvitation -count=1`, `go vet ./model ./controller ./router`, and `go build -o /tmp/new-api-referral-check .` passed.
+- With isolated `TEST_MYSQL_DSN` and `TEST_POSTGRES_DSN`, `go test ./model -run 'TestInvitation(AdminListsDatabaseMatrix|DomainDatabaseMatrix|RefundAfterZeroRewardDatabaseMatrix)' -count=1 -v` passed without skipping engines: SQLite 3.50.4, MySQL 8.4.13 and PostgreSQL 16.16. Includes fresh/legacy upgrade, filtering and pagination, orphan refund history and zero-reward refund regressions. These versions do not establish testing of the minimum supported database releases.
+- Independent review repeated invitation frontend tests/typecheck/scoped lint, controller/router boundaries and SQLite admin-list tests; no blocking findings.
+- Chrome read-only checks covered desktop tabs and campaign filter options, 390x844 overflow and drawer footer accessibility, Escape/focus return and unsaved-field reset. No real campaign publication or refund mutation was performed. The running local backend is an older image without `GET /api/invitation/admin/refunds`; browser refund-list integration remains unverified until the backend is rebuilt/restarted. Router/model tests cover the new endpoint.

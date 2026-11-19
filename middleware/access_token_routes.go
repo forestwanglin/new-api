@@ -290,6 +290,7 @@ var accessTokenRouteRules = map[string]accessTokenRouteRule{
 	"PUT /api/invitation/admin/campaigns/:id":                           accessTokenSessionRule,
 	"POST /api/invitation/admin/campaigns/:id/publish":                  accessTokenSessionRule,
 	"POST /api/invitation/admin/campaigns/:id/end":                      accessTokenSessionRule,
+	"GET /api/invitation/admin/refunds":                                 accessTokenSessionRule,
 	"GET /api/invitation/admin/rewards":                                 accessTokenSessionRule,
 	"POST /api/invitation/admin/orders/:id/refunds":                     accessTokenSessionRule,
 	"POST /api/invitation/admin/orders/:id/refunds/:refund_id/complete": accessTokenSessionRule,

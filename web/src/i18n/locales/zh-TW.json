@@ -8105,6 +8105,26 @@
     "Video Models": "影片模型",
     "Current subscription": "目前訂閱",
     "Buy": "購買",
-    "Renew": "續費"
+    "Renew": "續費",
+    "All campaigns": "全部活動",
+    "Campaign list": "活動列表",
+    "Cancellation time": "取消時間",
+    "Completion time": "完成時間",
+    "End campaign": "結束活動",
+    "Filter by campaign": "按活動篩選",
+    "Invitation reward orders": "邀請獎勵訂單",
+    "Invitation reward refund registrations": "邀請獎勵訂單退款登記列表",
+    "Net paid amount": "淨實付金額",
+    "Only one campaign can be active at a time": "同一時間只能開啟一個活動",
+    "Original points": "原始獎勵積分",
+    "Refund amount": "退款金額",
+    "Registration time": "登記時間",
+    "Tier thresholds must start at zero and increase": "級距人數須從零開始並遞增",
+    "Draft campaign": "草稿",
+    "Upcoming campaign": "未開始",
+    "Active campaign": "進行中",
+    "Ended campaign": "已結束",
+    "Reward released": "已發放",
+    "Pending refund": "待退款"
   }
 }

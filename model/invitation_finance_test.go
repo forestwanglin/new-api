@@ -87,3 +87,42 @@ func TestInvitationRefundAfterZeroRewardDatabaseMatrix(t *testing.T) {
 		})
 	}
 }
+
+func TestInvitationAdminListsDatabaseMatrix(t *testing.T) {
+	for _, dialect := range []string{"sqlite", "mysql", "postgres"} {
+		t.Run(dialect, func(t *testing.T) {
+			db := invitationDomainTestDB(t, dialect)
+			require.NoError(t, migrateInvitations(db))
+			for i := int64(1); i <= 3; i++ {
+				require.NoError(t, db.Create(&InvitationReward{Id: i, OrderId: i, InviterId: 11, InviteeId: 12, CampaignId: i%2 + 1, CampaignName: fmt.Sprintf("Campaign %d", i%2+1), Status: InvitationRewardFrozen}).Error)
+			}
+			// Same order may have multiple operations; history without a reward must survive.
+			done := int64(200)
+			evidence := "provider-evidence"
+			for i, status := range []string{"PREPARED", "SUCCEEDED", "CANCELLED"} {
+				orderID := int64(1)
+				if i == 2 {
+					orderID = 999
+				}
+				require.NoError(t, db.Create(&InvitationRefundOperation{Id: int64(i + 1), OrderId: orderID, AmountMinor: 9007199254740993, RequestId: fmt.Sprint(i), Status: status, PreparedAt: 100, CompletedAt: &done, Provider: "manual", ProviderRefundId: &[]string{evidence + fmt.Sprint(i)}[0]}).Error)
+			}
+			rewards, err := ListInvitationRewards(1, true, 1, 1, 2)
+			require.NoError(t, err)
+			require.Equal(t, "2", rewards.Total)
+			require.Equal(t, "3", rewards.Items[0].Id)
+			require.Equal(t, "2", rewards.Items[0].CampaignId)
+			refunds, err := ListInvitationRefunds(1, 2)
+			require.NoError(t, err)
+			require.Equal(t, "3", refunds.Total)
+			require.Equal(t, "3", refunds.Items[0].Id)
+			require.Empty(t, refunds.Items[0].CampaignName)
+			require.Equal(t, "9007199254740993", refunds.Items[1].AmountMinor)
+			require.Equal(t, "Campaign 2", refunds.Items[1].CampaignName)
+			require.Equal(t, "200", *refunds.Items[1].CompletedAt)
+			second, err := ListInvitationRefunds(2, 2)
+			require.NoError(t, err)
+			require.Len(t, second.Items, 1)
+			require.Equal(t, "1", second.Items[0].Id)
+		})
+	}
+}

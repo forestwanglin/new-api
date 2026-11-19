@@ -62,3 +62,20 @@ func TestInvitationCampaignTierBoundaries(t *testing.T) {
 		})
 	}
 }
+
+func TestInvitationAdminCampaignFilterBoundaries(t *testing.T) {
+	for _, query := range []string{"campaign_id=0", "campaign_id=-1", "campaign_id=01", "campaign_id=1&campaign_id=2", "campaign_id=9223372036854775808", "campaign_id=", "campaign_id=1&unknown=2"} {
+		c, _ := gin.CreateTestContext(httptest.NewRecorder())
+		c.Request = httptest.NewRequest("GET", "/?"+query, nil)
+		_, _, ok := invitationPagination(c, "campaign_id")
+		require.False(t, ok, query)
+	}
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest("GET", "/?p=2&page_size=10&campaign_id=3", nil)
+	p, size, ok := invitationPagination(c, "campaign_id")
+	require.True(t, ok)
+	require.Equal(t, 2, p)
+	require.Equal(t, 10, size)
+	_, _, ok = invitationPagination(c)
+	require.False(t, ok, "self and other pagination endpoints reject admin filters")
+}

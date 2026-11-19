@@ -8105,6 +8105,26 @@
     "Video Models": "Modèles vidéo",
     "Current subscription": "Abonnement actuel",
     "Buy": "Acheter",
-    "Renew": "Renouveler"
+    "Renew": "Renouveler",
+    "All campaigns": "Toutes les campagnes",
+    "Campaign list": "Liste des campagnes",
+    "Cancellation time": "Date d’annulation",
+    "Completion time": "Date de fin",
+    "End campaign": "Terminer la campagne",
+    "Filter by campaign": "Filtrer par campagne",
+    "Invitation reward orders": "Commandes de récompense de parrainage",
+    "Invitation reward refund registrations": "Remboursements des commandes de parrainage",
+    "Net paid amount": "Montant net payé",
+    "Only one campaign can be active at a time": "Une seule campagne peut être active à la fois",
+    "Original points": "Points de récompense initiaux",
+    "Refund amount": "Montant du remboursement",
+    "Registration time": "Date d’enregistrement",
+    "Tier thresholds must start at zero and increase": "Les seuils doivent commencer à zéro et augmenter",
+    "Draft campaign": "Brouillon",
+    "Upcoming campaign": "À venir",
+    "Active campaign": "En cours",
+    "Ended campaign": "Terminée",
+    "Reward released": "Récompense versée",
+    "Pending refund": "Remboursement en attente"
   }
 }
