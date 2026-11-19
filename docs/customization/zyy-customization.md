@@ -1254,6 +1254,17 @@
 - 开关与默认值：状态列默认随表格展示；无数据为 `—`。回滚删除该列、`ModelStatusCell` 与页面查询即可恢复。
 - 验证：模型页测试 35 项通过（含新增的状态列渲染与无数据用例）；`bun check -b` 1,646 文件无类型错误；涉及文件 scoped oxlint/oxfmt 通过；`bun run build` 通过。未在登录态真实页面目检桌面/窄屏最终排版与状态条宽度。
 
+### Z087 微信服务号网页授权与验证码方式并存
+
+- 需求与原因：在 OAuth 后台新增已认证微信服务号网页授权，网站动态二维码扫码后登录或完成当前账号验证；保留原公众号验证码方式、wechat-server 与各自独立开关。
+- 变更内容：新增服务号配置、服务端授权流程和显式手机确认，二维码与原浏览器取结果权限分离；登录继续现有注册、邀请、手机号绑定与 MFA 流程，绑定及敏感操作继续现有安全证明。旧、新方式共用微信身份归属；保留用户自定义昵称与头像。微信内同设备跳转通过 HttpOnly 所有者 Cookie 恢复授权，非敏感表单草稿按用户/会话限时保存，敏感操作返回后须重新确认，不自动重放。关闭或变更新配置会撤销尚未完成的服务号流程，包括手机号/MFA 待登录、绑定断言和证明；旧模式证明独立检查其开关。
+- 影响面：新增 `controller/wechat_official.go`、`model/wechat_official.go`、`service/wechat_official*.go`、`setting/system_setting/wechat_official.go`、`web/src/features/auth/wechat-official/`、`web/src/routes/wechat-official/` 及回归测试；**上游自有文件**包括 `controller/{misc,option,secure_verification,user,wechat}.go`、`model/{account_security,auth_flow,external_identity_claim,option,user,user_session}.go`、`service/{access_token_contact,account_security,auth_session,login_verification,phone_auth,phone_binding_verification,security_verification,wechat_binding_sms}.go`、`router/api-router.go`、`middleware/access_token_routes.go`，以及前端 OAuth 配置、登录注册、profile API、security dialogs/cards、secure-verification、七语言/static-keys 与生成的路由树。
+- 与上游差异：扩展原有微信验证码入口，新增服务号网页授权与跨设备结果交接；不迁移跨 AppID/UnionID 身份、不合并账号或自动替换现有绑定。
+- 开关与默认值：`wechat_official.enabled` 默认关闭；`wechat_official.app_id` / `wechat_official.app_secret` 由管理员保存，空 secret 保留原值，读取只返回是否配置；旧 `WeChatAuthEnabled` 独立控制验证码方案。AppID 首次保存后固定身份域，变更须另行迁移。配置沿用现有 options 存储，不能视作加密密钥库。
+- 配置步骤：系统站点地址须为公开 HTTPS 根地址，并设置 `SESSION_COOKIE_SECURE=true`、`SESSION_COOKIE_TRUSTED_URL=https://<站点域名>`（包含实际站点 origin），保障授权 Cookie 与来源校验；在微信公众平台的服务号接口权限中配置网页授权域名（域名与站点一致），按平台要求完成域名校验；按 OAuth 设置中服务端派生的回调地址核对反向代理路由。AppID 必须与旧 wechat-server 使用的服务号相同，旧配置没有 AppID，系统无法自动证明二者一致。先保存 AppID/secret，再打开服务号授权开关；旧、新都启用时由用户选择方式。AppSecret 仅由后端调用微信接口，前端和二维码不携带。
+- 验证：`go test ./service ./model ./middleware -count=1` 全包通过；`go test ./controller ./router -run TestWeChatOfficial -count=1` 及微信/手机/账户安全/邮件配置聚焦回归通过，覆盖 14 条路由权限分类、9 条 POST 来源/no-store 与 151 次轮询不耗尽敏感额度；`go vet ./model ./service ./controller ./middleware ./router`、应用 `go build`、`git diff --check` 通过。配置隔离本地测试 DSN 后执行 `go test ./service -run TestWeChatOfficial -count=1`，SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 16.16 验证 fresh/重复迁移、旧身份回填、并发唯一归属和一次性消费；三库共享登录政策测试通过，临时容器已删除，未触及开发库。前端受影响 11 文件/117 测试、`bun check -b`（1661 文件/2 项目）、改动范围 oxlint/格式检查、`bun run build` 通过。Chrome 检查独立配置及 390px 窄屏表单，未保存设置。
+- 风险与未覆盖：真实微信授权依赖已认证服务号、接口权限、正确域名和可访问回调；未使用真实凭据或执行真实账号绑定，不以模拟 HTTP 结果替代真实微信/短信和 WebView 同设备验收。Go 验证使用本机 1.27.3，未变更 go.mod 声明的 1.26.10；数据库验证未覆盖所有最低支持版本。全量 controller/router 仍有 7 个既有失败（访问令牌/积分 fixture 缺 claims 表、采样兼容断言和既有路由声明缺失），已在未修改的 `42993e642f` 独立副本复现；全前端 lint 有既有错误，定向检查通过。依照 OWASP Authentication/Session Management/OAuth2 Cheat Sheets 与 ASVS 5.0.0 的相关控制检查，不宣称完整认证。新方式可独立关闭回退旧模式；保留新增流程数据和唯一归属约束，不跨 AppID 迁移。不开启生产配置、不部署。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 

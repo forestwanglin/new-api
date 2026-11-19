@@ -42,6 +42,7 @@ import {
   SecureVerificationDialog,
   useSecureVerification,
 } from '../secure-verification'
+import { WeChatMethodChoice } from '../wechat-official/method-choice'
 import { LegalConsent } from './legal-consent'
 import { PhoneAuthForm } from './phone-auth-form'
 import { WeChatVerificationHint } from './wechat-verification-hint'
@@ -76,6 +77,9 @@ function LoginModalContent() {
   const phoneEnabled = Boolean(status?.phone_login ?? status?.data?.phone_login)
   const wechatEnabled = Boolean(
     status?.wechat_login ?? status?.data?.wechat_login
+  )
+  const officialEnabled = Boolean(
+    status?.wechat_official_login ?? status?.data?.wechat_official_login
   )
   const qr = status?.wechat_qrcode ?? status?.data?.wechat_qrcode
   const requiresConsent = Boolean(
@@ -222,61 +226,79 @@ function LoginModalContent() {
                 onResult={onResult}
               />
             ) : (
-              <form
-                className='auth-panel'
-                onSubmit={(event) => {
-                  event.preventDefault()
-                  if (enabled && wechatEnabled && wechatCode.trim()) {
-                    wechat.mutate()
-                  }
+              <WeChatMethodChoice
+                methods={[
+                  ...(officialEnabled ? ['official' as const] : []),
+                  ...(wechatEnabled ? ['code' as const] : []),
+                ]}
+                request={{
+                  intent: 'login',
+                  aff: getAffiliateCode() || undefined,
                 }}
+                enabled={enabled}
+                onResult={(result, request) =>
+                  onResult(
+                    result,
+                    request.intent === 'login' ? (request.aff ?? '') : ''
+                  )
+                }
               >
-                {qr ? (
-                  <div className='auth-qr'>
-                    <img src={qr} alt={t('WeChat login QR code')} />
-                  </div>
-                ) : (
-                  <p className='auth-helper'>
-                    {t('WeChat login QR code is not configured')}
-                  </p>
-                )}
-                <p className='auth-qr-status'>
-                  <WeChatVerificationHint />
-                </p>
-                <Label htmlFor='modal-wechat-code'>
-                  {t('WeChat verification code')}
-                </Label>
-                <Input
-                  id='modal-wechat-code'
-                  autoComplete='one-time-code'
-                  value={wechatCode}
-                  maxLength={64}
-                  onChange={(event) => setWeChatCode(event.target.value)}
-                  placeholder={t('Enter verification code')}
-                />
-                {!wechatEnabled && (
-                  <p className='auth-helper'>
-                    {t('WeChat sign in is not enabled')}
-                  </p>
-                )}
-                {error && (
-                  <div className='auth-error' role='alert'>
-                    {error}
-                  </div>
-                )}
-                <Button
-                  type='submit'
-                  className='auth-submit'
-                  disabled={
-                    !enabled ||
-                    !wechatEnabled ||
-                    !wechatCode.trim() ||
-                    wechat.isPending
-                  }
+                <form
+                  className='auth-panel'
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    if (enabled && wechatEnabled && wechatCode.trim()) {
+                      wechat.mutate()
+                    }
+                  }}
                 >
-                  {t('Confirm')}
-                </Button>
-              </form>
+                  {qr ? (
+                    <div className='auth-qr'>
+                      <img src={qr} alt={t('WeChat login QR code')} />
+                    </div>
+                  ) : (
+                    <p className='auth-helper'>
+                      {t('WeChat login QR code is not configured')}
+                    </p>
+                  )}
+                  <p className='auth-qr-status'>
+                    <WeChatVerificationHint />
+                  </p>
+                  <Label htmlFor='modal-wechat-code'>
+                    {t('WeChat verification code')}
+                  </Label>
+                  <Input
+                    id='modal-wechat-code'
+                    autoComplete='one-time-code'
+                    value={wechatCode}
+                    maxLength={64}
+                    onChange={(event) => setWeChatCode(event.target.value)}
+                    placeholder={t('Enter verification code')}
+                  />
+                  {!wechatEnabled && (
+                    <p className='auth-helper'>
+                      {t('WeChat sign in is not enabled')}
+                    </p>
+                  )}
+                  {error && (
+                    <div className='auth-error' role='alert'>
+                      {error}
+                    </div>
+                  )}
+                  <Button
+                    type='submit'
+                    className='auth-submit'
+                    disabled={
+                      !enabled ||
+                      !wechatEnabled ||
+                      !wechatCode.trim() ||
+                      wechat.isPending
+                    }
+                  >
+                    {t('Confirm')}
+                  </Button>
+                </form>
+              </WeChatMethodChoice>
             )}
           </TabsContent>
           <TabsContent value='phone'>

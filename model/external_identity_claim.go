@@ -11,6 +11,7 @@ import (
 )
 
 const ExternalIdentityProviderTelegram = "telegram"
+const ExternalIdentityProviderWeChat = "wechat"
 
 var ErrExternalIdentityAlreadyClaimed = errors.New("external identity is already claimed")
 
@@ -53,7 +54,7 @@ func ClaimExternalIdentityWithTx(tx *gorm.DB, provider, subject string, userId i
 		}
 		return err
 	}
-	if subjectOwner.UserId != userId {
+	if subjectOwner.UserId != userId || subjectOwner.Subject != subject || subjectOwner.Provider != provider {
 		return ErrExternalIdentityAlreadyClaimed
 	}
 
@@ -89,7 +90,7 @@ func BindTelegramForSessionWithTx(tx *gorm.DB, identity AuthSessionIdentity, tel
 		return err
 	}
 	var user User
-	if err := tx.Select("id", "telegram_id").First(&user, identity.UserID).Error; err != nil {
+	if err := tx.Select("id", "telegram_id", "wechat_id").First(&user, identity.UserID).Error; err != nil {
 		return err
 	}
 	if user.TelegramId != "" {
@@ -120,12 +121,27 @@ func releaseAllExternalIdentitiesWithTx(tx *gorm.DB, userId int) error {
 // than preserving an ambiguous login identity.
 func InitializeExternalIdentityClaims() error {
 	var users []User
-	if err := DB.Unscoped().Select("id", "telegram_id").
-		Where("telegram_id <> ?", "").Find(&users).Error; err != nil {
+	if err := DB.Unscoped().Select("id", "telegram_id", "wechat_id").
+		Where("telegram_id <> ? OR wechat_id <> ?", "", "").Find(&users).Error; err != nil {
 		return err
 	}
 	return DB.Transaction(func(tx *gorm.DB) error {
-		for _, user := range users {
+		for _, snapshot := range users {
+			var user User
+			if err := lockForUpdate(tx.Unscoped()).Select("id", "telegram_id", "wechat_id").First(&user, snapshot.Id).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					continue
+				}
+				return err
+			}
+			if user.WeChatId != "" {
+				if err := ClaimExternalIdentityWithTx(tx, ExternalIdentityProviderWeChat, user.WeChatId, user.Id); err != nil {
+					return fmt.Errorf("backfill WeChat identity for user %d: %w", user.Id, err)
+				}
+			}
+			if user.TelegramId == "" {
+				continue
+			}
 			if err := ClaimExternalIdentityWithTx(tx, ExternalIdentityProviderTelegram, user.TelegramId, user.Id); err != nil {
 				return fmt.Errorf("backfill Telegram identity for user %d: %w", user.Id, err)
 			}

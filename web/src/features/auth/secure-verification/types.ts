@@ -132,6 +132,7 @@ export interface VerificationRequirements {
   oauth_providers: { slug: string; name: string }[]
   password_encryption_enabled: boolean
   phone_masked?: string
+  wechat_methods?: ('code' | 'official')[]
   wechat_qrcode?: string
 }
 

@@ -194,6 +194,10 @@ export type AuthSettings = {
   LinuxDOClientId: string
   LinuxDOClientSecret: string
   LinuxDOMinimumTrustLevel: string
+  'wechat_official.enabled'?: boolean
+  'wechat_official.app_id'?: string
+  'wechat_official.app_secret_configured'?: boolean
+  'wechat_official.callback_url'?: string
   WeChatAuthEnabled: boolean
   WeChatServerAddress: string
   WeChatServerToken: string

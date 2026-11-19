@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { ErrorState } from '@/components/error-state'
 import { LoadingState } from '@/components/loading-state'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { readOfficialUIDraft } from '@/features/auth/wechat-official/ui-draft'
 import { getUserProfile } from '@/features/profile/api'
 import { AccessTokensCard } from '@/features/security/components/access-tokens-card'
 import { LoginSessionsCard } from '@/features/security/components/login-sessions-card'
@@ -51,7 +52,13 @@ function SecurityAccessContent(props: { userId: number | undefined }) {
         )}
         {profile.data && (
           <Tabs
-            defaultValue='account'
+            defaultValue={
+              readOfficialUIDraft('token-create') ||
+              readOfficialUIDraft('token-edit') ||
+              readOfficialUIDraft('token-action')
+                ? 'tokens'
+                : 'account'
+            }
             orientation='vertical'
             className='sa-card sa-settings'
           >

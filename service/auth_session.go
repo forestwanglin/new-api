@@ -53,14 +53,14 @@ func CreateLoginSession(userID int, loginMethod, ip, userAgent string) (*AuthBun
 	return createLoginSession(userID, 0, loginMethod, ip, userAgent)
 }
 
-func CreateLoginSessionAtAuthVersion(userID int, expectedAuthVersion int64, loginMethod, ip, userAgent string) (*AuthBundle, error) {
+func CreateLoginSessionAtAuthVersion(userID int, expectedAuthVersion int64, loginMethod, ip, userAgent string, officialFingerprint ...string) (*AuthBundle, error) {
 	if expectedAuthVersion <= 0 {
 		return nil, ErrLoginSessionInvalid
 	}
-	return createLoginSession(userID, expectedAuthVersion, loginMethod, ip, userAgent)
+	return createLoginSession(userID, expectedAuthVersion, loginMethod, ip, userAgent, officialFingerprint...)
 }
 
-func createLoginSession(userID int, expectedAuthVersion int64, loginMethod, ip, userAgent string) (*AuthBundle, error) {
+func createLoginSession(userID int, expectedAuthVersion int64, loginMethod, ip, userAgent string, officialFingerprint ...string) (*AuthBundle, error) {
 	user, err := model.GetUserCache(userID)
 	if err != nil {
 		return nil, err
@@ -90,7 +90,7 @@ func createLoginSession(userID int, expectedAuthVersion int64, loginMethod, ip, 
 	if err != nil {
 		return nil, err
 	}
-	if err := model.CreateUserSession(session); err != nil {
+	if err := model.CreateUserSession(session, officialFingerprint...); err != nil {
 		return nil, err
 	}
 	bundle, err := issueAuthBundle(session, session.SID+"."+refreshSecret, true)

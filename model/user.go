@@ -77,6 +77,7 @@ func resolveUserSortOptions(sortOptions []UserSortOptions) UserSortOptions {
 // User if you add sensitive fields, don't forget to clean them in setupLogin function.
 // Otherwise, the sensitive information will be saved on local storage in plain text!
 type User struct {
+	WeChatConfig         string                     `json:"-" gorm:"-:all"`
 	Id                   int                        `json:"id"`
 	Username             string                     `json:"username" gorm:"unique;index" validate:"max=20"`
 	Password             string                     `json:"password" gorm:"not null;" validate:"min=8,max=128"`
@@ -698,6 +699,11 @@ func (user *User) Insert(inviterId int) error {
 			if err := tx.Create(user).Error; err != nil {
 				return err
 			}
+			if user.WeChatId != "" {
+				if err := ClaimExternalIdentityWithTx(tx, ExternalIdentityProviderWeChat, user.WeChatId, user.Id); err != nil {
+					return err
+				}
+			}
 			return bindInvitationRegistration(tx, user, inviterId)
 		})
 	}); err != nil {
@@ -766,6 +772,11 @@ func (user *User) InsertWithTx(tx *gorm.DB, inviterId int) error {
 
 		if err := tx.Create(user).Error; err != nil {
 			return err
+		}
+		if user.WeChatId != "" {
+			if err := ClaimExternalIdentityWithTx(tx, ExternalIdentityProviderWeChat, user.WeChatId, user.Id); err != nil {
+				return err
+			}
 		}
 		return bindInvitationRegistration(tx, user, inviterId)
 	})
@@ -945,6 +956,9 @@ func (user *User) ClearBinding(bindingType string) error {
 	if err := DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Model(&User{}).Where("id = ?", user.Id).Update(column, "").Error; err != nil {
 			return err
+		}
+		if bindingType == ExternalIdentityProviderWeChat {
+			return ReleaseExternalIdentityWithTx(tx, ExternalIdentityProviderWeChat, user.Id)
 		}
 		if bindingType == ExternalIdentityProviderTelegram {
 			return ReleaseExternalIdentityWithTx(tx, ExternalIdentityProviderTelegram, user.Id)
@@ -1184,7 +1198,7 @@ func GetUniqueUserByEmail(email string) (*User, error) {
 }
 
 func IsWeChatIdAlreadyTaken(wechatId string) bool {
-	return DB.Unscoped().Where("wechat_id = ?", wechatId).Find(&User{}).RowsAffected == 1
+	return DB.Unscoped().Where("wechat_id = ?", wechatId).Find(&User{}).RowsAffected > 0
 }
 
 func IsGitHubIdAlreadyTaken(githubId string) bool {

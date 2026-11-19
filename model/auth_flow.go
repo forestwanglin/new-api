@@ -252,8 +252,19 @@ func ConsumeAuthFlowWithAction(token string, match AuthFlowMatch, action func(tx
 	if token == "" || match.Purpose == "" {
 		return nil, ErrAuthFlowInvalid
 	}
+	return consumeAuthFlowTransaction(DB, token, match, action, true)
+}
+
+// ConsumeAuthFlowWithTx consumes a flow in an existing transaction.
+func ConsumeAuthFlowWithTx(tx *gorm.DB, token string, match AuthFlowMatch, action func(*gorm.DB, *AuthFlow) error) (*AuthFlow, error) {
+	if tx == nil || token == "" || match.Purpose == "" {
+		return nil, ErrAuthFlowInvalid
+	}
+	return consumeAuthFlowTransaction(tx, token, match, action, false)
+}
+func consumeAuthFlowTransaction(db *gorm.DB, token string, match AuthFlowMatch, action func(*gorm.DB, *AuthFlow) error, transaction bool) (*AuthFlow, error) {
 	var consumed AuthFlow
-	err := DB.Transaction(func(tx *gorm.DB) error {
+	consume := func(tx *gorm.DB) error {
 		// Claim with the first write, rather than upgrading a prior read lock.
 		// SQLite cannot reliably upgrade two concurrent deferred read transactions.
 		now := time.Now()
@@ -285,7 +296,13 @@ func ConsumeAuthFlowWithAction(token string, match AuthFlowMatch, action func(tx
 			}
 		}
 		return nil
-	})
+	}
+	var err error
+	if transaction {
+		err = db.Transaction(consume)
+	} else {
+		err = consume(db)
+	}
 	if err != nil {
 		return nil, err
 	}

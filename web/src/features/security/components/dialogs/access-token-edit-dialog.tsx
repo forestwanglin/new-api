@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 
@@ -32,6 +33,11 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import {
+  readOfficialUIDraft,
+  saveOfficialUIDraft,
+  clearOfficialUIDraft,
+} from '@/features/auth/wechat-official/ui-draft'
 import {
   permissionMatrixToScopes,
   scopesToPermissionMatrix,
@@ -75,16 +81,29 @@ export function AccessTokenEditDialog(props: AccessTokenEditDialogProps) {
   const initialScopes = props.token.scopes
     .filter((scope) => offered.has(scope))
     .sort()
+  const restored = useRef(readOfficialUIDraft('token-edit'))
+  const draft = restored.current as {
+    token_id?: number
+    values?: AccessTokenEditFormValues
+  } | null
+  const parsedDraft = accessTokenEditFormSchema.safeParse(draft?.values)
+  const defaults =
+    draft?.token_id === props.token.id && parsedDraft.success
+      ? parsedDraft.data
+      : {
+          name: props.token.name,
+          permissions: scopesToPermissionMatrix(initialScopes),
+        }
   const form = useForm<AccessTokenEditFormValues>({
     resolver: zodResolver(accessTokenEditFormSchema),
-    defaultValues: {
-      name: props.token.name,
-      permissions: scopesToPermissionMatrix(initialScopes),
-    },
+    defaultValues: defaults,
   })
 
   const close = () => {
-    if (!props.pending) props.onClose()
+    if (!props.pending) {
+      clearOfficialUIDraft('token-edit')
+      props.onClose()
+    }
   }
   const submit = async (values: AccessTokenEditFormValues) => {
     const scopes = permissionMatrixToScopes(values.permissions)
@@ -95,11 +114,17 @@ export function AccessTokenEditDialog(props: AccessTokenEditDialogProps) {
       })
       return
     }
+    if (/MicroMessenger/i.test(navigator.userAgent)) {
+      saveOfficialUIDraft('token-edit', { token_id: props.token.id, values })
+    }
     const saved = await props.onSave({
       name: values.name.trim(),
       scopes: changed ? scopes : undefined,
     })
-    if (saved) props.onClose()
+    if (saved) {
+      clearOfficialUIDraft('token-edit')
+      props.onClose()
+    }
   }
 
   return (

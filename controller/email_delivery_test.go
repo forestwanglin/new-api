@@ -26,6 +26,17 @@ func (transport emailHTTPTransport) RoundTrip(request *http.Request) (*http.Resp
 
 func configureEmailDelivery(t *testing.T, options map[string]string) {
 	t.Helper()
+	// GetOptions now derives the Official Account credential status from the
+	// authoritative option store, rather than a potentially stale process map.
+	previousDB := model.DB
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&model.Option{}))
+	model.DB = db
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	t.Cleanup(func() { model.DB = previousDB; _ = sqlDB.Close() })
+
 	common.OptionMapRWMutex.Lock()
 	original := common.OptionMap
 	common.OptionMap = options

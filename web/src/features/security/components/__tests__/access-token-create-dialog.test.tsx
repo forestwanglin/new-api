@@ -440,3 +440,48 @@ describe('create access token dialog', () => {
     expect(postCalls('/api/verify')).toHaveLength(0)
   })
 })
+
+it('restores a same-device creation draft and preserves the exact authorization expiry on reconfirmation', async () => {
+  vi.mocked(api.post).mockImplementation(async (url, body) => {
+    if (url === '/api/verify') {
+      return passwordProof((body as { scope: string }).scope)
+    }
+    return {
+      data: { success: true, data: { token: 'created-secret', item: {} } },
+    }
+  })
+  const { saveOfficialUIDraft } =
+    await import('@/features/auth/wechat-official/ui-draft')
+  const expiresAt = Math.floor(Date.now() / 1000) + 30 * 86400 - 120
+  saveOfficialUIDraft('token-create', {
+    values: {
+      name: 'resumed export',
+      expiry: '30d',
+      permissions: { tokens: { read: true } },
+    },
+    expires_at: expiresAt,
+  })
+  renderCard()
+  const dialog = await screen.findByRole('dialog', {
+    name: 'Create access token',
+  })
+  expect(within(dialog).getByLabelText('Token name')).toHaveValue(
+    'resumed export'
+  )
+  const user = userEvent.setup()
+  await user.click(
+    within(dialog).getByRole('button', { name: 'Create access token' })
+  )
+  await verifyPassword(user)
+  await waitFor(() =>
+    expect(postCalls('/api/user/access_tokens')).toHaveLength(1)
+  )
+  expect(postCalls('/api/user/access_tokens')[0][1]).toEqual({
+    name: 'resumed export',
+    scopes: ['tokens:read'],
+    expires_at: expiresAt,
+  })
+  await waitFor(() =>
+    expect(sessionStorage.getItem('wechat-official-ui:token-create')).toBeNull()
+  )
+})

@@ -47,9 +47,11 @@ import { useAuthRedirect } from '@/features/auth/hooks/use-auth-redirect'
 import { useEmailVerification } from '@/features/auth/hooks/use-email-verification'
 import { useTurnstile } from '@/features/auth/hooks/use-turnstile'
 import {
+  clearAffiliateCode,
   getAffiliateCode,
   saveAffiliateCode,
 } from '@/features/auth/lib/storage'
+import { WeChatMethodChoice } from '@/features/auth/wechat-official/method-choice'
 import { useStatus } from '@/hooks/use-status'
 import { handleServerError } from '@/lib/handle-server-error'
 import { AuthOperationError } from '@/lib/secure-verification'
@@ -64,6 +66,7 @@ export function SignUpForm({
   const [isLoading, setIsLoading] = useState(false)
   const [verificationCode, setVerificationCode] = useState('')
   const [agreedToLegal, setAgreedToLegal] = useState(false)
+  const [officialSelected, setOfficialSelected] = useState(true)
   const [wechatCode, setWeChatCode] = useState('')
   const [isWeChatDialogOpen, setIsWeChatDialogOpen] = useState(false)
   const [isWeChatSubmitting, setIsWeChatSubmitting] = useState(false)
@@ -108,7 +111,8 @@ export function SignUpForm({
     status?.oauth_register_enabled ??
     status?.data?.oauth_register_enabled ??
     true
-  const hasWeChatLogin = Boolean(status?.wechat_login)
+  const hasOfficialWeChat = Boolean(status?.wechat_official_login)
+  const hasWeChatLogin = Boolean(status?.wechat_login || hasOfficialWeChat)
   const turnstileReady = !isTurnstileEnabled || Boolean(turnstileToken)
 
   const wechatQrCodeUrl = useMemo(() => {
@@ -419,6 +423,8 @@ export function SignUpForm({
                 onClick={handleWeChatLogin}
                 disabled={
                   isWeChatSubmitting ||
+                  (hasOfficialWeChat &&
+                    (officialSelected || !status?.wechat_login)) ||
                   !wechatCode.trim() ||
                   (requiresLegalConsent && !agreedToLegal)
                 }
@@ -432,29 +438,53 @@ export function SignUpForm({
             </>
           }
         >
-          {wechatQrCodeUrl ? (
-            <div className='flex justify-center'>
-              <img
-                src={wechatQrCodeUrl}
-                alt={t('WeChat login QR code')}
-                className='h-40 w-40 rounded-md border object-contain'
-              />
-            </div>
-          ) : (
-            <p className='text-muted-foreground text-sm'>
-              {t('QR code is not configured. Please contact support.')}
-            </p>
+          {isWeChatDialogOpen && (
+            <WeChatMethodChoice
+              methods={[
+                ...(hasOfficialWeChat ? ['official' as const] : []),
+                ...(status?.wechat_login ? ['code' as const] : []),
+              ]}
+              request={{
+                intent: 'login',
+                aff: getAffiliateCode() || undefined,
+              }}
+              enabled={!requiresLegalConsent || agreedToLegal}
+              onMethodChange={(method) =>
+                setOfficialSelected(method === 'official')
+              }
+              onResult={async (result, request) => {
+                handleWeChatDialogChange(false)
+                const signedIn = await handleLoginResult(result)
+                if (signedIn && request.intent === 'login') {
+                  clearAffiliateCode(request.aff ?? '')
+                }
+              }}
+            >
+              {wechatQrCodeUrl ? (
+                <div className='flex justify-center'>
+                  <img
+                    src={wechatQrCodeUrl}
+                    alt={t('WeChat login QR code')}
+                    className='h-40 w-40 rounded-md border object-contain'
+                  />
+                </div>
+              ) : (
+                <p className='text-muted-foreground text-sm'>
+                  {t('QR code is not configured. Please contact support.')}
+                </p>
+              )}
+              <div className='grid gap-2'>
+                <Label htmlFor='wechat-code'>{t('Verification code')}</Label>
+                <Input
+                  id='wechat-code'
+                  placeholder={t('Enter the verification code')}
+                  value={wechatCode}
+                  onChange={(event) => setWeChatCode(event.target.value)}
+                  autoComplete='one-time-code'
+                />
+              </div>
+            </WeChatMethodChoice>
           )}
-          <div className='grid gap-2'>
-            <Label htmlFor='wechat-code'>{t('Verification code')}</Label>
-            <Input
-              id='wechat-code'
-              placeholder={t('Enter the verification code')}
-              value={wechatCode}
-              onChange={(event) => setWeChatCode(event.target.value)}
-              autoComplete='one-time-code'
-            />
-          </div>
         </Dialog>
       )}
     </Form>

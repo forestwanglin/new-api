@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { KeyRound, Loader2, ShieldCheck } from 'lucide-react'
-import { useId } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Dialog } from '@/components/dialog'
@@ -29,6 +29,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { WeChatVerificationHint } from '../../components/wechat-verification-hint'
 import type { PasskeyDomains } from '../../passkey/assertion'
 import { PasskeyDomainSelector } from '../../passkey/components/passkey-domain-selector'
+import { WeChatMethodChoice } from '../../wechat-official/method-choice'
 import type {
   SecureVerificationState,
   VerificationInput,
@@ -42,6 +43,7 @@ interface SecureVerificationDialogProps {
   smsSending?: boolean
   smsRetryAfter?: number
   onVerify: (input?: VerificationInput) => void | Promise<void>
+  onOfficialWeChatProof?: (result: unknown) => void
   onCancel: () => void
   onRetry: () => void
   onInputChange: (input: VerificationInput) => void
@@ -60,6 +62,10 @@ const methodLabels: Record<VerificationMethod, string> = {
 export function SecureVerificationDialog(props: SecureVerificationDialogProps) {
   const { t } = useTranslation()
   const inputId = useId()
+  const [wechatCodeSelected, setWeChatCodeSelected] = useState(false)
+  useEffect(() => {
+    if (props.state.phase === 'idle') setWeChatCodeSelected(false)
+  }, [props.state.phase])
   const state = props.state
   if (state.phase === 'idle') return null
   const ready =
@@ -84,7 +90,12 @@ export function SecureVerificationDialog(props: SecureVerificationDialogProps) {
       canVerify && Boolean(input.smsToken) && /^\d{6}$/.test(input.code.trim())
   }
   // Linked-account verification starts from the provider button itself.
-  const showSubmit = state.phase !== 'error' && input?.method !== 'oauth'
+  const officialSelected =
+    input?.method === 'wechat' &&
+    ready?.requirements.wechat_methods?.includes('official') &&
+    (!ready.requirements.wechat_methods.includes('code') || !wechatCodeSelected)
+  const showSubmit =
+    state.phase !== 'error' && input?.method !== 'oauth' && !officialSelected
   const error = 'error' in state ? state.error : undefined
   const formId = `${inputId}-form`
   let smsSendLabel = t('Send code')
@@ -207,32 +218,50 @@ export function SecureVerificationDialog(props: SecureVerificationDialogProps) {
                 ))}
               </TabsList>
               <TabsContent value='wechat' className='space-y-3'>
-                {ready.requirements.wechat_qrcode && (
-                  <img
-                    src={ready.requirements.wechat_qrcode}
-                    alt={t('WeChat login QR code')}
-                    className='mx-auto size-48 rounded-lg border object-contain'
-                  />
-                )}
-                <p className='text-muted-foreground text-sm'>
-                  <WeChatVerificationHint />
-                </p>
-                <Label htmlFor={inputId}>{t('WeChat verification code')}</Label>
-                <Input
-                  id={inputId}
-                  autoComplete='one-time-code'
-                  inputMode='numeric'
-                  maxLength={10}
-                  autoFocus
-                  disabled={verifying}
-                  value={input.method === 'wechat' ? input.code : ''}
-                  onChange={(event) =>
-                    props.onInputChange({
-                      method: 'wechat',
-                      code: event.target.value,
-                    })
-                  }
-                />
+                {input.method === 'wechat' &&
+                  state.request.scope !== 'auth.login' && (
+                    <WeChatMethodChoice
+                      methods={ready.requirements.wechat_methods ?? ['code']}
+                      request={{ intent: 'verify', ...state.request }}
+                      onResult={(result) =>
+                        props.onOfficialWeChatProof?.(result)
+                      }
+                      onMethodChange={(method) =>
+                        setWeChatCodeSelected(method === 'code')
+                      }
+                    >
+                      <div className='space-y-3'>
+                        {ready.requirements.wechat_qrcode && (
+                          <img
+                            src={ready.requirements.wechat_qrcode}
+                            alt={t('WeChat login QR code')}
+                            className='mx-auto size-48 rounded-lg border object-contain'
+                          />
+                        )}
+                        <p className='text-muted-foreground text-sm'>
+                          <WeChatVerificationHint />
+                        </p>
+                        <Label htmlFor={inputId}>
+                          {t('WeChat verification code')}
+                        </Label>
+                        <Input
+                          id={inputId}
+                          autoComplete='one-time-code'
+                          inputMode='numeric'
+                          maxLength={10}
+                          autoFocus
+                          disabled={verifying}
+                          value={input.method === 'wechat' ? input.code : ''}
+                          onChange={(event) =>
+                            props.onInputChange({
+                              method: 'wechat',
+                              code: event.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                    </WeChatMethodChoice>
+                  )}
               </TabsContent>
               <TabsContent value='sms' className='space-y-3'>
                 <p className='text-muted-foreground text-sm'>

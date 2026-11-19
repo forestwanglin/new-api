@@ -186,9 +186,9 @@ func BindVerificationOperation(operation VerificationOperation) (VerificationBin
 			if len(fields) != 2 || common.Validate.Var(context.Email, "required,email") != nil || context.Code != "" {
 				return VerificationBinding{}, ErrVerificationContextInvalid
 			}
-		case "wechat":
+		case "wechat", "wechat_official":
 			context.Code = strings.TrimSpace(context.Code)
-			if len(fields) != 2 || context.Code == "" || len(context.Code) > 128 || context.Email != "" {
+			if len(fields) != 2 || context.Code == "" || len(context.Code) > 128 || (context.Provider == "wechat_official" && len(context.Code) != 43) || context.Email != "" {
 				return VerificationBinding{}, ErrVerificationContextInvalid
 			}
 		default:
@@ -312,6 +312,7 @@ type VerificationRequirements struct {
 	OAuthProviders            []VerificationOAuthProvider `json:"oauth_providers"`
 	PasswordEncryptionEnabled bool                        `json:"password_encryption_enabled"`
 	PhoneMasked               string                      `json:"phone_masked,omitempty"`
+	WeChatMethods             []string                    `json:"wechat_methods,omitempty"`
 	WeChatQRCode              string                      `json:"wechat_qrcode,omitempty"`
 }
 
@@ -413,6 +414,7 @@ func GetVerificationRequirements(identity AuthIdentity, scope string) (*Verifica
 			}
 			if contact.Method == VerificationMethodWeChat {
 				requirements.WeChatQRCode = common.WeChatAccountQRCodeImageURL
+				requirements.WeChatMethods = AvailableWeChatMethods()
 			}
 			return requirements, nil
 		}
@@ -541,6 +543,12 @@ func CompleteSecurityVerification(identity AuthIdentity, binding VerificationBin
 // ConsumeOperationProof accepts a proof at most once. The consumption commits
 // before the caller performs its action; an action failure must not restore it.
 func ConsumeOperationProof(raw string, identity AuthIdentity, operation VerificationOperation) (*model.AuthFlowAuthorization, error) {
+	return ConsumeOperationProofWithAction(raw, identity, operation, nil)
+}
+
+// ConsumeOperationProofWithAction commits an exact-operation proof and credential
+// mutation together. Existing callers retain consume-before-action semantics.
+func ConsumeOperationProofWithAction(raw string, identity AuthIdentity, operation VerificationOperation, action func(*gorm.DB) error) (*model.AuthFlowAuthorization, error) {
 	binding, err := BindVerificationOperation(operation)
 	if err != nil {
 		return nil, err
@@ -574,17 +582,26 @@ func ConsumeOperationProof(raw string, identity AuthIdentity, operation Verifica
 			return err
 		}
 		if operation.Scope == VerificationScopePhoneBinding {
-			return validatePhoneBindingContactWithTx(tx, identity, claims.Method, flow.Payload)
+			if err := validatePhoneBindingContactWithTx(tx, identity, claims.Method, flow.Payload); err != nil {
+				return err
+			}
 		}
 		if supportsAccessTokenContactVerification(operation.Scope) {
-			return validateAccessTokenContactWithTx(tx, identity, claims.Method, flow.Payload)
+			if err := validateAccessTokenContactWithTx(tx, identity, claims.Method, flow.Payload); err != nil {
+				return err
+			}
 		}
-		if claims.Method == VerificationMethodSMS {
+		if claims.Method == VerificationMethodSMS && !supportsAccessTokenContactVerification(operation.Scope) {
 			var payload weChatBindingSMSPayload
 			if common.UnmarshalJsonStr(flow.Payload, &payload) != nil {
 				return ErrProofMethod
 			}
-			return validateBindingPhoneWithTx(tx, identity, payload.Phone)
+			if err := validateBindingPhoneWithTx(tx, identity, payload.Phone); err != nil {
+				return err
+			}
+		}
+		if action != nil {
+			return action(tx)
 		}
 		return nil
 	})

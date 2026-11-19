@@ -63,6 +63,7 @@ type AccountLoginMethods struct {
 	Password          bool
 	Passkey           bool
 	WeChat            bool
+	OfficialWeChat    bool
 	OAuthColumns      []string
 	CustomProviderIDs []int
 }
@@ -82,6 +83,13 @@ func UnbindUserOAuthForSession(identity AuthSessionIdentity, providerID int, ena
 				return ErrAccountBindingChanged
 			}
 			return err
+		}
+		if current.WeChatId != "" && enabled.OfficialWeChat && !enabled.WeChat {
+			official, err := LockWeChatOfficialConfig(tx, "")
+			if err != nil {
+				return err
+			}
+			enabled.WeChat = official.Ready()
 		}
 		hasLogin := enabled.Password && current.Password != "" || enabled.WeChat && current.WeChatId != ""
 		columns := map[string]string{
@@ -118,6 +126,18 @@ func UpdateUserBindColumnForSessionWithTx(tx *gorm.DB, identity AuthSessionIdent
 	}
 	if err := ValidateAuthSessionWithTx(tx, identity); err != nil {
 		return err
+	}
+	if column == "wechat_id" {
+		var current User
+		if err := tx.Select("wechat_id").First(&current, identity.UserID).Error; err != nil {
+			return err
+		}
+		if current.WeChatId != "" {
+			return ErrAccountBindingChanged
+		}
+		if err := ClaimExternalIdentityWithTx(tx, ExternalIdentityProviderWeChat, value, identity.UserID); err != nil {
+			return err
+		}
 	}
 	// Preserve the existing ownership check within the transaction and update
 	// only the chosen binding column, never a complete user snapshot.

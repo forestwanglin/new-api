@@ -61,7 +61,7 @@ func GetWeChatBindingVerification(identity AuthIdentity) (*WeChatBindingVerifica
 
 func isWeChatBindingOperation(operation VerificationOperation) bool {
 	var context AccountBindingContext
-	return operation.Scope == VerificationScopeAccountBind && common.Unmarshal(operation.Context, &context) == nil && context.Provider == "wechat"
+	return operation.Scope == VerificationScopeAccountBind && common.Unmarshal(operation.Context, &context) == nil && (context.Provider == "wechat" || context.Provider == "wechat_official")
 }
 
 func requireWeChatBindingSMS(identity AuthIdentity, operation VerificationOperation) (string, error) {
@@ -75,7 +75,13 @@ func requireWeChatBindingSMS(identity AuthIdentity, operation VerificationOperat
 	if err != nil {
 		return "", err
 	}
-	if !status.SMSRequired || !PhoneSMSConfigured() || !common.WeChatAuthEnabled {
+	var bindingContext AccountBindingContext
+	_ = common.Unmarshal(operation.Context, &bindingContext)
+	available := common.WeChatAuthEnabled
+	if bindingContext.Provider == "wechat_official" {
+		available = model.WeChatOfficialAvailable()
+	}
+	if !status.SMSRequired || !PhoneSMSConfigured() || !available {
 		return "", ErrVerificationUnavailable
 	}
 	var claim model.ExternalIdentityClaim

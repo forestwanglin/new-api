@@ -87,6 +87,9 @@ func GetOptions(c *gin.Context) {
 	optionValues := make(map[string]string)
 	common.OptionMapRWMutex.Lock()
 	for k, v := range common.OptionMap {
+		if strings.HasPrefix(k, "wechat_official.") {
+			continue
+		}
 		if k == "theme.frontend" || k == "billing_setting.billing_mode" || k == "billing_setting.billing_expr" || k == "ResendKeyConfigured" {
 			continue
 		}
@@ -112,6 +115,18 @@ func GetOptions(c *gin.Context) {
 		Key: "ResendKeyConfigured", Value: strconv.FormatBool(strings.TrimSpace(common.OptionMap["ResendApiKey"]) != ""),
 	})
 	common.OptionMapRWMutex.Unlock()
+	official, err := model.ReadWeChatOfficialConfig(model.DB)
+	if err != nil {
+		common.ApiErrorT(c, "Failed to read WeChat Official Account configuration.")
+		return
+	}
+	options = append(options,
+		&model.Option{Key: "wechat_official.enabled", Value: strconv.FormatBool(official.Enabled)},
+		&model.Option{Key: "wechat_official.app_id", Value: official.AppID},
+		&model.Option{Key: "wechat_official.app_secret_configured", Value: strconv.FormatBool(official.AppSecret != "")},
+		&model.Option{Key: "wechat_official.callback_url", Value: official.CallbackURL},
+	)
+
 	// Display the same effective expressions used by pricing and settlement,
 	// including built-in defaults absent from persisted administrator options.
 	for key, values := range map[string]map[string]string{

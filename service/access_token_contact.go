@@ -16,8 +16,9 @@ const VerificationMethodWeChat = "wechat"
 
 // Contact identity is private proof payload, never returned to the browser.
 type accessTokenContact struct {
-	Method  string `json:"method"`
-	Subject string `json:"subject"`
+	Method              string `json:"method"`
+	Subject             string `json:"subject"`
+	OfficialFingerprint string `json:"official_fingerprint,omitempty"`
 }
 
 type accessTokenSMSPayload struct {
@@ -49,7 +50,7 @@ func getAccessTokenContact(db *gorm.DB, userID int) (accessTokenContact, error) 
 func contactMethodAvailable(contact accessTokenContact) bool {
 	switch contact.Method {
 	case VerificationMethodWeChat:
-		return common.WeChatAuthEnabled && strings.TrimSpace(common.WeChatServerAddress) != "" && strings.TrimSpace(common.WeChatServerToken) != ""
+		return LegacyWeChatAvailable() || model.WeChatOfficialAvailable()
 	case VerificationMethodSMS:
 		return mainlandPhonePattern.MatchString(contact.Subject) && PhoneSMSConfigured()
 	}
@@ -95,6 +96,9 @@ func requireAccessTokenContact(identity AuthIdentity, operation VerificationOper
 
 // Called after the trusted WeChat server has consumed the submitted code.
 func CompleteAccessTokenWeChat(identity AuthIdentity, operation VerificationOperation, openID string) (*SecurityProof, error) {
+	if !LegacyWeChatAvailable() {
+		return nil, ErrVerificationUnavailable
+	}
 	contact, binding, err := requireAccessTokenContact(identity, operation, VerificationMethodWeChat)
 	if err != nil {
 		return nil, err
@@ -130,14 +134,14 @@ func validateAccessTokenContactWithTx(tx *gorm.DB, identity AuthIdentity, method
 		}
 		return nil
 	}
-	if method != contact.Method || !contactMethodAvailable(contact) {
+	if method != contact.Method {
 		return ErrProofMethod
 	}
 	var issued accessTokenContact
 	if common.UnmarshalJsonStr(payload, &issued) != nil || issued.Method != contact.Method || !hmac.Equal([]byte(issued.Subject), []byte(contact.Subject)) {
 		return ErrProofMethod
 	}
-	return nil
+	return validateWeChatProofConfig(tx, method, issued.OfficialFingerprint)
 }
 
 func SendAccessTokenSMS(identity AuthIdentity, operation VerificationOperation, ip string) (string, error) {

@@ -656,3 +656,128 @@ describe('access tokens card', () => {
     )
   })
 })
+
+it('restores the exact same-device update grant and consumes its authorized ceremony only after Save', async () => {
+  const { saveOfficialUIDraft } =
+    await import('@/features/auth/wechat-official/ui-draft')
+  vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('MicroMessenger')
+  list = { items: [tokenItem({ id: 7 })], legacy: null }
+  const scopes = ['tokens:read', 'tokens:write']
+  const patch = mockPatch(tokenItem({ id: 7, name: 'recovered name', scopes }))
+  saveOfficialUIDraft('token-edit', {
+    token_id: 7,
+    values: {
+      name: 'recovered name',
+      permissions: { tokens: { read: true, write: true } },
+    },
+  })
+  const originalGet = vi.mocked(api.get).getMockImplementation()
+  if (!originalGet) throw new Error('Missing API transport fixture')
+  vi.mocked(api.get).mockImplementation(async (url, config) => {
+    if (url === '/api/verify/methods') {
+      return {
+        data: {
+          success: true,
+          data: {
+            methods: [{ method: 'wechat', available: true }],
+            wechat_methods: ['official'],
+            oauth_providers: [],
+            password_encryption_enabled: false,
+          },
+        },
+      }
+    }
+    if (url.endsWith('/browser')) {
+      return { data: { success: true, data: { browser_token: 'browser' } } }
+    }
+    return originalGet(url, config)
+  })
+  vi.mocked(api.post).mockImplementation(async (url) => {
+    const expiry = Math.floor(Date.now() / 1000) + 300
+    if (url.endsWith('/resume')) {
+      return {
+        data: {
+          success: true,
+          data: {
+            flow_token: 'resumed-owner',
+            intent: 'verify',
+            scope: 'access_token.update',
+            context: { scopes, token_id: 7 },
+            status: 'authorized',
+            qr_url: '',
+            expires_at: expiry,
+          },
+        },
+      }
+    }
+    if (url.endsWith('/status')) {
+      return { data: { success: true, data: { status: 'authorized' } } }
+    }
+    if (url.endsWith('/complete')) {
+      return {
+        data: {
+          success: true,
+          data: {
+            proof_token: 'resumed-proof',
+            method: 'wechat',
+            scope: 'access_token.update',
+            expires_at: expiry,
+          },
+        },
+      }
+    }
+    throw new Error(`Unexpected POST ${url}`)
+  })
+  renderCard()
+  const dialog = await screen.findByRole('dialog', {
+    name: 'Edit access token',
+  })
+  expect(within(dialog).getByLabelText('Token name')).toHaveValue(
+    'recovered name'
+  )
+  expect(permission(dialog, 'Edit')).toHaveAttribute('aria-pressed', 'true')
+  expect(patch).not.toHaveBeenCalled()
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
+  await waitFor(() =>
+    expect(patch).toHaveBeenCalledWith(
+      '/api/user/access_tokens/7',
+      { name: 'recovered name', scopes },
+      expect.objectContaining({
+        headers: { 'X-Security-Proof': 'resumed-proof' },
+      })
+    )
+  )
+  expect(
+    vi.mocked(api.post).mock.calls.some(([url]) => url.endsWith('/flows'))
+  ).toBe(false)
+  await waitFor(() =>
+    expect(sessionStorage.getItem('wechat-official-ui:token-edit')).toBeNull()
+  )
+})
+
+it('restores the same-device revoke target and waits for confirmation before verifying that exact token', async () => {
+  const { saveOfficialUIDraft } =
+    await import('@/features/auth/wechat-official/ui-draft')
+  list = { items: [tokenItem({ id: 7 })], legacy: null }
+  saveOfficialUIDraft('token-revoke', 7)
+  renderCard()
+  const dialog = await screen.findByRole('alertdialog')
+  expect(api.delete).not.toHaveBeenCalled()
+  const user = userEvent.setup()
+  await user.click(within(dialog).getByRole('button', { name: 'Revoke' }))
+  await verifyPassword(user)
+  await waitFor(() =>
+    expect(api.delete).toHaveBeenCalledWith(
+      '/api/user/access_tokens/7',
+      expect.objectContaining({
+        headers: { 'X-Security-Proof': 'one-use-proof-1' },
+      })
+    )
+  )
+  expect(verifyCalls()).toEqual([
+    expect.objectContaining({
+      scope: 'access_token.revoke',
+      context: { token_id: 7 },
+    }),
+  ])
+})

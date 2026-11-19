@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 
@@ -34,6 +35,11 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import {
+  readOfficialUIDraft,
+  saveOfficialUIDraft,
+  clearOfficialUIDraft,
+} from '@/features/auth/wechat-official/ui-draft'
 import { permissionMatrixToScopes } from '@/lib/admin-permissions'
 
 import type { AccessTokenCatalog, AccessTokenInput } from '../../api'
@@ -59,25 +65,57 @@ type AccessTokenCreateDialogProps = {
 
 export function AccessTokenCreateDialog(props: AccessTokenCreateDialogProps) {
   const { t } = useTranslation()
+  const saved = useRef(readOfficialUIDraft('token-create'))
+  const candidate = saved.current as {
+    values?: AccessTokenFormValues
+    expires_at?: number
+  } | null
+  const restoredValues = candidate?.values
+    ? {
+        ...candidate.values,
+        customExpiresAt: candidate.values.customExpiresAt
+          ? new Date(candidate.values.customExpiresAt)
+          : undefined,
+      }
+    : null
+  const parsed = accessTokenFormSchema.safeParse(restoredValues)
+  const draft =
+    parsed.success &&
+    typeof candidate?.expires_at === 'number' &&
+    Number.isFinite(candidate.expires_at)
+      ? candidate
+      : null
+  const draftValues = draft && parsed.success ? parsed.data : undefined
   const form = useForm<AccessTokenFormValues>({
     resolver: zodResolver(accessTokenFormSchema),
-    defaultValues: defaultAccessTokenFormValues,
+    defaultValues: draftValues ?? defaultAccessTokenFormValues,
   })
   const expiry = form.watch('expiry')
   const groups = accessTokenPermissionGroups(props.catalog)
 
   const close = () => {
     if (props.pending) return
+    clearOfficialUIDraft('token-create')
     form.reset(defaultAccessTokenFormValues)
     props.onOpenChange(false)
   }
   const submit = async (values: AccessTokenFormValues) => {
+    const sameValues =
+      draftValues && JSON.stringify(draftValues) === JSON.stringify(values)
+    const expiresAt =
+      sameValues && draft?.expires_at !== undefined
+        ? draft.expires_at
+        : resolveAccessTokenExpiry(values, Date.now())
+    if (/MicroMessenger/i.test(navigator.userAgent)) {
+      saveOfficialUIDraft('token-create', { values, expires_at: expiresAt })
+    }
     const created = await props.onCreate({
       name: values.name.trim(),
       scopes: permissionMatrixToScopes(values.permissions),
-      expires_at: resolveAccessTokenExpiry(values, Date.now()),
+      expires_at: expiresAt,
     })
     if (!created) return
+    clearOfficialUIDraft('token-create')
     form.reset(defaultAccessTokenFormValues)
     props.onOpenChange(false)
   }

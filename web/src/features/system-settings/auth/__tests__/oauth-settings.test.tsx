@@ -336,4 +336,54 @@ describe('OAuth settings saves', () => {
       })
     )
   })
+  it('keeps legacy configuration independent and clears a newly saved official secret', async () => {
+    const user = userEvent.setup()
+    await renderSettings({
+      'wechat_official.app_id': 'wxexisting',
+      'wechat_official.app_secret_configured': true,
+    })
+    await user.click(
+      screen.getByRole('tab', { name: 'WeChat Official Account authorization' })
+    )
+    await user.type(
+      screen.getByLabelText('Official Account AppSecret'),
+      'new-secret'
+    )
+    await user.click(screen.getByRole('button', { name: 'Save Changes' }))
+    await waitFor(() =>
+      expect(api.put).toHaveBeenCalledWith('/api/option/', {
+        key: 'wechat_official.app_secret',
+        value: 'new-secret',
+      })
+    )
+    await waitFor(() =>
+      expect(screen.getByLabelText('Official Account AppSecret')).toHaveValue(
+        ''
+      )
+    )
+    expect(api.put).not.toHaveBeenCalledWith(
+      '/api/option/',
+      expect.objectContaining({ key: 'WeChatAuthEnabled' })
+    )
+    await user.clear(screen.getByLabelText('Official Account AppID'))
+    await user.type(
+      screen.getByLabelText('Official Account AppID'),
+      'wxchanged'
+    )
+    await user.click(screen.getByRole('button', { name: 'Save Changes' }))
+    await waitFor(() =>
+      expect(api.put).toHaveBeenCalledWith('/api/option/', {
+        key: 'wechat_official.app_id',
+        value: 'wxchanged',
+      })
+    )
+    expect(
+      vi
+        .mocked(api.put)
+        .mock.calls.filter(
+          ([, body]) =>
+            (body as { key: string }).key === 'wechat_official.app_secret'
+        )
+    ).toHaveLength(1)
+  })
 })

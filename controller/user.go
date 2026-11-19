@@ -179,6 +179,7 @@ func setupLoginAtAuthVersion(user *model.User, expectedAuthVersion int64, c *gin
 			loginMethodFromContext(c),
 			c.ClientIP(),
 			c.Request.UserAgent(),
+			user.WeChatConfig, user.WeChatId,
 		)
 	} else {
 		bundle, err = service.CreateLoginSession(

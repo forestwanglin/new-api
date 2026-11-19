@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { officialBrowser } from '@/features/auth/wechat-official/api'
 import { api } from '@/lib/api'
 import type { CustomOAuthBinding } from '@/lib/oauth'
 import { authRequestOptions, authResult } from '@/lib/secure-verification'
@@ -262,6 +263,37 @@ export function bindWeChat(
         signal,
       }
     )
+  )
+}
+
+export async function officialWeChatBindingRequest<T>(
+  path: string,
+  body: object,
+  signal: AbortSignal,
+  proofToken?: string
+): Promise<T> {
+  const browserToken = await officialBrowser(signal)
+  return authResult(
+    api.post(`/api/oauth/wechat_official/bind${path}`, body, {
+      ...authRequestOptions,
+      signal,
+      singleUseAuthorization: true,
+      headers: {
+        'X-Phone-Auth': browserToken,
+        ...(proofToken ? { 'X-Security-Proof': proofToken } : {}),
+      },
+    })
+  )
+}
+export function getOfficialWeChatBindingVerification(
+  signal: AbortSignal
+): Promise<WeChatBindingVerification> {
+  return authResult(
+    api.get('/api/oauth/wechat_official/bind/verification', {
+      ...authRequestOptions,
+      signal,
+      disableDuplicate: true,
+    })
   )
 }
 

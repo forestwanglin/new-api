@@ -37,6 +37,10 @@ import {
 } from '@/features/auth/lib/oauth-popup'
 import { SecureVerificationDialog } from '@/features/auth/secure-verification'
 import type { CustomOAuthProviderInfo } from '@/features/auth/types'
+import {
+  readOfficialUIDraft,
+  clearOfficialUIDraft,
+} from '@/features/auth/wechat-official/ui-draft'
 import { getSelfOAuthBindings, unbindCustomOAuth } from '@/features/profile/api'
 import type {
   UserProfile,
@@ -82,6 +86,13 @@ export function AccountBindings({ profile, onUpdate }: AccountBindingsProps) {
   const { t } = useTranslation()
   const dialogs = useDialogs<DialogKey>()
   const { status, loading } = useStatus()
+  const openDialog = dialogs.open
+  useEffect(() => {
+    if (readOfficialUIDraft('bind') === true) {
+      clearOfficialUIDraft('bind')
+      openDialog('wechat')
+    }
+  }, [openDialog])
   const [customBindings, setCustomBindings] = useState<CustomOAuthBinding[]>([])
   const [unbindTarget, setUnbindTarget] = useState<CustomOAuthBinding | null>(
     null
@@ -247,7 +258,7 @@ export function AccountBindings({ profile, onUpdate }: AccountBindingsProps) {
       isBound: Boolean(
         (profile as unknown as Record<string, unknown>).wechat_id
       ),
-      isEnabled: status?.wechat_login || false,
+      isEnabled: Boolean(status?.wechat_login || status?.wechat_official_login),
       onBind: () => dialogs.open('wechat'),
     },
     {

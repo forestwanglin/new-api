@@ -37,6 +37,8 @@ import { Route as RankingsIndexRouteImport } from './routes/rankings/index'
 import { Route as SetupIndexRouteImport } from './routes/setup/index'
 import { Route as SubscriptionIndexRouteImport } from './routes/subscription/index'
 import { Route as TutorialIndexRouteImport } from './routes/tutorial/index'
+import { Route as WechatOfficialConfirmRouteImport } from './routes/wechat-official/confirm'
+import { Route as WechatOfficialResumeRouteImport } from './routes/wechat-official/resume'
 import { Route as authUserResetRouteImport } from './routes/(auth)/user/reset'
 import { Route as AuthenticatedChannelsIndexRouteImport } from './routes/_authenticated/channels/index'
 import { Route as AuthenticatedChatChatIdRouteImport } from './routes/_authenticated/chat/$chatId'
@@ -224,6 +226,16 @@ const SubscriptionIndexRoute = SubscriptionIndexRouteImport.update({
 const TutorialIndexRoute = TutorialIndexRouteImport.update({
   id: '/tutorial/',
   path: '/tutorial/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WechatOfficialConfirmRoute = WechatOfficialConfirmRouteImport.update({
+  id: '/wechat-official/confirm',
+  path: '/wechat-official/confirm',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WechatOfficialResumeRoute = WechatOfficialResumeRouteImport.update({
+  id: '/wechat-official/resume',
+  path: '/wechat-official/resume',
   getParentRoute: () => rootRouteImport,
 } as any)
 const authUserResetRoute = authUserResetRouteImport.update({
@@ -535,6 +547,8 @@ export interface FileRoutesByFullPath {
   '/503': typeof errors503Route
   '/chat2link': typeof AuthenticatedChat2linkRoute
   '/oauth/$provider': typeof OauthProviderRoute
+  '/wechat-official/confirm': typeof WechatOfficialConfirmRoute
+  '/wechat-official/resume': typeof WechatOfficialResumeRoute
   '/about/': typeof AboutIndexRoute
   '/invite/': typeof InviteIndexRoute
   '/model/': typeof ModelIndexRoute
@@ -611,6 +625,8 @@ export interface FileRoutesByTo {
   '/503': typeof errors503Route
   '/chat2link': typeof AuthenticatedChat2linkRoute
   '/oauth/$provider': typeof OauthProviderRoute
+  '/wechat-official/confirm': typeof WechatOfficialConfirmRoute
+  '/wechat-official/resume': typeof WechatOfficialResumeRoute
   '/about': typeof AboutIndexRoute
   '/invite': typeof InviteIndexRoute
   '/model': typeof ModelIndexRoute
@@ -691,6 +707,8 @@ export interface FileRoutesById {
   '/(errors)/503': typeof errors503Route
   '/_authenticated/chat2link': typeof AuthenticatedChat2linkRoute
   '/oauth/$provider': typeof OauthProviderRoute
+  '/wechat-official/confirm': typeof WechatOfficialConfirmRoute
+  '/wechat-official/resume': typeof WechatOfficialResumeRoute
   '/about/': typeof AboutIndexRoute
   '/invite/': typeof InviteIndexRoute
   '/model/': typeof ModelIndexRoute
@@ -770,6 +788,8 @@ export interface FileRouteTypes {
     | '/503'
     | '/chat2link'
     | '/oauth/$provider'
+    | '/wechat-official/confirm'
+    | '/wechat-official/resume'
     | '/about/'
     | '/invite/'
     | '/model/'
@@ -846,6 +866,8 @@ export interface FileRouteTypes {
     | '/503'
     | '/chat2link'
     | '/oauth/$provider'
+    | '/wechat-official/confirm'
+    | '/wechat-official/resume'
     | '/about'
     | '/invite'
     | '/model'
@@ -925,6 +947,8 @@ export interface FileRouteTypes {
     | '/(errors)/503'
     | '/_authenticated/chat2link'
     | '/oauth/$provider'
+    | '/wechat-official/confirm'
+    | '/wechat-official/resume'
     | '/about/'
     | '/invite/'
     | '/model/'
@@ -996,6 +1020,8 @@ export interface RootRouteChildren {
   errors500Route: typeof errors500Route
   errors503Route: typeof errors503Route
   OauthProviderRoute: typeof OauthProviderRoute
+  WechatOfficialConfirmRoute: typeof WechatOfficialConfirmRoute
+  WechatOfficialResumeRoute: typeof WechatOfficialResumeRoute
   AboutIndexRoute: typeof AboutIndexRoute
   InviteIndexRoute: typeof InviteIndexRoute
   ModelIndexRoute: typeof ModelIndexRoute
@@ -1203,6 +1229,20 @@ declare module '@tanstack/react-router' {
       path: '/tutorial'
       fullPath: '/tutorial/'
       preLoaderRoute: typeof TutorialIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/wechat-official/confirm': {
+      id: '/wechat-official/confirm'
+      path: '/wechat-official/confirm'
+      fullPath: '/wechat-official/confirm'
+      preLoaderRoute: typeof WechatOfficialConfirmRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/wechat-official/resume': {
+      id: '/wechat-official/resume'
+      path: '/wechat-official/resume'
+      fullPath: '/wechat-official/resume'
+      preLoaderRoute: typeof WechatOfficialResumeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/(auth)/user/reset': {
@@ -1731,6 +1771,8 @@ const rootRouteChildren: RootRouteChildren = {
   errors500Route: errors500Route,
   errors503Route: errors503Route,
   OauthProviderRoute: OauthProviderRoute,
+  WechatOfficialConfirmRoute: WechatOfficialConfirmRoute,
+  WechatOfficialResumeRoute: WechatOfficialResumeRoute,
   AboutIndexRoute: AboutIndexRoute,
   InviteIndexRoute: InviteIndexRoute,
   ModelIndexRoute: ModelIndexRoute,

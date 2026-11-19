@@ -19,6 +19,15 @@ For commercial licensing, please contact support@quantumnous.com
 // Static translation keys that don't get picked up by the t('...') regex.
 // These cover dynamic labels (e.g. constants, configs) that are passed into t at runtime.
 export const STATIC_I18N_KEYS = [
+  'WeChat Official Account authorization is unavailable. Please try again.',
+  'Invalid WeChat Official Account configuration. Check credentials and HTTPS site URL.',
+  'The WeChat AppID identity namespace is pinned. A separate identity migration is required to change it.',
+  'WeChat authorization failed. Please start again.',
+  'WeChat authorization expired or changed. Please start again.',
+  'Failed to read WeChat Official Account configuration.',
+  'Preparing WeChat authorization...',
+  'Return to the original security action and confirm again.',
+
   'Automatic renewal',
   'Benefits',
   'Created at',

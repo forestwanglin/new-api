@@ -284,6 +284,9 @@ func validateOptionValue(key string, value string) error {
 }
 
 func UpdateOption(key string, value string) error {
+	if IsWeChatOfficialOption(key) {
+		return UpdateWeChatOfficialOption(key, value)
+	}
 	if IsRequestPolicyOption(key) {
 		return UpdateRequestPolicyOptions(map[string]string{key: value})
 	}
@@ -322,6 +325,9 @@ func UpdateOptionsBulk(values map[string]string) error {
 		return nil
 	}
 	for key := range values {
+		if IsWeChatOfficialOption(key) {
+			return ErrWeChatOfficialConfiguration
+		}
 		if IsPasskeyDomainOption(key) {
 			_, err := UpdatePasskeyDomainOptions(values, false, "")
 			return err

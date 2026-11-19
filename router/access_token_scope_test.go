@@ -4,6 +4,8 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -21,6 +23,12 @@ import (
 // accessTokenExemptRoutes are /api routes that never reach dashboard
 // authentication, so a personal access token has no rule to satisfy there.
 var accessTokenExemptRoutes = []string{
+	"GET /api/oauth/wechat_official/browser",
+	"GET /api/oauth/wechat_official/start",
+	"GET /api/oauth/wechat_official/callback",
+	"GET /api/oauth/wechat_official/confirmation",
+	"POST /api/oauth/wechat_official/confirm",
+
 	// Anonymous pages and setup.
 	"GET /api/setup",
 	"POST /api/setup",
@@ -198,5 +206,96 @@ func TestAccessTokenVerificationScopesAreAllListed(t *testing.T) {
 	for _, scope := range scopes {
 		_, listed := service.AccessTokenVerificationScope(scope)
 		assert.True(t, listed, "verification scope %s has no access token rule", scope)
+	}
+}
+
+func TestWeChatOfficialPollingPreservesCriticalRateBudget(t *testing.T) {
+	previousCritical, previousGlobal, previousRedis, previousSecure := common.CriticalRateLimitEnable, common.GlobalApiRateLimitEnable, common.RedisEnabled, common.SessionCookieSecure
+	common.CriticalRateLimitEnable = true
+	common.GlobalApiRateLimitEnable = false
+	common.RedisEnabled = false
+	common.SessionCookieSecure = false
+	t.Cleanup(func() {
+		common.CriticalRateLimitEnable = previousCritical
+		common.GlobalApiRateLimitEnable = previousGlobal
+		common.RedisEnabled = previousRedis
+		common.SessionCookieSecure = previousSecure
+	})
+	engine := newAccessTokenScopeTestEngine(t)
+	// A full QR lifetime's reads cannot spend the shared login/SMS critical quota.
+	for range 151 {
+		r := httptest.NewRequest(http.MethodPost, "/api/oauth/wechat_official/flows/status", strings.NewReader(`{}`))
+		r.RemoteAddr = "192.0.2.188:1234"
+		w := httptest.NewRecorder()
+		engine.ServeHTTP(w, r)
+		require.NotEqual(t, http.StatusTooManyRequests, w.Code)
+	}
+	r := httptest.NewRequest(http.MethodPost, "/api/oauth/wechat", strings.NewReader(`{}`))
+	r.RemoteAddr = "192.0.2.188:1234"
+	w := httptest.NewRecorder()
+	engine.ServeHTTP(w, r)
+	require.NotEqual(t, http.StatusTooManyRequests, w.Code)
+}
+
+func TestWeChatOfficialRoutesHaveExplicitCredentialPolicy(t *testing.T) {
+	engine := newAccessTokenScopeTestEngine(t)
+	expected := map[string]string{
+		"GET /api/oauth/wechat_official/browser":           "public",
+		"GET /api/oauth/wechat_official/start":             "public",
+		"GET /api/oauth/wechat_official/callback":          "public",
+		"GET /api/oauth/wechat_official/confirmation":      "public",
+		"POST /api/oauth/wechat_official/confirm":          "public",
+		"POST /api/oauth/wechat_official/flows":            "session",
+		"POST /api/oauth/wechat_official/flows/status":     "session",
+		"POST /api/oauth/wechat_official/flows/cancel":     "session",
+		"POST /api/oauth/wechat_official/flows/resume":     "session",
+		"POST /api/oauth/wechat_official/flows/complete":   "session",
+		"GET /api/oauth/wechat_official/bind/verification": "session",
+		"POST /api/oauth/wechat_official/bind/sms/send":    "session",
+		"POST /api/oauth/wechat_official/bind/sms/verify":  "session",
+		"POST /api/oauth/wechat_official/bind":             "session",
+	}
+	count := 0
+	for _, route := range engine.Routes() {
+		if !strings.HasPrefix(route.Path, "/api/oauth/wechat_official/") {
+			continue
+		}
+		key := route.Method + " " + route.Path
+		kind, exists := expected[key]
+		require.True(t, exists, "unclassified official route %s", key)
+		count++
+		rule, declared := middleware.AccessTokenRouteRule(key)
+		if kind == "public" {
+			assert.False(t, declared, key)
+		} else {
+			require.True(t, declared, key)
+			assert.Equal(t, "session", rule.Kind(), key)
+			assert.Empty(t, rule.Scope(), "official ceremonies cannot become PAT catalog grants: %s", key)
+		}
+	}
+	assert.Equal(t, len(expected), count)
+}
+
+func TestWeChatOfficialMutationsRejectForeignOriginAndDisableCache(t *testing.T) {
+	previousSecure, previousTrusted := common.SessionCookieSecure, common.SessionCookieTrustedURLs
+	previousCritical, previousGlobal := common.CriticalRateLimitEnable, common.GlobalApiRateLimitEnable
+	common.SessionCookieSecure = true
+	common.SessionCookieTrustedURLs = []string{"https://site.example"}
+	common.CriticalRateLimitEnable, common.GlobalApiRateLimitEnable = false, false
+	t.Cleanup(func() {
+		common.SessionCookieSecure, common.SessionCookieTrustedURLs = previousSecure, previousTrusted
+		common.CriticalRateLimitEnable, common.GlobalApiRateLimitEnable = previousCritical, previousGlobal
+	})
+	engine := newAccessTokenScopeTestEngine(t)
+	for _, path := range []string{"/confirm", "/flows", "/flows/status", "/flows/cancel", "/flows/resume", "/flows/complete", "/bind/sms/send", "/bind/sms/verify", "/bind"} {
+		t.Run(path, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodPost, "https://site.example/api/oauth/wechat_official"+path, strings.NewReader(`{}`))
+			request.Header.Set("Origin", "https://foreign.example")
+			response := httptest.NewRecorder()
+			engine.ServeHTTP(response, request)
+			assert.Equal(t, http.StatusForbidden, response.Code)
+			assert.Contains(t, response.Body.String(), "AUTH_ORIGIN_FORBIDDEN")
+			assert.Contains(t, response.Header().Get("Cache-Control"), "no-store")
+		})
 	}
 }

@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { KeyRound, Plus } from 'lucide-react'
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { ConfirmDialog } from '@/components/confirm-dialog'
@@ -44,6 +44,10 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { SecureVerificationDialog } from '@/features/auth/secure-verification'
+import {
+  readOfficialUIDraft,
+  clearOfficialUIDraft,
+} from '@/features/auth/wechat-official/ui-draft'
 import { AuditLogViewer } from '@/features/usage-logs/audit/components/audit-log-viewer'
 import { toIntlLocale } from '@/i18n/languages'
 
@@ -68,7 +72,9 @@ export function AccessTokensCard() {
   )
   const formatTime = (seconds: number) =>
     timeFormat.format(new Date(seconds * 1000))
-  const [createOpen, setCreateOpen] = useState(false)
+  const [createOpen, setCreateOpen] = useState(() =>
+    Boolean(readOfficialUIDraft('token-create'))
+  )
   const [revokeTarget, setRevokeTarget] = useState<
     AccessToken | 'legacy' | null
   >(null)
@@ -77,6 +83,27 @@ export function AccessTokensCard() {
   const [records, setRecords] = useState<{ tokenRef?: string } | null>(null)
   const catalog = access.catalog.data
   const list = access.list.data
+  const restoredEdit = useRef(false)
+  useEffect(() => {
+    if (restoredEdit.current || !list) return
+    restoredEdit.current = true
+    const draft = readOfficialUIDraft('token-edit') as {
+      token_id?: number
+    } | null
+    if (draft?.token_id) {
+      setEditTarget(
+        list.items.find((token) => token.id === draft.token_id) ?? null
+      )
+    }
+    const revokeDraft = readOfficialUIDraft('token-revoke')
+    clearOfficialUIDraft('token-revoke')
+    if (revokeDraft === 'legacy' && list.legacy) setRevokeTarget('legacy')
+    else if (typeof revokeDraft === 'number') {
+      setRevokeTarget(
+        list.items.find((token) => token.id === revokeDraft) ?? null
+      )
+    }
+  }, [list])
   const resourceLabels = useMemo(
     () =>
       new Map(

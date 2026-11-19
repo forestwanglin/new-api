@@ -132,7 +132,29 @@ func userSessionCacheDeadline() time.Time {
 	return time.Now().Add(time.Duration(userCacheTTLSeconds()) * time.Second)
 }
 
-func CreateUserSession(session *UserSession) error {
+func CreateUserSession(session *UserSession, officialFingerprint ...string) error {
+	if session == nil {
+		return ErrUserSessionInvalid
+	}
+	if len(officialFingerprint) > 0 && officialFingerprint[0] != "" {
+		cacheDeadline := userSessionCacheDeadline()
+		if err := DB.Transaction(func(tx *gorm.DB) error {
+			var current User
+			if err := lockForUpdate(tx).Select("id", "status", "auth_version", "wechat_id").First(&current, session.UserID).Error; err != nil {
+				return err
+			}
+			if len(officialFingerprint) < 2 || current.WeChatId != officialFingerprint[1] || current.Status != common.UserStatusEnabled || current.AuthVersion != session.UserAuthVersion {
+				return ErrUserSessionInactive
+			}
+			if _, err := LockWeChatOfficialConfig(tx, officialFingerprint[0]); err != nil {
+				return err
+			}
+			return createUserSessionWithTx(tx, session)
+		}); err != nil {
+			return err
+		}
+		return publishCreatedUserSession(session, cacheDeadline)
+	}
 	cacheDeadline := userSessionCacheDeadline()
 	if err := createUserSessionWithTx(DB, session); err != nil {
 		return err

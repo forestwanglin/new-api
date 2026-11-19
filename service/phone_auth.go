@@ -39,12 +39,14 @@ var (
 )
 
 type phoneFlowPayload struct {
-	Phone         string `json:"phone,omitempty"`
-	AffiliateCode string `json:"affiliate_code,omitempty"`
-	Digest        string `json:"digest,omitempty"`
-	BindFlowID    int64  `json:"bind_flow_id,omitempty"`
-	AuthVersion   int64  `json:"auth_version,omitempty"`
-	SendAttempts  int    `json:"send_attempts,omitempty"`
+	OfficialFingerprint string `json:"official_fingerprint,omitempty"`
+	WeChatID            string `json:"wechat_id,omitempty"`
+	Phone               string `json:"phone,omitempty"`
+	AffiliateCode       string `json:"affiliate_code,omitempty"`
+	Digest              string `json:"digest,omitempty"`
+	BindFlowID          int64  `json:"bind_flow_id,omitempty"`
+	AuthVersion         int64  `json:"auth_version,omitempty"`
+	SendAttempts        int    `json:"send_attempts,omitempty"`
 }
 
 func phoneCodeDigest(code string) string {
@@ -157,7 +159,7 @@ func VerifyPhoneImage(token, answer, phone, bindToken, browser, affiliateCode st
 }
 
 func StartWeChatPhoneFlow(user *model.User, browser string) (string, error) {
-	encoded, err := common.Marshal(phoneFlowPayload{AuthVersion: user.AuthVersion})
+	encoded, err := common.Marshal(phoneFlowPayload{AuthVersion: user.AuthVersion, OfficialFingerprint: user.WeChatConfig, WeChatID: user.WeChatId})
 	if err != nil {
 		return "", err
 	}
@@ -171,8 +173,13 @@ func RequireWeChatPhoneFlow(token, browser string) (*model.AuthFlow, error) {
 		return nil, err
 	}
 	user, err := model.GetUserById(flow.UserId, false)
-	if err != nil || user.Status != common.UserStatusEnabled || user.AuthVersion != payload.AuthVersion {
+	if err != nil || user.Status != common.UserStatusEnabled || user.AuthVersion != payload.AuthVersion || (payload.WeChatID != "" && user.WeChatId != payload.WeChatID) {
 		return nil, ErrPhoneVerification
+	}
+	if payload.OfficialFingerprint != "" {
+		if _, err := model.RequireWeChatOfficialConfig(model.DB, payload.OfficialFingerprint); err != nil {
+			return nil, err
+		}
 	}
 	return flow, nil
 }
@@ -301,7 +308,16 @@ func CompletePhoneLogin(token, code, browser string) (*model.User, error) {
 					}
 					return err
 				}
+				if bindPayload.WeChatID != "" && bound.WeChatId != bindPayload.WeChatID {
+					return model.ErrAccountBindingChanged
+				}
+				if bindPayload.OfficialFingerprint != "" {
+					if _, err := model.LockWeChatOfficialConfig(tx, bindPayload.OfficialFingerprint); err != nil {
+						return err
+					}
+				}
 				user = *bound
+				user.WeChatConfig = bindPayload.OfficialFingerprint
 				return nil
 			}
 			var claim model.ExternalIdentityClaim
@@ -356,8 +372,13 @@ func readWeChatPhoneFlowByID(id int64, browser string) (*model.AuthFlow, phoneFl
 		return nil, payload, ErrPhoneVerification
 	}
 	user, err := model.GetUserById(flow.UserId, false)
-	if err != nil || user.Status != common.UserStatusEnabled || user.AuthVersion != payload.AuthVersion {
+	if err != nil || user.Status != common.UserStatusEnabled || user.AuthVersion != payload.AuthVersion || (payload.WeChatID != "" && user.WeChatId != payload.WeChatID) {
 		return nil, payload, ErrPhoneVerification
+	}
+	if payload.OfficialFingerprint != "" {
+		if _, err := model.RequireWeChatOfficialConfig(model.DB, payload.OfficialFingerprint); err != nil {
+			return nil, payload, err
+		}
 	}
 	return &flow, payload, nil
 }

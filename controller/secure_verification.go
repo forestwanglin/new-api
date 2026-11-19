@@ -176,6 +176,10 @@ func UniversalVerify(c *gin.Context) {
 	var proof *service.SecurityProof
 	var err error
 	if request.Method == service.VerificationMethodWeChat {
+		if !service.LegacyWeChatAvailable() {
+			writeSecurityOperationError(c, service.ErrVerificationUnavailable)
+			return
+		}
 		operation := service.VerificationOperation{Scope: request.Scope, Context: request.Context}
 		if _, err = service.BindVerificationOperation(operation); err == nil {
 			_, err = service.RequireVerificationMethod(identity, request.Scope, request.Method)

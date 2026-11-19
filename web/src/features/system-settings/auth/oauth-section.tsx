@@ -87,6 +87,11 @@ const oauthSchema = z.object({
   LinuxDOClientId: z.string(),
   LinuxDOClientSecret: z.string(),
   LinuxDOMinimumTrustLevel: z.string(),
+  wechat_official: z.object({
+    enabled: z.boolean(),
+    app_id: z.string(),
+    app_secret: z.string(),
+  }),
   WeChatAuthEnabled: z.boolean(),
   WeChatServerAddress: z.string(),
   WeChatServerToken: z.string(),
@@ -117,6 +122,11 @@ type FlatOAuthDefaults = {
   LinuxDOClientId: string
   LinuxDOClientSecret: string
   LinuxDOMinimumTrustLevel: string
+  'wechat_official.enabled'?: boolean
+  'wechat_official.app_id'?: string
+  'wechat_official.app_secret'?: string
+  'wechat_official.app_secret_configured'?: boolean
+  'wechat_official.callback_url'?: string
   WeChatAuthEnabled: boolean
   WeChatServerAddress: string
   WeChatServerToken: string
@@ -203,6 +213,11 @@ const buildFormDefaults = (defaults: FlatOAuthDefaults): OAuthFormValues => ({
   LinuxDOClientId: defaults.LinuxDOClientId ?? '',
   LinuxDOClientSecret: defaults.LinuxDOClientSecret ?? '',
   LinuxDOMinimumTrustLevel: defaults.LinuxDOMinimumTrustLevel ?? '',
+  wechat_official: {
+    enabled: defaults['wechat_official.enabled'] ?? false,
+    app_id: defaults['wechat_official.app_id'] ?? '',
+    app_secret: '',
+  },
   WeChatAuthEnabled: defaults.WeChatAuthEnabled,
   WeChatServerAddress: defaults.WeChatServerAddress ?? '',
   WeChatServerToken: defaults.WeChatServerToken ?? '',
@@ -231,6 +246,9 @@ const normalizeFormValues = (values: OAuthFormValues): FlatOAuthDefaults => ({
   LinuxDOClientId: values.LinuxDOClientId,
   LinuxDOClientSecret: values.LinuxDOClientSecret,
   LinuxDOMinimumTrustLevel: values.LinuxDOMinimumTrustLevel,
+  'wechat_official.app_id': values.wechat_official.app_id.trim(),
+  'wechat_official.app_secret': values.wechat_official.app_secret.trim(),
+  'wechat_official.enabled': values.wechat_official.enabled,
   WeChatAuthEnabled: values.WeChatAuthEnabled,
   WeChatServerAddress: values.WeChatServerAddress,
   WeChatServerToken: values.WeChatServerToken,
@@ -283,7 +301,9 @@ export function OAuthSection(props: OAuthSectionProps) {
     defaultValues: formDefaults,
   })
 
-  const baselineRef = useRef<FlatOAuthDefaults>(props.defaultValues)
+  const baselineRef = useRef<FlatOAuthDefaults>(
+    normalizeFormValues(buildFormDefaults(props.defaultValues))
+  )
   const baselineSerializedRef = useRef<string>(
     JSON.stringify(props.defaultValues)
   )
@@ -291,7 +311,9 @@ export function OAuthSection(props: OAuthSectionProps) {
   useEffect(() => {
     const serialized = JSON.stringify(props.defaultValues)
     if (serialized === baselineSerializedRef.current) return
-    baselineRef.current = props.defaultValues
+    baselineRef.current = normalizeFormValues(
+      buildFormDefaults(props.defaultValues)
+    )
     baselineSerializedRef.current = serialized
     form.reset(buildFormDefaults(props.defaultValues))
   }, [props.defaultValues, form])
@@ -361,13 +383,19 @@ export function OAuthSection(props: OAuthSectionProps) {
       return
     }
 
+    // Keep saved secrets when the input is blank; credentials precede enabling.
     for (const key of changedKeys) {
-      await updateOption.mutateAsync({
-        key,
-        value: normalized[key],
-      })
+      const value = normalized[key]
+      if (
+        value === undefined ||
+        (key === 'wechat_official.app_secret' && value === '')
+      ) {
+        continue
+      }
+      await updateOption.mutateAsync({ key, value })
     }
 
+    normalized['wechat_official.app_secret'] = ''
     baselineRef.current = normalized
     baselineSerializedRef.current = JSON.stringify(normalized)
     form.reset(buildFormDefaults(normalized))
@@ -384,7 +412,10 @@ export function OAuthSection(props: OAuthSectionProps) {
 
       <SettingsSection title={t('OAuth Integrations')}>
         <Form {...form}>
-          <SettingsForm onSubmit={form.handleSubmit(onSubmit)}>
+          <SettingsForm
+            className='max-w-full min-w-0'
+            onSubmit={form.handleSubmit(onSubmit)}
+          >
             <SettingsPageFormActions
               onSave={form.handleSubmit(onSubmit)}
               onReset={handleReset}
@@ -393,15 +424,26 @@ export function OAuthSection(props: OAuthSectionProps) {
             />
             <FormDirtyIndicator isDirty={form.formState.isDirty} />
 
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className='grid w-full grid-cols-6'>
-                <TabsTrigger value='github'>{t('GitHub')}</TabsTrigger>
-                <TabsTrigger value='discord'>{t('Discord')}</TabsTrigger>
-                <TabsTrigger value='oidc'>{t('OIDC')}</TabsTrigger>
-                <TabsTrigger value='telegram'>{t('Telegram')}</TabsTrigger>
-                <TabsTrigger value='linuxdo'>{t('LinuxDO')}</TabsTrigger>
-                <TabsTrigger value='wechat'>{t('WeChat')}</TabsTrigger>
-              </TabsList>
+            <Tabs
+              value={activeTab}
+              onValueChange={setActiveTab}
+              className='w-full max-w-full min-w-0'
+            >
+              <div className='w-full min-w-0 overflow-x-auto'>
+                <TabsList className='flex w-max min-w-full justify-start [&>[data-slot=tabs-trigger]]:flex-none'>
+                  <TabsTrigger value='github'>{t('GitHub')}</TabsTrigger>
+                  <TabsTrigger value='discord'>{t('Discord')}</TabsTrigger>
+                  <TabsTrigger value='oidc'>{t('OIDC')}</TabsTrigger>
+                  <TabsTrigger value='telegram'>{t('Telegram')}</TabsTrigger>
+                  <TabsTrigger value='linuxdo'>{t('LinuxDO')}</TabsTrigger>
+                  <TabsTrigger value='wechat'>
+                    {t('WeChat verification code')}
+                  </TabsTrigger>
+                  <TabsTrigger value='wechat-official'>
+                    {t('WeChat Official Account authorization')}
+                  </TabsTrigger>
+                </TabsList>
+              </div>
 
               <TabsContent value='github' className={oauthTabContentClassName}>
                 <OAuthSetupGuide
@@ -1034,6 +1076,101 @@ export function OAuthSection(props: OAuthSectionProps) {
                 />
               </TabsContent>
 
+              <TabsContent
+                value='wechat-official'
+                className={oauthTabContentClassName}
+              >
+                <OAuthSetupGuide
+                  title={t('Setup guide')}
+                  description={t(
+                    'Configure the web authorization domain in your verified Official Account. Use the same AppID as the existing WeChat service to keep existing accounts.'
+                  )}
+                  rows={[
+                    {
+                      label: t('Authorization callback URL'),
+                      value:
+                        props.defaultValues['wechat_official.callback_url'] ||
+                        '',
+                      copyLabel: t('Copy callback URL'),
+                    },
+                  ]}
+                />
+                <p className='text-muted-foreground text-sm lg:col-span-2'>
+                  {t(
+                    'Requires an HTTPS site, SESSION_COOKIE_SECURE=true and SESSION_COOKIE_TRUSTED_URL set to the exact HTTPS site URL.'
+                  )}
+                </p>
+                <FormField
+                  control={form.control}
+                  name='wechat_official.enabled'
+                  render={({ field }) => (
+                    <SettingsSwitchItem>
+                      <SettingsSwitchContent>
+                        <FormLabel>
+                          {t('Enable WeChat Official Account authorization')}
+                        </FormLabel>
+                        <FormDescription>
+                          {t(
+                            'Allow dynamic QR authorization independently of the verification code method.'
+                          )}
+                        </FormDescription>
+                      </SettingsSwitchContent>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                    </SettingsSwitchItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name='wechat_official.app_id'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('Official Account AppID')}</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          autoComplete='off'
+                          placeholder='wx...'
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name='wechat_official.app_secret'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('Official Account AppSecret')}</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          type='password'
+                          autoComplete='new-password'
+                          placeholder={
+                            props.defaultValues[
+                              'wechat_official.app_secret_configured'
+                            ]
+                              ? t('Configured — leave blank to keep')
+                              : t('Enter AppSecret')
+                          }
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        {t(
+                          'The saved secret is never returned. Leave blank to keep the current secret.'
+                        )}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </TabsContent>
               <TabsContent value='wechat' className={oauthTabContentClassName}>
                 <FormField
                   control={form.control}

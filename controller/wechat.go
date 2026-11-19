@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -119,6 +118,16 @@ func WeChatAuth(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	completeWeChatLogin(c, identity, browser, affiliateCode, "")
+}
+
+func completeWeChatLogin(c *gin.Context, identity wechatIdentity, browser, affiliateCode, fingerprint string) {
+	if fingerprint != "" {
+		if _, err := model.RequireWeChatOfficialConfig(model.DB, fingerprint); err != nil {
+			common.ApiError(c, err)
+			return
+		}
+	}
 	wechatId := identity.OpenID
 	user := model.User{
 		WeChatId: wechatId,
@@ -129,13 +138,13 @@ func WeChatAuth(c *gin.Context) {
 			common.ApiError(c, err)
 			return
 		}
-		if user.Id == 0 {
+		if user.Id == 0 || user.WeChatId != wechatId {
 			common.ApiErrorT(c, "User has been deleted")
 			return
 		}
 	} else {
 		if common.RegisterEnabled {
-			user.Username = "wechat_" + strconv.Itoa(model.GetMaxUserId()+1)
+			user.Username = "wechat_" + common.GetRandomString(13)
 			user.DisplayName = "WeChat User"
 			if identity.Profile.Nickname != "" {
 				user.DisplayName = identity.Profile.Nickname
@@ -153,9 +162,23 @@ func WeChatAuth(c *gin.Context) {
 				return
 			}
 			user.InviterId = inviterID
-			if err := user.Insert(inviterID); err != nil {
-				common.ApiError(c, err)
-				return
+			if err := model.DB.Transaction(func(tx *gorm.DB) error {
+				if fingerprint != "" {
+					if _, err := model.LockWeChatOfficialConfig(tx, fingerprint); err != nil {
+						return err
+					}
+				}
+				return user.InsertWithTx(tx, inviterID)
+			}); err != nil {
+				// A concurrent old/new registration may have won the durable identity claim.
+				var existing model.User
+				if !errors.Is(err, model.ErrExternalIdentityAlreadyClaimed) || model.DB.Where("wechat_id = ?", wechatId).First(&existing).Error != nil || existing.WeChatId != wechatId {
+					common.ApiError(c, err)
+					return
+				}
+				user = existing
+			} else {
+				user.FinalizeOAuthUserCreation(inviterID)
 			}
 		} else {
 			common.ApiErrorT(c, "New user registration has been disabled by administrator")
@@ -170,6 +193,7 @@ func WeChatAuth(c *gin.Context) {
 	if err := model.SyncWeChatProfile(user.Id, wechatId, identity.Profile.Nickname, identity.Profile.AvatarURL, false); err != nil {
 		common.SysLog(fmt.Sprintf("WeChat optional profile synchronization failed for user %d", user.Id))
 	}
+	user.WeChatConfig = fingerprint
 	hasPhone, err := model.HasUserPhone(user.Id)
 	if err != nil {
 		common.ApiError(c, err)

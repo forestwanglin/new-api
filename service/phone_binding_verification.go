@@ -13,8 +13,9 @@ const VerificationScopePhoneBinding = "phone.binding"
 const phoneBindingPurpose = "phone_change_binding_v2"
 
 type phoneBindingContact struct {
-	Method  string `json:"method"`
-	Subject string `json:"subject"`
+	Method              string `json:"method"`
+	Subject             string `json:"subject"`
+	OfficialFingerprint string `json:"official_fingerprint,omitempty"`
 }
 
 type PhoneBindingAuthorization struct {
@@ -64,6 +65,7 @@ func phoneBindingRequirements(identity AuthIdentity, state *model.UserVerificati
 	requirements := &VerificationRequirements{Scope: VerificationScopePhoneBinding, Methods: []VerificationMethodOption{option}, OAuthProviders: []VerificationOAuthProvider{}, PasswordEncryptionEnabled: common.PasswordLoginEncryptionEnabled}
 	if contact.Method == VerificationMethodWeChat {
 		requirements.WeChatQRCode = common.WeChatAccountQRCodeImageURL
+		requirements.WeChatMethods = AvailableWeChatMethods()
 	}
 	return requirements, nil
 }
@@ -77,8 +79,8 @@ func validatePhoneBindingContactWithTx(tx *gorm.DB, identity AuthIdentity, metho
 	if common.UnmarshalJsonStr(payload, &issued) != nil || current.Method != method || issued.Method != method || !hmac.Equal([]byte(issued.Subject), []byte(current.Subject)) {
 		return ErrProofMethod
 	}
-	if method == VerificationMethodWeChat && !contactMethodAvailable(accessTokenContact{Method: method, Subject: current.Subject}) {
-		return ErrVerificationUnavailable
+	if err := validateWeChatProofConfig(tx, method, issued.OfficialFingerprint); err != nil {
+		return err
 	}
 	if method == VerificationMethodPassword {
 		var user model.User
@@ -119,6 +121,9 @@ func issuePhoneBindingProof(identity AuthIdentity, binding VerificationBinding, 
 
 // The trusted WeChat service has already consumed the submitted code.
 func CompletePhoneBindingWeChat(identity AuthIdentity, operation VerificationOperation, openID string) (*SecurityProof, error) {
+	if !LegacyWeChatAvailable() {
+		return nil, ErrVerificationUnavailable
+	}
 	binding, err := BindVerificationOperation(operation)
 	if err != nil {
 		return nil, err

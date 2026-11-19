@@ -14,6 +14,7 @@ import (
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting/system_setting"
+	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,6 +22,125 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
+
+func TestWeChatOfficialBrowserProofWithoutCaptcha(t *testing.T) {
+	setupSecurityEnrollmentTest(t)
+	previousSecure := common.SessionCookieSecure
+	common.SessionCookieSecure = true
+	t.Cleanup(func() { common.SessionCookieSecure = previousSecure })
+	var before int64
+	require.NoError(t, model.DB.Model(&model.AuthFlow{}).Count(&before).Error)
+	var browser string
+	for range 2 {
+		response := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(response)
+		c.Request = httptest.NewRequest(http.MethodGet, "https://site.example/api/oauth/wechat_official/browser", nil)
+		if browser != "" {
+			c.Request.AddCookie(&http.Cookie{Name: phoneBrowserCookie, Value: browser})
+		}
+		WeChatOfficialBrowser(c)
+		var result struct {
+			Success bool `json:"success"`
+			Data    struct {
+				BrowserToken string `json:"browser_token"`
+			} `json:"data"`
+		}
+		require.NoError(t, common.Unmarshal(response.Body.Bytes(), &result))
+		require.True(t, result.Success)
+		require.Len(t, result.Data.BrowserToken, 43)
+		if browser != "" {
+			assert.Equal(t, browser, result.Data.BrowserToken)
+		}
+		browser = result.Data.BrowserToken
+		cookies := response.Result().Cookies()
+		require.Len(t, cookies, 1)
+		assert.Equal(t, phoneBrowserCookie, cookies[0].Name)
+		assert.Equal(t, browser, cookies[0].Value)
+		assert.Equal(t, "/api", cookies[0].Path)
+		assert.True(t, cookies[0].HttpOnly)
+		assert.True(t, cookies[0].Secure)
+		assert.Equal(t, http.SameSiteLaxMode, cookies[0].SameSite)
+		assert.Contains(t, response.Header().Get("Cache-Control"), "no-store")
+		assert.NotContains(t, response.Body.String(), "challenge_token")
+		assert.NotContains(t, response.Body.String(), "data:image")
+	}
+	var after int64
+	require.NoError(t, model.DB.Model(&model.AuthFlow{}).Count(&after).Error)
+	assert.Equal(t, before, after, "issuing browser proof must not create a CAPTCHA challenge")
+}
+
+func TestWeChatOfficialCallbackRejectsScannerMismatchBeforeExchange(t *testing.T) {
+	setupSecurityEnrollmentTest(t)
+	previousTransport := http.DefaultTransport
+	calls := 0
+	http.DefaultTransport = controllerSMSRoundTripper(func(*http.Request) (*http.Response, error) {
+		calls++
+		return &http.Response{StatusCode: http.StatusBadGateway, Body: io.NopCloser(strings.NewReader("")), Header: http.Header{}}, nil
+	})
+	t.Cleanup(func() { http.DefaultTransport = previousTransport })
+	for _, scanner := range []string{"", strings.Repeat("b", 64)} {
+		response := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(response)
+		c.Request = httptest.NewRequest(http.MethodGet, "https://site.example/api/oauth/wechat_official/callback?state="+strings.Repeat("a", 64)+"&code=provider-sensitive-code", nil)
+		if scanner != "" {
+			c.Request.AddCookie(&http.Cookie{Name: officialScannerCookie, Value: scanner})
+		}
+		CallbackWeChatOfficial(c)
+		assert.Contains(t, response.Body.String(), `"success":false`)
+		assert.NotContains(t, response.Body.String(), "provider-sensitive-code")
+		assert.NotContains(t, response.Body.String(), "access_token")
+		assert.Empty(t, response.Header().Get("Location"))
+	}
+	assert.Zero(t, calls, "a scanner mismatch must reject before provider HTTP")
+}
+
+func TestWeChatOfficialOptionSecretRedactionAndBlankRetention(t *testing.T) {
+	setupSecurityEnrollmentTest(t)
+	previousMap := common.OptionMap
+	common.OptionMap = map[string]string{}
+	t.Cleanup(func() { common.OptionMap = previousMap })
+	for key, value := range map[string]string{
+		"ServerAddress": "https://site.example", "wechat_official.app_secret": "write-only-official-secret",
+		"wechat_official.app_id": "wx0123456789abcdef", "wechat_official.revision": "private-revision",
+		"wechat_official.pinned_app_id": "wx0123456789abcdef",
+	} {
+		require.NoError(t, model.DB.Create(&model.Option{Key: key, Value: value}).Error)
+		common.OptionMap[key] = value
+	}
+	require.NoError(t, model.UpdateOption("wechat_official.app_secret", "  "))
+	configuration, err := model.ReadWeChatOfficialConfig(model.DB)
+	require.NoError(t, err)
+	assert.Equal(t, "write-only-official-secret", configuration.AppSecret)
+	assert.Equal(t, "private-revision", configuration.Revision)
+	// Another process may have changed the authoritative configuration while this
+	// instance's legacy option cache still contains a different namespace/site.
+	common.OptionMap["wechat_official.app_id"] = "wxstale00000000000"
+	common.OptionMap["wechat_official.enabled"] = "true"
+	common.OptionMap["wechat_official.callback_url"] = "https://stale.example/callback"
+	common.OptionMap["wechat_official.app_secret_configured"] = "false"
+	response := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(response)
+	c.Request = httptest.NewRequest(http.MethodGet, "https://site.example/api/option/", nil)
+	GetOptions(c)
+	var result struct {
+		Success bool           `json:"success"`
+		Data    []model.Option `json:"data"`
+	}
+	require.NoError(t, common.Unmarshal(response.Body.Bytes(), &result))
+	require.True(t, result.Success, response.Body.String())
+	values := map[string]string{}
+	for _, option := range result.Data {
+		values[option.Key] = option.Value
+	}
+	assert.NotContains(t, values, "wechat_official.app_secret")
+	assert.NotContains(t, values, "wechat_official.revision")
+	assert.NotContains(t, values, "wechat_official.pinned_app_id")
+	assert.Equal(t, "true", values["wechat_official.app_secret_configured"])
+	assert.Equal(t, "wx0123456789abcdef", values["wechat_official.app_id"])
+	assert.Equal(t, "false", values["wechat_official.enabled"])
+	assert.Equal(t, "https://site.example/api/oauth/wechat_official/callback", values["wechat_official.callback_url"])
+	assert.NotContains(t, response.Body.String(), "write-only-official-secret")
+}
 
 func TestWeChatOptionalProfileExchange(t *testing.T) {
 	for _, tc := range []struct{ name, profile, nickname, avatar string }{
@@ -406,6 +526,93 @@ func TestWeChatBindingSMS(t *testing.T) {
 				reused := securityEnrollmentRequest("POST", "/api/oauth/wechat/bind", `{"code":"wechat-code"}`, proof.Data.ProofToken, identity, WeChatBind)
 				assert.Contains(t, reused.Body.String(), `"success":false`)
 			}
+		})
+	}
+}
+
+// Both providers converge here after independently authenticating the OpenID.
+func TestWeChatOfficialSharedLoginRegistrationPolicy(t *testing.T) {
+	for _, scenario := range []string{"existing", "registration-disabled", "banned", "invited-new-user"} {
+		t.Run(scenario, func(t *testing.T) {
+			user, _ := setupSecurityEnrollmentTest(t)
+			previousRegister, previousSecure, previousTrusted := common.RegisterEnabled, common.SessionCookieSecure, common.SessionCookieTrustedURLs
+			common.RegisterEnabled, common.SessionCookieSecure = false, true
+			common.SessionCookieTrustedURLs = []string{"https://site.example"}
+			t.Cleanup(func() {
+				common.RegisterEnabled, common.SessionCookieSecure, common.SessionCookieTrustedURLs = previousRegister, previousSecure, previousTrusted
+			})
+			for key, value := range map[string]string{"ServerAddress": "https://site.example", "wechat_official.enabled": "true", "wechat_official.app_id": "wx0123456789abcdef", "wechat_official.app_secret": "test-secret", "wechat_official.pinned_app_id": "wx0123456789abcdef", "wechat_official.revision": "login-test"} {
+				require.NoError(t, model.DB.Create(&model.Option{Key: key, Value: value}).Error)
+			}
+			cfg, err := model.RequireWeChatOfficialConfig(model.DB, "")
+			require.NoError(t, err)
+			if scenario == "existing" || scenario == "banned" {
+				updates := map[string]interface{}{"wechat_id": "shared-login-openid", "display_name": "custom display", "avatar_url": "https://custom.example/avatar", "avatar_source": "custom"}
+				if scenario == "banned" {
+					updates["status"] = common.UserStatusDisabled
+				}
+				require.NoError(t, model.DB.Model(user).Updates(updates).Error)
+			}
+			affiliate := ""
+			if scenario == "invited-new-user" {
+				common.RegisterEnabled = true
+				affiliate = "inviter-code"
+				require.NoError(t, model.DB.Model(user).Update("aff_code", affiliate).Error)
+			}
+			fingerprints := []string{cfg.Fingerprint}
+			if scenario == "existing" {
+				fingerprints = []string{"", cfg.Fingerprint}
+			}
+			for _, fingerprint := range fingerprints {
+				response := httptest.NewRecorder()
+				c, _ := gin.CreateTestContext(response)
+				c.Request = httptest.NewRequest(http.MethodPost, "https://site.example/api/oauth/wechat_official/flows/complete", nil)
+				completeWeChatLogin(c, wechatIdentity{OpenID: "shared-login-openid", Profile: wechatProfile{Nickname: "provider nickname", AvatarURL: "https://provider.example/avatar"}}, "owner-browser", affiliate, fingerprint)
+				var result struct {
+					Success bool `json:"success"`
+					Data    struct {
+						RequirePhoneBinding bool   `json:"require_phone_binding"`
+						BindToken           string `json:"bind_token"`
+					} `json:"data"`
+				}
+				require.NoError(t, common.Unmarshal(response.Body.Bytes(), &result))
+				if scenario == "registration-disabled" || scenario == "banned" {
+					require.False(t, result.Success, response.Body.String())
+					var count int64
+					require.NoError(t, model.DB.Model(&model.AuthFlow{}).Where("purpose = ?", service.WeChatPhonePurpose).Count(&count).Error)
+					assert.Zero(t, count)
+					continue
+				}
+				require.True(t, result.Success, response.Body.String())
+				require.True(t, result.Data.RequirePhoneBinding)
+				require.NotEmpty(t, result.Data.BindToken)
+				flow, err := service.RequireWeChatPhoneFlow(result.Data.BindToken, "owner-browser")
+				require.NoError(t, err)
+				var account model.User
+				require.NoError(t, model.DB.First(&account, flow.UserId).Error)
+				if scenario == "existing" {
+					assert.Equal(t, user.Id, account.Id)
+					assert.Equal(t, "custom display", account.DisplayName)
+					assert.Equal(t, "https://custom.example/avatar", account.AvatarURL)
+				} else {
+					assert.Equal(t, user.Id, account.InviterId)
+					assert.Equal(t, "provider nickname", account.DisplayName)
+					assert.LessOrEqual(t, len(account.Username), 20)
+				}
+				var payload map[string]interface{}
+				require.NoError(t, common.UnmarshalJsonStr(flow.Payload, &payload))
+				if fingerprint != "" {
+					assert.Contains(t, flow.Payload, fingerprint)
+				}
+				assert.NotContains(t, response.Body.String(), "access_token")
+			}
+			var count int64
+			require.NoError(t, model.DB.Model(&model.User{}).Count(&count).Error)
+			expected := int64(1)
+			if scenario == "invited-new-user" {
+				expected = 2
+			}
+			assert.Equal(t, expected, count)
 		})
 	}
 }

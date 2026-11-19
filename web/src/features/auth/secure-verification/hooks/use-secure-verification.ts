@@ -407,6 +407,38 @@ export function useSecureVerification() {
     []
   )
 
+  const onOfficialWeChatProof = (result: unknown) => {
+    const current = pending.current
+    if (
+      !current ||
+      current.kind !== 'operation' ||
+      state.phase !== 'ready' ||
+      state.input?.method !== 'wechat' ||
+      !state.requirements.wechat_methods?.includes('official')
+    ) {
+      return
+    }
+    if (
+      !result ||
+      typeof result !== 'object' ||
+      !('proof_token' in result) ||
+      typeof result.proof_token !== 'string' ||
+      !result.proof_token ||
+      !('expires_at' in result) ||
+      typeof result.expires_at !== 'number' ||
+      result.expires_at * 1000 <= Date.now() ||
+      !('scope' in result) ||
+      !('method' in result) ||
+      result.scope !== current.request.scope ||
+      result.method !== 'wechat'
+    ) {
+      throw new AuthOperationError('Invalid verification result')
+    }
+    pending.current = null
+    dispatch({ type: 'reset' })
+    current.resolve(result as SecurityProof)
+  }
+
   return {
     requestVerification,
     requestLoginVerification,
@@ -419,6 +451,7 @@ export function useSecureVerification() {
       onRetry: retry,
       onInputChange: setInput,
       onVerify: executeVerification,
+      onOfficialWeChatProof,
       onSendSMS: sendSMS,
       smsSending,
       smsRetryAfter: smsCountdown.isActive ? smsCountdown.secondsLeft : 0,

@@ -27,8 +27,10 @@ type LegacyGitHubMigration struct {
 
 // loginFlowPayload stays comparable; completion compares it with the bound copy.
 type loginFlowPayload struct {
-	AuthVersion int64  `json:"auth_version"`
-	LoginMethod string `json:"login_method"`
+	OfficialFingerprint string `json:"official_fingerprint,omitempty"`
+	WeChatID            string `json:"wechat_id,omitempty"`
+	AuthVersion         int64  `json:"auth_version"`
+	LoginMethod         string `json:"login_method"`
 	// The GitHub binding rewrite waiting for this verification, if any.
 	PendingGitHubID       string `json:"pending_github_id,omitempty"`
 	PendingGitHubLegacyID string `json:"pending_github_legacy_id,omitempty"`
@@ -69,7 +71,7 @@ func StartLoginVerification(user *model.User, loginMethod string, migration *Leg
 	if !available {
 		return nil, ErrVerificationUnavailable
 	}
-	payload := loginFlowPayload{AuthVersion: state.AuthVersion, LoginMethod: loginMethod}
+	payload := loginFlowPayload{AuthVersion: state.AuthVersion, LoginMethod: loginMethod, OfficialFingerprint: user.WeChatConfig, WeChatID: user.WeChatId}
 	if migration != nil {
 		payload.PendingGitHubID, payload.PendingGitHubLegacyID = migration.GitHubID, migration.LegacyID
 	}
@@ -103,6 +105,11 @@ func RequireLoginVerification(token, method string) (*LoginVerification, error) 
 	}
 	if state.Status != common.UserStatusEnabled || state.AuthVersion != payload.AuthVersion {
 		return nil, model.ErrUserSessionInactive
+	}
+	if payload.OfficialFingerprint != "" {
+		if _, err := model.RequireWeChatOfficialConfig(model.DB, payload.OfficialFingerprint); err != nil {
+			return nil, err
+		}
 	}
 	if err := requireLoginVerificationMethod(state, method); err != nil {
 		return nil, err
@@ -160,6 +167,18 @@ func CompleteLoginVerification(token string, verification *LoginVerification, me
 		var payload loginFlowPayload
 		if flow.Id != verification.Flow.Id || common.UnmarshalJsonStr(flow.Payload, &payload) != nil || payload != verification.payload {
 			return model.ErrAuthFlowInvalid
+		}
+		if payload.OfficialFingerprint != "" {
+			if _, err := model.LockWeChatOfficialConfig(tx, payload.OfficialFingerprint); err != nil {
+				return err
+			}
+			var current model.User
+			if err := tx.Select("wechat_id").First(&current, state.UserID).Error; err != nil {
+				return err
+			}
+			if current.WeChatId != payload.WeChatID {
+				return model.ErrAccountBindingChanged
+			}
 		}
 		if err := requireLoginVerificationMethod(state, method); err != nil {
 			return err
