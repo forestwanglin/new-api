@@ -59,7 +59,7 @@ export function ProfileDropdown() {
   const { displayName, secondaryText } = useUserDisplay(user)
   const nameCharacters = Array.from(displayName)
   const headerDisplayName =
-    nameCharacters.length > 8 ? `${nameCharacters.slice(0, 5).join('')}.` : displayName
+    nameCharacters.length > 8 ? `${nameCharacters.slice(0, 5).join('')}...` : displayName
   const isSuperAdmin = user?.role === ROLE.SUPER_ADMIN
   const isSecurityVisible = useIsSidebarModuleVisible('/security-access')
   const isSubscriptionVisible = useIsSidebarModuleVisible('/my-subscription')
