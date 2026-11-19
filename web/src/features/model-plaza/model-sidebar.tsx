@@ -68,7 +68,7 @@ export function ModelSidebar(props: ModelSidebarProps) {
           props.filter.category === group.id && props.filter.vendorId === null
         return (
           <div className='mp-group' key={group.id}>
-            {group.id === 'domestic' ? (
+            {group.id !== 'other' ? (
               <h3 className='mp-group-head'>{group.label}</h3>
             ) : (
               <Button

@@ -64,3 +64,60 @@ it('does not show confirm controls if scanner confirmation cannot be loaded', as
   ).not.toBeInTheDocument()
   expect(post).not.toHaveBeenCalled()
 })
+
+it('shows a dedicated success result after confirming and removes authorization controls', async () => {
+  vi.spyOn(api, 'get').mockResolvedValue({
+    data: {
+      success: true,
+      data: {
+        intent: 'login',
+        site_name: 'Example',
+        csrf_token: 'scanner-csrf',
+        expires_at: Math.floor(Date.now() / 1000) + 60,
+      },
+    },
+  })
+  vi.spyOn(api, 'post').mockResolvedValue({
+    data: { success: true, data: { same_device: false } },
+  })
+  render(<OfficialWeChatConfirmation />)
+  await userEvent.click(
+    await screen.findByRole('button', { name: 'Confirm authorization' })
+  )
+  expect(await screen.findByText('Authorization successful')).toBeVisible()
+  expect(screen.getByRole('status')).toHaveTextContent(
+    'Authorization completed. Return to the original page.'
+  )
+  expect(
+    screen.queryByRole('button', { name: 'Confirm authorization' })
+  ).not.toBeInTheDocument()
+})
+it('shows a failure result with recovery guidance when confirmation fails', async () => {
+  vi.spyOn(api, 'get').mockResolvedValue({
+    data: {
+      success: true,
+      data: {
+        intent: 'login',
+        site_name: 'Example',
+        csrf_token: 'scanner-csrf',
+        expires_at: Math.floor(Date.now() / 1000) + 60,
+      },
+    },
+  })
+  vi.spyOn(api, 'post').mockRejectedValue(new Error('scanner expired'))
+  render(<OfficialWeChatConfirmation />)
+  await userEvent.click(
+    await screen.findByRole('button', { name: 'Confirm authorization' })
+  )
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'Authorization failed'
+  )
+  expect(
+    screen.getByText(
+      'Return to the original page and scan a new QR code to try again.'
+    )
+  ).toBeVisible()
+  expect(
+    screen.queryByRole('button', { name: 'Confirm authorization' })
+  ).not.toBeInTheDocument()
+})

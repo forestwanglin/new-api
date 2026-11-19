@@ -198,12 +198,17 @@ export function OfficialWeChatAuthorization(props: AuthorizationProps) {
       {flow && !flow.qr_url && !error && <p role='status'>{t('Loading...')}</p>}
       {flow && flow.qr_url && !terminal && !error && (
         <>
-          <QRCodeSVG
-            value={flow.qr_url}
-            size={192}
-            className='mx-auto max-w-full'
-            title={t('WeChat authorization QR code')}
-          />
+          <div className='mx-auto w-fit max-w-full rounded-2xl border border-black/10 bg-white p-2'>
+            <QRCodeSVG
+              value={flow.qr_url}
+              size={224}
+              marginSize={4}
+              bgColor='#ffffff'
+              fgColor='#000000'
+              className='h-auto max-w-full'
+              title={t('WeChat authorization QR code')}
+            />
+          </div>
           <p role='status'>
             {status === 'awaiting_consent'
               ? t('Confirm authorization in WeChat.')

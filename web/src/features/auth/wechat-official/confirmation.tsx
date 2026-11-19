@@ -16,10 +16,16 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { CheckCircle2, CircleX, ShieldCheck } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { IconWeChat } from '@/assets/brand-icons/icon-wechat'
+import { EmptyState } from '@/components/empty-state'
+import { ErrorState } from '@/components/error-state'
+import { LoadingState } from '@/components/loading-state'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import { api } from '@/lib/api'
 import {
   createServerError,
@@ -83,42 +89,95 @@ export function OfficialWeChatConfirmation() {
   if (data?.intent === 'login') action = t('Sign in')
   if (data?.intent === 'bind') action = t('Bind WeChat')
   return (
-    <main className='mx-auto max-w-md space-y-5 p-6'>
-      <h1 className='text-xl font-semibold'>
-        {t('WeChat Official Account authorization')}
-      </h1>
-      {error && <p role='alert'>{error}</p>}
-      {done ? (
-        <p role='status'>
-          {done === 'confirmed'
-            ? t('Authorization completed. Return to the original page.')
-            : t('Cancelled')}
-        </p>
-      ) : (
-        data && (
-          <>
-            <p>
-              {t('Authorize {{site}} to continue?', { site: data.site_name })}
-            </p>
-            <p>{action}</p>
-            <div className='flex gap-3'>
-              <Button
-                disabled={busy || Date.now() >= data.expires_at * 1000}
-                onClick={() => void confirm(true)}
-              >
-                {t('Confirm authorization')}
-              </Button>
-              <Button
-                variant='outline'
-                disabled={busy}
-                onClick={() => void confirm(false)}
-              >
-                {t('Cancel')}
-              </Button>
+    <main className='bg-muted/30 flex min-h-svh items-center justify-center px-5 py-10 sm:px-6'>
+      <Card className='w-full max-w-md rounded-3xl py-8 sm:py-10'>
+        <CardContent className='px-6 sm:px-8'>
+          <header className='flex flex-col items-center gap-4 text-center'>
+            <div className='bg-success/10 text-success flex size-14 items-center justify-center rounded-2xl'>
+              <IconWeChat className='size-8' aria-hidden='true' />
             </div>
-          </>
-        )
-      )}
+            <h1 className='text-xl font-semibold text-balance'>
+              {t('WeChat Official Account authorization')}
+            </h1>
+          </header>
+          {error ? (
+            <div role='alert' className='mt-6'>
+              <ErrorState
+                title={t('Authorization failed')}
+                description={error}
+                className='min-h-0 px-0 py-4 wrap-anywhere'
+                action={
+                  <p className='text-muted-foreground text-sm leading-relaxed'>
+                    {t(
+                      'Return to the original page and scan a new QR code to try again.'
+                    )}
+                  </p>
+                }
+              />
+            </div>
+          ) : null}
+          {!error && done && (
+            <div role='status' className='mt-6'>
+              <EmptyState
+                icon={done === 'confirmed' ? CheckCircle2 : CircleX}
+                title={
+                  done === 'confirmed'
+                    ? t('Authorization successful')
+                    : t('Cancelled')
+                }
+                description={
+                  done === 'confirmed'
+                    ? t('Authorization completed. Return to the original page.')
+                    : t(
+                        'Return to the original page and scan a new QR code to try again.'
+                      )
+                }
+                className={
+                  done === 'confirmed'
+                    ? '[&_svg]:text-success min-h-0 px-0 py-4'
+                    : 'min-h-0 px-0 py-4'
+                }
+              />
+            </div>
+          )}
+          {!error && !done && !data && (
+            <div role='status'>
+              <LoadingState />
+            </div>
+          )}
+          {!error && !done && data && (
+            <div className='mt-6 space-y-6'>
+              <p className='text-muted-foreground text-center text-sm leading-relaxed wrap-anywhere'>
+                {t('Authorize {{site}} to continue?', { site: data.site_name })}
+              </p>
+              <div className='bg-muted/60 flex items-center gap-3 rounded-xl px-4 py-4'>
+                <ShieldCheck
+                  className='text-muted-foreground size-5 shrink-0'
+                  aria-hidden='true'
+                />
+                <p className='text-sm font-medium'>{action}</p>
+              </div>
+              <div className='flex flex-col gap-3'>
+                <Button
+                  className='min-h-12 w-full rounded-xl text-base'
+                  disabled={busy || Date.now() >= data.expires_at * 1000}
+                  onClick={() => void confirm(true)}
+                >
+                  {busy ? t('Processing...') : t('Confirm authorization')}
+                </Button>
+                <Button
+                  className='min-h-12 w-full rounded-xl text-base'
+                  variant='outline'
+                  disabled={busy}
+                  onClick={() => void confirm(false)}
+                >
+                  {t('Cancel')}
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </main>
   )
 }

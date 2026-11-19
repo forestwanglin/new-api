@@ -281,9 +281,7 @@ it('keeps domestic vendors selectable beneath the domestic heading', async () =>
   await user.click(within(sidebar).getByRole('button', { name: /^DeepSeek/ }))
   expect(screen.getByText('deepseek-chat')).toBeVisible()
   expect(screen.queryByText('sd2.0-720P')).not.toBeInTheDocument()
-  await user.click(
-    within(sidebar).getByRole('button', { name: /^Overseas Models/ })
-  )
+  await user.click(within(sidebar).getByRole('button', { name: /^OpenAI/ }))
   expect(screen.getByText('gpt-api-model')).toBeVisible()
   expect(screen.queryByText('deepseek-chat')).not.toBeInTheDocument()
 })
@@ -349,11 +347,11 @@ it('keeps missing and unrecognized vendors in other models while a custom name w
   expect(screen.getByText('code-auto-review')).toBeVisible()
   expect(screen.getByText('custom-service')).toBeVisible()
   expect(screen.queryByText('code-auto-review-openai')).not.toBeInTheDocument()
-  await user.click(screen.getByRole('button', { name: /^Overseas Models/ }))
+  await user.click(screen.getByRole('button', { name: /^OpenAI/ }))
   expect(screen.getByText('code-auto-review-openai')).toBeVisible()
 })
 
-it('updates category and vendor counts for search without hiding categories with no matches', async () => {
+it('updates vendor counts for search while category headings stay count-free', async () => {
   const user = userEvent.setup()
   renderPlaza()
   const sidebar = screen.getByRole('complementary', { name: 'Vendors' })
@@ -371,9 +369,9 @@ it('updates category and vendor counts for search without hiding categories with
     ).getByText('1')
   ).toBeVisible()
   expect(
-    within(
-      within(sidebar).getByRole('button', { name: /^Overseas Models/ })
-    ).getByText('0')
+    within(within(sidebar).getByRole('button', { name: /^OpenAI/ })).getByText(
+      '0'
+    )
   ).toBeVisible()
   expect(
     within(
@@ -381,11 +379,11 @@ it('updates category and vendor counts for search without hiding categories with
     ).getByText('1')
   ).toBeVisible()
   expect(screen.getByText('sd2.0-720P')).toBeVisible()
-  await user.click(
-    within(sidebar).getByRole('button', { name: /^Overseas Models/ })
-  )
+  await user.click(within(sidebar).getByRole('button', { name: /^OpenAI/ }))
   expect(screen.getByText('No models found')).toBeVisible()
-  expect(screen.getByRole('heading', { name: 'Overseas Models' })).toBeVisible()
+  expect(
+    within(sidebar).getByRole('heading', { name: 'Overseas Models' })
+  ).toHaveTextContent(/^Overseas Models$/)
   await user.click(screen.getByRole('button', { name: 'Clear all filters' }))
   expect(screen.getByRole('textbox', { name: 'Search models' })).toHaveValue('')
   expect(
@@ -526,7 +524,7 @@ it('shows codex-auto-review in the overseas filter without vendor metadata', asy
   const user = userEvent.setup()
   renderPlaza()
   const overseas = await screen.findByRole('button', {
-    name: /^Overseas Models/,
+    name: /^OpenAI/,
   })
   expect(within(overseas).getByText('1')).toBeVisible()
   await user.click(overseas)
@@ -591,7 +589,7 @@ it('keeps dots on selectable model and vendor children', async () => {
   }
   expect(
     screen
-      .getByRole('button', { name: /^Overseas Models/ })
+      .getByRole('heading', { name: 'Overseas Models' })
       .querySelector('.mp-dot')
   ).toBeNull()
 })

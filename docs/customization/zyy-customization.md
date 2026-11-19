@@ -1247,6 +1247,8 @@
 
 ### Z086 模型页列表展示运行状态
 
+- 菜单一致性修复（2026-11-19）：`web/src/features/model-plaza/model-sidebar.tsx` 将海外模型与国内模型统一为不可点击、不显示数量的一级标题，供应商筛选及其他模型入口保留。更新模型列表交互测试并新增 sidebar 回归，保护一级标题和供应商筛选行为。
+
 - 需求与原因：顶部菜单「模型」页（`features/model-plaza`）只展示名称、描述、类型、价格和折扣，用户看不到模型真实运行情况。需要在表格列表中加入与模型广场卡片一致的成功率、延迟和吞吐信息。
 - 变更内容：在「类型」和「价格」之间新增「状态」列，使用新增的 `ModelStatusCell` 展示彩色状态点、成功率、最近 24 小时状态条，以及 `延迟 · 吞吐` 次行；无真实流量时显示 `—`，不把缺失值渲染成 0%。`features/model-plaza/index.tsx` 通过一次 `GET /api/perf-metrics/summary?hours=24`（不传 `recent_model`）获取窗口内所有有流量模型的汇总和各自序列，建立映射后按模型名查表，不按行或按过滤结果重复请求；该查询失败时静默降级为 `—`，不影响定价列表与错误重试。移动端沿用现有卡片布局自动显示「状态」标签。
 - 影响面：**上游自有文件**：`web/src/features/model-plaza/index.tsx`、`web/src/features/model-plaza/__tests__/model-plaza.test.tsx`。新增 fork 自有文件 `web/src/features/model-plaza/components/model-status-cell.tsx`。无后端、配置、依赖或部署变更。
@@ -1257,6 +1259,8 @@
 - 状态接口权限修复（2026-11-19）：`router/api-router.go` 的 `GET /api/perf-metrics/summary` 与 `GET /api/perf-metrics` 移除旧模型广场导航权限门禁，始终允许匿名读取现有聚合状态；隐藏模型广场或设置其需要登录均不影响状态查询，原 `/api/pricing` 权限保持不变。新增 `router/perf_metrics_public_test.go` 覆盖显示、隐藏、需要登录及旧布尔开关四种配置，避免匿名刷新被误判为会话过期。 验证：新增路由用例先复现隐藏/登录限制配置的 401，修复后与原模型定价权限用例均通过；`go test ./middleware ./pkg/perf_metrics -count=1`、Go 构建和差异检查通过。开发容器需重建或更新后端后生效，本次未重启运行环境。
 
 ### Z087 微信服务号网页授权与验证码方式并存
+
+- 授权 UI 优化（2026-11-19）：`web/src/features/auth/wechat-official/{confirmation,authorization}.tsx` 复用站点 Card、EmptyState、ErrorState、LoadingState 与 Button；手机确认页采用居中自适应布局、明确操作说明和全宽触控按钮，成功/取消/失败分别展示结果，失败提供返回原页面重新扫码的指引；PC 共用授权组件的二维码使用圆角白底、外留白和内置四模块静区，保持二维码图案完整。七语言补齐结果与恢复文案。仅调整展示，不修改服务端授权、安全校验和同设备跳转。验证：受影响 8 文件/78 测试、`bun run typecheck`、定向 oxlint/oxfmt、`bun run build` 与差异检查通过；Chrome 390px 检查确认/成功/失败状态，授权接口使用仅当前本地标签页生效的模拟响应，未进行真实微信授权。导航测试有两条既有失败（期望 `/dashboard`，实际 `/onboarding`），在未修改 HEAD 的隔离副本中复现。
 
 - 样式恢复（2026-11-19）：OAuth 集成页顶部七个 Tab 恢复等宽网格，平铺占满容器；移除按内容宽度排列及禁止伸展的样式。按用户要求未运行测试。
 

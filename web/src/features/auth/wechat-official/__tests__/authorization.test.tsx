@@ -279,3 +279,22 @@ it('replaces a failed same-device ceremony when the user refreshes instead of re
     post.mock.calls.filter(([url]) => url.endsWith('/resume'))
   ).toHaveLength(1)
 })
+
+it('keeps the QR code on a rounded white surface with a four-module quiet zone', async () => {
+  vi.spyOn(api, 'post').mockImplementation(async (url) => {
+    if (url.endsWith('/flows')) return response(flow)
+    return response({ status: 'pending' })
+  })
+  render(
+    <OfficialWeChatAuthorization
+      request={{ intent: 'login' }}
+      onResult={vi.fn()}
+    />
+  )
+  const qr = (await screen.findByTitle('WeChat authorization QR code')).closest(
+    'svg'
+  )
+  // The quiet zone is inside the SVG so it survives scaling and dark themes.
+  expect(qr).toHaveAttribute('viewBox', '0 0 41 41')
+  expect(qr?.parentElement).toHaveClass('rounded-2xl', 'bg-white', 'p-2')
+})
