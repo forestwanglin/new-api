@@ -101,8 +101,13 @@
 .dark .subscriptions-custom-footer .sub-footer-copy {
   color: #a2aec1;
 }
+.dark .subscriptions-custom-footer .sub-footer-columns a,
 .dark .subscriptions-custom-footer .sub-footer-columns button {
   color: #c5cfde;
+}
+.dark .subscriptions-custom-footer .sub-footer-columns a:hover,
+.dark .subscriptions-custom-footer .sub-footer-columns button:hover {
+  color: #60a5fa;
 }
 .dark .subscriptions-custom-footer .sub-footer-copy {
   border-color: #344155;
