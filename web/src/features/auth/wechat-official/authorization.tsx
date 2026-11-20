@@ -20,8 +20,8 @@ import { QRCodeSVG } from 'qrcode.react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { LoadingState } from '@/components/loading-state'
 import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
 import { getServerErrorMessage } from '@/lib/server-error-message'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -189,8 +189,7 @@ export function OfficialWeChatAuthorization(props: AuthorizationProps) {
   ])
   const terminal = ['cancelled', 'denied', 'failed', 'expired'].includes(status)
   const qrReady = Boolean(flow?.qr_url) && !terminal && !error
-  const preparing =
-    props.enabled !== false && !qrReady && !terminal && !error
+  const preparing = props.enabled !== false && !qrReady && !terminal && !error
   return (
     <div className='space-y-3 py-3 text-center'>
       {props.enabled === false && (
@@ -199,11 +198,11 @@ export function OfficialWeChatAuthorization(props: AuthorizationProps) {
       {preparing && (
         <div role='status' className='space-y-3'>
           <div className='mx-auto w-fit max-w-full rounded-2xl border border-black/10 bg-white p-2'>
-            <div className='relative flex aspect-square w-56 max-w-full items-center justify-center overflow-hidden rounded-lg bg-neutral-100'>
-              <Skeleton
-                aria-hidden='true'
-                className='absolute inset-0 rounded-lg bg-neutral-200'
-              />
+            <div
+              aria-hidden='true'
+              className='flex aspect-square w-56 max-w-full items-center justify-center'
+            >
+              <LoadingState inline size='lg' className='text-neutral-400' />
             </div>
           </div>
           <p className='text-muted-foreground'>
@@ -213,7 +212,7 @@ export function OfficialWeChatAuthorization(props: AuthorizationProps) {
       )}
       {flow && qrReady && (
         <>
-          <div className='mx-auto w-fit max-w-full animate-in rounded-2xl border border-black/10 bg-white p-2 fade-in-0 duration-200'>
+          <div className='animate-in fade-in-0 mx-auto w-fit max-w-full rounded-2xl border border-black/10 bg-white p-2 duration-200'>
             <QRCodeSVG
               value={flow.qr_url}
               size={224}

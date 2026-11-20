@@ -1260,6 +1260,8 @@
 
 ### Z087 微信服务号网页授权与验证码方式并存
 
+- 二维码加载展示（2026-11-20）：`web/src/features/auth/wechat-official/authorization.tsx` 将动态二维码生成期间的灰色 Skeleton 替换为现有 LoadingState 旋转指示，保留圆角白底、固定二维码区域和加载提示，避免生成前后布局跳动。扩展既有服务号授权 UI，不修改授权流程；按用户要求不运行测试，仅做定向格式、lint 与差异检查。
+
 - 服务号身份展示（2026-11-20）：OAuth 服务号配置新增可选 `wechat_official.display_name`（名称，最多 128 个 Unicode 字符）和 `wechat_official.logo_url`（不含凭据的绝对 HTTPS 图片地址，最多 2048 字节），服务端拒绝控制字符并支持清空；沿用 options 与 revision 更新机制，变更后在途授权须重新发起。管理员读取与手机 confirmation 接口贯通配置，后者仅返回展示字段 `official_account_name` / `official_account_logo`，不返回凭据。手机确认、成功、取消及已加载配置的失败页复用 Avatar 展示名称与 Logo，未配置或图片失败回退微信图标；图片使用 `no-referrer`。文案明确通过哪个服务号登录、绑定或验证哪个站点，七语言同步。影响面：`setting/system_setting/wechat_official.go`、`model/wechat_official.go`、`service/wechat_official*.go`、`controller/wechat_official.go`、前端授权页与 OAuth 设置及测试；扩展**上游自有文件** `controller/option.go` 与前端系统设置/七语言文件。旧微信验证码方式及授权控制不变，无新依赖。本次验证：前端服务号授权及 OAuth 设置共 4 文件/37 项测试、typecheck（1662 文件/2 项目）、14 文件格式检查、定向 lint 和生产构建通过；`go test ./service ./controller -run 'TestWeChatOfficial|TestWeChatProfile' -count=1` 通过，覆盖真实 UpdateOption 错误翻译键；SQLite 3.50.4 / MySQL 8.4.13 / PostgreSQL 16.16 持久化 matrix 无跳过。Chrome 390px 检查确认、成功与取消页的名称、文案和无横向溢出，Logo 图片失败回退通过组件测试及预览验证。授权 API 仅使用本地标签页模拟响应，未验证真实微信授权；临时拦截和尺寸覆盖已清除，不改站点设置、不部署。
 
 - 授权 UI 优化（2026-11-19）：`web/src/features/auth/wechat-official/{confirmation,authorization}.tsx` 复用站点 Card、EmptyState、ErrorState、LoadingState 与 Button；手机确认页采用居中自适应布局、明确操作说明和全宽触控按钮，成功/取消/失败分别展示结果，失败提供返回原页面重新扫码的指引；PC 共用授权组件的二维码使用圆角白底、外留白和内置四模块静区，保持二维码图案完整。七语言补齐结果与恢复文案。仅调整展示，不修改服务端授权、安全校验和同设备跳转。验证：受影响 8 文件/78 测试、`bun run typecheck`、定向 oxlint/oxfmt、`bun run build` 与差异检查通过；Chrome 390px 检查确认/成功/失败状态，授权接口使用仅当前本地标签页生效的模拟响应，未进行真实微信授权。导航测试有两条既有失败（期望 `/dashboard`，实际 `/onboarding`），在未修改 HEAD 的隔离副本中复现。
