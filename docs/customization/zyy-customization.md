@@ -1277,6 +1277,16 @@
 - 验证：`go test ./service ./model ./middleware -count=1` 全包通过；`go test ./controller ./router -run TestWeChatOfficial -count=1` 及微信/手机/账户安全/邮件配置聚焦回归通过，覆盖 14 条路由权限分类、9 条 POST 来源/no-store 与 151 次轮询不耗尽敏感额度；`go vet ./model ./service ./controller ./middleware ./router`、应用 `go build`、`git diff --check` 通过。配置隔离本地测试 DSN 后执行 `go test ./service -run TestWeChatOfficial -count=1`，SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 16.16 验证 fresh/重复迁移、旧身份回填、并发唯一归属和一次性消费；三库共享登录政策测试通过，临时容器已删除，未触及开发库。前端受影响 11 文件/117 测试、`bun check -b`（1661 文件/2 项目）、改动范围 oxlint/格式检查、`bun run build` 通过。Chrome 检查独立配置及 390px 窄屏表单，未保存设置。
 - 风险与未覆盖：真实微信授权依赖已认证服务号、接口权限、正确域名和可访问回调；未使用真实凭据或执行真实账号绑定，不以模拟 HTTP 结果替代真实微信/短信和 WebView 同设备验收。Go 验证使用本机 1.27.3，未变更 go.mod 声明的 1.26.10；数据库验证未覆盖所有最低支持版本。全量 controller/router 仍有 7 个既有失败（访问令牌/积分 fixture 缺 claims 表、采样兼容断言和既有路由声明缺失），已在未修改的 `42993e642f` 独立副本复现；全前端 lint 有既有错误，定向检查通过。依照 OWASP Authentication/Session Management/OAuth2 Cheat Sheets 与 ASVS 5.0.0 的相关控制检查，不宣称完整认证。新方式可独立关闭回退旧模式；保留新增流程数据和唯一归属约束，不跨 AppID 迁移。不开启生产配置、不部署。
 
+### Z088 上游插件扩展合并后的 fork 集成兼容
+
+- 需求与原因：2026-11-20 将 `main`（`3a407cc9b`）合入 `zyy-c`，保留 fork 的积分计费、Seedance 渠道测试及控制台页面，与上游新的插件能力共同工作。
+- 变更内容：插件路由保留列表补齐十个 fork 控制台路径，防止插件占用页面地址；明确尚未发送业务请求的 `NeedsLogin` 错误使用 `plugin_credential_needs_login`，允许备用 key 重试，同时保留专用禁用原因；上游新增 relay 集成测试 fixture 补齐积分表、规则和余额，不绕过真实积分计费；Seedance 两种测试只在内置渠道显示，插件渠道继续按声明的 relay 路径筛选 endpoint。
+- 影响面：**上游自有文件** `pkg/jsplugin/routing.go`、`relaykit/types/error.go`、`relay/channel/providerplugin/adaptor.go`、`router/provider_plugin_relay_test.go`、`service/relay_error_test.go`、`web/src/features/channels/components/dialogs/channel-test-dialog.tsx`、`web/src/features/channels/components/__tests__/channel-test-dialog-endpoints.test.tsx`；Z004 的测试入口继续保留。纯上游同步文件不另作定制登记。
+- 与上游差异：上游不包含 fork 页面和积分 fixture；上游将登录失效归入 `do_request_failed`，会触发 fork 的未知计费结果保护。本次只区分明确未发送的登录失效，网络传输失败和上游结果未知时仍禁止自动重试，避免重复扣费。
+- 开关与默认值：无新增配置；自动禁用开关开/关均保持登录失效 key 的专用禁用规则。新增错误码沿用原 HTTP 状态和错误消息，不携带凭证。
+- 验证：`bun run typecheck`（1,744 文件/2 项目）、`bun run build`、两个渠道测试文件的 oxlint/oxfmt 检查通过；`channel-test-dialog-endpoints.test.tsx` 两个用例通过。`go build ./...`、`go vet ./...`、relaykit/tokenkit 独立构建与测试通过；`go test ./pkg/jsplugin -count=1`、`go test ./router -run 'Test(NeedsLoginCredentialFailsWithoutReachingTheUpstream|FailedRefreshBeforeTheRequest)' -count=1` 通过，覆盖未发送业务请求、备用 key、禁用原因及不泄露 refresh token；`sh scripts/check-doubao-plugin-patch.sh` 通过。补充 `go test ./service -run 'Test(PluginCredentialNeedsLoginKeepsPointsRefundable|PointsUncertainOutcomeRetainsHoldAndStopsRetry)' -count=1` 通过，同时验证登录失效保留退款资格、允许重试以及真正未知结果继续保留冻结。最终 `go test ./...` 剩余 8 个既有顶层测试失败，完整名称见本次合并提交说明。
+- 风险与未覆盖：前端全量 335 文件中 330 通过，3,638 用例中 3,620 通过；18 个既有失败分布在 model-plaza/navigation、security/wechat-binding、sidebar-config、account-avatar、config-tutorial/page，已在 `git archive HEAD` 的合并前副本复现。全量 lint 的 error 涉及 82 个文件，这些文件相对合并前 HEAD 无改动。后端既有 AccessToken fixture/路由声明、采样兼容断言、`TestUserPointBalancesAPI` 缺 claims 表及 `TestGPT6AstraBuiltinBilling` 无数据库 fixture 的失败不在本次修复范围；后两项已在 `git archive HEAD` 副本实测复现。未执行真实上游登录或付费请求，未运行 MySQL/PostgreSQL 真实数据库及历史库迁移矩阵，不能据此宣称完整数据库兼容；本机 Go 1.27.3，未变更模块声明的版本。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 
@@ -1286,6 +1296,7 @@
 
 | 区域 | 文件 | 关联条目 |
 |---|---|---|
+| 上游插件扩展与 fork 集成 | `pkg/jsplugin/routing.go`、`relaykit/types/error.go`、`relay/channel/providerplugin/adaptor.go`、`router/provider_plugin_relay_test.go`、渠道测试弹窗及 endpoint 测试 | Z088 |
 | 模型页列表运行状态 | `web/src/features/model-plaza/index.tsx`、`web/src/features/model-plaza/__tests__/model-plaza.test.tsx` | Z086 |
 | 计费与短信恢复加固 | `controller/{secure_verification,system_task,token_test}.go`、`middleware/access_token_routes.go`、`model/{auth_flow,main,task,task_cas_test,token}.go`、`router/api-router.go`、`service/task_polling.go`、共享验证 hook 和 `web/src/lib/secure-verification.ts` | Z085 |
 | API Key 积分限额 | `controller/{token,token_test}.go`、`middleware/auth.go`、`model/{token,quota_reserve,token_cache,token_auto_groups_cache_test}.go`、API Key 表单/列表/类型及测试、七种 locale | Z080 |

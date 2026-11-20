@@ -280,6 +280,25 @@ func TestRequestPolicyEventsReachLogAdminInfo(t *testing.T) {
 	assert.NotContains(t, other.Snapshot()["admin_info"], "request_policy", "requests without decisions do not carry an empty record")
 }
 
+func TestPluginCredentialNeedsLoginKeepsPointsRefundable(t *testing.T) {
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	info := &relaycommon.RelayInfo{RequestId: "needs-login"}
+	s := &BillingSession{pointsMode: true, pointsID: info.RequestId, pointsContext: c, relayInfo: info}
+	info.Billing = s
+	c.Set("points_billing_session", s)
+	apiErr := types.NewOpenAIError(
+		types.NewError(ErrPluginCredentialNeedsLogin, types.ErrorCodePluginCredentialNeedsLogin),
+		types.ErrorCodeDoRequestFailed,
+		http.StatusInternalServerError,
+	)
+
+	assert.False(t, PointsBillingOutcomeUncertain(apiErr))
+	assert.Equal(t, "retry", DecideRelayRetry(c, apiErr, 1).Action)
+	assert.True(t, s.NeedsRefund(), "a request never sent upstream must release its reservation on failure")
+	assert.False(t, c.GetBool("points_upstream_uncertain"))
+	assert.False(t, ShouldDisableChannel(apiErr), "keep the plugin's login-specific disabling reason")
+}
+
 func TestPointsUncertainOutcomeRetainsHoldAndStopsRetry(t *testing.T) {
 	for _, code := range []types.ErrorCode{types.ErrorCodeDoRequestFailed, types.ErrorCodeReadResponseBodyFailed, types.ErrorCodeBadResponse, types.ErrorCodeBadResponseBody, types.ErrorCodeEmptyResponse, types.ErrorCodeAwsInvokeError, types.ErrorCodeChannelResponseTimeExceeded} {
 		t.Run(string(code), func(t *testing.T) {
@@ -304,5 +323,51 @@ func TestPointsUncertainOutcomeRetainsHoldAndStopsRetry(t *testing.T) {
 	}
 	for _, code := range []types.ErrorCode{types.ErrorCodeReadRequestBodyFailed, types.ErrorCodeConvertRequestFailed, types.ErrorCodeBadResponseStatusCode, types.ErrorCodeSensitiveWordsDetected} {
 		assert.False(t, PointsBillingOutcomeUncertain(types.NewError(errors.New("rejected"), code)))
+	}
+}
+
+// Automatic disabling only reacts to failures that say something about the
+// channel. Errors new-api raised itself before or without an upstream answer
+// never disable it, even when their text matches a disable keyword, while
+// upstream credential failures and channel errors still do.
+func TestShouldDisableChannelIgnoresLocalErrors(t *testing.T) {
+	previousAutoDisable := common.AutomaticDisableChannelEnabled
+	common.AutomaticDisableChannelEnabled = true
+	t.Cleanup(func() { common.AutomaticDisableChannelEnabled = previousAutoDisable })
+	upstreamKeyErr := types.WithOpenAIError(types.OpenAIError{Message: "Incorrect API key provided", Type: "invalid_request_error", Code: "invalid_api_key"}, http.StatusUnauthorized)
+	for _, tc := range []struct {
+		name        string
+		err         *types.NewAPIError
+		source      string
+		wantDisable bool
+		wantRetry   bool
+	}{
+		{name: "upstream invalid key", err: upstreamKeyErr, source: "upstream", wantDisable: true, wantRetry: true},
+		{name: "upstream keyword in a 403 response", err: types.NewOpenAIError(errors.New("Permission denied"), types.ErrorCodeBadResponseStatusCode, http.StatusForbidden), source: "upstream", wantDisable: true, wantRetry: true},
+		{name: "upstream keyword in an adaptor-parsed body", err: types.NewError(errors.New("Your credit balance is too low"), types.ErrorCodeBadResponseBody), source: "upstream", wantDisable: true, wantRetry: false},
+		{name: "channel key error", err: types.NewError(errors.New("invalid auth"), types.ErrorCodeChannelInvalidKey), source: "channel", wantDisable: true, wantRetry: true},
+		{name: "channel model mapping error", err: types.NewError(errors.New("bad mapping"), types.ErrorCodeChannelModelMappedError, types.ErrOptionWithSkipRetry()), source: "channel", wantDisable: true, wantRetry: true},
+		{name: "local 401 from request conversion", err: types.NewErrorWithStatusCode(errors.New("bad image"), types.ErrorCodeConvertRequestFailed, http.StatusUnauthorized), source: "local", wantDisable: false, wantRetry: true},
+		{name: "local error carrying a disable keyword from client input", err: types.NewError(errors.New("fetch https://x.invalid/Permission denied failed"), types.ErrorCodeConvertRequestFailed), source: "local", wantDisable: false, wantRetry: true},
+		{name: "override condition type mismatch", err: types.NewErrorWithStatusCode(errors.New("comparison failed for path temperature"), types.ErrorCodeInvalidRequest, http.StatusBadRequest, types.ErrOptionWithSkipRetry()), source: "local", wantDisable: false, wantRetry: false},
+		{name: "local wrapper around an upstream key error", err: types.NewErrorWithStatusCode(upstreamKeyErr, types.ErrorCodeInvalidRequest, http.StatusUnauthorized), source: "upstream", wantDisable: true, wantRetry: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c, _ := gin.CreateTestContext(httptest.NewRecorder())
+			assert.Equal(t, tc.source, RelayErrorSource(tc.err))
+			assert.Equal(t, tc.wantDisable, ShouldDisableChannel(tc.err))
+			assert.Equal(t, tc.wantRetry, DecideRelayRetry(c, tc.err, 1).Action == "retry")
+
+			c.Set("auto_ban", true)
+			RecordPolicyFailure(c, 7, tc.err, DecideRelayRetry(c, tc.err, 1))
+			events := RequestPolicy(c).Events()
+			require.Len(t, events, 2)
+			assert.Equal(t, tc.source, events[0].ErrorSource)
+			wantHealth := "unchanged"
+			if tc.wantDisable {
+				wantHealth = "channel_disable_requested"
+			}
+			assert.Equal(t, wantHealth, events[1].Health, "the logged health matches the disable decision")
+		})
 	}
 }

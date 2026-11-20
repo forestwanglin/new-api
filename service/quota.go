@@ -84,9 +84,11 @@ func calculateAudioQuota(info QuotaInfo) (int, *common.QuotaClamp) {
 	return common.QuotaFromDecimalChecked(quota)
 }
 
-func PreWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage *dto.RealtimeUsage) error {
+// PreWssConsumeQuota charges the usage of one Realtime response and returns
+// the quota it charged.
+func PreWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage *dto.RealtimeUsage) (int, error) {
 	if relayInfo.UsePrice {
-		return nil
+		return 0, nil
 	}
 
 	modelName := relayInfo.OriginModelName
@@ -129,10 +131,12 @@ func PreWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usag
 	noteQuotaClamp(relayInfo, clamp)
 
 	if relayInfo.PointsBillingID != "" {
-		return pointsRealtimeConsume(relayInfo, quota)
+		if err := pointsRealtimeConsume(relayInfo, quota); err != nil {
+			return 0, err
+		}
+		return quota, nil
 	}
-	return errors.New("realtime points billing session is missing")
-
+	return 0, errors.New("realtime points billing session is missing")
 }
 
 func PostWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, modelName string,

@@ -40,16 +40,20 @@ type ErrorCode string
 const (
 	ErrorCodeInvalidRequest         ErrorCode = "invalid_request"
 	ErrorCodeSensitiveWordsDetected ErrorCode = "sensitive_words_detected"
+	ErrorCodeRequestRejected        ErrorCode = "request_rejected"
+	ErrorCodeRequestPluginFailed    ErrorCode = "request_plugin_failed"
+	ErrorCodeResponseRejected       ErrorCode = "response_rejected"
 	ErrorCodeViolationFeeGrokCSAM   ErrorCode = "violation_fee.grok.csam"
 
 	// new api error
-	ErrorCodeCountTokenFailed   ErrorCode = "count_token_failed"
-	ErrorCodeModelPriceError    ErrorCode = "model_price_error"
-	ErrorCodeInvalidApiType     ErrorCode = "invalid_api_type"
-	ErrorCodeJsonMarshalFailed  ErrorCode = "json_marshal_failed"
-	ErrorCodeDoRequestFailed    ErrorCode = "do_request_failed"
-	ErrorCodeGetChannelFailed   ErrorCode = "get_channel_failed"
-	ErrorCodeGenRelayInfoFailed ErrorCode = "gen_relay_info_failed"
+	ErrorCodeCountTokenFailed           ErrorCode = "count_token_failed"
+	ErrorCodeModelPriceError            ErrorCode = "model_price_error"
+	ErrorCodeInvalidApiType             ErrorCode = "invalid_api_type"
+	ErrorCodeJsonMarshalFailed          ErrorCode = "json_marshal_failed"
+	ErrorCodeDoRequestFailed            ErrorCode = "do_request_failed"
+	ErrorCodePluginCredentialNeedsLogin ErrorCode = "plugin_credential_needs_login"
+	ErrorCodeGetChannelFailed           ErrorCode = "get_channel_failed"
+	ErrorCodeGenRelayInfoFailed         ErrorCode = "gen_relay_info_failed"
 
 	// channel error
 	ErrorCodeChannelNoAvailableKey        ErrorCode = "channel:no_available_key"

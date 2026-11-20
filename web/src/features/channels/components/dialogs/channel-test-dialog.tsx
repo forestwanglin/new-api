@@ -82,10 +82,13 @@ import { useIsMobile } from '@/hooks/use-mobile'
 import { handleServerError } from '@/lib/handle-server-error'
 
 import { updateChannel, testChannel } from '../../api'
+import { CHANNEL_TYPE_TASK_PLUGIN } from '../../constants'
+import { useTaskPluginOption } from '../../hooks/use-task-plugin-option'
 import {
   channelsQueryKeys,
   formatResponseTime,
   handleTestChannel,
+  parseChannelSettings,
 } from '../../lib'
 import {
   runSeedanceChannelTest,
@@ -189,27 +192,66 @@ const seedanceStageLabels: Record<SeedanceStage, string> = {
   pending: 'Video task retained; check task history',
 }
 
-const endpointTypeOptions: Array<{ value: string; label: string }> = [
+// `path` is the client path an endpoint is tested on; a plugin channel offers
+// only the endpoints its plugin's routes serve. `builtinOnly` marks the fork's
+// Seedance checks, which apply to real Ark channels rather than task plugins.
+const endpointTypeOptions: Array<{
+  value: string
+  label: string
+  path?: string
+  builtinOnly?: boolean
+}> = [
   { value: 'auto', label: 'Auto detect (default)' },
-  { value: 'seedance-quick', label: 'Seedance Quick (no video generation)' },
-  { value: 'seedance-video', label: 'Seedance Video (paid generation test)' },
-  { value: 'openai', label: 'OpenAI (/v1/chat/completions)' },
-  { value: 'openai-response', label: 'OpenAI Responses (/v1/responses)' },
+  {
+    value: 'seedance-quick',
+    label: 'Seedance Quick (no video generation)',
+    builtinOnly: true,
+  },
+  {
+    value: 'seedance-video',
+    label: 'Seedance Video (paid generation test)',
+    builtinOnly: true,
+  },
+  {
+    value: 'openai',
+    label: 'OpenAI (/v1/chat/completions)',
+    path: '/v1/chat/completions',
+  },
+  {
+    value: 'openai-response',
+    label: 'OpenAI Responses (/v1/responses)',
+    path: '/v1/responses',
+  },
   {
     value: 'openai-response-compact',
     label: 'OpenAI Response Compaction (/v1/responses/compact)',
+    path: '/v1/responses/compact',
   },
-  { value: 'anthropic', label: 'Anthropic (/v1/messages)' },
+  {
+    value: 'anthropic',
+    label: 'Anthropic (/v1/messages)',
+    path: '/v1/messages',
+  },
   {
     value: 'gemini',
     label: 'Gemini (/v1beta/models/{model}:generateContent)',
+    path: '/v1beta/models/{model}:generateContent',
   },
-  { value: 'jina-rerank', label: 'Jina Rerank (/v1/rerank)' },
+  {
+    value: 'jina-rerank',
+    label: 'Jina Rerank (/v1/rerank)',
+    path: '/v1/rerank',
+  },
   {
     value: 'image-generation',
     label: 'Image Generation (/v1/images/generations)',
+    path: '/v1/images/generations',
   },
-  { value: 'embeddings', label: 'Embeddings (/v1/embeddings)' },
+  {
+    value: 'embeddings',
+    label: 'Embeddings (/v1/embeddings)',
+    path: '/v1/embeddings',
+  },
 ]
 
 const STREAM_INCOMPATIBLE_ENDPOINTS = new Set([
@@ -367,13 +409,26 @@ function ChannelTestDialogContent({
     pageIndex: 0,
     pageSize: 30,
   })
+  const plugin = useTaskPluginOption(
+    currentRow.type === CHANNEL_TYPE_TASK_PLUGIN
+      ? parseChannelSettings(currentRow.setting)?.task_plugin_key
+      : undefined
+  )
+  const relayPaths = plugin?.relayPaths
   const endpointSelectItems = useMemo(
     () =>
-      endpointTypeOptions.map((option) => ({
-        value: option.value,
-        label: t(option.label),
-      })),
-    [t]
+      endpointTypeOptions
+        .filter(
+          (option) =>
+            !relayPaths ||
+            (!option.builtinOnly &&
+              (!option.path || relayPaths.includes(option.path)))
+        )
+        .map((option) => ({
+          value: option.value,
+          label: t(option.label),
+        })),
+    [relayPaths, t]
   )
   const channelGroupOptions = useMemo(() => {
     const groups = (currentRow.group || '')
