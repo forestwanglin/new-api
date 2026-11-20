@@ -91,6 +91,42 @@ const oauthSchema = z.object({
     enabled: z.boolean(),
     app_id: z.string(),
     app_secret: z.string(),
+    display_name: z
+      .string()
+      .refine(
+        (value) =>
+          [...value.trim()].length <= 128 &&
+          ![...value].some(
+            (character) =>
+              character.charCodeAt(0) < 32 ||
+              (character.charCodeAt(0) >= 127 && character.charCodeAt(0) <= 159)
+          ),
+        'Use up to 128 characters without control characters.'
+      ),
+    logo_url: z.string().refine((value) => {
+      if (
+        [...value].some(
+          (character) =>
+            character.charCodeAt(0) < 32 ||
+            (character.charCodeAt(0) >= 127 && character.charCodeAt(0) <= 159)
+        )
+      ) {
+        return false
+      }
+      if (!value.trim()) return true
+      if (new TextEncoder().encode(value.trim()).byteLength > 2048) return false
+      try {
+        const url = new URL(value.trim())
+        return (
+          url.protocol === 'https:' &&
+          Boolean(url.hostname) &&
+          !url.username &&
+          !url.password
+        )
+      } catch {
+        return false
+      }
+    }, 'Use an HTTPS image URL without credentials.'),
   }),
   WeChatAuthEnabled: z.boolean(),
   WeChatServerAddress: z.string(),
@@ -123,6 +159,8 @@ type FlatOAuthDefaults = {
   LinuxDOClientSecret: string
   LinuxDOMinimumTrustLevel: string
   'wechat_official.enabled'?: boolean
+  'wechat_official.display_name'?: string
+  'wechat_official.logo_url'?: string
   'wechat_official.app_id'?: string
   'wechat_official.app_secret'?: string
   'wechat_official.app_secret_configured'?: boolean
@@ -217,6 +255,8 @@ const buildFormDefaults = (defaults: FlatOAuthDefaults): OAuthFormValues => ({
     enabled: defaults['wechat_official.enabled'] ?? false,
     app_id: defaults['wechat_official.app_id'] ?? '',
     app_secret: '',
+    display_name: defaults['wechat_official.display_name'] ?? '',
+    logo_url: defaults['wechat_official.logo_url'] ?? '',
   },
   WeChatAuthEnabled: defaults.WeChatAuthEnabled,
   WeChatServerAddress: defaults.WeChatServerAddress ?? '',
@@ -248,6 +288,8 @@ const normalizeFormValues = (values: OAuthFormValues): FlatOAuthDefaults => ({
   LinuxDOMinimumTrustLevel: values.LinuxDOMinimumTrustLevel,
   'wechat_official.app_id': values.wechat_official.app_id.trim(),
   'wechat_official.app_secret': values.wechat_official.app_secret.trim(),
+  'wechat_official.display_name': values.wechat_official.display_name.trim(),
+  'wechat_official.logo_url': values.wechat_official.logo_url.trim(),
   'wechat_official.enabled': values.wechat_official.enabled,
   WeChatAuthEnabled: values.WeChatAuthEnabled,
   WeChatServerAddress: values.WeChatServerAddress,
@@ -1122,6 +1164,42 @@ export function OAuthSection(props: OAuthSectionProps) {
                         />
                       </FormControl>
                     </SettingsSwitchItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name='wechat_official.display_name'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('Official Account name')}</FormLabel>
+                      <FormControl>
+                        <Input {...field} autoComplete='off' />
+                      </FormControl>
+                      <FormDescription>
+                        {t('Shown on mobile authorization and result pages.')}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name='wechat_official.logo_url'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('Official Account logo URL')}</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          autoComplete='off'
+                          placeholder='https://example.com/logo.png'
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        {t('Use an HTTPS image URL without credentials.')}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
                   )}
                 />
                 <FormField

@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, expect, it, vi } from 'vitest'
 
@@ -25,9 +25,18 @@ import { api } from '@/lib/api'
 import { OfficialWeChatConfirmation } from '../confirmation'
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  useTranslation: () => ({
+    t: (key: string, values?: Record<string, string>) =>
+      key.replaceAll(
+        /{{(\w+)}}/g,
+        (_, name: string) => values?.[name] ?? `{{${name}}}`
+      ),
+  }),
 }))
-afterEach(() => vi.restoreAllMocks())
+afterEach(() => {
+  vi.restoreAllMocks()
+  vi.unstubAllGlobals()
+})
 it('shows explicit binding intent and sends only scanner confirmation when cancelled', async () => {
   vi.spyOn(api, 'get').mockResolvedValue({
     data: {
@@ -45,6 +54,14 @@ it('shows explicit binding intent and sends only scanner confirmation when cance
   })
   render(<OfficialWeChatConfirmation />)
   await screen.findByText('Bind WeChat')
+  expect(
+    screen.getByRole('heading', { name: 'WeChat Official Account' })
+  ).toBeVisible()
+  expect(
+    screen.getByText(
+      'Bind your WeChat account to Example via WeChat Official Account?'
+    )
+  ).toBeVisible()
   await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
   await screen.findByText('Cancelled')
   expect(post).toHaveBeenCalledWith(
@@ -86,7 +103,7 @@ it('shows a dedicated success result after confirming and removes authorization 
   )
   expect(await screen.findByText('Authorization successful')).toBeVisible()
   expect(screen.getByRole('status')).toHaveTextContent(
-    'Authorization completed. Return to the original page.'
+    'Authorization via WeChat Official Account is complete. Return to Example to continue.'
   )
   expect(
     screen.queryByRole('button', { name: 'Confirm authorization' })
@@ -120,4 +137,100 @@ it('shows a failure result with recovery guidance when confirmation fails', asyn
   expect(
     screen.queryByRole('button', { name: 'Confirm authorization' })
   ).not.toBeInTheDocument()
+})
+
+it.each(['confirmed', 'cancelled'] as const)(
+  'keeps the service account identity visible on the %s result',
+  async (result) => {
+    const images: HTMLImageElement[] = []
+    const OriginalImage = window.Image
+    vi.stubGlobal(
+      'Image',
+      class extends OriginalImage {
+        constructor() {
+          super()
+          images.push(this)
+        }
+      }
+    )
+    vi.spyOn(api, 'get').mockResolvedValue({
+      data: {
+        success: true,
+        data: {
+          intent: 'login',
+          site_name: 'Example',
+          official_account_name: 'My Service',
+          official_account_logo: 'https://example.com/official.png',
+          csrf_token: 'scanner-csrf',
+          expires_at: Math.floor(Date.now() / 1000) + 60,
+        },
+      },
+    })
+    vi.spyOn(api, 'post').mockResolvedValue({ data: { success: true } })
+    render(<OfficialWeChatConfirmation />)
+    expect(
+      await screen.findByRole('heading', { name: 'My Service' })
+    ).toBeVisible()
+    expect(screen.getByText('Sign in to Example via My Service?')).toBeVisible()
+    await waitFor(() => expect(images.length).toBeGreaterThan(0))
+    await act(async () => {
+      images.forEach((image) => image.dispatchEvent(new Event('load')))
+    })
+    expect(
+      await screen.findByRole('img', { name: 'My Service' })
+    ).toHaveAttribute('src', 'https://example.com/official.png')
+    await userEvent.click(
+      screen.getByRole('button', {
+        name: result === 'confirmed' ? 'Confirm authorization' : 'Cancel',
+      })
+    )
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      result === 'confirmed'
+        ? 'Authorization via My Service is complete. Return to Example to continue.'
+        : 'Authorization via My Service was cancelled. Return to Example to start again.'
+    )
+    expect(screen.getByRole('heading', { name: 'My Service' })).toBeVisible()
+    expect(screen.getByRole('img', { name: 'My Service' })).toBeVisible()
+  }
+)
+
+it('keeps a readable service account identity when its logo fails to load', async () => {
+  const images: HTMLImageElement[] = []
+  const OriginalImage = window.Image
+  vi.stubGlobal(
+    'Image',
+    class extends OriginalImage {
+      constructor() {
+        super()
+        images.push(this)
+      }
+    }
+  )
+  vi.spyOn(api, 'get').mockResolvedValue({
+    data: {
+      success: true,
+      data: {
+        intent: 'bind',
+        site_name: 'Example',
+        official_account_name: 'My Service',
+        official_account_logo: 'https://example.com/broken.png',
+        csrf_token: 'scanner-csrf',
+        expires_at: Math.floor(Date.now() / 1000) + 60,
+      },
+    },
+  })
+  render(<OfficialWeChatConfirmation />)
+  await screen.findByRole('heading', { name: 'My Service' })
+  await waitFor(() => expect(images.length).toBeGreaterThan(0))
+  await act(async () => {
+    images.forEach((image) => image.dispatchEvent(new Event('error')))
+  })
+  expect(screen.queryByRole('img')).not.toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: 'My Service' })).toBeVisible()
+  expect(
+    screen.getByText('Bind your WeChat account to Example via My Service?')
+  ).toBeVisible()
+  expect(
+    screen.getByRole('button', { name: 'Confirm authorization' })
+  ).toBeEnabled()
 })

@@ -8158,6 +8158,18 @@
     "WeChat authorization failed. Please start again.": "WeChat authorization failed. Please start again.",
     "WeChat authorization expired or changed. Please start again.": "WeChat authorization expired or changed. Please start again.",
     "Failed to read WeChat Official Account configuration.": "Failed to read WeChat Official Account configuration.",
-    "Requires an HTTPS site, SESSION_COOKIE_SECURE=true and SESSION_COOKIE_TRUSTED_URL set to the exact HTTPS site URL.": "Requires an HTTPS site, SESSION_COOKIE_SECURE=true and SESSION_COOKIE_TRUSTED_URL set to the exact HTTPS site URL."
+    "Requires an HTTPS site, SESSION_COOKIE_SECURE=true and SESSION_COOKIE_TRUSTED_URL set to the exact HTTPS site URL.": "Requires an HTTPS site, SESSION_COOKIE_SECURE=true and SESSION_COOKIE_TRUSTED_URL set to the exact HTTPS site URL.",
+    "Official Account name": "Official Account name",
+    "Official Account logo URL": "Official Account logo URL",
+    "Shown on mobile authorization and result pages.": "Shown on mobile authorization and result pages.",
+    "Use an HTTPS image URL without credentials.": "Use an HTTPS image URL without credentials.",
+    "Use up to 128 characters without control characters.": "Use up to 128 characters without control characters.",
+    "Sign in to {{site}} via {{account}}?": "Sign in to {{site}} via {{account}}?",
+    "Bind your WeChat account to {{site}} via {{account}}?": "Bind your WeChat account to {{site}} via {{account}}?",
+    "Verify your identity for {{site}} via {{account}}?": "Verify your identity for {{site}} via {{account}}?",
+    "Authorization via {{account}} is complete. Return to {{site}} to continue.": "Authorization via {{account}} is complete. Return to {{site}} to continue.",
+    "Authorization via {{account}} was cancelled. Return to {{site}} to start again.": "Authorization via {{account}} was cancelled. Return to {{site}} to start again.",
+    "WeChat Official Account": "WeChat Official Account",
+    "Invalid Official Account branding. Use a name up to 128 characters and an absolute HTTPS logo URL.": "Invalid Official Account branding. Use a name up to 128 characters and an absolute HTTPS logo URL."
   }
 }

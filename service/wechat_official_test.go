@@ -56,7 +56,7 @@ func configureOfficialTest(t *testing.T) {
 	common.OptionMap = map[string]string{}
 	t.Cleanup(func() { common.OptionMap = previousOptions })
 	require.NoError(t, model.DB.AutoMigrate(&model.Option{}, &model.AuthFlow{}, &model.ExternalIdentityClaim{}, &model.UserSession{}))
-	for key, value := range map[string]string{"ServerAddress": "https://site.example", "wechat_official.app_id": "wx0123456789abcdef", "wechat_official.app_secret": "provider-secret", "wechat_official.pinned_app_id": "wx0123456789abcdef", "wechat_official.enabled": "true", "wechat_official.revision": "revision-one"} {
+	for key, value := range map[string]string{"ServerAddress": "https://site.example", "wechat_official.app_id": "wx0123456789abcdef", "wechat_official.app_secret": "provider-secret", "wechat_official.pinned_app_id": "wx0123456789abcdef", "wechat_official.enabled": "true", "wechat_official.revision": "revision-one", "wechat_official.display_name": "示例服务号", "wechat_official.logo_url": "https://image.example/official.png"} {
 		require.NoError(t, model.DB.Create(&model.Option{Key: key, Value: value}).Error)
 	}
 }
@@ -81,6 +81,8 @@ func officialAuthorizedTestFlow(t *testing.T, intent string, identity AuthIdenti
 	require.NoError(t, err)
 	require.Equal(t, intent, c.Intent)
 	require.Equal(t, "site.example", c.SiteName)
+	require.Equal(t, "示例服务号", c.OfficialAccountName)
+	require.Equal(t, "https://image.example/official.png", c.OfficialAccountLogo)
 	_, _, _, err = CompleteWeChatOfficial(flow.FlowToken, "browser", identity)
 	require.Error(t, err, "GET callback must not authorize")
 	require.NoError(t, ConfirmWeChatOfficial(consent, true))
@@ -121,6 +123,49 @@ func TestWeChatOfficialCapabilitiesAndConfiguration(t *testing.T) {
 		require.Error(t, err)
 	}
 }
+func TestWeChatOfficialBrandingConfiguration(t *testing.T) {
+	setupAuthSessionTestDB(t)
+	configureOfficialTest(t)
+	cfg, err := model.RequireWeChatOfficialConfig(model.DB, "")
+	require.NoError(t, err)
+	require.Equal(t, "示例服务号", cfg.DisplayName)
+	require.Equal(t, "https://image.example/official.png", cfg.LogoURL)
+	for _, option := range []struct{ name, key, value string }{
+		{"name_exceeds_unicode_limit", "wechat_official.display_name", strings.Repeat("服", 129)},
+		{"name_contains_control", "wechat_official.display_name", "服务\n号"},
+		{"logo_uses_http", "wechat_official.logo_url", "http://image.example/logo.png"},
+		{"logo_is_relative", "wechat_official.logo_url", "/logo.png"},
+		{"logo_contains_userinfo", "wechat_official.logo_url", "https://name:secret@image.example/logo.png"},
+		{"logo_exceeds_url_limit", "wechat_official.logo_url", "https://image.example/" + strings.Repeat("a", 2048)},
+		{"logo_contains_control", "wechat_official.logo_url", "https://image.example/logo.png\x00"},
+	} {
+		t.Run(option.name, func(t *testing.T) {
+			require.ErrorIs(t, model.UpdateWeChatOfficialOption(option.key, option.value), model.ErrWeChatOfficialBranding)
+			unchanged, err := model.RequireWeChatOfficialConfig(model.DB, cfg.Fingerprint)
+			require.NoError(t, err, "rejected branding edits must not invalidate active ceremonies")
+			require.Equal(t, cfg.DisplayName, unchanged.DisplayName)
+			require.Equal(t, cfg.LogoURL, unchanged.LogoURL)
+		})
+	}
+	require.NoError(t, model.UpdateWeChatOfficialOption("wechat_official.display_name", "  "+strings.Repeat("服", 128)+"  "))
+	_, err = model.RequireWeChatOfficialConfig(model.DB, cfg.Fingerprint)
+	require.ErrorIs(t, err, model.ErrWeChatOfficialUnavailable, "accepted edits must invalidate pending ceremonies")
+	current, err := model.RequireWeChatOfficialConfig(model.DB, "")
+	require.NoError(t, err)
+	require.Equal(t, strings.Repeat("服", 128), current.DisplayName)
+	require.NoError(t, model.UpdateWeChatOfficialOption("wechat_official.logo_url", "  https://image.example/new.png  "))
+	current, err = model.ReadWeChatOfficialConfig(model.DB)
+	require.NoError(t, err)
+	require.Equal(t, "https://image.example/new.png", current.LogoURL)
+	for _, key := range []string{"wechat_official.display_name", "wechat_official.logo_url"} {
+		require.NoError(t, model.UpdateWeChatOfficialOption(key, ""))
+	}
+	current, err = model.RequireWeChatOfficialConfig(model.DB, "")
+	require.NoError(t, err, "branding is optional for existing installations")
+	require.Empty(t, current.DisplayName)
+	require.Empty(t, current.LogoURL)
+}
+
 func TestWeChatOfficialCancellationAndOptionalProfile(t *testing.T) {
 	setupAuthSessionTestDB(t)
 	configureOfficialTest(t)
@@ -239,6 +284,18 @@ func TestWeChatOfficialPersistenceMatrix(t *testing.T) {
 				}
 			})
 			configureOfficialTest(t)
+			beforeBranding, err := model.RequireWeChatOfficialConfig(db, "")
+			require.NoError(t, err)
+			require.NoError(t, model.UpdateWeChatOfficialOption("wechat_official.display_name", "  示例服务号  "))
+			require.NoError(t, model.UpdateWeChatOfficialOption("wechat_official.logo_url", "  https://image.example/official.png  "))
+			branding, err := model.RequireWeChatOfficialConfig(db, "")
+			require.NoError(t, err)
+			require.Equal(t, "示例服务号", branding.DisplayName)
+			require.Equal(t, "https://image.example/official.png", branding.LogoURL)
+			require.NotEqual(t, beforeBranding.Fingerprint, branding.Fingerprint)
+			require.ErrorIs(t, model.UpdateWeChatOfficialOption("wechat_official.logo_url", "javascript:alert(1)"), model.ErrWeChatOfficialBranding)
+			_, err = model.RequireWeChatOfficialConfig(db, branding.Fingerprint)
+			require.NoError(t, err, "invalid presentation data must not mutate the stored revision")
 			legacy := model.User{Username: "legacy", AffCode: "legacy", WeChatId: "legacy-openid", Status: common.UserStatusEnabled}
 			require.NoError(t, db.Create(&legacy).Error)
 			for range 2 {

@@ -8159,6 +8159,18 @@
     "WeChat authorization failed. Please start again.": "Авторизация WeChat не удалась. Начните заново.",
     "WeChat authorization expired or changed. Please start again.": "Авторизация WeChat истекла или изменена. Начните заново.",
     "Failed to read WeChat Official Account configuration.": "Не удалось прочитать конфигурацию официального аккаунта WeChat.",
-    "Requires an HTTPS site, SESSION_COOKIE_SECURE=true and SESSION_COOKIE_TRUSTED_URL set to the exact HTTPS site URL.": "Требуется HTTPS-сайт, SESSION_COOKIE_SECURE=true и SESSION_COOKIE_TRUSTED_URL с точным HTTPS-адресом сайта."
+    "Requires an HTTPS site, SESSION_COOKIE_SECURE=true and SESSION_COOKIE_TRUSTED_URL set to the exact HTTPS site URL.": "Требуется HTTPS-сайт, SESSION_COOKIE_SECURE=true и SESSION_COOKIE_TRUSTED_URL с точным HTTPS-адресом сайта.",
+    "Official Account name": "Название официального аккаунта",
+    "Official Account logo URL": "URL логотипа официального аккаунта",
+    "Shown on mobile authorization and result pages.": "Отображается на мобильных страницах авторизации и результата.",
+    "Use an HTTPS image URL without credentials.": "Используйте HTTPS-ссылку на изображение без учётных данных.",
+    "Use up to 128 characters without control characters.": "Введите до 128 символов без управляющих символов.",
+    "Sign in to {{site}} via {{account}}?": "Войти на {{site}} через {{account}}?",
+    "Bind your WeChat account to {{site}} via {{account}}?": "Привязать WeChat к {{site}} через {{account}}?",
+    "Verify your identity for {{site}} via {{account}}?": "Подтвердить личность для {{site}} через {{account}}?",
+    "Authorization via {{account}} is complete. Return to {{site}} to continue.": "Авторизация через {{account}} завершена. Вернитесь на {{site}}, чтобы продолжить.",
+    "Authorization via {{account}} was cancelled. Return to {{site}} to start again.": "Авторизация через {{account}} отменена. Вернитесь на {{site}}, чтобы начать заново.",
+    "WeChat Official Account": "Официальный аккаунт WeChat",
+    "Invalid Official Account branding. Use a name up to 128 characters and an absolute HTTPS logo URL.": "Неверные данные официального аккаунта. Укажите название до 128 символов и абсолютный HTTPS-адрес логотипа."
   }
 }

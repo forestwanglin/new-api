@@ -24,6 +24,7 @@ import { IconWeChat } from '@/assets/brand-icons/icon-wechat'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { LoadingState } from '@/components/loading-state'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { api } from '@/lib/api'
@@ -37,6 +38,8 @@ export function OfficialWeChatConfirmation() {
   const [data, setData] = useState<{
     intent: string
     site_name: string
+    official_account_name?: string
+    official_account_logo?: string
     expires_at: number
     csrf_token: string
     same_device?: boolean
@@ -85,6 +88,25 @@ export function OfficialWeChatConfirmation() {
       setBusy(false)
     }
   }
+  const accountName =
+    data?.official_account_name || t('WeChat Official Account')
+  const authorizationContext = {
+    account: accountName,
+    site: data?.site_name ?? '',
+  }
+  let consent = t(
+    'Verify your identity for {{site}} via {{account}}?',
+    authorizationContext
+  )
+  if (data?.intent === 'login') {
+    consent = t('Sign in to {{site}} via {{account}}?', authorizationContext)
+  }
+  if (data?.intent === 'bind') {
+    consent = t(
+      'Bind your WeChat account to {{site}} via {{account}}?',
+      authorizationContext
+    )
+  }
   let action = t('Security verification')
   if (data?.intent === 'login') action = t('Sign in')
   if (data?.intent === 'bind') action = t('Bind WeChat')
@@ -93,12 +115,24 @@ export function OfficialWeChatConfirmation() {
       <Card className='w-full max-w-md rounded-3xl py-8 sm:py-10'>
         <CardContent className='px-6 sm:px-8'>
           <header className='flex flex-col items-center gap-4 text-center'>
-            <div className='bg-success/10 text-success flex size-14 items-center justify-center rounded-2xl'>
-              <IconWeChat className='size-8' aria-hidden='true' />
+            <Avatar className='size-16'>
+              <AvatarImage
+                src={data?.official_account_logo}
+                alt={accountName}
+                referrerPolicy='no-referrer'
+              />
+              <AvatarFallback className='bg-success/10 text-success'>
+                <IconWeChat className='size-8' aria-hidden='true' />
+              </AvatarFallback>
+            </Avatar>
+            <div className='w-full min-w-0 space-y-1.5'>
+              <h1 className='text-xl font-semibold text-balance wrap-anywhere'>
+                {accountName}
+              </h1>
+              <p className='text-muted-foreground text-sm'>
+                {t('WeChat Official Account authorization')}
+              </p>
             </div>
-            <h1 className='text-xl font-semibold text-balance'>
-              {t('WeChat Official Account authorization')}
-            </h1>
           </header>
           {error ? (
             <div role='alert' className='mt-6'>
@@ -127,9 +161,13 @@ export function OfficialWeChatConfirmation() {
                 }
                 description={
                   done === 'confirmed'
-                    ? t('Authorization completed. Return to the original page.')
+                    ? t(
+                        'Authorization via {{account}} is complete. Return to {{site}} to continue.',
+                        authorizationContext
+                      )
                     : t(
-                        'Return to the original page and scan a new QR code to try again.'
+                        'Authorization via {{account}} was cancelled. Return to {{site}} to start again.',
+                        authorizationContext
                       )
                 }
                 className={
@@ -148,7 +186,7 @@ export function OfficialWeChatConfirmation() {
           {!error && !done && data && (
             <div className='mt-6 space-y-6'>
               <p className='text-muted-foreground text-center text-sm leading-relaxed wrap-anywhere'>
-                {t('Authorize {{site}} to continue?', { site: data.site_name })}
+                {consent}
               </p>
               <div className='bg-muted/60 flex items-center gap-3 rounded-xl px-4 py-4'>
                 <ShieldCheck

@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/QuantumNous/new-api/common"
 	"gorm.io/gorm"
@@ -18,6 +20,7 @@ const weChatOfficialRevisionKey = "wechat_official.revision"
 
 var ErrWeChatOfficialUnavailable = errors.New("WeChat Official Account authorization is unavailable. Please try again.")
 var ErrWeChatOfficialConfiguration = errors.New("Invalid WeChat Official Account configuration. Check credentials and HTTPS site URL.")
+var ErrWeChatOfficialBranding = common.NewMessage("Invalid Official Account branding. Use a name up to 128 characters and an absolute HTTPS logo URL.")
 var ErrWeChatOfficialAppIDPinned = errors.New("The WeChat AppID identity namespace is pinned. A separate identity migration is required to change it.")
 var officialAppIDPattern = regexp.MustCompile(`^wx[a-zA-Z0-9]{16}$`)
 
@@ -25,6 +28,8 @@ type WeChatOfficialConfig struct {
 	Enabled     bool
 	AppID       string
 	AppSecret   string
+	DisplayName string
+	LogoURL     string
 	CallbackURL string
 	Fingerprint string
 	Revision    string
@@ -40,7 +45,7 @@ func ReadWeChatOfficialConfig(tx *gorm.DB) (WeChatOfficialConfig, error) {
 	for _, o := range options {
 		values[o.Key] = o.Value
 	}
-	cfg := WeChatOfficialConfig{Enabled: values["wechat_official.enabled"] == "true", AppID: values["wechat_official.app_id"], AppSecret: values["wechat_official.app_secret"], Revision: values[weChatOfficialRevisionKey], PinnedAppID: values["wechat_official.pinned_app_id"]}
+	cfg := WeChatOfficialConfig{DisplayName: values["wechat_official.display_name"], LogoURL: values["wechat_official.logo_url"], Enabled: values["wechat_official.enabled"] == "true", AppID: values["wechat_official.app_id"], AppSecret: values["wechat_official.app_secret"], Revision: values[weChatOfficialRevisionKey], PinnedAppID: values["wechat_official.pinned_app_id"]}
 	// Never trust the request Host or an instance-local stale site configuration.
 	site, err := url.Parse(strings.TrimRight(values["ServerAddress"], "/"))
 	if err == nil && site.Scheme == "https" && site.Hostname() != "" && site.User == nil && site.RawQuery == "" && site.Fragment == "" && (site.Path == "" || site.Path == "/") {
@@ -81,10 +86,24 @@ func IsWeChatOfficialOption(key string) bool { return strings.HasPrefix(key, "we
 // The revision row is the first write and serializes configuration edits on all
 // supported databases, including SQLite. Disable/re-enable cannot revive flows.
 func UpdateWeChatOfficialOption(key, value string) error {
-	if key != "wechat_official.enabled" && key != "wechat_official.app_id" && key != "wechat_official.app_secret" {
+	if key != "wechat_official.enabled" && key != "wechat_official.app_id" && key != "wechat_official.app_secret" && key != "wechat_official.display_name" && key != "wechat_official.logo_url" {
 		return ErrWeChatOfficialConfiguration
 	}
+	if key == "wechat_official.display_name" || key == "wechat_official.logo_url" {
+		if !utf8.ValidString(value) || strings.ContainsFunc(value, unicode.IsControl) {
+			return ErrWeChatOfficialBranding
+		}
+	}
 	value = strings.TrimSpace(value)
+	if key == "wechat_official.display_name" && utf8.RuneCountInString(value) > 128 {
+		return ErrWeChatOfficialBranding
+	}
+	if key == "wechat_official.logo_url" && value != "" {
+		logo, err := url.Parse(value)
+		if err != nil || len(value) > 2048 || logo.Scheme != "https" || logo.Hostname() == "" || logo.User != nil {
+			return ErrWeChatOfficialBranding
+		}
+	}
 	if key == "wechat_official.app_secret" && value == "" {
 		return nil
 	}

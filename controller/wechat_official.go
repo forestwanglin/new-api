@@ -225,7 +225,7 @@ func GetWeChatOfficialConfirmation(c *gin.Context) {
 		officialError(c, err)
 		return
 	}
-	common.ApiSuccess(c, gin.H{"intent": confirmation.Intent, "site_name": confirmation.SiteName, "expires_at": confirmation.ExpiresAt, "same_device": confirmation.SameDevice, "csrf_token": officialCSRF(token)})
+	common.ApiSuccess(c, gin.H{"intent": confirmation.Intent, "official_account_name": confirmation.OfficialAccountName, "official_account_logo": confirmation.OfficialAccountLogo, "site_name": confirmation.SiteName, "expires_at": confirmation.ExpiresAt, "same_device": confirmation.SameDevice, "csrf_token": officialCSRF(token)})
 }
 func ConfirmWeChatOfficial(c *gin.Context) {
 	token, err := c.Cookie(officialConfirmationCookie)

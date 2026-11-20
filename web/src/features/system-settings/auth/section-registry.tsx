@@ -87,6 +87,9 @@ const AUTH_SECTIONS = [
           LinuxDOClientSecret: settings.LinuxDOClientSecret,
           LinuxDOMinimumTrustLevel: settings.LinuxDOMinimumTrustLevel,
           'wechat_official.enabled': settings['wechat_official.enabled'],
+          'wechat_official.display_name':
+            settings['wechat_official.display_name'],
+          'wechat_official.logo_url': settings['wechat_official.logo_url'],
           'wechat_official.app_id': settings['wechat_official.app_id'],
           'wechat_official.app_secret_configured':
             settings['wechat_official.app_secret_configured'],

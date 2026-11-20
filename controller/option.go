@@ -123,6 +123,8 @@ func GetOptions(c *gin.Context) {
 	options = append(options,
 		&model.Option{Key: "wechat_official.enabled", Value: strconv.FormatBool(official.Enabled)},
 		&model.Option{Key: "wechat_official.app_id", Value: official.AppID},
+		&model.Option{Key: "wechat_official.display_name", Value: official.DisplayName},
+		&model.Option{Key: "wechat_official.logo_url", Value: official.LogoURL},
 		&model.Option{Key: "wechat_official.app_secret_configured", Value: strconv.FormatBool(official.AppSecret != "")},
 		&model.Option{Key: "wechat_official.callback_url", Value: official.CallbackURL},
 	)

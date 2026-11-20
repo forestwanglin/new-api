@@ -312,10 +312,12 @@ func CallbackWeChatOfficial(ctx context.Context, state, code string) (string, er
 }
 
 type WeChatOfficialConfirmation struct {
-	Intent     string `json:"intent"`
-	SiteName   string `json:"site_name"`
-	ExpiresAt  int64  `json:"expires_at"`
-	SameDevice bool   `json:"same_device"`
+	OfficialAccountName string `json:"official_account_name"`
+	OfficialAccountLogo string `json:"official_account_logo"`
+	Intent              string `json:"intent"`
+	SiteName            string `json:"site_name"`
+	ExpiresAt           int64  `json:"expires_at"`
+	SameDevice          bool   `json:"same_device"`
 }
 
 func GetWeChatOfficialConfirmation(token string) (WeChatOfficialConfirmation, error) {
@@ -336,7 +338,7 @@ func GetWeChatOfficialConfirmation(token string) (WeChatOfficialConfirmation, er
 		return WeChatOfficialConfirmation{}, err
 	}
 	site, _ := url.Parse(cfg.CallbackURL)
-	return WeChatOfficialConfirmation{Intent: p.Intent, SiteName: site.Hostname(), ExpiresAt: f.ExpiresAt.Unix(), SameDevice: p.SameDevice}, nil
+	return WeChatOfficialConfirmation{OfficialAccountName: cfg.DisplayName, OfficialAccountLogo: cfg.LogoURL, Intent: p.Intent, SiteName: site.Hostname(), ExpiresAt: f.ExpiresAt.Unix(), SameDevice: p.SameDevice}, nil
 }
 func ConfirmWeChatOfficial(token string, confirmed bool) error {
 	_, err := model.ConsumeAuthFlowWithAction(token, officialMatch(officialConsentPurpose), func(tx *gorm.DB, f *model.AuthFlow) error {

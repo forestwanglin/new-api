@@ -8157,6 +8157,18 @@
     "WeChat authorization failed. Please start again.": "WeChat認証に失敗しました。やり直してください。",
     "WeChat authorization expired or changed. Please start again.": "WeChat認証が期限切れか変更されました。やり直してください。",
     "Failed to read WeChat Official Account configuration.": "WeChat公式アカウント設定の読み込みに失敗しました。",
-    "Requires an HTTPS site, SESSION_COOKIE_SECURE=true and SESSION_COOKIE_TRUSTED_URL set to the exact HTTPS site URL.": "HTTPSサイト、SESSION_COOKIE_SECURE=true、および正確なHTTPSサイトURLを指定したSESSION_COOKIE_TRUSTED_URLが必要です。"
+    "Requires an HTTPS site, SESSION_COOKIE_SECURE=true and SESSION_COOKIE_TRUSTED_URL set to the exact HTTPS site URL.": "HTTPSサイト、SESSION_COOKIE_SECURE=true、および正確なHTTPSサイトURLを指定したSESSION_COOKIE_TRUSTED_URLが必要です。",
+    "Official Account name": "公式アカウント名",
+    "Official Account logo URL": "公式アカウントのロゴURL",
+    "Shown on mobile authorization and result pages.": "モバイルの認証画面と結果画面に表示されます。",
+    "Use an HTTPS image URL without credentials.": "認証情報を含まないHTTPS画像URLを使用してください。",
+    "Use up to 128 characters without control characters.": "制御文字を含まない128文字以内の名前を入力してください。",
+    "Sign in to {{site}} via {{account}}?": "{{account}}を通じて{{site}}にログインしますか？",
+    "Bind your WeChat account to {{site}} via {{account}}?": "{{account}}を通じてWeChatを{{site}}に連携しますか？",
+    "Verify your identity for {{site}} via {{account}}?": "{{account}}を通じて{{site}}の本人確認を行いますか？",
+    "Authorization via {{account}} is complete. Return to {{site}} to continue.": "{{account}}を通じた認証が完了しました。{{site}}に戻って続行してください。",
+    "Authorization via {{account}} was cancelled. Return to {{site}} to start again.": "{{account}}を通じた認証をキャンセルしました。{{site}}に戻ってやり直してください。",
+    "WeChat Official Account": "WeChat公式アカウント",
+    "Invalid Official Account branding. Use a name up to 128 characters and an absolute HTTPS logo URL.": "公式アカウントの表示情報が無効です。名前は128文字以内、ロゴは絶対HTTPS URLを指定してください。"
   }
 }

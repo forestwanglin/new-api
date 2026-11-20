@@ -61,6 +61,8 @@ const defaultAuthSettings: AuthSettings = {
   LinuxDOClientSecret: '',
   LinuxDOMinimumTrustLevel: '0',
   'wechat_official.enabled': false,
+  'wechat_official.display_name': '',
+  'wechat_official.logo_url': '',
   'wechat_official.app_id': '',
   'wechat_official.app_secret_configured': false,
   'wechat_official.callback_url': '',

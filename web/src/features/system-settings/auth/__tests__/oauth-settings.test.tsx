@@ -23,7 +23,7 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import axios from 'axios'
 import { createInstance, type i18n } from 'i18next'
@@ -385,5 +385,100 @@ describe('OAuth settings saves', () => {
             (body as { key: string }).key === 'wechat_official.app_secret'
         )
     ).toHaveLength(1)
+  })
+})
+
+it('loads and saves trimmed official account branding independently of credentials', async () => {
+  const user = userEvent.setup()
+  await renderSettings({
+    'wechat_official.display_name': 'Existing Service',
+    'wechat_official.logo_url': 'https://example.com/old.png',
+  })
+  await user.click(
+    screen.getByRole('tab', { name: 'WeChat Official Account authorization' })
+  )
+  const name = screen.getByLabelText('Official Account name')
+  const logo = screen.getByLabelText('Official Account logo URL')
+  expect(name).toHaveValue('Existing Service')
+  expect(logo).toHaveValue('https://example.com/old.png')
+  await user.clear(name)
+  await user.type(name, ' My Service ')
+  await user.clear(logo)
+  await user.type(logo, 'https://example.com/new.png')
+  await user.click(screen.getByRole('button', { name: 'Save Changes' }))
+  await waitFor(() => expect(api.put).toHaveBeenCalledTimes(2))
+  expect(api.put).toHaveBeenCalledWith('/api/option/', {
+    key: 'wechat_official.display_name',
+    value: 'My Service',
+  })
+  expect(api.put).toHaveBeenCalledWith('/api/option/', {
+    key: 'wechat_official.logo_url',
+    value: 'https://example.com/new.png',
+  })
+})
+
+it('rejects an insecure official account logo URL before saving', async () => {
+  const user = userEvent.setup()
+  await renderSettings()
+  await user.click(
+    screen.getByRole('tab', { name: 'WeChat Official Account authorization' })
+  )
+  await user.type(
+    screen.getByLabelText('Official Account logo URL'),
+    'http://example.com/logo.png'
+  )
+  await user.click(screen.getByRole('button', { name: 'Save Changes' }))
+  await waitFor(() =>
+    expect(screen.getByLabelText('Official Account logo URL')).toHaveAttribute(
+      'aria-invalid',
+      'true'
+    )
+  )
+  expect(
+    screen.getByLabelText('Official Account logo URL')
+  ).toHaveAccessibleDescription(
+    expect.stringContaining('Use an HTTPS image URL without credentials.')
+  )
+  expect(api.put).not.toHaveBeenCalled()
+})
+
+it.each([
+  ['Official Account name', '\u0085'],
+  ['Official Account logo URL', ' \t '],
+  ['Official Account logo URL', `https://example.com/${'图'.repeat(680)}`],
+])('rejects invalid branding in %s before saving', async (label, value) => {
+  const user = userEvent.setup()
+  await renderSettings()
+  await user.click(
+    screen.getByRole('tab', { name: 'WeChat Official Account authorization' })
+  )
+  fireEvent.change(screen.getByLabelText(label), { target: { value } })
+  await user.click(screen.getByRole('button', { name: 'Save Changes' }))
+  await waitFor(() =>
+    expect(screen.getByLabelText(label)).toHaveAttribute('aria-invalid', 'true')
+  )
+  expect(api.put).not.toHaveBeenCalled()
+})
+
+it('clears optional official account branding without changing credentials', async () => {
+  const user = userEvent.setup()
+  await renderSettings({
+    'wechat_official.display_name': 'My Service',
+    'wechat_official.logo_url': 'https://example.com/logo.png',
+  })
+  await user.click(
+    screen.getByRole('tab', { name: 'WeChat Official Account authorization' })
+  )
+  await user.clear(screen.getByLabelText('Official Account name'))
+  await user.clear(screen.getByLabelText('Official Account logo URL'))
+  await user.click(screen.getByRole('button', { name: 'Save Changes' }))
+  await waitFor(() => expect(api.put).toHaveBeenCalledTimes(2))
+  expect(api.put).toHaveBeenCalledWith('/api/option/', {
+    key: 'wechat_official.display_name',
+    value: '',
+  })
+  expect(api.put).toHaveBeenCalledWith('/api/option/', {
+    key: 'wechat_official.logo_url',
+    value: '',
   })
 })

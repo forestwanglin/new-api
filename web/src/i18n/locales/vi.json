@@ -8157,6 +8157,18 @@
     "WeChat authorization failed. Please start again.": "Ủy quyền WeChat thất bại. Vui lòng bắt đầu lại.",
     "WeChat authorization expired or changed. Please start again.": "Ủy quyền WeChat đã hết hạn hoặc thay đổi. Vui lòng bắt đầu lại.",
     "Failed to read WeChat Official Account configuration.": "Không thể đọc cấu hình tài khoản chính thức WeChat.",
-    "Requires an HTTPS site, SESSION_COOKIE_SECURE=true and SESSION_COOKIE_TRUSTED_URL set to the exact HTTPS site URL.": "Cần trang HTTPS, SESSION_COOKIE_SECURE=true và SESSION_COOKIE_TRUSTED_URL là URL HTTPS chính xác của trang."
+    "Requires an HTTPS site, SESSION_COOKIE_SECURE=true and SESSION_COOKIE_TRUSTED_URL set to the exact HTTPS site URL.": "Cần trang HTTPS, SESSION_COOKIE_SECURE=true và SESSION_COOKIE_TRUSTED_URL là URL HTTPS chính xác của trang.",
+    "Official Account name": "Tên tài khoản chính thức",
+    "Official Account logo URL": "URL logo tài khoản chính thức",
+    "Shown on mobile authorization and result pages.": "Hiển thị trên trang cấp quyền và kết quả trên điện thoại.",
+    "Use an HTTPS image URL without credentials.": "Sử dụng URL hình ảnh HTTPS không chứa thông tin đăng nhập.",
+    "Use up to 128 characters without control characters.": "Nhập tên tối đa 128 ký tự, không có ký tự điều khiển.",
+    "Sign in to {{site}} via {{account}}?": "Đăng nhập vào {{site}} qua {{account}}?",
+    "Bind your WeChat account to {{site}} via {{account}}?": "Liên kết WeChat với {{site}} qua {{account}}?",
+    "Verify your identity for {{site}} via {{account}}?": "Xác minh danh tính cho {{site}} qua {{account}}?",
+    "Authorization via {{account}} is complete. Return to {{site}} to continue.": "Đã cấp quyền qua {{account}}. Quay lại {{site}} để tiếp tục.",
+    "Authorization via {{account}} was cancelled. Return to {{site}} to start again.": "Đã hủy cấp quyền qua {{account}}. Quay lại {{site}} để bắt đầu lại.",
+    "WeChat Official Account": "Tài khoản chính thức WeChat",
+    "Invalid Official Account branding. Use a name up to 128 characters and an absolute HTTPS logo URL.": "Thông tin hiển thị tài khoản chính thức không hợp lệ. Tên tối đa 128 ký tự và logo phải là URL HTTPS tuyệt đối."
   }
 }

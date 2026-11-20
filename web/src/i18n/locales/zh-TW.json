@@ -8157,6 +8157,18 @@
     "WeChat authorization failed. Please start again.": "微信授權失敗，請重新開始。",
     "WeChat authorization expired or changed. Please start again.": "微信授權已過期或設定已變更，請重新開始。",
     "Failed to read WeChat Official Account configuration.": "讀取微信服務號設定失敗。",
-    "Requires an HTTPS site, SESSION_COOKIE_SECURE=true and SESSION_COOKIE_TRUSTED_URL set to the exact HTTPS site URL.": "需要 HTTPS 網站，並設定 SESSION_COOKIE_SECURE=true、SESSION_COOKIE_TRUSTED_URL 為準確的 HTTPS 網站網址。"
+    "Requires an HTTPS site, SESSION_COOKIE_SECURE=true and SESSION_COOKIE_TRUSTED_URL set to the exact HTTPS site URL.": "需要 HTTPS 網站，並設定 SESSION_COOKIE_SECURE=true、SESSION_COOKIE_TRUSTED_URL 為準確的 HTTPS 網站網址。",
+    "Official Account name": "服務號名稱",
+    "Official Account logo URL": "服務號 Logo 網址",
+    "Shown on mobile authorization and result pages.": "顯示於手機端授權及結果頁面。",
+    "Use an HTTPS image URL without credentials.": "請使用不含登入憑證的 HTTPS 圖片網址。",
+    "Use up to 128 characters without control characters.": "請輸入不含控制字元且不超過 128 個字元的名稱。",
+    "Sign in to {{site}} via {{account}}?": "是否透過「{{account}}」登入 {{site}}？",
+    "Bind your WeChat account to {{site}} via {{account}}?": "是否透過「{{account}}」將微信綁定至 {{site}}？",
+    "Verify your identity for {{site}} via {{account}}?": "是否透過「{{account}}」為 {{site}} 驗證身分？",
+    "Authorization via {{account}} is complete. Return to {{site}} to continue.": "已透過「{{account}}」完成授權，請返回 {{site}} 繼續操作。",
+    "Authorization via {{account}} was cancelled. Return to {{site}} to start again.": "已取消透過「{{account}}」授權，請返回 {{site}} 重新發起。",
+    "WeChat Official Account": "微信服務號",
+    "Invalid Official Account branding. Use a name up to 128 characters and an absolute HTTPS logo URL.": "服務號顯示資訊無效。名稱不得超過 128 個字元，Logo 須使用完整的 HTTPS 圖片網址。"
   }
 }
