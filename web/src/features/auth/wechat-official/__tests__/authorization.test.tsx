@@ -298,3 +298,42 @@ it('keeps the QR code on a rounded white surface with a four-module quiet zone',
   expect(qr).toHaveAttribute('viewBox', '0 0 41 41')
   expect(qr?.parentElement).toHaveClass('rounded-2xl', 'bg-white', 'p-2')
 })
+
+it('shows a skeleton placeholder sized to the QR while the flow is pending and replaces it when the QR arrives', async () => {
+  let finishFlow!: (value: ReturnType<typeof response>) => void
+  const pendingFlow = new Promise<ReturnType<typeof response>>((resolve) => {
+    finishFlow = resolve
+  })
+  vi.spyOn(api, 'post').mockImplementation(async (url) => {
+    if (url.endsWith('/flows')) return pendingFlow
+    return response({ status: 'pending' })
+  })
+  render(
+    <OfficialWeChatAuthorization
+      request={{ intent: 'login' }}
+      onResult={vi.fn()}
+    />
+  )
+  const placeholder = await screen.findByText(
+    'Preparing WeChat authorization...'
+  )
+  const placeholderCard = placeholder.closest('[role="status"]')
+  expect(placeholderCard).toBeInTheDocument()
+  // The placeholder keeps the QR footprint so the card does not shift.
+  expect(placeholderCard?.firstElementChild).toHaveClass(
+    'rounded-2xl',
+    'bg-white',
+    'p-2'
+  )
+  expect(placeholderCard?.firstElementChild?.firstElementChild).toHaveClass(
+    'w-56'
+  )
+  expect(
+    screen.queryByTitle('WeChat authorization QR code')
+  ).not.toBeInTheDocument()
+  finishFlow(response(flow))
+  await screen.findByTitle('WeChat authorization QR code')
+  expect(
+    screen.queryByText('Preparing WeChat authorization...')
+  ).not.toBeInTheDocument()
+})
