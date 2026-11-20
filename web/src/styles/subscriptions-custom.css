@@ -257,8 +257,8 @@
   padding: 24px;
   margin: 22px 0;
 }
-.subscriptions-custom .sub-card .empty {
-  min-height: 0;
+.subscriptions-custom .sub-card [data-slot='empty'] {
+  min-height: 0 !important;
 }
 .subscriptions-custom .account-orders > :last-child {
   margin-top: 16px;
