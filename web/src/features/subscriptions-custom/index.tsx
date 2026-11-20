@@ -145,29 +145,33 @@ export function SubscriptionsCustom(
               )}
               {query.isSuccess &&
                 plans.length > 0 &&
-                ([false, true] as const).map((yearly) => (
-                  <section className='sub-cycle-block' key={String(yearly)}>
-                    <div className='sub-cycle-heading'>
-                      <h2>
-                        {yearly
-                          ? t('Subscription yearly')
-                          : t('Subscription monthly')}
-                      </h2>
-                      <p>
-                        {yearly
-                          ? t(
-                              'Twelve months per term; prices and points follow each yearly plan'
-                            )
-                          : t('One month per term; choose the points you need')}
-                      </p>
-                    </div>
-                    <div className='sub-cycle-grid'>
-                      {plans
-                        .filter(
-                          (plan) =>
-                            plan.billing_cycle === (yearly ? 'year' : 'month')
-                        )
-                        .map((plan) => {
+                ([false, true] as const)
+                  .map((yearly) => ({
+                    yearly,
+                    items: plans.filter(
+                      (plan) =>
+                        plan.billing_cycle === (yearly ? 'year' : 'month')
+                    ),
+                  }))
+                  .filter(({ items }) => items.length > 0)
+                  .map(({ yearly, items }) => (
+                    <section className='sub-cycle-block' key={String(yearly)}>
+                      <div className='sub-cycle-heading'>
+                        <h2>
+                          {yearly
+                            ? t('Subscription yearly')
+                            : t('Subscription monthly')}
+                        </h2>
+                        <p>
+                          {yearly
+                            ? t(
+                                'Twelve months per term; prices and points follow each yearly plan'
+                              )
+                            : t('One month per term; choose the points you need')}
+                        </p>
+                      </div>
+                      <div className='sub-cycle-grid'>
+                        {items.map((plan) => {
                           const offer = { plan, yearly, auto: false }
                           return (
                             <PlanCard
@@ -179,9 +183,9 @@ export function SubscriptionsCustom(
                             />
                           )
                         })}
-                    </div>
-                  </section>
-                ))}
+                      </div>
+                    </section>
+                  ))}
               {isAuthenticated && (
                 <section className='sub-card'>
                   <h2>{t('Auto renewal management')}</h2>
