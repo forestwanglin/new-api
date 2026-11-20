@@ -1287,6 +1287,16 @@
 - 验证：`bun run typecheck`（1,744 文件/2 项目）、`bun run build`、两个渠道测试文件的 oxlint/oxfmt 检查通过；`channel-test-dialog-endpoints.test.tsx` 两个用例通过。`go build ./...`、`go vet ./...`、relaykit/tokenkit 独立构建与测试通过；`go test ./pkg/jsplugin -count=1`、`go test ./router -run 'Test(NeedsLoginCredentialFailsWithoutReachingTheUpstream|FailedRefreshBeforeTheRequest)' -count=1` 通过，覆盖未发送业务请求、备用 key、禁用原因及不泄露 refresh token；`sh scripts/check-doubao-plugin-patch.sh` 通过。补充 `go test ./service -run 'Test(PluginCredentialNeedsLoginKeepsPointsRefundable|PointsUncertainOutcomeRetainsHoldAndStopsRetry)' -count=1` 通过，同时验证登录失效保留退款资格、允许重试以及真正未知结果继续保留冻结。最终 `go test ./...` 剩余 8 个既有顶层测试失败，完整名称见本次合并提交说明。
 - 风险与未覆盖：前端全量 335 文件中 330 通过，3,638 用例中 3,620 通过；18 个既有失败分布在 model-plaza/navigation、security/wechat-binding、sidebar-config、account-avatar、config-tutorial/page，已在 `git archive HEAD` 的合并前副本复现。全量 lint 的 error 涉及 82 个文件，这些文件相对合并前 HEAD 无改动。后端既有 AccessToken fixture/路由声明、采样兼容断言、`TestUserPointBalancesAPI` 缺 claims 表及 `TestGPT6AstraBuiltinBilling` 无数据库 fixture 的失败不在本次修复范围；后两项已在 `git archive HEAD` 副本实测复现。未执行真实上游登录或付费请求，未运行 MySQL/PostgreSQL 真实数据库及历史库迁移矩阵，不能据此宣称完整数据库兼容；本机 Go 1.27.3，未变更模块声明的版本。
 
+### Z089 系统设置返回新手引导
+
+- 需求与原因：从系统设置返回控制台时直接进入新手引导，与控制台首页入口一致。
+- 变更内容：将“返回控制台”链接从 `/dashboard/overview` 改为 `/onboarding`。
+- 影响面：**上游自有文件** `web/src/components/layout/config/system-settings.config.ts`。
+- 与上游差异：替换系统设置侧栏的返回目标。
+- 开关与默认值：无新增配置或依赖。
+- 验证：复核链接配置与 Git diff；按用户要求不运行测试。
+- 风险与未覆盖：未进行浏览器验证。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 
@@ -1296,6 +1306,7 @@
 
 | 区域 | 文件 | 关联条目 |
 |---|---|---|
+| 系统设置返回新手引导 | `web/src/components/layout/config/system-settings.config.ts` | Z089 |
 | 上游插件扩展与 fork 集成 | `pkg/jsplugin/routing.go`、`relaykit/types/error.go`、`relay/channel/providerplugin/adaptor.go`、`router/provider_plugin_relay_test.go`、渠道测试弹窗及 endpoint 测试 | Z088 |
 | 模型页列表运行状态 | `web/src/features/model-plaza/index.tsx`、`web/src/features/model-plaza/__tests__/model-plaza.test.tsx` | Z086 |
 | 计费与短信恢复加固 | `controller/{secure_verification,system_task,token_test}.go`、`middleware/access_token_routes.go`、`model/{auth_flow,main,task,task_cas_test,token}.go`、`router/api-router.go`、`service/task_polling.go`、共享验证 hook 和 `web/src/lib/secure-verification.ts` | Z085 |
