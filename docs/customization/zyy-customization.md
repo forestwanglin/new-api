@@ -1297,6 +1297,16 @@
 - 验证：复核链接配置与 Git diff；按用户要求不运行测试。
 - 风险与未覆盖：未进行浏览器验证。
 
+### Z090 客服联系方式统一展示为微信
+
+- 需求与原因：系统信息和前端联系客服弹窗将“企业微信”统一改称“微信”。
+- 变更内容：更新系统信息字段标签与说明、客服弹窗“微信（响应最快）”及复制微信号文案，同步七种语言。
+- 影响面：**上游自有文件** `web/src/i18n/locales/{en,zh,zh-TW,fr,ru,ja,vi}.json`。
+- 与上游差异：替换客服联系方式展示文案；沿用现有翻译键与 `support_wecom` 配置字段，保留已保存的联系方式。
+- 开关与默认值：无新增配置或依赖。
+- 验证：七种语言 JSON 解析通过，复核定向 diff；按用户要求未运行测试。
+- 风险与未覆盖：未进行浏览器验证。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 
@@ -1306,6 +1316,7 @@
 
 | 区域 | 文件 | 关联条目 |
 |---|---|---|
+| 客服微信展示文案 | `web/src/i18n/locales/{en,zh,zh-TW,fr,ru,ja,vi}.json` | Z090 |
 | 系统设置返回新手引导 | `web/src/components/layout/config/system-settings.config.ts` | Z089 |
 | 上游插件扩展与 fork 集成 | `pkg/jsplugin/routing.go`、`relaykit/types/error.go`、`relay/channel/providerplugin/adaptor.go`、`router/provider_plugin_relay_test.go`、渠道测试弹窗及 endpoint 测试 | Z088 |
 | 模型页列表运行状态 | `web/src/features/model-plaza/index.tsx`、`web/src/features/model-plaza/__tests__/model-plaza.test.tsx` | Z086 |
