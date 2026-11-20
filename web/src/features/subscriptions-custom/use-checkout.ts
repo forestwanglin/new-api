@@ -32,6 +32,7 @@ import {
 } from './api'
 import { subscriptionCopy as t } from './copy'
 import type { Offer, PublicSubscriptionPlan } from './plans'
+import { generateRequestId } from '@/lib/utils'
 
 const intentKey = 'custom-subscription-purchase-intent'
 
@@ -47,7 +48,7 @@ export function useSubscriptionCheckout(props: SubscriptionCheckoutProps) {
   const loginOpen = useLoginModalStore((state) => state.isOpen)
   const client = useQueryClient()
   const [payment, setPayment] = useState<string | null>(null)
-  const [requestId, setRequestId] = useState(() => crypto.randomUUID())
+  const [requestId, setRequestId] = useState(() => generateRequestId())
   const [planChanged, setPlanChanged] = useState(false)
   const lastPlan = useRef<{ id: string; version: string } | null>(null)
   const [tradeNo, setTradeNo] = useState(props.tradeNo ?? '')
@@ -173,7 +174,7 @@ export function useSubscriptionCheckout(props: SubscriptionCheckoutProps) {
       selectedId && selectedVersion
         ? { id: selectedId, version: selectedVersion }
         : null
-    setRequestId(crypto.randomUUID())
+    setRequestId(generateRequestId())
     setPayment(null)
     resetMutation()
   }, [selectedId, selectedVersion, resetMutation])

@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { formatPlanPrice } from '@/features/custom-subscriptions/lib/format'
 import { formatNumber } from '@/lib/format'
+import { generateRequestId } from '@/lib/utils'
 import { getServerErrorMessage } from '@/lib/server-error-message'
 import { useLoginModalStore } from '@/stores/login-modal-store'
 
@@ -175,7 +176,7 @@ export function SubscriptionCheckout(props: SubscriptionCheckoutProps) {
               value={paymentType ?? ''}
               onChange={(event) => {
                 setPayment(event.target.value)
-                setRequestId(crypto.randomUUID())
+                setRequestId(generateRequestId())
                 resetMutation()
               }}
               disabled={
@@ -212,7 +213,7 @@ export function SubscriptionCheckout(props: SubscriptionCheckoutProps) {
                 onClick={() => {
                   resetMutation()
                   setPlanChanged(false)
-                  setRequestId(crypto.randomUUID())
+                  setRequestId(generateRequestId())
                 }}
               >
                 {t('Plan changed. Confirm the updated price and points again.')}

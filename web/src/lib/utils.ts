@@ -100,3 +100,14 @@ export function tryPrettyJson(text: string): string {
     return raw
   }
 }
+
+/**
+ * Generate a unique request ID, falling back to a timestamp+random string
+ * when `crypto.randomUUID` is unavailable (e.g. older browsers / dev env).
+ */
+export function generateRequestId(): string {
+  if (typeof globalThis.crypto?.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID()
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
