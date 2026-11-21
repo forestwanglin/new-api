@@ -1317,6 +1317,16 @@
 - 验证：Go 1.26.10 构建和针对性规则/管理/积分计费测试通过。真实 SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 16.16 矩阵通过（新建、代表性旧表升级、重复迁移、CAS、渠道换路、Key 限额、其他请求冻结隔离和失败回滚）；执行 `go test ./model -run 'TestPointEligibility|TestPointRulesAdminDatabaseMatrix|TestPointsDatabaseMatrix|TestPointCallRouteDatabaseMatrix|TestPointCallFinancialLifecycle|TestPointCallExactConversionAndModelMatch' -count=1 -v`，未跳过数据库。前端扩大回归 71 文件/805 测试通过；主会话最终定向回归 28 文件/211 测试通过；`bun run typecheck`、49 个变更 TS/TSX 的 scoped oxlint、`bun run build` 通过。全仓 format:check 的 38 个文件、copyright:check 的 74 个文件以及全仓 lint 的报错均不与本任务变更文件相交，未扩展处理既有问题。`go vet ./model ./service ./controller ./router`、最终 diff 检查通过。Chrome 隔离测试验证重命名、模型 AND 渠道策略保存回读、钱包动态名称及 390px 规则表单；未请求真实上游。
 - 风险与未覆盖：新增主库列；旧二进制忽略分组/渠道限制，升级不支持混跑，回滚需停止准入、对账并恢复兼容配置。重命名不替换管理员自行编写的说明内容。升级测试使用代表性旧结构而非完整线上备份。后端扩大回归的 `TestUserPointBalancesAPI` 和全局路由目录检查失败已在未修改 HEAD 基线上复现（缺 claims fixture / 既有路由登记缺项）。
 
+### Z092 用户积分接口测试夹具同步手机号依赖
+
+- 需求与原因：用户列表已读取手机号绑定表，但 `TestUserPointBalancesAPI` 未创建该表，导致扩大回归在积分断言前失败。
+- 变更内容：在原隔离测试补齐 `ExternalIdentityClaim` 依赖，并覆盖手机号绑定/未绑定及积分数据共存，保留权限、分页、精确余额和查询错误断言。
+- 影响面：`router/user_points_test.go`；上游自有文件：无（fork 新增测试）。父仓库同步管理员用户列表测试规范。
+- 与上游差异：维护 fork 积分与手机号列表功能的真实路由回归测试；不改变生产接口或数据库迁移。
+- 开关与默认值：无新增环境变量、依赖或运行时行为。
+- 验证：修复前独立执行 `GOTOOLCHAIN=go1.26.10 go test ./router -run TestUserPointBalancesAPI -count=1`，复现缺少 `external_identity_claims`；修复后独立及组合执行 `go test ./router -run 'TestUserPointBalancesAPI|TestAdminUserPointsAPI|TestPointsAdminAPI' -count=1` 通过；重跑原扩大回归 `GOTOOLCHAIN=go1.26.10 go test ./model ./controller ./service ./router -run 'Point|Points|Invitation|CustomSubscription' -count=1`，四包均通过；`go vet ./router`、gofmt 和 `git diff --check` 通过。
+- 风险与未覆盖：仅调整 SQLite 测试夹具，未变更生产数据库访问、鉴权或错误处理。未来增加列表投影依赖时须同步相关路由测试的有限建表清单，并独立执行此用例。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 

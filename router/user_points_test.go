@@ -25,7 +25,8 @@ func TestUserPointBalancesAPI(t *testing.T) {
 	sqlDB, err := db.DB()
 	require.NoError(t, err)
 	sqlDB.SetMaxOpenConns(1)
-	require.NoError(t, db.AutoMigrate(&model.PointType{}, &model.PointAccount{}, &model.User{}, &model.UserSession{}, &model.UserAccessToken{}, &model.AuditLog{}, &model.Option{}))
+	// List/search also load phone claims through AttachAdminUserListDetails.
+	require.NoError(t, db.AutoMigrate(&model.PointType{}, &model.PointAccount{}, &model.User{}, &model.ExternalIdentityClaim{}, &model.UserSession{}, &model.UserAccessToken{}, &model.AuditLog{}, &model.Option{}))
 	oldDB, oldLogDB, oldType, oldRedis, oldSecret := model.DB, model.LOG_DB, common.MainDatabaseType(), common.RedisEnabled, common.SessionSecret
 	model.DB, model.LOG_DB = db, db
 	common.SetMainDatabaseType(common.DatabaseTypeSQLite)
@@ -43,6 +44,12 @@ func TestUserPointBalancesAPI(t *testing.T) {
 		{Id: 3, Username: "points-empty", DisplayName: "Empty", Password: "private-password", Role: common.RoleCommonUser, Status: common.UserStatusEnabled, Group: "other", AuthVersion: 1, AffCode: "empty-points"},
 	}
 	require.NoError(t, db.Create(&users).Error)
+	claims := []model.ExternalIdentityClaim{
+		{Provider: model.ExternalIdentityProviderPhone, Subject: "13800138000", UserId: 1},
+		{Provider: model.ExternalIdentityProviderTelegram, Subject: "13900139000", UserId: 2},
+		{Provider: model.ExternalIdentityProviderPhone, Subject: "13800138001", UserId: 3},
+	}
+	require.NoError(t, db.Create(&claims).Error)
 	admin, err := service.CreateLoginSession(users[0].Id, "password", "127.0.0.1", "user-points-test")
 	require.NoError(t, err)
 	ordinary, err := service.CreateLoginSession(users[1].Id, "password", "127.0.0.1", "user-points-test")
@@ -93,6 +100,7 @@ func TestUserPointBalancesAPI(t *testing.T) {
 				Items []struct {
 					ID            int                 `json:"id"`
 					Quota         int                 `json:"quota"`
+					Phone         string              `json:"phone"`
 					PointBalances []map[string]string `json:"point_balances"`
 				} `json:"items"`
 			}
@@ -101,6 +109,9 @@ func TestUserPointBalancesAPI(t *testing.T) {
 			require.Len(t, page.Items, 1)
 			assert.Equal(t, 1, page.Items[0].ID)
 			assert.Equal(t, 12000, page.Items[0].Quota)
+			assert.Equal(t, claims[0].Subject, page.Items[0].Phone)
+			assert.NotContains(t, string(response.Data), claims[1].Subject)
+			assert.NotContains(t, string(response.Data), claims[2].Subject)
 			assert.Equal(t, []map[string]string{
 				{"code": "GENERAL", "name": "General points", "available_points": "9007199254740993", "frozen_points": "2000"},
 				{"code": "GPT", "name": "GPT points", "available_points": "9223372036854775807", "frozen_points": "0"},
@@ -111,10 +122,11 @@ func TestUserPointBalancesAPI(t *testing.T) {
 	t.Run("filtered frozen-only and empty holdings", func(t *testing.T) {
 		for _, test := range []struct {
 			id       int
+			phone    string
 			balances string
 		}{
-			{2, `[{"code":"GPT","name":"GPT points","available_points":"0","frozen_points":"500"}]`},
-			{3, `[]`},
+			{2, "", `[{"code":"GPT","name":"GPT points","available_points":"0","frozen_points":"500"}]`},
+			{3, claims[2].Subject, `[]`},
 		} {
 			response := request(t, fmt.Sprintf("/api/user/search?keyword=%d&role=1&status=1", test.id), admin.AccessToken, 200)
 			require.True(t, response.Success, response.Message)
@@ -122,6 +134,7 @@ func TestUserPointBalancesAPI(t *testing.T) {
 				Total int `json:"total"`
 				Items []struct {
 					ID            int               `json:"id"`
+					Phone         string            `json:"phone"`
 					PointBalances common.RawMessage `json:"point_balances"`
 				} `json:"items"`
 			}
@@ -129,7 +142,17 @@ func TestUserPointBalancesAPI(t *testing.T) {
 			assert.Equal(t, 1, page.Total)
 			require.Len(t, page.Items, 1)
 			assert.Equal(t, test.id, page.Items[0].ID)
+			assert.Equal(t, test.phone, page.Items[0].Phone)
 			assert.JSONEq(t, test.balances, string(page.Items[0].PointBalances))
+		}
+	})
+	t.Run("claim lookup failure", func(t *testing.T) {
+		require.NoError(t, db.Migrator().DropTable(&model.ExternalIdentityClaim{}))
+		t.Cleanup(func() { require.NoError(t, db.AutoMigrate(&model.ExternalIdentityClaim{})) })
+		for _, path := range []string{"/api/user/", "/api/user/search?keyword=points"} {
+			response := request(t, path, admin.AccessToken, http.StatusOK)
+			assert.False(t, response.Success)
+			assert.Empty(t, response.Data)
 		}
 	})
 	t.Run("empty page and errors", func(t *testing.T) {
