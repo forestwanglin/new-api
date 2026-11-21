@@ -21,9 +21,10 @@ import { ErrorState } from '@/components/error-state'
 import { Button } from '@/components/ui/button'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { formatPlanPrice } from '@/features/custom-subscriptions/lib/format'
+import { usePointName } from '@/features/points/lib/point-name-context'
 import { formatNumber } from '@/lib/format'
-import { generateRequestId } from '@/lib/utils'
 import { getServerErrorMessage } from '@/lib/server-error-message'
+import { generateRequestId } from '@/lib/utils'
 import { useLoginModalStore } from '@/stores/login-modal-store'
 
 import { subscriptionCopy as t } from './copy'
@@ -34,6 +35,7 @@ import {
 } from './use-checkout'
 
 export function SubscriptionCheckout(props: SubscriptionCheckoutProps) {
+  const pointName = usePointName()
   const selection = props.selection
   const onClose = props.onClose
   const {
@@ -152,13 +154,17 @@ export function SubscriptionCheckout(props: SubscriptionCheckoutProps) {
               </p>
               <p>
                 {t('Points credited with this purchase')}{' '}
-                {offerPointAmounts(selection.plan).map((entry, index) => (
-                  <span key={entry.id}>
-                    {index > 0 && ' + '}
-                    <strong>{formatNumber(entry.amount, 'zh-CN')}</strong>{' '}
-                    {entry.name}
-                  </span>
-                ))}
+                {offerPointAmounts(selection.plan, false, pointName).map(
+                  (entry, index) => (
+                    <span key={entry.id}>
+                      {index > 0 && ' + '}
+                      <strong>
+                        {formatNumber(entry.amount, 'zh-CN')}
+                      </strong>{' '}
+                      {entry.name}
+                    </span>
+                  )
+                )}
                 ，{t('Points never expire')}
               </p>
               <p>

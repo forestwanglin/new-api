@@ -317,11 +317,11 @@ it('marks missing point types and the combined total unavailable while preservin
   await renderWallet()
   const stats = await screen.findByRole('region', { name: 'Wallet statistics' })
   const general = within(stats)
-    .getByRole('heading', { name: 'General points balance' })
+    .getByRole('heading', { name: 'General' })
     .closest('div')
   if (!general) throw new Error('General points card is missing')
   expect(within(general).getByText('0')).toBeVisible()
-  for (const title of ['Total credited points', 'GPT-specific points']) {
+  for (const title of ['Total credited points', 'GPT']) {
     const card = within(stats)
       .getByRole('heading', { name: title })
       .closest('div')

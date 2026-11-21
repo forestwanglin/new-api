@@ -32,6 +32,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
+import { usePointName } from '@/features/points/lib/point-name-context'
 
 import { POINT_LEDGER_ACTIONS } from '../lib/actions'
 import type { PointLedgerFilters, PointLedgerType } from '../types'
@@ -74,6 +75,7 @@ export function LedgerFilters(props: {
   onApply: (value: PointLedgerFilters) => void
 }) {
   const { t } = useTranslation()
+  const pointName = usePointName()
   const form = useForm<FilterValues>({
     resolver: zodResolver(schema),
     defaultValues: defaults,
@@ -91,7 +93,7 @@ export function LedgerFilters(props: {
   }
   const typeItems = props.types.map((type) => ({
     value: type.id,
-    label: `${type.name} (${type.code})`,
+    label: `${pointName(type)} (${type.code})`,
   }))
   const actionItems = POINT_LEDGER_ACTIONS.map((action) => ({
     value: action.value,

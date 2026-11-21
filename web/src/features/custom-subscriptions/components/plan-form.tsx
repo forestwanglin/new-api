@@ -30,6 +30,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
 import { SheetFooter } from '@/components/ui/sheet'
+import { usePointName } from '@/features/points/lib/point-name-context'
 import { usePaymentCompliance } from '@/features/system-settings/hooks/use-payment-compliance'
 import { handleServerError } from '@/lib/handle-server-error'
 import { getServerErrorMessage } from '@/lib/server-error-message'
@@ -53,6 +54,7 @@ export function PlanForm(props: {
   onRetry: () => void
 }) {
   const { t } = useTranslation()
+  const pointName = usePointName()
   const complianceConfirmed = usePaymentCompliance()
   const form = useForm<PlanFormValues>({
     resolver: zodResolver(createPlanSchema(props.types ?? [])),
@@ -82,7 +84,7 @@ export function PlanForm(props: {
     { value: '', label: t('Select an available point type') },
     ...(props.types ?? []).map((type) => ({
       value: type.id,
-      label: `${type.name} (${type.code})`,
+      label: `${pointName(type)} (${type.code})`,
     })),
   ]
   return (

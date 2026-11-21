@@ -38,14 +38,17 @@ func CreatePointModelRule(typeID int64, rule *PointModelRule) error {
 	// Construct the persisted row explicitly; callers cannot set ownership or metadata.
 	created := PointModelRule{PointTypeId: typeID, MatchType: rule.MatchType, MatchValue: rule.MatchValue, Enabled: rule.Enabled}
 	err := DB.Transaction(func(tx *gorm.DB) error {
-		var pointType PointType
-		if err := lockForUpdate(tx).First(&pointType, typeID).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return ErrPointTypeNotFound
-			}
+		pointType, err := pointTypeConfigForUpdate(tx, typeID)
+		if err != nil {
 			return err
 		}
-		return tx.Create(&created).Error
+		if pointType.EligibilityPolicy != nil && *pointType.EligibilityPolicy != "" {
+			return ErrPointPolicyManaged
+		}
+		if err := tx.Create(&created).Error; err != nil {
+			return err
+		}
+		return updatePointTypeConfiguration(tx, pointType, map[string]any{})
 	})
 	if err != nil {
 		return pointRuleWriteError(err)
@@ -57,12 +60,12 @@ func CreatePointModelRule(typeID int64, rule *PointModelRule) error {
 func UpdatePointModelRule(typeID, ruleID int64, input *PointModelRule) (*PointModelRule, error) {
 	var rule PointModelRule
 	err := DB.Transaction(func(tx *gorm.DB) error {
-		var pointType PointType
-		if err := lockForUpdate(tx).First(&pointType, typeID).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return ErrPointTypeNotFound
-			}
+		pointType, err := pointTypeConfigForUpdate(tx, typeID)
+		if err != nil {
 			return err
+		}
+		if pointType.EligibilityPolicy != nil && *pointType.EligibilityPolicy != "" {
+			return ErrPointPolicyManaged
 		}
 		scope := tx.Where("point_type_id = ? AND id = ?", typeID, ruleID)
 		if err := lockForUpdate(scope).First(&rule).Error; err != nil {
@@ -78,7 +81,10 @@ func UpdatePointModelRule(typeID, ruleID int64, input *PointModelRule) (*PointMo
 		}).Error; err != nil {
 			return err
 		}
-		return tx.Where("point_type_id = ? AND id = ?", typeID, ruleID).First(&rule).Error
+		if err := tx.Where("point_type_id = ? AND id = ?", typeID, ruleID).First(&rule).Error; err != nil {
+			return err
+		}
+		return updatePointTypeConfiguration(tx, pointType, map[string]any{})
 	})
 	if err != nil {
 		return nil, pointRuleWriteError(err)
@@ -88,12 +94,12 @@ func UpdatePointModelRule(typeID, ruleID int64, input *PointModelRule) (*PointMo
 
 func DeletePointModelRule(typeID, ruleID int64) error {
 	return DB.Transaction(func(tx *gorm.DB) error {
-		var pointType PointType
-		if err := lockForUpdate(tx).First(&pointType, typeID).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return ErrPointTypeNotFound
-			}
+		pointType, err := pointTypeConfigForUpdate(tx, typeID)
+		if err != nil {
 			return err
+		}
+		if pointType.EligibilityPolicy != nil && *pointType.EligibilityPolicy != "" {
+			return ErrPointPolicyManaged
 		}
 		result := tx.Where("point_type_id = ? AND id = ?", typeID, ruleID).Delete(&PointModelRule{})
 		if result.Error != nil {
@@ -102,7 +108,7 @@ func DeletePointModelRule(typeID, ruleID int64) error {
 		if result.RowsAffected == 0 {
 			return ErrPointModelRuleNotFound
 		}
-		return nil
+		return updatePointTypeConfiguration(tx, pointType, map[string]any{})
 	})
 }
 

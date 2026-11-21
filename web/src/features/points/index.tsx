@@ -31,12 +31,14 @@ import { formatNumber } from '@/lib/format'
 import { getServerErrorMessage } from '@/lib/server-error-message'
 
 import { getPointTypes, pointsQueryKeys } from './api'
+import { PointRenameDialog } from './components/point-rename-dialog'
 import { PointRulesDialog } from './components/point-rules-dialog'
 import type { PointType } from './types'
 
 export function Points() {
   const { t, i18n } = useTranslation()
   const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
+  const [renameType, setRenameType] = useState<PointType | null>(null)
   const [selectedType, setSelectedType] = useState<PointType | null>(null)
   const query = useQuery({
     queryKey: pointsQueryKeys.types,
@@ -78,7 +80,14 @@ export function Points() {
             header: t('Actions'),
             className: 'text-right',
             cell: (type) => (
-              <div className='flex justify-end'>
+              <div className='flex flex-wrap justify-end gap-2'>
+                <Button
+                  variant='outline'
+                  size='sm'
+                  onClick={() => setRenameType(type)}
+                >
+                  {t('Rename point type')}
+                </Button>
                 <Button
                   variant='outline'
                   size='sm'
@@ -102,10 +111,17 @@ export function Points() {
       <SectionPageLayout.Content>
         <p className='text-muted-foreground mb-4 text-sm'>
           {t(
-            'Point types are maintained through scripts or the database. Manage their supported models here.'
+            'Rename point types and configure model and channel conditions with grouped OR/AND rules.'
           )}
         </p>
         {content}
+        {renameType && (
+          <PointRenameDialog
+            key={renameType.id}
+            pointType={renameType}
+            onClose={() => setRenameType(null)}
+          />
+        )}
         {selectedType && (
           <PointRulesDialog
             key={selectedType.id}

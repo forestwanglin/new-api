@@ -83,7 +83,7 @@ it('shows each type separately and keeps frozen-only holdings visible', () => {
   view([general, { ...gpt, available_points: '0', frozen_points: '15' }])
   expect(screen.getByText('12,000')).toBeVisible()
   expect(screen.getByText('Frozen points 2,000')).toBeVisible()
-  expect(screen.getByText('GPT')).toBeVisible()
+  expect(screen.getByText('GPT 专用积分')).toBeVisible()
   expect(screen.getByText('0')).toBeVisible()
   expect(screen.getByText('Frozen points 15')).toBeVisible()
   expect(screen.queryByText('12,015')).not.toBeInTheDocument()
@@ -171,11 +171,11 @@ it.each(['en', 'fr', 'ru', 'ja', 'vi', 'zhCN', 'zhTW'])(
   }
 )
 
-it('updates labels and grouping when the interface language changes', async () => {
+it('preserves configured type names while translating labels and number grouping', async () => {
   view([general])
   expect(screen.getByText('12,000')).toBeVisible()
   await act(() => i18n.changeLanguage('fr'))
-  expect(screen.getByText('Généraux')).toBeVisible()
+  expect(screen.getByText('通用积分')).toBeVisible()
   expect(
     screen.getByText('12\u202f000', { normalizer: (text) => text })
   ).toBeVisible()

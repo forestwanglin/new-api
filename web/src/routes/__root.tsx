@@ -33,6 +33,7 @@ import { LoginModal } from '@/features/auth/components/login-modal'
 import { saveAffiliateCode } from '@/features/auth/lib/storage'
 import { GeneralError } from '@/features/errors/general-error'
 import { NotFoundError } from '@/features/errors/not-found-error'
+import { PointNamesProvider } from '@/features/points/point-names-provider'
 import { getSetupStatus } from '@/features/setup/api'
 import { useSystemConfig } from '@/hooks/use-system-config'
 import {
@@ -90,7 +91,9 @@ function RootComponent() {
   return (
     <ThemeCustomizationProvider>
       <NavigationProgress />
-      <Outlet />
+      <PointNamesProvider>
+        <Outlet />
+      </PointNamesProvider>
       <LoginModal />
       <Toaster closeButton duration={5000} position='top-center' richColors />
       {import.meta.env.MODE === 'development' && (

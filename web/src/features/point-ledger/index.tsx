@@ -32,6 +32,7 @@ import { SectionPageLayout } from '@/components/layout'
 import { PageFooterPortal } from '@/components/layout/components/page-footer'
 import { LoadingState } from '@/components/loading-state'
 import { Button } from '@/components/ui/button'
+import { usePointName } from '@/features/points/lib/point-name-context'
 import { toIntlLocale } from '@/i18n/languages'
 import { formatNumber, formatTimestampToDate } from '@/lib/format'
 import { ROLE } from '@/lib/roles'
@@ -50,6 +51,7 @@ import type {
 
 export function PointLedger(props: { scope: PointLedgerScope }) {
   const { t, i18n } = useTranslation()
+  const pointName = usePointName()
   const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
   const userId = useAuthStore((state) => state.auth.user?.id)
   const [filters, setFilters] = useState<PointLedgerFilters>({})
@@ -93,7 +95,11 @@ export function PointLedger(props: { scope: PointLedgerScope }) {
       id: 'type',
       header: t('Point type'),
       cell: (row) =>
-        row.point_type_name || row.point_type_code || row.point_type_id,
+        pointName({
+          id: row.point_type_id,
+          code: row.point_type_code,
+          name: row.point_type_name,
+        }),
     },
     {
       id: 'action',

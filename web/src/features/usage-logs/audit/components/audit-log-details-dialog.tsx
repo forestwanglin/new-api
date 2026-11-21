@@ -23,6 +23,7 @@ import { useTranslation } from 'react-i18next'
 import { Dialog } from '@/components/dialog'
 import { StatusBadge } from '@/components/status-badge'
 import { Button } from '@/components/ui/button'
+import { usePointName } from '@/features/points/lib/point-name-context'
 import { getAccessTokenScopes } from '@/features/security/api'
 import dayjs from '@/lib/dayjs'
 
@@ -37,6 +38,7 @@ import { AuditDetailValue } from './audit-detail-value'
 
 export function AuditLogDetailsDialog(props: { entry: AuditLog }) {
   const { t } = useTranslation()
+  const pointName = usePointName()
   const [open, setOpen] = useState(false)
   const scopes = useQuery({
     queryKey: ['access-token-scopes'],
@@ -49,6 +51,7 @@ export function AuditLogDetailsDialog(props: { entry: AuditLog }) {
   })
   const detail = buildAuditDetails(props.entry, t, {
     scopeResources: scopes.data?.resources,
+    pointName,
   })
   const operationDetailLabel = detail.pointsOperation
     ? t('Points adjustment details')

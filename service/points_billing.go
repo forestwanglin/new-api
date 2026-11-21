@@ -41,20 +41,11 @@ func newPointsBillingSession(c *gin.Context, info *relaycommon.RelayInfo, quota 
 		tokenID = 0
 	}
 	id := info.RequestId
-	if err := model.CreatePointCall(id, info.UserId, tokenID, info.OriginModelName, strconv.FormatFloat(rate, 'f', -1, 64), strconv.FormatFloat(unit, 'f', -1, 64)); err != nil {
+	channelID := selectedPointsChannel(c, info)
+	if err := model.CreatePointCallForRoute(id, info.UserId, tokenID, info.OriginModelName, strconv.FormatFloat(rate, 'f', -1, 64), strconv.FormatFloat(unit, 'f', -1, 64), channelID, info.UsingGroup); err != nil {
 		return nil, pointsBillingAPIError(err)
 	}
 	session.pointsID = id
-	channelID := 0
-	if info.ChannelMeta != nil {
-		channelID = info.ChannelId
-	} else if c != nil {
-		// Responses can prepare admission before building its ChannelMeta.
-		channelID = c.GetInt("channel_id")
-	}
-	if err := model.DB.Model(&model.PointCallBilling{}).Where("id = ? AND user_id = ?", id, info.UserId).Updates(map[string]any{"channel_id": channelID, "group": info.UsingGroup}).Error; err != nil {
-		return nil, pointsBillingAPIError(err)
-	}
 	info.PointsBillingID = id
 	if err := model.ReservePointCall(id, fmt.Sprintf("%s:reserve:%d", id, quota), quota, info.TokenUnlimited); err != nil {
 		return nil, pointsBillingAPIError(err)
@@ -67,7 +58,9 @@ func newPointsBillingSession(c *gin.Context, info *relaycommon.RelayInfo, quota 
 	info.FinalPreConsumedQuota = quota
 	// ReservePointCall records dispatch intent in the same transaction as the
 	// initial hold, so no later marker failure can strand an unsubmitted hold.
-	c.Set("points_billing_session", session)
+	if c != nil {
+		c.Set("points_billing_session", session)
+	}
 	return session, nil
 }
 func pointsBillingAPIError(err error) *types.NewAPIError {
@@ -76,12 +69,51 @@ func pointsBillingAPIError(err error) *types.NewAPIError {
 	}
 	return types.NewError(err, types.ErrorCodeUpdateDataError, types.ErrOptionWithSkipRetry())
 }
+
+// The context holds this attempt's channel before ChannelMeta is rebuilt by
+// the transport. Prefer it to the previous attempt's cached metadata.
+func selectedPointsChannel(c *gin.Context, info *relaycommon.RelayInfo) int {
+	if c != nil {
+		if channelID := c.GetInt("channel_id"); channelID > 0 {
+			return channelID
+		}
+	}
+	if info != nil && info.ChannelMeta != nil {
+		return info.ChannelId
+	}
+	return 0
+}
+
+// PreparePointsBillingForSelectedChannel is called even for legacy/non-tiered
+// prices before each relay attempt; unchanged estimates must still check routes.
+func PreparePointsBillingForSelectedChannel(c *gin.Context, info *relaycommon.RelayInfo) *types.NewAPIError {
+	if info == nil {
+		return nil
+	}
+	s, ok := info.Billing.(*BillingSession)
+	if !ok || !s.pointsMode || s.freePoints {
+		return nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if c != nil {
+		s.pointsContext = c
+	}
+	if err := s.pointsReserve(s.preConsumedQuota); err != nil {
+		return pointsBillingAPIError(err)
+	}
+	return nil
+}
+
 func (s *BillingSession) pointsReserve(target int) error {
 	if target < 0 {
 		return model.ErrPointCallInvalid
 	}
-	if s.settled || s.refunded {
-		return nil
+	if PointsBillingOutcomeUncertain(s.relayInfo.LastError) {
+		s.pointsUncertain = true
+	}
+	if s.pointsUncertain || s.settled || s.refunded {
+		return model.ErrPointCallConflict
 	}
 	if s.freePoints {
 		if target == 0 {
@@ -89,10 +121,11 @@ func (s *BillingSession) pointsReserve(target int) error {
 		}
 		return model.ErrInsufficientPoints
 	}
-	if target <= s.preConsumedQuota {
-		return nil
-	}
-	if err := model.ReservePointCall(s.pointsID, fmt.Sprintf("%s:reserve:%d", s.pointsID, target), target, s.relayInfo.TokenUnlimited); err != nil {
+	target = max(target, s.preConsumedQuota)
+	channelID := selectedPointsChannel(s.pointsContext, s.relayInfo)
+	allowRebind := !s.pointsObserved && s.relayInfo.LastError != nil && !PointsBillingOutcomeUncertain(s.relayInfo.LastError)
+	event := fmt.Sprintf("%s:r:%d:%d:%d", s.pointsID, s.relayInfo.RetryIndex, channelID, target)
+	if err := model.ReservePointCallForRoute(s.pointsID, event, target, s.relayInfo.TokenUnlimited, channelID, s.relayInfo.UsingGroup, allowRebind); err != nil {
 		return err
 	}
 	s.preConsumedQuota = target
@@ -100,6 +133,7 @@ func (s *BillingSession) pointsReserve(target int) error {
 	s.relayInfo.FinalPreConsumedQuota = target
 	return nil
 }
+
 func (s *BillingSession) pointsSettle(target int, final bool) error {
 	if s.freePoints {
 		if target != 0 {

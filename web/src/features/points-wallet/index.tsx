@@ -23,6 +23,7 @@ import { ErrorState } from '@/components/error-state'
 import { SectionPageLayout } from '@/components/layout'
 import { LoadingState } from '@/components/loading-state'
 import { InvitationPendingRewards } from '@/features/invitation/pending'
+import { usePointName } from '@/features/points/lib/point-name-context'
 import { toIntlLocale } from '@/i18n/languages'
 import { formatNumber } from '@/lib/format'
 import { getServerErrorMessage } from '@/lib/server-error-message'
@@ -36,6 +37,7 @@ import '@/styles/points-account.css'
 
 function WalletStatistics(props: { wallet: PointWallet }) {
   const { t, i18n } = useTranslation()
+  const pointName = usePointName()
   const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
   const general = props.wallet.balances.find((item) => item.code === 'GENERAL')
   const gpt = props.wallet.balances.find((item) => item.code === 'GPT')
@@ -49,23 +51,31 @@ function WalletStatistics(props: { wallet: PointWallet }) {
       value:
         total === null ? t('Not available yet') : formatNumber(total, locale),
       description: t(
-        'General and GPT available points, subject to model eligibility'
+        'Available points, subject to configured model and channel rules'
       ),
       total: true,
     },
     {
-      title: t('General points balance'),
+      title: general
+        ? pointName({
+            id: general.point_type_id,
+            code: general.code,
+            name: general.name,
+          })
+        : 'GENERAL',
       value: general
         ? formatNumber(BigInt(general.available_points), locale)
         : t('Not available yet'),
-      description: t('Applicable to all available models'),
+      description: t('Available for calls matching the configured rules'),
     },
     {
-      title: t('GPT-specific points'),
+      title: gpt
+        ? pointName({ id: gpt.point_type_id, code: gpt.code, name: gpt.name })
+        : 'GPT',
       value: gpt
         ? formatNumber(BigInt(gpt.available_points), locale)
         : t('Not available yet'),
-      description: t('Available for eligible GPT model calls'),
+      description: t('Available for calls matching the configured rules'),
     },
   ]
   return (
@@ -85,7 +95,11 @@ function WalletStatistics(props: { wallet: PointWallet }) {
         {props.wallet.pending_invitation_rewards.map((reward) => (
           <div key={reward.point_type_id}>
             <span className='text-muted-foreground block text-xs break-words'>
-              {reward.name || reward.code || reward.point_type_id}
+              {pointName({
+                id: reward.point_type_id,
+                code: reward.code,
+                name: reward.name,
+              })}
             </span>
             <div className='wallet-stat-number'>
               {formatNumber(BigInt(reward.pending_points), locale)}
@@ -116,9 +130,7 @@ export function PointsWallet() {
     <SectionPageLayout variant='user'>
       <SectionPageLayout.Title>{t('Points wallet')}</SectionPageLayout.Title>
       <SectionPageLayout.Description>
-        {t(
-          'View your general and GPT-specific points, balance details and points rules.'
-        )}
+        {t('View your point balances, details and configured rules.')}
       </SectionPageLayout.Description>
       <SectionPageLayout.Content>
         <div className='points-account'>
@@ -134,14 +146,9 @@ export function PointsWallet() {
               <WalletStatistics wallet={query.data} />
               <div className='wallet-usage-guide'>
                 <p>
-                  <strong>{t('GPT model calls:')}</strong>{' '}
                   {t(
-                    'Eligible GPT-specific points first, then general points.'
+                    'Calls use eligible point types according to configured model and channel rules and consumption priorities.'
                   )}
-                </p>
-                <p>
-                  <strong>{t('Other model calls:')}</strong>{' '}
-                  {t('Use general points.')}
                 </p>
               </div>
               <PointsWalletDetails wallet={query.data} />

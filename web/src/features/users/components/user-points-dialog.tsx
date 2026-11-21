@@ -31,6 +31,7 @@ import { LoadingState } from '@/components/loading-state'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { usePointName } from '@/features/points/lib/point-name-context'
 import { toIntlLocale } from '@/i18n/languages'
 import { formatNumber } from '@/lib/format'
 import { handleServerError } from '@/lib/handle-server-error'
@@ -61,6 +62,7 @@ type Props = {
 
 export function UserPointsDialog(props: Props) {
   const { t, i18n } = useTranslation()
+  const pointName = usePointName()
   const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
   const viewerId = useAuthStore((state) => state.auth.user?.id)
   const fieldId = useId()
@@ -182,7 +184,12 @@ export function UserPointsDialog(props: Props) {
         selected && (
           <form id={fieldId} onSubmit={submit} className='space-y-4'>
             <p className='text-sm font-medium break-words'>
-              {selected.name || selected.code} ({selected.code})
+              {pointName({
+                id: selected.point_type_id,
+                code: selected.code,
+                name: selected.name,
+              })}{' '}
+              ({selected.code})
             </p>
             <div
               role='status'

@@ -336,10 +336,19 @@ func TestPointRulesAdminDatabaseMatrix(t *testing.T) {
 			require.ErrorIs(t, DeletePointModelRule(types[1].Id, rule.Id), ErrPointModelRuleNotFound)
 			_, err = UpdatePointModelRule(types[1].Id, rule.Id, updated)
 			require.ErrorIs(t, err, ErrPointModelRuleNotFound)
-			// No CRUD operation can mutate a type or restore removed rules.
+			// Rule writes advance only configuration metadata; type identity and settings stay unchanged.
 			var savedTypes []PointType
 			require.NoError(t, db.Order("id").Find(&savedTypes).Error)
-			assert.Equal(t, types, savedTypes)
+			for i := range savedTypes {
+				expected := types[i]
+				if i == 1 {
+					assert.EqualValues(t, 8, savedTypes[i].ConfigVersion, "seven successful legacy writes advance the shared editor version")
+					assert.GreaterOrEqual(t, savedTypes[i].UpdatedAt, expected.UpdatedAt)
+					expected.ConfigVersion = 8
+					expected.UpdatedAt = savedTypes[i].UpdatedAt
+				}
+				assert.Equal(t, expected, savedTypes[i])
+			}
 			gotRules, err = GetPointModelRules(types[1].Id)
 			require.NoError(t, err)
 			require.Len(t, gotRules, 3)

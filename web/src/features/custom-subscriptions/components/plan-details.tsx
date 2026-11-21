@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { useTranslation } from 'react-i18next'
 
 import { sideDrawerFormClassName } from '@/components/drawer-layout'
+import { usePointName } from '@/features/points/lib/point-name-context'
 import { toIntlLocale } from '@/i18n/languages'
 import { formatNumber } from '@/lib/format'
 
@@ -28,10 +29,11 @@ import type { CustomSubscriptionPlan, PointTypeOption } from '../types'
 
 export function PlanDetails(props: { plan: CustomSubscriptionPlan }) {
   const { t, i18n } = useTranslation()
+  const pointName = usePointName()
   const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
   const plan = props.plan
   const typeLabel = (type: PointTypeOption | null) =>
-    type ? `${type.name} (${type.code})` : '—'
+    type ? `${pointName(type)} (${type.code})` : '—'
   const fields = [
     [t('ID'), plan.id],
     [t('Version'), plan.version],

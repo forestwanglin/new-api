@@ -1731,3 +1731,95 @@ func TestPostTextConsumeQuotaLogsMissingUsageAsStructuredContent(t *testing.T) {
 		map[string]any{"key": "Upstream returned no usage, so nothing was charged (possibly an upstream timeout)"},
 	}, other["content_parts"])
 }
+
+func TestPointsSelectedChannelAdmissionAndRetry(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	sqlDB.SetMaxOpenConns(1)
+	oldDB, oldType := model.DB, common.MainDatabaseType()
+	oldRate, oldUnit := operation_setting.USDExchangeRate, common.QuotaPerUnit
+	model.DB = db
+	common.SetMainDatabaseType(common.DatabaseTypeSQLite)
+	operation_setting.USDExchangeRate, common.QuotaPerUnit = 1, 1000
+	t.Cleanup(func() {
+		model.DB = oldDB
+		common.SetMainDatabaseType(oldType)
+		operation_setting.USDExchangeRate, common.QuotaPerUnit = oldRate, oldUnit
+		require.NoError(t, sqlDB.Close())
+	})
+	require.NoError(t, db.AutoMigrate(&model.User{}, &model.Token{}, &model.PointType{}, &model.PointModelRule{}, &model.PointAccount{}, &model.PointTransaction{}, &model.PointLedger{}, &model.PointFreeze{}, &model.PointCallBilling{}, &model.PointCallEvent{}, &model.PointCallOperation{}))
+	user := model.User{Username: "channel-admission", Quota: 1000}
+	require.NoError(t, db.Create(&user).Error)
+	token := model.Token{UserId: user.Id, Key: "channel-admission-key", RemainQuota: 1000, Status: common.TokenStatusEnabled, ExpiredTime: -1}
+	require.NoError(t, db.Create(&token).Error)
+	accounts := make([]model.PointAccount, 2)
+	for i, channelID := range []int{10, 20} {
+		policy := fmt.Sprintf(`{"version":1,"operator":"OR","groups":[{"operator":"AND","enabled":true,"conditions":[{"kind":"MODEL","match_type":"EXACT","match_value":"client-model","enabled":true},{"kind":"CHANNEL","channel_id":"%d","enabled":true}]}]}`, channelID)
+		pointType := model.PointType{Code: fmt.Sprintf("CHANNEL_%d", channelID), Name: "Channel points", EligibilityPolicy: &policy}
+		require.NoError(t, db.Create(&pointType).Error)
+		accounts[i] = model.PointAccount{UserId: int64(user.Id), PointTypeId: pointType.Id, AvailablePoints: 100}
+		require.NoError(t, db.Create(&accounts[i]).Error)
+	}
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Request = httptest.NewRequest("POST", "/v1/chat/completions", nil)
+	ctx.Set("channel_id", 10)
+	info := &relaycommon.RelayInfo{RequestId: "channel-admission-call", UserId: user.Id, TokenId: token.Id, OriginModelName: "client-model", ChannelMeta: &relaycommon.ChannelMeta{ChannelId: 99}, UsingGroup: "default"}
+	require.Nil(t, PreConsumeBilling(ctx, 10, info), "admission must use this attempt's context instead of stale metadata")
+	call, err := model.GetPointCall(info.PointsBillingID)
+	require.NoError(t, err)
+	assert.Equal(t, 10, call.ChannelID)
+
+	// A changed route without authoritative failed-attempt evidence cannot move
+	// an existing call's hold, even though the target amount is unchanged.
+	ctx.Set("channel_id", 20)
+	info.RetryIndex = 1
+	require.NotNil(t, PrepareTieredBillingForSelectedGroup(ctx, info))
+	call, err = model.GetPointCall(info.PointsBillingID)
+	require.NoError(t, err)
+	assert.Equal(t, 10, call.ChannelID)
+	info.LastError = types.NewErrorWithStatusCode(fmt.Errorf("upstream rejected"), types.ErrorCodeBadResponseStatusCode, 503)
+	require.Nil(t, PrepareTieredBillingForSelectedGroup(ctx, info), "non-tiered pricing still checks and rebinds the selected channel")
+	require.Nil(t, PreConsumeBilling(ctx, 12, info))
+	for i := range accounts {
+		require.NoError(t, db.First(&accounts[i], accounts[i].Id).Error)
+	}
+	assert.EqualValues(t, 100, accounts[0].AvailablePoints)
+	assert.Zero(t, accounts[0].FrozenPoints)
+	assert.EqualValues(t, 88, accounts[1].AvailablePoints)
+	assert.EqualValues(t, 12, accounts[1].FrozenPoints)
+	require.NoError(t, db.First(&token, token.Id).Error)
+	assert.Equal(t, 988, token.RemainQuota)
+
+	ctx.Set("channel_id", 30)
+	info.RetryIndex = 2
+	apiErr := PrepareTieredBillingForSelectedGroup(ctx, info)
+	require.NotNil(t, apiErr)
+	assert.Equal(t, types.ErrorCodeInsufficientUserQuota, apiErr.GetErrorCode())
+	assert.True(t, types.IsSkipRetryError(apiErr), "point rejection must not cause point-driven rerouting")
+	call, err = model.GetPointCall(info.PointsBillingID)
+	require.NoError(t, err)
+	assert.Equal(t, 20, call.ChannelID)
+
+	// An uncertain LastError alone blocks even same-route dispatch and retains
+	// funds; callers need not first set the explicit preservation flag.
+	ctx.Set("channel_id", 20)
+	info.LastError = types.NewError(fmt.Errorf("connection outcome unknown"), types.ErrorCodeDoRequestFailed)
+	require.NotNil(t, PrepareTieredBillingForSelectedGroup(ctx, info))
+	ctx.Set("channel_id", 10)
+	require.NotNil(t, PrepareTieredBillingForSelectedGroup(ctx, info))
+	info.Billing.Refund(ctx)
+	require.NoError(t, db.First(&accounts[1], accounts[1].Id).Error)
+	assert.EqualValues(t, 12, accounts[1].FrozenPoints)
+	PreserveUncertainPointsBilling(info)
+	require.NotNil(t, PrepareTieredBillingForSelectedGroup(ctx, info))
+	uncertain := types.NewError(fmt.Errorf("connection outcome unknown"), types.ErrorCodeDoRequestFailed)
+	decision := DecideRelayRetry(ctx, uncertain, 3)
+	assert.Equal(t, "stop", decision.Action)
+	assert.Equal(t, "uncertain_upstream_outcome", decision.Reason)
+	info.Billing.Refund(ctx)
+	require.NoError(t, db.First(&accounts[1], accounts[1].Id).Error)
+	assert.EqualValues(t, 12, accounts[1].FrozenPoints, "unknown upstream outcome retains its original hold")
+}

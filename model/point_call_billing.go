@@ -29,11 +29,12 @@ type PointCallBilling struct {
 	TokenPointMode      *bool
 	TokenReservedPoints int64 `gorm:"type:bigint;not null;default:0"`
 	ChannelID           int
-	Group               string `gorm:"type:varchar(64)"`
-	Model               string `gorm:"type:varchar(255);not null"`
-	Rate                string `gorm:"type:varchar(128);not null"`
-	Unit                string `gorm:"type:varchar(128);not null"`
-	Allocations         string `gorm:"type:text;not null"`
+	Group               string  `gorm:"type:varchar(64)"`
+	Model               string  `gorm:"type:varchar(255);not null"`
+	Rate                string  `gorm:"type:varchar(128);not null"`
+	Unit                string  `gorm:"type:varchar(128);not null"`
+	Allocations         string  `gorm:"type:text;not null"`
+	EligibilitySnapshot *string `gorm:"type:text"`
 	ReservedQuota       int64
 	TokenQuota          int64
 	BookedQuota         int64
@@ -282,7 +283,13 @@ func pointCallSave(tx *gorm.DB, c *PointCallBilling, a []pointCallAllocation) er
 // CreatePointCall creates a stable identity and snapshot without charging money.
 // Account discovery is read-only; no account is invented to absorb future debt.
 func CreatePointCall(id string, userID, tokenID int, model, rate, unit string) error {
-	if id == "" || len(id) > 64 || userID <= 0 || model == "" {
+	return CreatePointCallForRoute(id, userID, tokenID, model, rate, unit, 0, "")
+}
+
+// CreatePointCallForRoute snapshots every candidate policy before filtering on
+// the actual selected channel. Later retries use this immutable directory.
+func CreatePointCallForRoute(id string, userID, tokenID int, model, rate, unit string, channelID int, group string) error {
+	if id == "" || len(id) > 64 || userID <= 0 || model == "" || channelID < 0 {
 		return ErrPointCallInvalid
 	}
 	if _, e := PointCallPoints(0, rate, unit); e != nil {
@@ -301,7 +308,7 @@ func CreatePointCall(id string, userID, tokenID int, model, rate, unit string) e
 		var old PointCallBilling
 		e := tx.First(&old, "id = ?", id).Error
 		if e == nil {
-			if old.UserID != userID || old.TokenID != tokenID || old.Model != model {
+			if old.UserID != userID || old.TokenID != tokenID || old.Model != model || old.ChannelID != channelID {
 				return ErrPointCallConflict
 			}
 			return nil
@@ -309,44 +316,48 @@ func CreatePointCall(id string, userID, tokenID int, model, rate, unit string) e
 		if !errors.Is(e, gorm.ErrRecordNotFound) {
 			return e
 		}
-
 		var types []PointType
 		var rules []PointModelRule
 		if e := tx.Order("consume_priority DESC, id ASC").Find(&types).Error; e != nil {
 			return e
 		}
-		if e := tx.Where("enabled = ?", true).Find(&rules).Error; e != nil {
+		if e := tx.Find(&rules).Error; e != nil {
 			return e
 		}
-		eligible := map[int64]bool{}
-		for _, r := range rules {
-			if PointModelMatches(r.MatchType, string(r.MatchValue), model) {
-				eligible[r.PointTypeId] = true
-			}
-		}
-		a := []pointCallAllocation{}
-		owned := 0
+		snapshot := pointCallEligibilitySnapshot{Version: 1, Types: make([]pointCallEligibilityType, 0, len(types))}
 		for _, typ := range types {
-			if !eligible[typ.Id] {
-				continue
+			policy, err := ResolvePointEligibilityPolicy(typ, rules)
+			if err != nil {
+				return err
 			}
+			snapshot.Types = append(snapshot.Types, pointCallEligibilityType{TypeID: typ.Id, Code: typ.Code, Name: typ.Name, Priority: typ.ConsumePriority, Policy: *policy})
+		}
+		a := snapshot.allocations(model, channelID)
+		if len(a) == 0 {
+			return ErrInsufficientPoints
+		}
+		owned := 0
+		for i := range a {
 			var account PointAccount
-			e := tx.Where("user_id = ? AND point_type_id = ?", userID, typ.Id).First(&account).Error
+			e := tx.Where("user_id = ? AND point_type_id = ?", userID, a[i].TypeID).First(&account).Error
 			if errors.Is(e, gorm.ErrRecordNotFound) {
-				account = PointAccount{}
-				e = nil
-			} else if e == nil {
-				owned++
+				continue
 			}
 			if e != nil {
 				return e
 			}
-			a = append(a, pointCallAllocation{TypeID: typ.Id, Code: typ.Code, Name: typ.Name, Priority: typ.ConsumePriority, AccountID: account.Id})
+			a[i].AccountID = account.Id
+			owned++
 		}
-		if len(a) == 0 || owned == 0 {
+		if owned == 0 {
 			return ErrInsufficientPoints
 		}
-		c := PointCallBilling{ID: id, UserID: userID, TokenID: tokenID, Model: model, Rate: rate, Unit: unit, State: "reserved", Dispatch: "unsubmitted"}
+		encoded, err := common.Marshal(snapshot)
+		if err != nil {
+			return err
+		}
+		snapshotJSON := string(encoded)
+		c := PointCallBilling{ID: id, UserID: userID, TokenID: tokenID, ChannelID: channelID, Group: group, Model: model, Rate: rate, Unit: unit, State: "reserved", Dispatch: "unsubmitted", EligibilitySnapshot: &snapshotJSON}
 		return pointCallSave(tx, &c, a)
 	})
 }
@@ -375,146 +386,152 @@ func ReservePointCall(id, event string, target int, unlimited bool) error {
 	if target < 0 {
 		return ErrPointCallInvalid
 	}
-	payload := fmt.Sprintf("reserve:%d", target)
 	return DB.Transaction(func(tx *gorm.DB) error {
-		c, e := pointCallLock(tx, id)
-		if e != nil {
-			return e
+		c, err := pointCallLock(tx, id)
+		if err != nil {
+			return err
 		}
-		if r, e := pointCallReplay(tx, c, event, payload); r != nil || e != nil {
-			return e
-		}
-		if c.State == "refunded" {
-			return ErrPointCallConflict
-		}
-		if int64(target) <= c.ReservedQuota && c.Dispatch != "unsubmitted" {
-			return nil
-		}
-		points, e := PointCallPoints(int64(target), c.Rate, c.Unit)
-		if e != nil {
-			return e
-		}
-		a, e := pointCallDecode(c)
-		if e != nil {
-			return e
-		}
-		// Snapshot at first admission, after user/call locks and before accounts.
-		if c.TokenID > 0 {
-			if c.TokenPointMode == nil {
-				mode := false
-				if c.ReservedQuota == 0 && c.Dispatch == "unsubmitted" {
-					token, err := lockTokenQuotaTx(tx, c.TokenID)
-					if err != nil {
-						return err
-					}
-					mode = token.PointLimitEnabled
-				}
-				c.TokenPointMode = &mode
-			}
-			if *c.TokenPointMode {
-				next := max(points-c.Points, int64(0))
-				ok, err := ReserveTokenPointLimitTx(tx, c.TokenID, c.ID, max(c.TokenReservedPoints, next))
-				if err != nil {
-					return err
-				}
-				if !ok {
-					return ErrTokenPointLimit
-				}
-				c.TokenReservedPoints = max(c.TokenReservedPoints, next)
-			} else if int64(target) > c.TokenQuota {
-				ok, err := ReserveTokenQuotaTx(tx, c.TokenID, target-int(c.TokenQuota), unlimited)
-				if err != nil {
-					return err
-				}
-				if !ok {
-					return errors.New("token quota is not enough")
-				}
-			}
-		}
-		accounts, e := pointCallAccounts(tx, c.UserID, c.ID, a)
-		if e != nil {
-			return e
-		}
-		net := new(big.Int)
-		held := int64(0)
-		for _, v := range a {
-			if account := accounts[v.TypeID]; account != nil {
-				net.Add(net, big.NewInt(account.AvailablePoints))
-			}
-			held += v.Held
-		}
-		needed := points - c.Points - held
-		if needed < 0 {
-			needed = 0
-		}
-		if net.Cmp(big.NewInt(needed)) < 0 {
-			return ErrInsufficientPoints
-		}
-		tr, e := pointCallTransaction(tx, c, event, PointActionFreeze, needed)
-		if e != nil {
-			return e
-		}
-		remaining := needed
-		for i := range a {
-			if remaining == 0 {
-				break
-			}
-			account := accounts[a[i].TypeID]
-			if account == nil {
-				continue
-			}
-			n := min(max(account.AvailablePoints, int64(0)), remaining)
-			if n == 0 {
-				continue
-			}
-			if a[i].FreezeID == 0 {
-				f := PointFreeze{AccountId: account.Id, TransactionId: tr.Id, ReasonCode: "MODEL_CALL", Reason: c.ID, Status: PointFreezeActive}
-				if e := tx.Create(&f).Error; e != nil {
-					return e
-				}
-				a[i].FreezeID = f.Id
-			}
-			var freeze PointFreeze
-			if e := lockForUpdate(tx).First(&freeze, a[i].FreezeID).Error; e != nil {
-				return e
-			}
-			freeze.OriginalPoints, e = pointAdd(freeze.OriginalPoints, n)
-			if e != nil {
-				return e
-			}
-			freeze.RemainingPoints, e = pointAdd(freeze.RemainingPoints, n)
-			if e != nil {
-				return e
-			}
-			freeze.Status = PointFreezeActive
-			freeze.ClosedAt = nil
-			if e := tx.Save(&freeze).Error; e != nil {
-				return e
-			}
-			if e := pointCallMutation(tx, tr, account, -n, n, &a[i].FreezeID); e != nil {
-				return e
-			}
-			a[i].Held += n
-			remaining -= n
-		}
-		if remaining != 0 {
-			return ErrInsufficientPoints
-		}
-		c.ReservedQuota = int64(target)
-		if c.TokenPointMode == nil || !*c.TokenPointMode {
-			c.TokenQuota = int64(target)
-		}
-		if c.Dispatch == "unsubmitted" {
-			c.Dispatch = "dispatching"
-		}
-		c.Revision++
-		if e := pointCallSave(tx, c, a); e != nil {
-			return e
-		}
-		meta := PointBillingMetadata{Version: 1, CallID: id, EventID: event, Status: "reserved", TotalPoints: "0", Items: []PointBillingItem{}}
-		m, _ := common.Marshal(meta)
-		return tx.Create(&PointCallEvent{ID: event, CallID: id, Payload: payload, Metadata: string(m), Revision: c.Revision, CacheState: "pending", LogState: "none"}).Error
+		return reservePointCallTx(tx, c, event, target, unlimited, fmt.Sprintf("reserve:%d", target))
 	})
+}
+
+// reservePointCallTx shares the original reservation transaction with a route
+// change so neither released holds nor the new Key budget can commit alone.
+func reservePointCallTx(tx *gorm.DB, c *PointCallBilling, event string, target int, unlimited bool, payload string) error {
+	id := c.ID
+	if r, e := pointCallReplay(tx, c, event, payload); r != nil || e != nil {
+		return e
+	}
+	if c.State == "refunded" {
+		return ErrPointCallConflict
+	}
+	if int64(target) <= c.ReservedQuota && c.Dispatch != "unsubmitted" {
+		return nil
+	}
+	points, e := PointCallPoints(int64(target), c.Rate, c.Unit)
+	if e != nil {
+		return e
+	}
+	a, e := pointCallDecode(c)
+	if e != nil {
+		return e
+	}
+	// Snapshot at first admission, after user/call locks and before accounts.
+	if c.TokenID > 0 {
+		if c.TokenPointMode == nil {
+			mode := false
+			if c.ReservedQuota == 0 && c.Dispatch == "unsubmitted" {
+				token, err := lockTokenQuotaTx(tx, c.TokenID)
+				if err != nil {
+					return err
+				}
+				mode = token.PointLimitEnabled
+			}
+			c.TokenPointMode = &mode
+		}
+		if *c.TokenPointMode {
+			next := max(points-c.Points, int64(0))
+			ok, err := ReserveTokenPointLimitTx(tx, c.TokenID, c.ID, max(c.TokenReservedPoints, next))
+			if err != nil {
+				return err
+			}
+			if !ok {
+				return ErrTokenPointLimit
+			}
+			c.TokenReservedPoints = max(c.TokenReservedPoints, next)
+		} else if int64(target) > c.TokenQuota {
+			ok, err := ReserveTokenQuotaTx(tx, c.TokenID, target-int(c.TokenQuota), unlimited)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				return errors.New("token quota is not enough")
+			}
+		}
+	}
+	accounts, e := pointCallAccounts(tx, c.UserID, c.ID, a)
+	if e != nil {
+		return e
+	}
+	net := new(big.Int)
+	held := int64(0)
+	for _, v := range a {
+		if account := accounts[v.TypeID]; account != nil {
+			net.Add(net, big.NewInt(account.AvailablePoints))
+		}
+		held += v.Held
+	}
+	needed := points - c.Points - held
+	if needed < 0 {
+		needed = 0
+	}
+	if net.Cmp(big.NewInt(needed)) < 0 {
+		return ErrInsufficientPoints
+	}
+	tr, e := pointCallTransaction(tx, c, event, PointActionFreeze, needed)
+	if e != nil {
+		return e
+	}
+	remaining := needed
+	for i := range a {
+		if remaining == 0 {
+			break
+		}
+		account := accounts[a[i].TypeID]
+		if account == nil {
+			continue
+		}
+		n := min(max(account.AvailablePoints, int64(0)), remaining)
+		if n == 0 {
+			continue
+		}
+		if a[i].FreezeID == 0 {
+			f := PointFreeze{AccountId: account.Id, TransactionId: tr.Id, ReasonCode: "MODEL_CALL", Reason: c.ID, Status: PointFreezeActive}
+			if e := tx.Create(&f).Error; e != nil {
+				return e
+			}
+			a[i].FreezeID = f.Id
+		}
+		var freeze PointFreeze
+		if e := lockForUpdate(tx).First(&freeze, a[i].FreezeID).Error; e != nil {
+			return e
+		}
+		freeze.OriginalPoints, e = pointAdd(freeze.OriginalPoints, n)
+		if e != nil {
+			return e
+		}
+		freeze.RemainingPoints, e = pointAdd(freeze.RemainingPoints, n)
+		if e != nil {
+			return e
+		}
+		freeze.Status = PointFreezeActive
+		freeze.ClosedAt = nil
+		if e := tx.Save(&freeze).Error; e != nil {
+			return e
+		}
+		if e := pointCallMutation(tx, tr, account, -n, n, &a[i].FreezeID); e != nil {
+			return e
+		}
+		a[i].Held += n
+		remaining -= n
+	}
+	if remaining != 0 {
+		return ErrInsufficientPoints
+	}
+	c.ReservedQuota = int64(target)
+	if c.TokenPointMode == nil || !*c.TokenPointMode {
+		c.TokenQuota = int64(target)
+	}
+	if c.Dispatch == "unsubmitted" {
+		c.Dispatch = "dispatching"
+	}
+	c.Revision++
+	if e := pointCallSave(tx, c, a); e != nil {
+		return e
+	}
+	meta := PointBillingMetadata{Version: 1, CallID: id, EventID: event, Status: "reserved", TotalPoints: "0", Items: []PointBillingItem{}}
+	m, _ := common.Marshal(meta)
+	return tx.Create(&PointCallEvent{ID: event, CallID: id, Payload: payload, Metadata: string(m), Revision: c.Revision, CacheState: "pending", LogState: "none"}).Error
 }
 
 // SetPointCallTarget adjusts the cumulative BASE quota. Fees have a distinct

@@ -16,166 +16,70 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { toast } from 'sonner'
 
-import { ConfirmDialog } from '@/components/confirm-dialog'
-import { StaticDataTable, StaticRowActions } from '@/components/data-table'
 import { Dialog } from '@/components/dialog'
-import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { LoadingState } from '@/components/loading-state'
-import { StatusBadge } from '@/components/status-badge'
-import { Button } from '@/components/ui/button'
 import { getServerErrorMessage } from '@/lib/server-error-message'
 
-import { deletePointRule, getPointRules, pointsQueryKeys } from '../api'
-import type { PointModelRule, PointType } from '../types'
-import { PointRuleForm } from './point-rule-form'
+import { getPointChannels, getPointPolicy, pointsQueryKeys } from '../api'
+import type { PointType } from '../types'
+import { PointPolicyEditor } from './point-policy-editor'
 
-type Props = { pointType: PointType; onClose: () => void }
-
-export function PointRulesDialog(props: Props) {
+export function PointRulesDialog(props: {
+  pointType: PointType
+  onClose: () => void
+}) {
   const { t } = useTranslation()
-  const client = useQueryClient()
-  const [formRule, setFormRule] = useState<PointModelRule | null | undefined>(
-    undefined
-  )
-  const [deleteRule, setDeleteRule] = useState<PointModelRule | null>(null)
+  const [pending, setPending] = useState(false)
   const query = useQuery({
-    queryKey: pointsQueryKeys.rules(props.pointType.id),
-    queryFn: () => getPointRules(props.pointType.id),
+    queryKey: pointsQueryKeys.policy(props.pointType.id),
+    queryFn: () => getPointPolicy(props.pointType.id),
   })
-  const deletion = useMutation({
-    mutationFn: (ruleId: number) => deletePointRule(props.pointType.id, ruleId),
-    onSuccess: async () => {
-      await client.invalidateQueries({
-        queryKey: pointsQueryKeys.rules(props.pointType.id),
-      })
-      toast.success(t('Model rule deleted'))
-      setDeleteRule(null)
-    },
+  const channels = useQuery({
+    queryKey: ['points', 'channels'],
+    queryFn: getPointChannels,
   })
   let content
-  if (query.isPending) content = <LoadingState />
-  else if (query.isError) {
+  if (query.isPending || channels.isPending) content = <LoadingState />
+  else if (query.isError || channels.isError) {
     content = (
       <ErrorState
-        description={getServerErrorMessage(query.error)}
-        onRetry={() => void query.refetch()}
+        description={getServerErrorMessage(query.error ?? channels.error)}
+        onRetry={() => {
+          void query.refetch()
+          void channels.refetch()
+        }}
       />
     )
   } else {
     content = (
-      <StaticDataTable
-        tableClassName='min-w-[480px]'
-        data={query.data}
-        getRowKey={(rule) => rule.id}
-        emptyContent={
-          <EmptyState
-            title={t('No model rules configured')}
-            description={t(
-              'Without an enabled rule, this point type cannot be used for any model.'
-            )}
-          />
-        }
-        columns={[
-          {
-            id: 'mode',
-            header: t('Match mode'),
-            cell: (rule) => rule.match_type,
-          },
-          {
-            id: 'value',
-            header: t('Model name or pattern'),
-            cell: (rule) => (
-              <span className='font-mono'>{rule.match_value}</span>
-            ),
-          },
-          {
-            id: 'enabled',
-            header: t('Status'),
-            cell: (rule) => (
-              <StatusBadge
-                label={rule.enabled ? t('Enabled') : t('Disabled')}
-                variant={rule.enabled ? 'success' : 'neutral'}
-                copyable={false}
-              />
-            ),
-          },
-          {
-            id: 'actions',
-            header: t('Actions'),
-            className: 'text-right',
-            cell: (rule) => (
-              <StaticRowActions
-                editLabel={t('Edit model rule')}
-                deleteLabel={t('Delete model rule')}
-                menuLabel={t('Open menu')}
-                onEdit={() => setFormRule(rule)}
-                onDelete={() => setDeleteRule(rule)}
-              />
-            ),
-          },
-        ]}
+      <PointPolicyEditor
+        typeId={props.pointType.id}
+        config={query.data}
+        channels={channels.data}
+        onClose={props.onClose}
+        onPendingChange={setPending}
       />
     )
   }
-
   return (
-    <>
-      <Dialog
-        open
-        onOpenChange={(open) => {
-          if (!open) props.onClose()
-        }}
-        title={t('Model rules for {{code}}', { code: props.pointType.code })}
-        description={t(
-          'Enabled rules are combined with OR. Model names do not need to exist in the model catalog.'
-        )}
-        contentClassName='sm:max-w-3xl'
-      >
-        <div className='mb-4 flex flex-wrap gap-2'>
-          <Button size='sm' onClick={() => setFormRule(null)}>
-            {t('Add model rule')}
-          </Button>
-          <Button
-            size='sm'
-            variant='outline'
-            disabled={query.isFetching}
-            onClick={() => void query.refetch()}
-          >
-            {t('Refresh')}
-          </Button>
-        </div>
-        {content}
-      </Dialog>
-      {formRule !== undefined && (
-        <PointRuleForm
-          key={formRule?.id ?? 'new'}
-          typeId={props.pointType.id}
-          rule={formRule}
-          onClose={() => setFormRule(undefined)}
-        />
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open && !pending) props.onClose()
+      }}
+      title={t('Point rules for {{name}}', { name: props.pointType.name })}
+      description={t(
+        'Choose OR or AND between groups and within each group. Channel conditions use the channel actually selected for the request.'
       )}
-      <ConfirmDialog
-        open={deleteRule !== null}
-        onOpenChange={(open) => {
-          if (!open) setDeleteRule(null)
-        }}
-        title={t('Delete model rule')}
-        desc={t('Delete model rule "{{value}}"?', {
-          value: deleteRule?.match_value ?? '',
-        })}
-        destructive
-        confirmText={t('Delete')}
-        isLoading={deletion.isPending}
-        handleConfirm={() => {
-          if (deleteRule) deletion.mutate(deleteRule.id)
-        }}
-      />
-    </>
+      showCloseButton={!pending}
+      contentClassName='sm:max-w-5xl'
+    >
+      {content}
+    </Dialog>
   )
 }

@@ -414,6 +414,7 @@ func SetApiRouter(router *gin.Engine) {
 			groupRoute.GET("/", controller.GetGroups)
 		}
 
+		apiRouter.GET("/points/catalog", middleware.DisableCache(), controller.GetPointCatalog)
 		apiRouter.GET("/points/ledger/self", middleware.UserAuth(), controller.GetSelfPointLedger)
 		apiRouter.GET("/points/ledger", middleware.AdminAuth(), controller.GetAdminPointLedger)
 		apiRouter.GET("/points/wallet/self", middleware.UserAuth(), middleware.DisableCache(), controller.GetSelfPointWallet)
@@ -481,9 +482,12 @@ func SetApiRouter(router *gin.Engine) {
 		customSubscriptions.DELETE("/:id", controller.DeleteCustomSubscriptionPlan)
 
 		pointsRoute := apiRouter.Group("/points")
-		pointsRoute.Use(middleware.AdminAuth())
+		pointsRoute.Use(middleware.AdminAuth(), middleware.DisableCache())
 		{
 			pointsRoute.GET("/types", controller.GetPointTypes)
+			pointsRoute.PATCH("/types/:type_id", controller.RenamePointType)
+			pointsRoute.GET("/types/:type_id/policy", controller.GetPointEligibilityPolicy)
+			pointsRoute.PUT("/types/:type_id/policy", controller.UpdatePointEligibilityPolicy)
 			pointsRoute.GET("/types/:type_id/rules", controller.GetPointModelRules)
 			pointsRoute.POST("/types/:type_id/rules", controller.CreatePointModelRule)
 			pointsRoute.PUT("/types/:type_id/rules/:rule_id", controller.UpdatePointModelRule)

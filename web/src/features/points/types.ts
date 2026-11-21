@@ -20,6 +20,7 @@ export type PointType = {
   id: number
   code: string
   name: string
+  config_version: number
   consume_priority: number
   created_at: number
   updated_at: number
@@ -39,3 +40,24 @@ export type PointRuleInput = Pick<
   PointModelRule,
   'match_type' | 'match_value' | 'enabled'
 >
+
+export type PointPolicyCondition =
+  | {
+      kind: 'MODEL'
+      match_type: 'EXACT' | 'PATTERN'
+      match_value: string
+      enabled: boolean
+    }
+  | { kind: 'CHANNEL'; channel_id: string; enabled: boolean }
+export type PointPolicyGroup = {
+  operator: 'OR' | 'AND'
+  enabled: boolean
+  conditions: PointPolicyCondition[]
+}
+export type PointPolicy = {
+  version: 1
+  operator: 'OR' | 'AND'
+  groups: PointPolicyGroup[]
+}
+export type PointPolicyConfig = { policy: PointPolicy; config_version: number }
+export type PointCatalogItem = { id: string; code: string; name: string }

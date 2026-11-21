@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { useTranslation } from 'react-i18next'
 
 import { QuotaDetailsPopover } from '@/components/quota-details-popover'
+import { usePointName } from '@/features/points/lib/point-name-context'
 import { toIntlLocale } from '@/i18n/languages'
 import { formatNumber } from '@/lib/format'
 
@@ -27,6 +28,7 @@ import { pointBillingSchema } from '../data/schema'
 /** Display committed event contributions; task summaries use the same safe DTO. */
 export function LogPointsDisplay(props: { billing?: unknown }) {
   const { t, i18n } = useTranslation()
+  const pointName = usePointName()
   const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
   const parsed = pointBillingSchema.safeParse(props.billing)
   if (!parsed.success) return <span className='text-muted-foreground'>—</span>
@@ -48,7 +50,7 @@ export function LogPointsDisplay(props: { billing?: unknown }) {
   if (!billing.items.length) return <span className='tabular-nums'>0</span>
 
   const details = billing.items.map((item) => ({
-    label: `${item.name || item.code} (${item.code})`,
+    label: `${pointName({ id: item.point_type_id, code: item.code, name: item.name })} (${item.code})`,
     value: formatNumber(BigInt(item.points), locale),
   }))
   return (
@@ -59,7 +61,11 @@ export function LogPointsDisplay(props: { billing?: unknown }) {
           className='flex min-w-0 flex-wrap items-baseline gap-x-2'
         >
           <span className='text-muted-foreground min-w-0 [overflow-wrap:anywhere]'>
-            {item.name || item.code}
+            {pointName({
+              id: item.point_type_id,
+              code: item.code,
+              name: item.name,
+            })}
           </span>
           <span className='min-w-0 [overflow-wrap:anywhere]'>
             {formatNumber(BigInt(item.points), locale)}

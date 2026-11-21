@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import type { TFunction } from 'i18next'
 
+import type { PointNameResolver } from '@/features/points/lib/point-name'
 import { loginMethodLabel } from '@/features/security/components/login-session-utils'
 import type { PermissionResourceDef } from '@/lib/admin-permissions'
 import dayjs from '@/lib/dayjs'
@@ -71,6 +72,7 @@ export type AuditDetailField = {
 }
 
 export type AuditDetailOptions = {
+  pointName?: PointNameResolver
   // Labels for stored access token scopes; omitted until they have loaded.
   scopeResources?: PermissionResourceDef[]
 }
@@ -414,7 +416,8 @@ export function buildAuditDetails(
     action,
     params,
     entry.success,
-    t
+    t,
+    options.pointName
   )
   const operation = tokenOperation ?? quotaOperation ?? pointsOperation
   const summaryParams: NonNullable<NonNullable<LogOtherData['op']>['params']> =
@@ -459,7 +462,8 @@ export function buildAuditDetails(
           success: entry.success,
         },
       },
-      t
+      t,
+      options.pointName
     ) || (entry.content && entry.content !== action ? entry.content : fallback)
   const admin = isAuditDetailObject(metadata.admin_info)
     ? metadata.admin_info

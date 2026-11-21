@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import type { StatusBadgeProps } from '@/components/status-badge'
+import type { PointNameResolver } from '@/features/points/lib/point-name'
 import {
   BILLING_PRICING_VARS,
   normalizeTierLabel,
@@ -609,7 +610,8 @@ export function logTokenName(
  */
 export function renderAuditContent(
   other: LogOtherData | null | undefined,
-  t: (key: string, opts?: Record<string, unknown>) => string
+  t: (key: string, opts?: Record<string, unknown>) => string,
+  pointName?: PointNameResolver
 ): string | null {
   const op = other?.op
   if (!op?.action) return null
@@ -635,7 +637,8 @@ export function renderAuditContent(
     op.action,
     op.params ?? {},
     other?.audit_info?.success !== false,
-    t
+    t,
+    pointName
   )
   if (pointsOperation) {
     return `${pointsOperation.summary} · ${pointsOperation.description}`

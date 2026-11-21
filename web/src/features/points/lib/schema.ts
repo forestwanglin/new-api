@@ -34,3 +34,65 @@ export const pointRuleSchema = z.object({
 })
 
 export type PointRuleFormValues = z.infer<typeof pointRuleSchema>
+
+export const pointNameSchema = z
+  .string()
+  .refine(
+    (value) =>
+      [...value].length >= 1 &&
+      [...value].length <= 64 &&
+      value.trim() === value &&
+      !/\p{Cc}/u.test(value),
+    'Use 1–64 characters without surrounding whitespace or control characters.'
+  )
+
+const pointConditionSchema = z.discriminatedUnion('kind', [
+  pointRuleSchema.extend({ kind: z.literal('MODEL') }).strict(),
+  z
+    .object({
+      kind: z.literal('CHANNEL'),
+      channel_id: z
+        .string()
+        .regex(/^[1-9]\d*$/)
+        .refine(
+          (value) =>
+            /^[1-9]\d*$/.test(value) && BigInt(value) <= 9223372036854775807n
+        ),
+      enabled: z.boolean(),
+    })
+    .strict(),
+])
+
+export const pointPolicySchema = z
+  .object({
+    version: z.literal(1),
+    operator: z.enum(['OR', 'AND']),
+    groups: z
+      .array(
+        z
+          .object({
+            operator: z.enum(['OR', 'AND']),
+            enabled: z.boolean(),
+            conditions: z.array(pointConditionSchema).max(64),
+          })
+          .strict()
+          .refine(
+            (group) =>
+              !group.enabled ||
+              group.conditions.some((condition) => condition.enabled),
+            'An enabled group needs an enabled condition.'
+          )
+      )
+      .max(32),
+  })
+  .strict()
+  .refine(
+    (policy) =>
+      policy.groups.reduce(
+        (count, group) => count + group.conditions.length,
+        0
+      ) <= 512,
+    'Use at most 512 conditions.'
+  )
+
+export type PointPolicyFormValues = z.infer<typeof pointPolicySchema>

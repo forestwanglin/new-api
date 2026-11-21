@@ -35,6 +35,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import type { PointNameResolver } from '@/features/points/lib/point-name'
+import { usePointName } from '@/features/points/lib/point-name-context'
 import { usePricingData } from '@/features/pricing/hooks/use-pricing-data'
 import {
   normalizeTierLabel,
@@ -120,9 +122,17 @@ function buildDetailSegments(
   t: (key: string, opts?: Record<string, unknown>) => string,
   isAdmin: boolean,
   language: string,
-  usageSchema?: BillingUsageSchema
+  usageSchema?: BillingUsageSchema,
+  pointName?: PointNameResolver
 ): DetailSegment[] {
-  const segments = buildTypeDetailSegments(log, other, t, language, usageSchema)
+  const segments = buildTypeDetailSegments(
+    log,
+    other,
+    t,
+    language,
+    usageSchema,
+    pointName
+  )
   const adminSegments: DetailSegment[] = []
   // Quota saturation is a rare, admin-only anomaly marker; surface it first
   // and in danger styling so it stands out on the related billing log. The
@@ -139,11 +149,13 @@ function buildTypeDetailSegments(
   other: LogOtherData | null,
   t: (key: string, opts?: Record<string, unknown>) => string,
   language: string,
-  usageSchema?: BillingUsageSchema
+  usageSchema?: BillingUsageSchema,
+  pointName?: PointNameResolver
 ): DetailSegment[] {
   // Top-up, audit, and login logs can carry a localized operation descriptor.
   if (log.type === 1 || log.type === 3 || log.type === 7) {
-    const text = renderAuditContent(other, t) ?? renderLogContent(other, t)
+    const text =
+      renderAuditContent(other, t, pointName) ?? renderLogContent(other, t)
     return text ? [{ text }] : []
   }
 
@@ -842,6 +854,7 @@ export function useCommonLogsColumns(
         header: t('Details'),
         cell: function DetailsCell({ row }) {
           const { t, i18n } = useTranslation()
+          const pointName = usePointName()
           const [dialogOpen, setDialogOpen] = useState(false)
           const log = row.original
           const other = parseLogOther(log.other)
@@ -863,7 +876,8 @@ export function useCommonLogsColumns(
             t,
             isAdmin,
             i18n.language,
-            usageSchema
+            usageSchema,
+            pointName
           )
           const primary = segments[0]
           const hasMore = segments.length > 1

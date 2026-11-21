@@ -1307,6 +1307,16 @@
 - 验证：七种语言 JSON 解析通过，复核定向 diff；按用户要求未运行测试。
 - 风险与未覆盖：未进行浏览器验证。
 
+### Z091 积分动态名称与模型渠道分组规则
+
+- 需求与原因：控制台管理员需要修改积分名称，并通过分组 OR/AND 配置模型和实际渠道的适用关系。
+- 变更内容：新增版本化名称/策略编辑和最小名称目录；保留旧平面 OR 兼容；两层规则支持 MODEL EXACT/PATTERN、CHANNEL；调用准入和重试按实际渠道判断并维护本次独占冻结；系统类型标签读取当前名称，财务快照保持不变。
+- 影响面：积分模型/策略/管理 API、路由与会话声明、调用计费和渠道重试、积分编辑界面及钱包/用户/订阅/邀请/使用审计展示。**上游自有文件**包括 `router/api-router.go`、`middleware/access_token_routes.go`、`controller/relay.go`、`service/tiered_settle.go`、前端根路由与共享账户/日志组件、七种 locale；完整改动列表以本次 Git diff 为准。详见 [积分结构与兼容边界](points-schema.md#积分动态名称与分组渠道规则z091)。
+- 与上游差异：扩展 fork 原有只读积分类型与平面模型 OR 规则；实际扣费继续沿用原积分账务，不以 legacy quota 代替积分准入。
+- 开关与默认值：无新环境变量/运行时依赖。空数据库策略兼容旧 OR；显式空分组策略禁止消费。名称和策略使用同一 `config_version` 防止并发覆盖；启用分组后旧规则写接口明确失败。
+- 验证：Go 1.26.10 构建和针对性规则/管理/积分计费测试通过。真实 SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 16.16 矩阵通过（新建、代表性旧表升级、重复迁移、CAS、渠道换路、Key 限额、其他请求冻结隔离和失败回滚）；执行 `go test ./model -run 'TestPointEligibility|TestPointRulesAdminDatabaseMatrix|TestPointsDatabaseMatrix|TestPointCallRouteDatabaseMatrix|TestPointCallFinancialLifecycle|TestPointCallExactConversionAndModelMatch' -count=1 -v`，未跳过数据库。前端扩大回归 71 文件/805 测试通过；主会话最终定向回归 28 文件/211 测试通过；`bun run typecheck`、49 个变更 TS/TSX 的 scoped oxlint、`bun run build` 通过。全仓 format:check 的 38 个文件、copyright:check 的 74 个文件以及全仓 lint 的报错均不与本任务变更文件相交，未扩展处理既有问题。`go vet ./model ./service ./controller ./router`、最终 diff 检查通过。Chrome 隔离测试验证重命名、模型 AND 渠道策略保存回读、钱包动态名称及 390px 规则表单；未请求真实上游。
+- 风险与未覆盖：新增主库列；旧二进制忽略分组/渠道限制，升级不支持混跑，回滚需停止准入、对账并恢复兼容配置。重命名不替换管理员自行编写的说明内容。升级测试使用代表性旧结构而非完整线上备份。后端扩大回归的 `TestUserPointBalancesAPI` 和全局路由目录检查失败已在未修改 HEAD 基线上复现（缺 claims fixture / 既有路由登记缺项）。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 
@@ -1316,6 +1326,7 @@
 
 | 区域 | 文件 | 关联条目 |
 |---|---|---|
+| 积分名称与分组渠道规则 | `router/api-router.go`、`middleware/access_token_routes.go`、`controller/relay.go`、`service/tiered_settle.go`、前端根路由/账户/用户/使用日志组件与七种 locale | Z091 |
 | 客服微信展示文案 | `web/src/i18n/locales/{en,zh,zh-TW,fr,ru,ja,vi}.json` | Z090 |
 | 系统设置返回新手引导 | `web/src/components/layout/config/system-settings.config.ts` | Z089 |
 | 上游插件扩展与 fork 集成 | `pkg/jsplugin/routing.go`、`relaykit/types/error.go`、`relay/channel/providerplugin/adaptor.go`、`router/provider_plugin_relay_test.go`、渠道测试弹窗及 endpoint 测试 | Z088 |

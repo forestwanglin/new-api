@@ -72,7 +72,7 @@ func TestPointsAdminAPI(t *testing.T) {
 		engine.ServeHTTP(recorder, req)
 		require.Equal(t, status, recorder.Code, recorder.Body.String())
 		var response pointAdminResponse
-		if status == http.StatusOK {
+		if status == http.StatusOK || status == http.StatusConflict {
 			require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &response))
 		}
 		return response
@@ -80,9 +80,9 @@ func TestPointsAdminAPI(t *testing.T) {
 	admin := tokens[common.RoleAdminUser]
 	base := fmt.Sprintf("/api/points/types/%d/rules", types[1].Id)
 	other := fmt.Sprintf("/api/points/types/%d/rules", types[0].Id)
-	t.Run("authorization and readonly types", func(t *testing.T) {
+	t.Run("authorization and protected type fields", func(t *testing.T) {
 		for _, route := range []struct{ method, path, body string }{
-			{"GET", "/api/points/types", ""}, {"GET", base, ""}, {"POST", base, `{"match_type":"EXACT","match_value":"restricted","enabled":true}`}, {"PUT", base + "/1", `{}`}, {"DELETE", base + "/1", ""},
+			{"GET", "/api/points/types", ""}, {"PATCH", "/api/points/types/1", `{}`}, {"GET", "/api/points/types/1/policy", ""}, {"PUT", "/api/points/types/1/policy", `{}`}, {"GET", base, ""}, {"POST", base, `{"match_type":"EXACT","match_value":"restricted","enabled":true}`}, {"PUT", base + "/1", `{}`}, {"DELETE", base + "/1", ""},
 		} {
 			request(t, route.method, route.path, route.body, "", http.StatusUnauthorized)
 			request(t, route.method, route.path, route.body, tokens[common.RoleCommonUser], http.StatusForbidden)
@@ -170,4 +170,61 @@ func TestPointsAdminAPI(t *testing.T) {
 			assert.False(t, request(t, "DELETE", base+"/"+id, "", admin, 200).Success)
 		}
 	})
+	t.Run("dynamic names catalog and grouped policy", func(t *testing.T) {
+		type channel struct {
+			Id   int `gorm:"primaryKey"`
+			Name string
+		}
+		require.NoError(t, db.Table("channels").AutoMigrate(&channel{}))
+		require.NoError(t, db.Table("channels").Create(&channel{Id: 12, Name: "Test channel"}).Error)
+		path := fmt.Sprintf("/api/points/types/%d", types[2].Id)
+		original := request(t, "GET", path+"/policy", "", admin, 200)
+		require.True(t, original.Success, original.Message)
+		var config model.PointEligibilityConfiguration
+		require.NoError(t, common.Unmarshal(original.Data, &config))
+		assert.EqualValues(t, 1, config.ConfigVersion)
+		renamed := request(t, "PATCH", path, `{"name":"自定义积分","config_version":1}`, admin, 200)
+		require.True(t, renamed.Success, renamed.Message)
+		var typ model.PointType
+		require.NoError(t, common.Unmarshal(renamed.Data, &typ))
+		assert.Equal(t, "自定义积分", typ.Name)
+		assert.Equal(t, "DS", typ.Code)
+		assert.EqualValues(t, 2, typ.ConfigVersion)
+		stale := request(t, "PATCH", path, `{"name":"stale","config_version":1}`, admin, http.StatusConflict)
+		assert.False(t, stale.Success)
+		for _, body := range []string{`{}`, `{"name":null,"config_version":2}`, `{"name":"","config_version":2}`, `{"name":" bad","config_version":2}`, `{"name":"bad\nname","config_version":2}`, `{"Name":"bad","config_version":2}`, `{"name":"bad","config_version":2,"code":"OTHER"}`, `{"name":"bad","config_version":null}`, `{"name":"bad","config_version":"2"}`, `{"name":"bad","config_version":0}`, `{"name":"bad","config_version":2} {}`, fmt.Sprintf(`{"name":%q,"config_version":2}`, strings.Repeat("名", 65))} {
+			assert.False(t, request(t, "PATCH", path, body, admin, 200).Success, body)
+		}
+		catalog := request(t, "GET", "/api/points/catalog", "", "", 200)
+		require.True(t, catalog.Success, catalog.Message)
+		var entries []map[string]common.RawMessage
+		require.NoError(t, common.Unmarshal(catalog.Data, &entries))
+		require.Len(t, entries, 3)
+		for _, entry := range entries {
+			require.Len(t, entry, 3)
+			assert.Contains(t, entry, "id")
+			assert.Contains(t, entry, "code")
+			assert.Contains(t, entry, "name")
+		}
+		var catalogItems []model.PointCatalogEntry
+		require.NoError(t, common.Unmarshal(catalog.Data, &catalogItems))
+		assert.Equal(t, "自定义积分", catalogItems[2].Name)
+		assert.Equal(t, fmt.Sprint(types[2].Id), catalogItems[2].ID)
+		policy := `{"version":1,"operator":"AND","groups":[{"operator":"OR","enabled":true,"conditions":[{"kind":"MODEL","match_type":"PATTERN","match_value":"gpt-*","enabled":true}]},{"operator":"OR","enabled":true,"conditions":[{"kind":"CHANNEL","channel_id":"12","enabled":true}]}]}`
+		saved := request(t, "PUT", path+"/policy", `{"config_version":2,"policy":`+policy+`}`, admin, 200)
+		require.True(t, saved.Success, saved.Message)
+		require.NoError(t, common.Unmarshal(saved.Data, &config))
+		assert.EqualValues(t, 3, config.ConfigVersion)
+		assert.True(t, config.Policy.Matches("gpt-4", 12))
+		assert.False(t, config.Policy.Matches("gpt-4", 13))
+		assert.False(t, request(t, "PUT", path+"/policy", `{"config_version":2,"policy":`+policy+`}`, admin, http.StatusConflict).Success)
+		assert.False(t, request(t, "POST", path+"/rules", `{"match_type":"EXACT","match_value":"hidden","enabled":true}`, admin, http.StatusConflict).Success)
+		for _, body := range []string{`{}`, `{"config_version":3,"policy":null}`, `{"config_version":3,"Policy":` + policy + `}`, `{"config_version":3,"policy":` + policy + `,"enabled":true}`, `{"config_version":3,"policy":` + strings.Replace(policy, `"channel_id":"12"`, `"channel_id":"999"`, 1) + `}`, `{"config_version":3,"policy":` + strings.Replace(policy, `"kind":"CHANNEL"`, `"kind":"CHANNEL","match_value":"bad"`, 1) + `}`} {
+			assert.False(t, request(t, "PUT", path+"/policy", body, admin, 200).Success, body)
+		}
+		current := request(t, "GET", path+"/policy", "", admin, 200)
+		assert.JSONEq(t, string(saved.Data), string(current.Data), "rejected saves preserve current policy/version")
+		require.NoError(t, db.Table("channels").Delete(&channel{}, 12).Error)
+	})
+
 }

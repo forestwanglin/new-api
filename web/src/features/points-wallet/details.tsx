@@ -25,6 +25,7 @@ import {
 } from '@/components/data-table'
 import { EmptyState } from '@/components/empty-state'
 import { Button } from '@/components/ui/button'
+import { usePointName } from '@/features/points/lib/point-name-context'
 import { toIntlLocale } from '@/i18n/languages'
 import { formatNumber } from '@/lib/format'
 
@@ -32,6 +33,7 @@ import type { PointWallet } from './api'
 
 export function PointsWalletDetails(props: { wallet: PointWallet }) {
   const { t, i18n } = useTranslation()
+  const pointName = usePointName()
   const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
   const sourceLabels = new Map([
     ['custom_subscription', t('Subscription')],
@@ -46,7 +48,8 @@ export function PointsWalletDetails(props: { wallet: PointWallet }) {
     {
       id: 'type',
       header: t('Point type'),
-      cell: (row) => row.name || row.code,
+      cell: (row) =>
+        pointName({ id: row.point_type_id, code: row.code, name: row.name }),
     },
     {
       id: 'available',
@@ -66,7 +69,11 @@ export function PointsWalletDetails(props: { wallet: PointWallet }) {
       id: 'type',
       header: t('Point type'),
       cell: (row) =>
-        row.point_type_name || row.point_type_code || row.point_type_id,
+        pointName({
+          id: row.point_type_id,
+          code: row.point_type_code,
+          name: row.point_type_name,
+        }),
     },
     {
       id: 'source',

@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { z } from 'zod'
 
 import { autoBonusPoints } from '@/features/custom-subscriptions/lib/schema'
+import type { PointNameResolver } from '@/features/points/lib/point-name'
 import { formatNumber } from '@/lib/format'
 
 const quantity = z
@@ -64,7 +65,8 @@ export function offerId(offer: Offer): string {
 // Sum only matching identities; distinct point currencies remain explicit.
 export function offerPointAmounts(
   plan: PublicSubscriptionPlan,
-  renewal = false
+  renewal = false,
+  pointName?: PointNameResolver
 ): { id: string; name: string; amount: bigint }[] {
   const amounts = new Map<
     string,
@@ -89,7 +91,7 @@ export function offerPointAmounts(
     const current = amounts.get(entry.type.id)
     amounts.set(entry.type.id, {
       id: entry.type.id,
-      name: entry.type.name,
+      name: pointName ? pointName(entry.type) : entry.type.name,
       amount: (current?.amount ?? 0n) + BigInt(entry.value),
     })
   }
@@ -98,9 +100,10 @@ export function offerPointAmounts(
 
 export function formatOfferPoints(
   plan: PublicSubscriptionPlan,
-  locale: string
+  locale: string,
+  pointName?: PointNameResolver
 ): string {
-  return offerPointAmounts(plan)
+  return offerPointAmounts(plan, false, pointName)
     .map((entry) => `${formatNumber(entry.amount, locale)} ${entry.name}`)
     .join(' + ')
 }

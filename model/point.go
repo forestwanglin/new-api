@@ -42,12 +42,14 @@ func (PointModelMatchValue) GormDBDataType(db *gorm.DB, _ *schema.Field) string 
 }
 
 type PointType struct {
-	Id              int64  `json:"id" gorm:"primaryKey"`
-	Code            string `json:"code" gorm:"type:varchar(32);not null;uniqueIndex:idx_point_types_code"`
-	Name            string `json:"name" gorm:"type:varchar(64);not null"`
-	ConsumePriority int    `json:"consume_priority" gorm:"not null"`
-	CreatedAt       int64  `json:"created_at" gorm:"autoCreateTime:milli"`
-	UpdatedAt       int64  `json:"updated_at" gorm:"autoUpdateTime:milli"`
+	Id                int64   `json:"id" gorm:"primaryKey"`
+	Code              string  `json:"code" gorm:"type:varchar(32);not null;uniqueIndex:idx_point_types_code"`
+	Name              string  `json:"name" gorm:"type:varchar(64);not null"`
+	EligibilityPolicy *string `json:"-" gorm:"type:text"`
+	ConfigVersion     int64   `json:"config_version" gorm:"not null;default:1"`
+	ConsumePriority   int     `json:"consume_priority" gorm:"not null"`
+	CreatedAt         int64   `json:"created_at" gorm:"autoCreateTime:milli"`
+	UpdatedAt         int64   `json:"updated_at" gorm:"autoUpdateTime:milli"`
 }
 
 type PointModelRule struct {

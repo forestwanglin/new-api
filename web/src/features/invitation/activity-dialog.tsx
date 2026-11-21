@@ -1,3 +1,21 @@
+/*
+Copyright (C) 2023-2026 QuantumNous
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+For commercial licensing, please contact support@quantumnous.com
+*/
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 
@@ -13,6 +31,7 @@ import {
   TableHead,
   TableCell,
 } from '@/components/ui/table'
+import { usePointName } from '@/features/points/lib/point-name-context'
 
 import { getLatestCampaigns } from './api'
 import { campaignTiers, invitationTime, rateText, tierLabel } from './display'
@@ -22,6 +41,7 @@ export function ActivityDialog(props: {
   onOpenChange: (value: boolean) => void
 }) {
   const { t } = useTranslation()
+  const pointName = usePointName()
   const query = useQuery({
     queryKey: ['invitation', 'latest-campaigns'],
     queryFn: getLatestCampaigns,
@@ -87,7 +107,7 @@ export function ActivityDialog(props: {
                           {t(
                             'Direct friends subscribe or renew to earn {{type}} at the payment-time tier. Released in full after {{days}} days.',
                             {
-                              type: campaign.reward_point_type.name,
+                              type: pointName(campaign.reward_point_type),
                               days: campaign.freeze_days,
                             }
                           )}

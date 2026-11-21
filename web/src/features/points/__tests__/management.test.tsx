@@ -17,13 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { toast } from 'sonner'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -39,6 +33,7 @@ const pointType: PointType = {
   id: 3,
   code: 'DS',
   name: 'Future points',
+  config_version: 1,
   consume_priority: 20,
   created_at: 0,
   updated_at: 0,
@@ -165,29 +160,60 @@ describe('points management', () => {
     expect(success).not.toHaveBeenCalled()
   })
 
-  it('requires confirmation to delete and reloads the selected type rules', async () => {
-    let rules = [rule]
-    const get = vi.spyOn(api, 'get').mockImplementation(async () => ({
-      data: { success: true, data: rules },
+  it('loads grouped policy and saves removal of a group atomically', async () => {
+    const policy = {
+      version: 1,
+      operator: 'OR',
+      groups: [
+        {
+          operator: 'OR',
+          enabled: true,
+          conditions: [
+            {
+              kind: 'MODEL',
+              match_type: 'PATTERN',
+              match_value: 'Future/*',
+              enabled: true,
+            },
+          ],
+        },
+      ],
+    }
+    vi.spyOn(api, 'get').mockImplementation(async (url) => ({
+      data: {
+        success: true,
+        data: String(url).endsWith('/policy')
+          ? { policy, config_version: 4 }
+          : {
+              items: [{ id: 12, name: 'Primary' }],
+              total: 1,
+              page: 1,
+              page_size: 100,
+            },
+      },
     }))
-    const remove = vi.spyOn(api, 'delete').mockImplementation(async () => {
-      rules = []
-      return { data: { success: true } }
+    const put = vi.spyOn(api, 'put').mockResolvedValue({
+      data: {
+        success: true,
+        data: { policy: { ...policy, groups: [] }, config_version: 5 },
+      },
     })
-    setup(<PointRulesDialog pointType={pointType} onClose={() => undefined} />)
-    expect(await screen.findByText('Future/*')).toBeVisible()
-    expect(screen.getByText('Disabled')).toBeVisible()
-    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
-    fireEvent.click(
-      await screen.findByRole('menuitem', { name: 'Delete model rule' })
-    )
-    const confirmation = await screen.findByRole('alertdialog')
-    expect(remove).not.toHaveBeenCalled()
-    fireEvent.click(
-      within(confirmation).getByRole('button', { name: 'Delete' })
-    )
-    expect(await screen.findByText('No model rules configured')).toBeVisible()
-    expect(remove).toHaveBeenCalledWith('/api/points/types/3/rules/7')
-    expect(get).toHaveBeenCalledTimes(2)
+    const onClose = vi.fn()
+    setup(<PointRulesDialog pointType={pointType} onClose={onClose} />)
+    expect(
+      await screen.findByRole('textbox', { name: 'Model name or pattern' })
+    ).toHaveValue('Future/*')
+    fireEvent.click(screen.getByRole('button', { name: 'Remove group' }))
+    expect(
+      screen.getByText(
+        'Without an enabled rule, this point type cannot be used for any model.'
+      )
+    ).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(put).toHaveBeenCalledWith('/api/points/types/3/policy', {
+      policy: { version: 1, operator: 'OR', groups: [] },
+      config_version: 4,
+    })
   })
 })

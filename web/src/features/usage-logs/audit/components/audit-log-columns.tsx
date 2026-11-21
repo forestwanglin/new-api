@@ -22,6 +22,7 @@ import { useTranslation } from 'react-i18next'
 
 import { TruncatedCell } from '@/components/data-table'
 import { StatusBadge } from '@/components/status-badge'
+import { usePointName } from '@/features/points/lib/point-name-context'
 import dayjs from '@/lib/dayjs'
 
 import type { AuditLog } from '../api'
@@ -32,6 +33,7 @@ export function useAuditLogColumns(
   accessOnly?: boolean
 ): ColumnDef<AuditLog>[] {
   const { t } = useTranslation()
+  const pointName = usePointName()
   return useMemo(() => {
     const columns: ColumnDef<AuditLog>[] = [
       {
@@ -59,13 +61,15 @@ export function useAuditLogColumns(
           header: t('Event'),
           size: 360,
           accessorFn: (entry) => {
-            const detail = buildAuditDetails(entry, t)
+            const detail = buildAuditDetails(entry, t, { pointName })
             return [detail.summary, detail.operation?.description]
               .filter(Boolean)
               .join(' · ')
           },
           cell: ({ row, getValue }) => {
-            const operation = buildAuditDetails(row.original, t).operation
+            const operation = buildAuditDetails(row.original, t, {
+              pointName,
+            }).operation
             if (!operation) {
               return (
                 <TruncatedCell className='max-w-64'>
@@ -181,5 +185,5 @@ export function useAuditLogColumns(
       }
     )
     return columns
-  }, [accessOnly, t])
+  }, [accessOnly, t, pointName])
 }

@@ -27,6 +27,7 @@ import { LoadingState } from '@/components/loading-state'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { usePointName } from '@/features/points/lib/point-name-context'
 import { toIntlLocale } from '@/i18n/languages'
 import { formatNumber } from '@/lib/format'
 import { useAuthStore } from '@/stores/auth-store'
@@ -45,11 +46,12 @@ function UserPointRow(
   props: Props & { balance: UserPointAccount; disabled: boolean }
 ) {
   const { t, i18n } = useTranslation()
+  const pointName = usePointName()
   const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
   const [open, setOpen] = useState(false)
   const fieldId = useId()
   const balance = props.balance
-  const label = `${balance.name || balance.code} (${balance.code})`
+  const label = `${pointName({ id: balance.point_type_id, code: balance.code, name: balance.name })} (${balance.code})`
   return (
     <div
       role='group'

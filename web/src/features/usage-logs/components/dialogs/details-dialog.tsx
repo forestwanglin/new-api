@@ -57,6 +57,7 @@ import { Dialog } from '@/components/dialog'
 import { StatusBadge, type StatusBadgeProps } from '@/components/status-badge'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { usePointName } from '@/features/points/lib/point-name-context'
 import { DynamicPricingBreakdown } from '@/features/pricing/components/dynamic-pricing-breakdown'
 import { usePricingData } from '@/features/pricing/hooks/use-pricing-data'
 import { BILLING_PRICING_VARS } from '@/features/pricing/lib/billing-expr'
@@ -535,6 +536,7 @@ interface DetailsDialogProps {
 }
 
 export function DetailsDialog(props: DetailsDialogProps) {
+  const pointName = usePointName()
   const { t } = useTranslation()
   const { copiedText, copyToClipboard } = useCopyToClipboard({ notify: false })
   const other = parseLogOther(props.log.other)
@@ -629,10 +631,11 @@ export function DetailsDialog(props: DetailsDialogProps) {
         other?.op?.action ?? '',
         other?.op?.params ?? {},
         true,
-        t
+        t,
+        pointName
       )
     : null
-  const operationText = renderAuditContent(other, t)
+  const operationText = renderAuditContent(other, t, pointName)
   const details =
     (isTopup ? operationText : null) ??
     renderLogContent(other, t) ??

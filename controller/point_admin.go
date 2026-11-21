@@ -136,6 +136,16 @@ func pointAdminRuleInput(c *gin.Context) (*model.PointModelRule, bool) {
 
 func writePointAdminError(c *gin.Context, err error) {
 	switch {
+	case errors.Is(err, model.ErrPointConfigConflict):
+		common.ApiErrorStatus(c, http.StatusConflict, common.NewMessage("Point configuration changed. Reload and try again."))
+	case errors.Is(err, model.ErrPointPolicyManaged):
+		common.ApiErrorStatus(c, http.StatusConflict, common.NewMessage("Grouped point rules are active. Use the grouped rule editor."))
+	case errors.Is(err, model.ErrInvalidPointEligibilityPolicy):
+		common.ApiErrorT(c, "Invalid point eligibility policy")
+	case errors.Is(err, model.ErrPointPolicyChannelNotFound):
+		common.ApiErrorT(c, "Point eligibility channel not found")
+	case errors.Is(err, model.ErrInvalidPointTypeName):
+		common.ApiErrorT(c, "Point type name must contain 1 to 64 characters without surrounding whitespace or control characters")
 	case errors.Is(err, model.ErrPointTypeNotFound):
 		common.ApiErrorT(c, "Point type not found")
 	case errors.Is(err, model.ErrPointModelRuleNotFound):
@@ -143,6 +153,6 @@ func writePointAdminError(c *gin.Context, err error) {
 	case errors.Is(err, model.ErrPointModelRuleDuplicate):
 		common.ApiErrorT(c, "Point model rule already exists")
 	default:
-		common.ApiErrorT(c, "Failed to manage point model rules")
+		common.ApiErrorT(c, "Failed to manage point configuration")
 	}
 }

@@ -16,6 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import type { PointNameResolver } from '@/features/points/lib/point-name'
+
 type Translate = (key: string, opts?: Record<string, unknown>) => string
 
 // Points are decimal integer strings, never quota/currency or JavaScript Numbers.
@@ -28,7 +30,8 @@ export function buildPointsAuditOperation(
   action: string,
   params: Record<string, unknown>,
   success: boolean,
-  t: Translate
+  t: Translate,
+  pointName?: PointNameResolver
 ) {
   let headline: string
   switch (action) {
@@ -52,7 +55,22 @@ export function buildPointsAuditOperation(
   const id = text(params.target_user_id)
   const identifier = t('(ID: {{id}})', { id })
   const summary = t('{{operation}} (ID: {{id}})', { operation: headline, id })
-  const name = text(params.point_type_name)
+  const name = pointName
+    ? pointName({
+        id:
+          typeof params.point_type_id === 'string'
+            ? params.point_type_id
+            : undefined,
+        code:
+          typeof params.point_type_code === 'string'
+            ? params.point_type_code
+            : undefined,
+        name:
+          typeof params.point_type_name === 'string'
+            ? params.point_type_name
+            : undefined,
+      })
+    : text(params.point_type_name)
   const code = text(params.point_type_code)
   const type = `${name} (${code})`
   const amount = pointText(params.amount, t)

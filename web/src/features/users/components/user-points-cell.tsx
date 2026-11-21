@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { useTranslation } from 'react-i18next'
 
 import { QuotaDetailsPopover } from '@/components/quota-details-popover'
+import { usePointName } from '@/features/points/lib/point-name-context'
 import { toIntlLocale } from '@/i18n/languages'
 import { formatNumber } from '@/lib/format'
 
@@ -30,6 +31,7 @@ type UserPointsCellProps = {
 
 export function UserPointsCell(props: UserPointsCellProps) {
   const { t, i18n } = useTranslation()
+  const pointName = usePointName()
   const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
   const balances = (props.balances ?? []).filter(
     (balance) =>
@@ -38,18 +40,14 @@ export function UserPointsCell(props: UserPointsCellProps) {
   if (balances.length === 0) return <span>—</span>
 
   const format = (value: string) => formatNumber(BigInt(value), locale)
-  const name = (balance: UserPointBalance) => {
-    if (balance.code === 'GENERAL') return t('General points')
-    if (balance.code === 'GPT') return 'GPT'
-    return balance.name || balance.code
-  }
+  const name = pointName
   const details = (balance: UserPointBalance) => [
     {
-      label: `${balance.name || balance.code} (${balance.code}) · ${t('Available points')}`,
+      label: `${pointName(balance)} (${balance.code}) · ${t('Available points')}`,
       value: format(balance.available_points),
     },
     {
-      label: `${balance.name || balance.code} (${balance.code}) · ${t('Frozen points')}`,
+      label: `${pointName(balance)} (${balance.code}) · ${t('Frozen points')}`,
       value: format(balance.frozen_points),
     },
   ]
@@ -60,7 +58,7 @@ export function UserPointsCell(props: UserPointsCellProps) {
         <QuotaDetailsPopover
           key={balance.code}
           title={t('Points details')}
-          triggerLabel={`${balance.name || balance.code} (${balance.code}) · ${t('Available points')} ${format(balance.available_points)}; ${t('Frozen points')} ${format(balance.frozen_points)}`}
+          triggerLabel={`${pointName(balance)} (${balance.code}) · ${t('Available points')} ${format(balance.available_points)}; ${t('Frozen points')} ${format(balance.frozen_points)}`}
           details={details(balance)}
         >
           <span className='grid w-full min-w-0 gap-0.5'>

@@ -1,11 +1,3 @@
-import { Fragment } from 'react'
-
-import { Button } from '@/components/ui/button'
-import { Switch } from '@/components/ui/switch'
-import { formatPlanPrice } from '@/features/custom-subscriptions/lib/format'
-import { autoBonusPoints } from '@/features/custom-subscriptions/lib/schema'
-import { formatNumber } from '@/lib/format'
-
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -24,6 +16,15 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { Fragment } from 'react'
+
+import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
+import { formatPlanPrice } from '@/features/custom-subscriptions/lib/format'
+import { autoBonusPoints } from '@/features/custom-subscriptions/lib/schema'
+import { usePointName } from '@/features/points/lib/point-name-context'
+import { formatNumber } from '@/lib/format'
+
 import { subscriptionCopy as t } from './copy'
 import {
   formatOfferPoints,
@@ -37,12 +38,15 @@ function PlanPoints(props: {
   locale: string
   renewal?: boolean
 }) {
-  return offerPointAmounts(props.plan, props.renewal).map((entry, index) => (
-    <Fragment key={entry.id}>
-      {index > 0 && ' + '}
-      {formatNumber(entry.amount, props.locale)} <small>{entry.name}</small>
-    </Fragment>
-  ))
+  const pointName = usePointName()
+  return offerPointAmounts(props.plan, props.renewal, pointName).map(
+    (entry, index) => (
+      <Fragment key={entry.id}>
+        {index > 0 && ' + '}
+        {formatNumber(entry.amount, props.locale)} <small>{entry.name}</small>
+      </Fragment>
+    )
+  )
 }
 
 type Props = {
@@ -52,10 +56,11 @@ type Props = {
   onCancel: () => void
 }
 export function PlanCard(props: Props) {
+  const pointName = usePointName()
   const offer = props.offer
   const locale = 'zh-CN'
   const price = formatPlanPrice(offer.plan.price_amount_minor, locale)
-  const points = formatOfferPoints(offer.plan, locale)
+  const points = formatOfferPoints(offer.plan, locale, pointName)
   const benefitCounts = new Map<string, number>()
   const benefits = offer.plan.benefits.map((text) => {
     const occurrence = (benefitCounts.get(text) ?? 0) + 1
@@ -146,7 +151,7 @@ export function PlanCard(props: Props) {
           <span>
             {t('Includes {{points}} extra', {
               points:
-                `${formatNumber(BigInt(extra), locale)} ${offer.plan.auto_bonus_point_type?.name ?? ''}`.trim(),
+                `${formatNumber(BigInt(extra), locale)} ${offer.plan.auto_bonus_point_type ? pointName(offer.plan.auto_bonus_point_type) : ''}`.trim(),
             })}
           </span>
         </div>

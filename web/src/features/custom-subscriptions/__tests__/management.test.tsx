@@ -22,6 +22,7 @@ import userEvent from '@testing-library/user-event'
 import i18next from 'i18next'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { PointNamesContext } from '@/features/points/lib/point-name-context'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -57,7 +58,7 @@ const plan: CustomSubscriptionPlan = {
   bonus_point_type: null,
   auto_bonus_point_type: null,
 }
-function renderPage(confirmed = true, version = 'v1') {
+function renderPage(confirmed = true, version = 'v1', currentName?: string) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   })
@@ -70,7 +71,13 @@ function renderPage(confirmed = true, version = 'v1') {
   })
   render(
     <QueryClientProvider client={client}>
-      <CustomSubscriptions />
+      <PointNamesContext
+        value={
+          currentName ? [{ id: '1', code: 'GENERAL', name: currentName }] : []
+        }
+      >
+        <CustomSubscriptions />
+      </PointNamesContext>
     </QueryClientProvider>
   )
   return client
@@ -95,6 +102,22 @@ beforeEach(() => {
 afterEach(() => useAuthStore.getState().auth.reset())
 
 describe('custom subscription management', () => {
+  it('uses the current catalog name in cached plan rows and their detail drawer', async () => {
+    const user = userEvent.setup()
+    renderPage(true, 'v1', 'Current catalog name')
+    expect(
+      await screen.findByText('Current catalog name (GENERAL)')
+    ).toBeVisible()
+    expect(screen.queryByText('General (GENERAL)')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'View details' }))
+    expect(
+      await within(screen.getByRole('dialog')).findByText(
+        'Current catalog name (GENERAL)'
+      )
+    ).toBeVisible()
+    expect(plan.paid_point_type?.name).toBe('General')
+  })
+
   it('keeps large points exact and shows detail benefits; Escape closes the drawer', async () => {
     const user = userEvent.setup()
     renderPage()

@@ -1,8 +1,27 @@
+/*
+Copyright (C) 2023-2026 QuantumNous
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+For commercial licensing, please contact support@quantumnous.com
+*/
 import type { CSSProperties, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { LoadingState } from '@/components/loading-state'
 import { Button } from '@/components/ui/button'
+import { usePointName } from '@/features/points/lib/point-name-context'
 
 import { formatPoints, type Campaign, type getSummary } from './api'
 import { CampaignRules } from './campaign-rules'
@@ -25,6 +44,7 @@ export function CampaignPanel(props: {
   onActivities: () => void
 }) {
   const { t } = useTranslation()
+  const pointName = usePointName()
   const campaign = props.campaign
   const tiers = campaign ? campaignTiers(campaign) : []
   const effective = BigInt(props.summary?.effective_friends ?? '0')
@@ -87,7 +107,7 @@ export function CampaignPanel(props: {
             {campaign && (
               <>
                 <strong className='iv-point-badge'>
-                  {campaign.reward_point_type.name}
+                  {pointName(campaign.reward_point_type)}
                 </strong>
                 <p>
                   {t(

@@ -21,6 +21,7 @@ import { useTranslation } from 'react-i18next'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { usePointName } from '@/features/points/lib/point-name-context'
 import { toIntlLocale } from '@/i18n/languages'
 import { formatNumber } from '@/lib/format'
 
@@ -36,6 +37,7 @@ export function usePlanColumns(props: {
   isPending: boolean
 }): ColumnDef<CustomSubscriptionPlan, unknown>[] {
   const { t, i18n } = useTranslation()
+  const pointName = usePointName()
   const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
   const points = (amount: string, type: PointTypeOption | null) => (
     <div>
@@ -44,7 +46,7 @@ export function usePlanColumns(props: {
       </span>
       {type && (
         <p className='text-muted-foreground max-w-44 text-xs [overflow-wrap:anywhere] whitespace-normal'>
-          {type.name} ({type.code})
+          {pointName(type)} ({type.code})
         </p>
       )}
     </div>
@@ -121,7 +123,9 @@ export function usePlanColumns(props: {
           {row.original.auto_renew_bonus_bps > 0 && (
             <p>
               {formatNumber(row.original.auto_renew_bonus_bps / 100, locale)}% ·{' '}
-              {row.original.auto_bonus_point_type?.name ?? '—'}
+              {row.original.auto_bonus_point_type
+                ? pointName(row.original.auto_bonus_point_type)
+                : '—'}
             </p>
           )}
           <p className='text-muted-foreground text-xs'>

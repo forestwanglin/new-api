@@ -16,15 +16,25 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { getChannels } from '@/features/channels/api'
 import { api } from '@/lib/api'
 import { requireServerSuccess } from '@/lib/server-error-message'
 
-import type { PointModelRule, PointRuleInput, PointType } from './types'
+import type {
+  PointModelRule,
+  PointRuleInput,
+  PointType,
+  PointPolicyConfig,
+  PointPolicy,
+  PointCatalogItem,
+} from './types'
 
 type PointsResponse<T> = { success: boolean; message?: string; data: T }
 
 export const pointsQueryKeys = {
   types: ['points', 'types'] as const,
+  catalog: ['points', 'catalog'] as const,
+  policy: (typeId: number) => ['points', 'types', typeId, 'policy'] as const,
   rules: (typeId: number) => ['points', 'types', typeId, 'rules'] as const,
 }
 
@@ -68,4 +78,72 @@ export async function deletePointRule(
     `/api/points/types/${typeId}/rules/${ruleId}`
   )
   requireServerSuccess(response.data)
+}
+
+export async function getPointPolicy(
+  typeId: number
+): Promise<PointPolicyConfig> {
+  return requireServerSuccess(
+    (
+      await api.get<PointsResponse<PointPolicyConfig>>(
+        `/api/points/types/${typeId}/policy`
+      )
+    ).data
+  ).data
+}
+export async function savePointPolicy(
+  typeId: number,
+  policy: PointPolicy,
+  configVersion: number
+): Promise<PointPolicyConfig> {
+  return requireServerSuccess(
+    (
+      await api.put<PointsResponse<PointPolicyConfig>>(
+        `/api/points/types/${typeId}/policy`,
+        { policy, config_version: configVersion }
+      )
+    ).data
+  ).data
+}
+export async function renamePointType(
+  typeId: number,
+  name: string,
+  configVersion: number
+): Promise<PointType> {
+  return requireServerSuccess(
+    (
+      await api.patch<PointsResponse<PointType>>(
+        `/api/points/types/${typeId}`,
+        { name, config_version: configVersion }
+      )
+    ).data
+  ).data
+}
+export async function getPointCatalog(): Promise<PointCatalogItem[]> {
+  return requireServerSuccess(
+    (await api.get<PointsResponse<PointCatalogItem[]>>('/api/points/catalog'))
+      .data
+  ).data
+}
+
+export async function getPointChannels(): Promise<
+  { id: string; name: string }[]
+> {
+  const items: { id: string; name: string }[] = []
+  let page = 1
+  while (true) {
+    const result = requireServerSuccess(
+      await getChannels({ p: page, page_size: 100 })
+    )
+    if (!result.data) throw new Error('Failed to load channels')
+    items.push(
+      ...result.data.items.map((item) => ({
+        id: String(item.id),
+        name: item.name,
+      }))
+    )
+    if (items.length >= result.data.total) return items
+    if (!result.data.items.length) throw new Error('Failed to load channels')
+    page += 1
+  }
 }
