@@ -1348,6 +1348,14 @@
 - 验证：Go 1.26.10 定向 SQLite 回归先复现 8 项失败，修复后 `go test ./model -run '^TestInvitationCampaignPointPolicyDatabaseMatrix$/sqlite' -count=1` 全部通过；14 场景覆盖真实创建/编辑器写入、模型/渠道、AND/OR、空/禁用/损坏 canonical 对旧规则的优先级、缺失类型、legacy 回退及 513 条历史规则。真实 SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 16.16 的新增策略矩阵、邀请领域/时间/退款/列表、套餐支付、积分策略编辑/升级及类型 CRUD 共 9 个矩阵全部通过，无数据库跳过；`go test ./model ./controller ./service ./router -run 'Point|Points|Invitation|CustomSubscription' -count=1`、`go vet ./model ./controller`、`go build ./...` 通过。
 - 风险与未覆盖：发布只检查有效启用条件，不做策略可满足性分析，不承诺特定模型/渠道一定匹配；调用仍按实际模型/渠道策略校验。
 
+### Z095 合作入口中文文案调整
+
+- 需求与原因：按用户要求将“联系合作”改为“我要代理”，“合作咨询”改为“渠道合作”。
+- 变更内容：仅替换简体中文翻译值，保留现有翻译键与入口行为。
+- 影响面：`web/src/i18n/locales/zh.json`；**上游自有文件**：该翻译文件。
+- 与上游差异：定制合作入口的简体中文展示文案。
+- 验证：检查差异与目标翻译值；按用户要求不运行测试。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 
