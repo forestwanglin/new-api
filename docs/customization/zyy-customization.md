@@ -1327,6 +1327,17 @@
 - 验证：修复前独立执行 `GOTOOLCHAIN=go1.26.10 go test ./router -run TestUserPointBalancesAPI -count=1`，复现缺少 `external_identity_claims`；修复后独立及组合执行 `go test ./router -run 'TestUserPointBalancesAPI|TestAdminUserPointsAPI|TestPointsAdminAPI' -count=1` 通过；重跑原扩大回归 `GOTOOLCHAIN=go1.26.10 go test ./model ./controller ./service ./router -run 'Point|Points|Invitation|CustomSubscription' -count=1`，四包均通过；`go vet ./router`、gofmt 和 `git diff --check` 通过。
 - 风险与未覆盖：仅调整 SQLite 测试夹具，未变更生产数据库访问、鉴权或错误处理。未来增加列表投影依赖时须同步相关路由测试的有限建表清单，并独立执行此用例。
 
+### Z093 积分类型 CRUD 与引用安全删除
+
+- 需求与原因：控制台“积分管理”调整为“积分类型”，支持类型创建、名称/消费优先级编辑和安全删除；初始化只保留不可删除的 GENERAL。
+- 变更内容：新增 POST/DELETE 类型接口，PATCH 兼容原名称更新并允许可选优先级；类型编码创建后不可修改；新类型默认无适用规则。共享配置版本保护名称、优先级、规则和删除。删除按账户（包括零余额）、套餐/历史订单、邀请活动版本/奖励、调用分配和候选快照逐类校验，失败显示具体原因，成功原子清理自有规则。引用写入使用共享类型锁，删除/配置使用独占锁，避免独立调用被全局串行化。
+- 并发回归修复：初建计费调用改为 encode + INSERT，避免原 GORM Save 对缺失主键先 UPDATE 再 upsert 导致的 InnoDB 间隙锁死锁；同 ID 跨用户竞争返回冲突，保留获胜调用所有者，已有调用更新与同用户幂等读取保持原逻辑。
+- 影响面：积分模型/管理 API、调用准入、套餐/邀请/管理员调账引用入口、路由会话声明、积分页面/菜单/设置及七种 locale。**上游自有文件**包括 `router/api-router.go`、`middleware/access_token_routes.go`、`web/src/hooks/use-sidebar-data.ts`、系统设置菜单组件与七种 locale；完整路径以本次提交为准。
+- 与上游差异：扩展 fork 积分类型管理；继续沿用精确积分账务与分组模型/渠道规则。
+- 开关与默认值：无新环境变量、运行时依赖或运维入口变更。只补建 GENERAL；历史 GPT 原样保留并按普通类型执行删除校验，不自动清理或重建。需要双类型的财务测试显式创建 GPT，不依赖生产默认值。
+- 验证：Go 1.26.10 扩大积分/邀请/订阅回归四包、vet 与 build 通过；真实 SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 16.16 的 CRUD/初始化/代表性升级/财务/订阅/邀请/调账矩阵通过，另在 MySQL 5.7.44 验证旧 SHARE 语法与并发。并发测试覆盖引用提交/回滚对删除、删除对首次调账、不同用户同时持 SHARE 锁、同 ID 跨用户仅一成功且不覆盖；SQLite 单写者不执行多共享行锁重叠断言。前端扩大回归 42 文件/335 测试、最终定向 10 文件/72 测试、类型检查、scoped oxlint/格式检查与生产构建通过；Chrome 验证 CRUD、刷新、取消、GENERAL、零余额账户删除提示、390px 与规则入口。独立代码审查无阻断问题。
+- 风险与未覆盖：历史快照也会阻止删除；损坏快照或引用表查询失败均拒绝删除。旧二进制可能重新创建 GPT，回滚不做任何资产/历史数据清理。升级测试为代表性旧结构，并非线上完整备份。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 
@@ -1336,6 +1347,7 @@
 
 | 区域 | 文件 | 关联条目 |
 |---|---|---|
+| 积分类型 CRUD | `router/api-router.go`、`middleware/access_token_routes.go`、前端侧栏/系统设置组件与七种 locale | Z093 |
 | 积分名称与分组渠道规则 | `router/api-router.go`、`middleware/access_token_routes.go`、`controller/relay.go`、`service/tiered_settle.go`、前端根路由/账户/用户/使用日志组件与七种 locale | Z091 |
 | 客服微信展示文案 | `web/src/i18n/locales/{en,zh,zh-TW,fr,ru,ja,vi}.json` | Z090 |
 | 系统设置返回新手引导 | `web/src/components/layout/config/system-settings.config.ts` | Z089 |

@@ -38,7 +38,7 @@ func RenamePointType(c *gin.Context) {
 	if !ok {
 		return
 	}
-	fields, ok := pointConfigurationInput(c, "name", "config_version")
+	fields, ok := pointConfigurationFields(c, []string{"name", "config_version"}, "consume_priority")
 	if !ok {
 		return
 	}
@@ -48,7 +48,16 @@ func RenamePointType(c *gin.Context) {
 		common.ApiErrorT(c, "Invalid point configuration fields")
 		return
 	}
-	typ, err := model.RenamePointType(typeID, version, name)
+	var priority *int
+	if raw, exists := fields["consume_priority"]; exists {
+		var value int
+		if common.Unmarshal(raw, &value) != nil {
+			common.ApiErrorT(c, "Consumption priority must be a 32-bit integer")
+			return
+		}
+		priority = &value
+	}
+	typ, err := model.UpdatePointType(typeID, version, name, priority)
 	if err != nil {
 		writePointAdminError(c, err)
 		return
@@ -84,15 +93,29 @@ func UpdatePointEligibilityPolicy(c *gin.Context) {
 }
 
 func pointConfigurationInput(c *gin.Context, keys ...string) (map[string]common.RawMessage, bool) {
+	return pointConfigurationFields(c, keys)
+}
+
+func pointConfigurationFields(c *gin.Context, required []string, optional ...string) (map[string]common.RawMessage, bool) {
 	body, err := io.ReadAll(http.MaxBytesReader(c.Writer, c.Request.Body, 64*1024))
 	var fields map[string]common.RawMessage
-	if err != nil || !utf8.Valid(body) || common.Unmarshal(body, &fields) != nil || len(fields) != len(keys) {
+	if err != nil || !utf8.Valid(body) || common.Unmarshal(body, &fields) != nil || len(fields) < len(required) || len(fields) > len(required)+len(optional) {
 		common.ApiErrorT(c, "Invalid point configuration fields")
 		return nil, false
 	}
-	for _, key := range keys {
-		value, exists := fields[key]
-		if !exists || strings.TrimSpace(string(value)) == "null" {
+	allowed := make(map[string]bool, len(required)+len(optional))
+	for _, key := range required {
+		if _, exists := fields[key]; !exists {
+			common.ApiErrorT(c, "Invalid point configuration fields")
+			return nil, false
+		}
+		allowed[key] = true
+	}
+	for _, key := range optional {
+		allowed[key] = true
+	}
+	for key, value := range fields {
+		if !allowed[key] || strings.TrimSpace(string(value)) == "null" {
 			common.ApiErrorT(c, "Invalid point configuration fields")
 			return nil, false
 		}

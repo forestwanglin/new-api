@@ -23,6 +23,50 @@ func GetPointTypes(c *gin.Context) {
 	common.ApiSuccess(c, types)
 }
 
+func CreatePointType(c *gin.Context) {
+	fields, ok := pointConfigurationInput(c, "code", "name", "consume_priority")
+	if !ok {
+		return
+	}
+	var code, name string
+	var priority int
+	if common.Unmarshal(fields["code"], &code) != nil || common.Unmarshal(fields["name"], &name) != nil {
+		common.ApiErrorT(c, "Invalid point configuration fields")
+		return
+	}
+	if common.Unmarshal(fields["consume_priority"], &priority) != nil {
+		common.ApiErrorT(c, "Consumption priority must be a 32-bit integer")
+		return
+	}
+	typ, err := model.CreatePointType(code, name, priority)
+	if err != nil {
+		writePointAdminError(c, err)
+		return
+	}
+	common.ApiSuccess(c, typ)
+}
+
+func DeletePointType(c *gin.Context) {
+	id, ok := pointAdminID(c, "type_id")
+	if !ok {
+		return
+	}
+	fields, ok := pointConfigurationInput(c, "config_version")
+	if !ok {
+		return
+	}
+	var version int64
+	if common.Unmarshal(fields["config_version"], &version) != nil || version <= 0 {
+		common.ApiErrorT(c, "Invalid point configuration fields")
+		return
+	}
+	if err := model.DeletePointType(id, version); err != nil {
+		writePointAdminError(c, err)
+		return
+	}
+	common.ApiSuccess(c, nil)
+}
+
 func GetPointModelRules(c *gin.Context) {
 	typeID, ok := pointAdminID(c, "type_id")
 	if !ok {
@@ -136,6 +180,26 @@ func pointAdminRuleInput(c *gin.Context) (*model.PointModelRule, bool) {
 
 func writePointAdminError(c *gin.Context, err error) {
 	switch {
+	case errors.Is(err, model.ErrInvalidPointTypeCode):
+		common.ApiErrorT(c, "Point type code must start with an uppercase letter and contain only uppercase letters, digits or underscores (1 to 32 characters)")
+	case errors.Is(err, model.ErrInvalidPointPriority):
+		common.ApiErrorT(c, "Consumption priority must be a 32-bit integer")
+	case errors.Is(err, model.ErrPointTypeDuplicate):
+		common.ApiErrorT(c, "Point type code already exists")
+	case errors.Is(err, model.ErrPointTypeProtected):
+		common.ApiErrorT(c, "GENERAL is a system point type and cannot be deleted")
+	case errors.Is(err, model.ErrPointTypeHasAccounts):
+		common.ApiErrorT(c, "Point type is used by user accounts")
+	case errors.Is(err, model.ErrPointTypeHasPlans):
+		common.ApiErrorT(c, "Point type is used by subscription plans")
+	case errors.Is(err, model.ErrPointTypeHasOrders):
+		common.ApiErrorT(c, "Point type is used by subscription orders")
+	case errors.Is(err, model.ErrPointTypeHasCampaigns):
+		common.ApiErrorT(c, "Point type is used by invitation campaigns")
+	case errors.Is(err, model.ErrPointTypeHasRewards):
+		common.ApiErrorT(c, "Point type is used by invitation rewards")
+	case errors.Is(err, model.ErrPointTypeHasCalls):
+		common.ApiErrorT(c, "Point type is used by model billing history")
 	case errors.Is(err, model.ErrPointConfigConflict):
 		common.ApiErrorStatus(c, http.StatusConflict, common.NewMessage("Point configuration changed. Reload and try again."))
 	case errors.Is(err, model.ErrPointPolicyManaged):
@@ -153,6 +217,7 @@ func writePointAdminError(c *gin.Context, err error) {
 	case errors.Is(err, model.ErrPointModelRuleDuplicate):
 		common.ApiErrorT(c, "Point model rule already exists")
 	default:
+		common.SysError("Failed to manage point configuration: " + err.Error())
 		common.ApiErrorT(c, "Failed to manage point configuration")
 	}
 }

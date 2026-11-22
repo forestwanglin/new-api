@@ -46,9 +46,7 @@ describe('points management entry', () => {
     })
     setup()
     expect(await screen.findByText('No point types configured')).toBeVisible()
-    expect(
-      screen.getByRole('heading', { name: 'Points management' })
-    ).toBeVisible()
+    expect(screen.getByRole('heading', { name: 'Point types' })).toBeVisible()
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
     expect(screen.queryByRole('tab')).not.toBeInTheDocument()
     expect(get).toHaveBeenCalledTimes(1)

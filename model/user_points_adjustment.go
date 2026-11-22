@@ -82,7 +82,7 @@ func AdjustUserPoints(userID, operatorID, operatorRole int, typeID int64, mode, 
 		}
 		result.Username = user.Username
 		var pointType PointType
-		if err := tx.First(&pointType, typeID).Error; errors.Is(err, gorm.ErrRecordNotFound) {
+		if err := lockForShare(tx).First(&pointType, typeID).Error; errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrPointTypeNotFound
 		} else if err != nil {
 			return err

@@ -3,6 +3,7 @@ package model
 import (
 	"errors"
 	"math"
+	"slices"
 	"strings"
 
 	"gorm.io/gorm"
@@ -163,13 +164,14 @@ func validateCustomSubscriptionTypes(tx *gorm.DB, input CustomSubscriptionPlanIn
 	if input.AutoBonusPointTypeId != nil {
 		ids = append(ids, *input.AutoBonusPointTypeId)
 	}
-	for _, id := range ids {
-		var count int64
-		if err := tx.Model(&PointType{}).Where("id = ?", id).Count(&count).Error; err != nil {
+	slices.Sort(ids)
+	for _, id := range slices.Compact(ids) {
+		var typ PointType
+		if err := lockForShare(tx).First(&typ, id).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrPointTypeNotFound
+			}
 			return err
-		}
-		if count != 1 {
-			return ErrPointTypeNotFound
 		}
 	}
 	return nil

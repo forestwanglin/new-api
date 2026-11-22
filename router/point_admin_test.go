@@ -30,7 +30,7 @@ func TestPointsAdminAPI(t *testing.T) {
 	sqlDB, err := db.DB()
 	require.NoError(t, err)
 	sqlDB.SetMaxOpenConns(1)
-	require.NoError(t, db.AutoMigrate(&model.PointType{}, &model.PointModelRule{}, &model.User{}, &model.UserSession{}, &model.UserAccessToken{}, &model.AuditLog{}, &model.Option{}))
+	require.NoError(t, db.AutoMigrate(&model.PointType{}, &model.PointModelRule{}, &model.PointAccount{}, &model.CustomSubscriptionPlan{}, &model.CustomSubscriptionOrder{}, &model.InvitationCampaignVersion{}, &model.InvitationReward{}, &model.PointCallBilling{}, &model.User{}, &model.UserSession{}, &model.UserAccessToken{}, &model.AuditLog{}, &model.Option{}))
 	oldDB, oldLogDB, oldType, oldRedis, oldSecret := model.DB, model.LOG_DB, common.MainDatabaseType(), common.RedisEnabled, common.SessionSecret
 	model.DB, model.LOG_DB = db, db
 	common.SetMainDatabaseType(common.DatabaseTypeSQLite)
@@ -82,16 +82,15 @@ func TestPointsAdminAPI(t *testing.T) {
 	other := fmt.Sprintf("/api/points/types/%d/rules", types[0].Id)
 	t.Run("authorization and protected type fields", func(t *testing.T) {
 		for _, route := range []struct{ method, path, body string }{
-			{"GET", "/api/points/types", ""}, {"PATCH", "/api/points/types/1", `{}`}, {"GET", "/api/points/types/1/policy", ""}, {"PUT", "/api/points/types/1/policy", `{}`}, {"GET", base, ""}, {"POST", base, `{"match_type":"EXACT","match_value":"restricted","enabled":true}`}, {"PUT", base + "/1", `{}`}, {"DELETE", base + "/1", ""},
+			{"GET", "/api/points/types", ""}, {"POST", "/api/points/types", `{}`}, {"DELETE", "/api/points/types/1", `{}`}, {"PATCH", "/api/points/types/1", `{}`}, {"GET", "/api/points/types/1/policy", ""}, {"PUT", "/api/points/types/1/policy", `{}`}, {"GET", base, ""}, {"POST", base, `{"match_type":"EXACT","match_value":"restricted","enabled":true}`}, {"PUT", base + "/1", `{}`}, {"DELETE", base + "/1", ""},
 		} {
 			request(t, route.method, route.path, route.body, "", http.StatusUnauthorized)
 			request(t, route.method, route.path, route.body, tokens[common.RoleCommonUser], http.StatusForbidden)
 			request(t, route.method, route.path, route.body, adminPAT, http.StatusForbidden)
 		}
 		assert.True(t, request(t, "GET", "/api/points/types", "", tokens[common.RoleRootUser], 200).Success)
-		for _, method := range []string{"POST", "PUT", "DELETE"} {
-			request(t, method, "/api/points/types", `{}`, admin, 404)
-			request(t, method, "/api/points/types/1", `{}`, admin, 404)
+		for _, route := range []struct{ method, path string }{{"PUT", "/api/points/types"}, {"DELETE", "/api/points/types"}, {"POST", "/api/points/types/1"}, {"PUT", "/api/points/types/1"}} {
+			request(t, route.method, route.path, `{}`, admin, 404)
 		}
 	})
 	t.Run("all types sorted and empty rules", func(t *testing.T) {
@@ -225,6 +224,56 @@ func TestPointsAdminAPI(t *testing.T) {
 		current := request(t, "GET", path+"/policy", "", admin, 200)
 		assert.JSONEq(t, string(saved.Data), string(current.Data), "rejected saves preserve current policy/version")
 		require.NoError(t, db.Table("channels").Delete(&channel{}, 12).Error)
+	})
+
+	t.Run("point type CRUD preserves identity and rejects invalid writes", func(t *testing.T) {
+		created := request(t, "POST", "/api/points/types", `{"code":"RESEARCH","name":"研究积分","consume_priority":12}`, admin, 200)
+		require.True(t, created.Success, created.Message)
+		var typ model.PointType
+		require.NoError(t, common.Unmarshal(created.Data, &typ))
+		path := fmt.Sprintf("/api/points/types/%d", typ.Id)
+		assert.False(t, request(t, "POST", "/api/points/types", `{"code":"RESEARCH","name":"duplicate","consume_priority":0}`, admin, 200).Success)
+		policy := request(t, "GET", path+"/policy", "", admin, 200)
+		require.True(t, policy.Success)
+		var config model.PointEligibilityConfiguration
+		require.NoError(t, common.Unmarshal(policy.Data, &config))
+		assert.False(t, config.Policy.Matches("gpt-any", 12))
+		for _, body := range []string{
+			`{}`, `null`, `[]`, `{"code":"LOWER_case","name":"x","consume_priority":1}`,
+			`{"code":"1FIRST","name":"x","consume_priority":1}`, `{"code":"WITH-HYPHEN","name":"x","consume_priority":1}`,
+			`{"code":"INVALID","name":"x","consume_priority":1.5}`, `{"code":"INVALID","name":"x","consume_priority":2147483648}`,
+			`{"code":"INVALID","name":"x","consume_priority":-2147483649}`, `{"code":"INVALID","name":"x","consume_priority":null}`,
+			`{"code":"INVALID","name":"x","consume_priority":"1"}`, `{"code":"INVALID","name":" x","consume_priority":1}`,
+			`{"code":"INVALID","name":"x","consume_priority":1,"id":1}`, `{"code":"INVALID","name":"x","consume_priority":1} {}`,
+		} {
+			assert.False(t, request(t, "POST", "/api/points/types", body, admin, 200).Success, body)
+		}
+		for _, body := range []string{
+			`{"name":"x","config_version":1,"code":"CHANGED"}`, `{"name":"x","config_version":1,"consume_priority":null}`,
+			`{"name":"x","config_version":1,"consume_priority":2147483648}`, `{"name":"x","config_version":null}`,
+		} {
+			assert.False(t, request(t, "PATCH", path, body, admin, 200).Success, body)
+		}
+		updated := request(t, "PATCH", path, `{"name":"Updated","consume_priority":0,"config_version":1}`, admin, 200)
+		require.True(t, updated.Success, updated.Message)
+		require.NoError(t, common.Unmarshal(updated.Data, &typ))
+		assert.Equal(t, "RESEARCH", typ.Code)
+		assert.Zero(t, typ.ConsumePriority)
+		assert.EqualValues(t, 2, typ.ConfigVersion)
+		assert.False(t, request(t, "DELETE", path, `{"config_version":1}`, admin, http.StatusConflict).Success)
+		for _, body := range []string{`{}`, `null`, `{"config_version":null}`, `{"config_version":0}`, `{"config_version":"2"}`, `{"config_version":2,"force":true}`, `{"config_version":2} {}`} {
+			assert.False(t, request(t, "DELETE", path, body, admin, 200).Success, body)
+		}
+		require.NoError(t, db.Create(&model.PointAccount{UserId: 1, PointTypeId: typ.Id}).Error)
+		used := request(t, "DELETE", path, `{"config_version":2}`, admin, 200)
+		assert.False(t, used.Success)
+		assert.Contains(t, used.Message, "user accounts")
+		require.NoError(t, db.Where("point_type_id = ?", typ.Id).Delete(&model.PointAccount{}).Error)
+		assert.True(t, request(t, "DELETE", path, `{"config_version":2}`, admin, 200).Success)
+		assert.False(t, request(t, "DELETE", path, `{"config_version":2}`, admin, 200).Success)
+		protected := request(t, "DELETE", fmt.Sprintf("/api/points/types/%d", types[0].Id), `{"config_version":1}`, admin, 200)
+		assert.False(t, protected.Success)
+		assert.Contains(t, protected.Message, "system point type")
 	})
 
 }

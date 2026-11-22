@@ -96,3 +96,20 @@ export const pointPolicySchema = z
   )
 
 export type PointPolicyFormValues = z.infer<typeof pointPolicySchema>
+
+export const pointCodeSchema = z
+  .string()
+  .regex(
+    /^[A-Z][A-Z0-9_]{0,31}$/,
+    'Point type code must start with an uppercase letter and contain only uppercase letters, digits or underscores (1 to 32 characters)'
+  )
+
+export const pointPrioritySchema = z
+  .string()
+  .refine(
+    (value) =>
+      /^-?\d+$/.test(value) &&
+      Number(value) >= -2147483648 &&
+      Number(value) <= 2147483647,
+    'Consumption priority must be a 32-bit integer'
+  )

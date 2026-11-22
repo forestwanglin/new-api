@@ -18,7 +18,11 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { describe, expect, it } from 'vitest'
 
-import { pointRuleSchema } from '../lib/schema'
+import {
+  pointRuleSchema,
+  pointCodeSchema,
+  pointPrioritySchema,
+} from '../lib/schema'
 
 describe('point rule validation', () => {
   it.each([
@@ -72,4 +76,25 @@ describe('point rule validation', () => {
         .success
     ).toBe(false)
   })
+})
+
+describe('point type validation', () => {
+  it.each(['', 'image', '1IMAGE', 'IMAGE-CREDIT', ' IMAGE', 'I'.repeat(33)])(
+    'rejects invalid immutable code %j',
+    (code) => {
+      expect(pointCodeSchema.safeParse(code).success).toBe(false)
+    }
+  )
+  it.each(['', '1.5', '2147483648', '-2147483649', '1e2'])(
+    'rejects invalid priority %j',
+    (priority) => {
+      expect(pointPrioritySchema.safeParse(priority).success).toBe(false)
+    }
+  )
+  it.each(['-2147483648', '0', '2147483647'])(
+    'accepts signed int32 priority boundary %j',
+    (priority) => {
+      expect(pointPrioritySchema.safeParse(priority).success).toBe(true)
+    }
+  )
 })

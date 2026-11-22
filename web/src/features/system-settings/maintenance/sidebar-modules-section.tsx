@@ -173,7 +173,7 @@ export function SidebarModulesSection({
         description: t('Administer user accounts and roles.'),
       },
       points: {
-        title: t('Points management'),
+        title: t('Point types'),
         description: t('Manage supported models for each point type.'),
       },
       setting: {

@@ -88,7 +88,7 @@ describe('points sidebar', () => {
     )
     const links = screen.getAllByRole('link')
     const users = links.findIndex((link) => link.textContent === 'Users')
-    expect(links[users + 1]).toHaveTextContent('Points management')
+    expect(links[users + 1]).toHaveTextContent('Point types')
     expect(links[users + 1]).toHaveAttribute('href', '/points')
   })
   it.each([
@@ -98,13 +98,13 @@ describe('points sidebar', () => {
   ])('respects admin and user disablement (%j, %j)', async (admin, user) => {
     await renderSidebar(ROLE.ADMIN, admin, user)
     expect(
-      screen.queryByRole('link', { name: 'Points management' })
+      screen.queryByRole('link', { name: 'Point types' })
     ).not.toBeInTheDocument()
   })
   it('hides Points from ordinary users', async () => {
     await renderSidebar(ROLE.USER)
     expect(
-      screen.queryByRole('link', { name: 'Points management' })
+      screen.queryByRole('link', { name: 'Point types' })
     ).not.toBeInTheDocument()
   })
   it('defaults the maintenance setting on and preserves a saved false', () => {

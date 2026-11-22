@@ -47,9 +47,9 @@ func TestPointsInitializationRollsBackFailedRule(t *testing.T) {
 	require.NoError(t, db.Callback().Create().Remove(callback))
 	require.NoError(t, initializePointTypes(db))
 	require.NoError(t, db.Model(&PointType{}).Count(&count).Error)
-	assert.EqualValues(t, 2, count)
+	assert.EqualValues(t, 1, count)
 	require.NoError(t, db.Model(&PointModelRule{}).Count(&count).Error)
-	assert.EqualValues(t, 2, count, "a later startup must be able to retry initialization")
+	assert.EqualValues(t, 1, count, "a later startup must be able to retry initialization")
 }
 
 func TestPointsDatabaseMatrix(t *testing.T) {
@@ -126,11 +126,15 @@ func TestPointsDatabaseMatrix(t *testing.T) {
 					assert.False(t, db.Migrator().HasTable("point_ledgers"))
 					var types []PointType
 					require.NoError(t, db.Order("consume_priority").Find(&types).Error)
-					require.Len(t, types, 2)
-					assert.Equal(t, PointTypeGPT, types[0].Code)
-					assert.Equal(t, 10, types[0].ConsumePriority)
-					assert.Equal(t, PointTypeGeneral, types[1].Code)
-					assert.Equal(t, 100, types[1].ConsumePriority)
+					require.Len(t, types, 1)
+					assert.Equal(t, PointTypeGeneral, types[0].Code)
+					assert.Equal(t, 100, types[0].ConsumePriority)
+					// Explicit legacy GPT fixture preserves two-type persistence and
+					// operator-configuration coverage without reseeding GPT at startup.
+					legacyGPT := PointType{Code: PointTypeGPT, Name: "Legacy GPT", ConsumePriority: 10}
+					require.NoError(t, db.Create(&legacyGPT).Error)
+					require.NoError(t, db.Create(&PointModelRule{PointTypeId: legacyGPT.Id, MatchType: PointMatchPattern, MatchValue: "gpt-*", Enabled: true}).Error)
+					types = []PointType{legacyGPT, types[0]}
 					assert.GreaterOrEqual(t, types[0].CreatedAt, time.Now().Add(-time.Minute).UnixMilli())
 					var rules []PointModelRule
 					require.NoError(t, db.Order("point_type_id").Find(&rules).Error)
@@ -544,6 +548,10 @@ func testPointCallFinancialLifecycle(t *testing.T, dialect string) {
 	require.NoError(t, db.Create(&user).Error)
 	token := Token{UserId: user.Id, Key: "point-call-key", RemainQuota: 100, Status: common.TokenStatusEnabled, ExpiredTime: -1}
 	require.NoError(t, db.Create(&token).Error)
+	// This financial scenario explicitly needs two independent point accounts.
+	gptFixture := PointType{Code: PointTypeGPT, Name: "GPT", ConsumePriority: 10}
+	require.NoError(t, db.Create(&gptFixture).Error)
+	require.NoError(t, db.Create(&PointModelRule{PointTypeId: gptFixture.Id, MatchType: PointMatchPattern, MatchValue: "gpt-*", Enabled: true}).Error)
 	var general, gpt PointType
 	require.NoError(t, db.Where("code = ?", PointTypeGeneral).First(&general).Error)
 	require.NoError(t, db.Where("code = ?", PointTypeGPT).First(&gpt).Error)

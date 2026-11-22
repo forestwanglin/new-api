@@ -26,7 +26,7 @@ import { api } from '@/lib/api'
 
 import { pointsQueryKeys } from '../api'
 import { PointPolicyEditor } from '../components/point-policy-editor'
-import { PointRenameDialog } from '../components/point-rename-dialog'
+import { PointTypeDialog } from '../components/point-type-dialog'
 import { PointNamesProvider } from '../point-names-provider'
 import type { PointPolicyConfig } from '../types'
 
@@ -207,7 +207,7 @@ describe('point editor concurrent refresh', () => {
     ).toHaveValue('my-draft')
     expect(onClose).not.toHaveBeenCalled()
   })
-  it('keeps the rename base version when the type directory refreshes', async () => {
+  it('keeps the edit version and priority draft when the type directory refreshes', async () => {
     const patch = vi.spyOn(api, 'patch').mockResolvedValue({
       data: {
         success: false,
@@ -229,8 +229,12 @@ describe('point editor concurrent refresh', () => {
     const onClose = vi.fn()
     const content = (version: number) => (
       <QueryClientProvider client={client}>
-        <PointRenameDialog
-          pointType={{ ...pointType, config_version: version }}
+        <PointTypeDialog
+          pointType={{
+            ...pointType,
+            config_version: version,
+            consume_priority: version === 7 ? 100 : 200,
+          }}
           onClose={onClose}
         />
       </QueryClientProvider>
@@ -240,6 +244,9 @@ describe('point editor concurrent refresh', () => {
       target: { value: 'My draft name' },
     })
     view.rerender(content(8))
+    expect(
+      screen.getByRole('spinbutton', { name: 'Consumption priority' })
+    ).toHaveValue(100)
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Point configuration changed.'
@@ -261,7 +268,7 @@ describe('point rename and directory presentation', () => {
       .mockResolvedValue({ data: { success: true, data: {} } })
     const onClose = vi.fn()
     const client = setup(
-      <PointRenameDialog
+      <PointTypeDialog
         pointType={{
           id: 1,
           code: 'GENERAL',

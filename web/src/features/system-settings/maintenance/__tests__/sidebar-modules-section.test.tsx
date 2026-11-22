@@ -42,7 +42,5 @@ it('uses the points management label without changing the sidebar module setting
     </QueryClientProvider>
   )
 
-  expect(
-    screen.getByRole('switch', { name: 'Points management' })
-  ).toBeVisible()
+  expect(screen.getByRole('switch', { name: 'Point types' })).toBeVisible()
 })

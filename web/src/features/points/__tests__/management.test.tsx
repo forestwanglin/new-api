@@ -57,7 +57,7 @@ function setup(element: React.ReactNode) {
 }
 
 describe('points management', () => {
-  it('renders future database types with read-only metadata and a model management action', async () => {
+  it('renders future database types with CRUD and model management actions', async () => {
     vi.spyOn(api, 'get').mockResolvedValue({
       data: { success: true, data: [pointType] },
     })
@@ -69,11 +69,7 @@ describe('points management', () => {
     expect(
       screen.getByRole('button', { name: 'Manage model rules' })
     ).toBeEnabled()
-    expect(
-      screen.queryByRole('button', {
-        name: /add point type|delete point type|edit point type/i,
-      })
-    ).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add point type' })).toBeEnabled()
   })
 
   it('shows an explicit empty type state', async () => {

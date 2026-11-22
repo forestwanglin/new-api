@@ -251,7 +251,7 @@ func validateCampaign(in InvitationCampaignInput) error {
 }
 func validateInvitationPointType(tx *gorm.DB, id int64, publish bool) error {
 	var pt PointType
-	if err := tx.First(&pt, id).Error; err != nil {
+	if err := lockForShare(tx).First(&pt, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrInvitationPointType
 		}

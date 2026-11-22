@@ -99,25 +99,7 @@ func updatePointTypeConfiguration(tx *gorm.DB, typ *PointType, fields map[string
 }
 
 func RenamePointType(typeID, expectedVersion int64, name string) (*PointType, error) {
-	if !pointConfigurationText(name, 64) {
-		return nil, ErrInvalidPointTypeName
-	}
-	var saved *PointType
-	err := DB.Transaction(func(tx *gorm.DB) error {
-		typ, err := pointTypeConfigForUpdate(tx, typeID)
-		if err != nil {
-			return err
-		}
-		if expectedVersion != typ.ConfigVersion {
-			return ErrPointConfigConflict
-		}
-		if err := updatePointTypeConfiguration(tx, typ, map[string]any{"name": name}); err != nil {
-			return err
-		}
-		saved = typ
-		return nil
-	})
-	return saved, err
+	return UpdatePointType(typeID, expectedVersion, name, nil)
 }
 
 func UpdatePointEligibilityPolicy(typeID, expectedVersion int64, policy *PointEligibilityPolicy) (*PointEligibilityConfiguration, error) {

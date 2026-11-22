@@ -61,3 +61,8 @@ export type PointPolicy = {
 }
 export type PointPolicyConfig = { policy: PointPolicy; config_version: number }
 export type PointCatalogItem = { id: string; code: string; name: string }
+
+export type PointTypeInput = Pick<
+  PointType,
+  'code' | 'name' | 'consume_priority'
+>

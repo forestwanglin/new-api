@@ -26,6 +26,10 @@ func TestCustomSubscriptionPaymentDatabaseMatrix(t *testing.T) {
 			})
 			require.NoError(t, db.AutoMigrate(&User{}, &TopUp{}))
 			require.NoError(t, migratePoints(db))
+			// Payment split/merge cases require a second currency; startup only seeds GENERAL.
+			gpt := PointType{Code: PointTypeGPT, Name: "GPT 专用积分", ConsumePriority: 10}
+			require.NoError(t, db.Create(&gpt).Error)
+			require.NoError(t, db.Create(&PointModelRule{PointTypeId: gpt.Id, MatchType: PointMatchPattern, MatchValue: "gpt-*", Enabled: true}).Error)
 			require.NoError(t, migrateInvitations(db))
 			require.NoError(t, migrateCustomSubscriptions(db))
 			require.NoError(t, migrateCustomSubscriptions(db))

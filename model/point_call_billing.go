@@ -4,10 +4,12 @@ package model
 // call, optional task, token, then point accounts in ascending type ID. Priority
 // controls allocation only. No cache or log write participates in this commit.
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"math"
 	"math/big"
+	"slices"
 	"sort"
 	"strconv"
 	"time"
@@ -318,12 +320,18 @@ func CreatePointCallForRoute(id string, userID, tokenID int, model, rate, unit s
 		}
 		var types []PointType
 		var rules []PointModelRule
-		if e := tx.Order("consume_priority DESC, id ASC").Find(&types).Error; e != nil {
+		if e := lockForShare(tx).Order("id ASC").Find(&types).Error; e != nil {
 			return e
 		}
-		if e := tx.Find(&rules).Error; e != nil {
+		if e := lockForShare(tx).Find(&rules).Error; e != nil {
 			return e
 		}
+		slices.SortFunc(types, func(a, b PointType) int {
+			if priority := cmp.Compare(b.ConsumePriority, a.ConsumePriority); priority != 0 {
+				return priority
+			}
+			return cmp.Compare(a.Id, b.Id)
+		})
 		snapshot := pointCallEligibilitySnapshot{Version: 1, Types: make([]pointCallEligibilityType, 0, len(types))}
 		for _, typ := range types {
 			policy, err := ResolvePointEligibilityPolicy(typ, rules)
@@ -358,7 +366,20 @@ func CreatePointCallForRoute(id string, userID, tokenID int, model, rate, unit s
 		}
 		snapshotJSON := string(encoded)
 		c := PointCallBilling{ID: id, UserID: userID, TokenID: tokenID, ChannelID: channelID, Group: group, Model: model, Rate: rate, Unit: unit, State: "reserved", Dispatch: "unsubmitted", EligibilitySnapshot: &snapshotJSON}
-		return pointCallSave(tx, &c, a)
+		// Creation must be INSERT-only: Save first UPDATEs an absent primary key,
+		// taking an InnoDB gap lock that can deadlock unrelated concurrent calls
+		// during its fallback INSERT. An upsert would also overwrite a different
+		// owner's call if two users concurrently supplied the same new identity.
+		if err := pointCallEncode(&c, a); err != nil {
+			return err
+		}
+		if err := tx.Create(&c).Error; err != nil {
+			if errors.Is(pointRuleWriteError(err), ErrPointModelRuleDuplicate) {
+				return ErrPointCallConflict
+			}
+			return err
+		}
+		return nil
 	})
 }
 

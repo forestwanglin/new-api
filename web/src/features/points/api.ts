@@ -27,6 +27,7 @@ import type {
   PointPolicyConfig,
   PointPolicy,
   PointCatalogItem,
+  PointTypeInput,
 } from './types'
 
 type PointsResponse<T> = { success: boolean; message?: string; data: T }
@@ -105,20 +106,52 @@ export async function savePointPolicy(
     ).data
   ).data
 }
-export async function renamePointType(
+export async function createPointType(
+  values: PointTypeInput
+): Promise<PointType> {
+  const response = await api.post<PointsResponse<PointType>>(
+    '/api/points/types',
+    {
+      code: values.code,
+      name: values.name,
+      consume_priority: values.consume_priority,
+    }
+  )
+  return requireServerSuccess(response.data).data
+}
+
+export async function updatePointType(
   typeId: number,
   name: string,
-  configVersion: number
+  configVersion: number,
+  consumePriority?: number
 ): Promise<PointType> {
-  return requireServerSuccess(
-    (
-      await api.patch<PointsResponse<PointType>>(
-        `/api/points/types/${typeId}`,
-        { name, config_version: configVersion }
-      )
-    ).data
-  ).data
+  const response = await api.patch<PointsResponse<PointType>>(
+    `/api/points/types/${typeId}`,
+    {
+      name,
+      config_version: configVersion,
+      ...(consumePriority === undefined
+        ? {}
+        : { consume_priority: consumePriority }),
+    }
+  )
+  return requireServerSuccess(response.data).data
 }
+
+export async function deletePointType(
+  typeId: number,
+  configVersion: number
+): Promise<void> {
+  const response = await api.delete<PointsResponse<unknown>>(
+    `/api/points/types/${typeId}`,
+    {
+      data: { config_version: configVersion },
+    }
+  )
+  requireServerSuccess(response.data)
+}
+
 export async function getPointCatalog(): Promise<PointCatalogItem[]> {
   return requireServerSuccess(
     (await api.get<PointsResponse<PointCatalogItem[]>>('/api/points/catalog'))

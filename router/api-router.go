@@ -485,6 +485,8 @@ func SetApiRouter(router *gin.Engine) {
 		pointsRoute.Use(middleware.AdminAuth(), middleware.DisableCache())
 		{
 			pointsRoute.GET("/types", controller.GetPointTypes)
+			pointsRoute.POST("/types", controller.CreatePointType)
+			pointsRoute.DELETE("/types/:type_id", controller.DeletePointType)
 			pointsRoute.PATCH("/types/:type_id", controller.RenamePointType)
 			pointsRoute.GET("/types/:type_id/policy", controller.GetPointEligibilityPolicy)
 			pointsRoute.PUT("/types/:type_id/policy", controller.UpdatePointEligibilityPolicy)

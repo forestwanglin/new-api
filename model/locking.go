@@ -23,3 +23,13 @@ func lockForUpdate(tx *gorm.DB) *gorm.DB {
 	}
 	return tx.Clauses(clause.Locking{Strength: "UPDATE"})
 }
+
+// lockForShare protects referenced rows against deletion while allowing unrelated
+// writers to establish references concurrently. The MySQL driver translates this
+// to LOCK IN SHARE MODE on server versions without FOR SHARE.
+func lockForShare(tx *gorm.DB) *gorm.DB {
+	if common.UsingMainDatabase(common.DatabaseTypeSQLite) {
+		return tx
+	}
+	return tx.Clauses(clause.Locking{Strength: "SHARE"})
+}

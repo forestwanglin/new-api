@@ -338,6 +338,8 @@ var accessTokenRouteRules = map[string]accessTokenRouteRule{
 	"PATCH /api/points/types/:type_id":                                  accessTokenSessionRule,
 	"GET /api/points/types/:type_id/policy":                             accessTokenSessionRule,
 	"PUT /api/points/types/:type_id/policy":                             accessTokenSessionRule,
+	"POST /api/points/types":                                            accessTokenSessionRule,
+	"DELETE /api/points/types/:type_id":                                 accessTokenSessionRule,
 	"GET /api/points/types":                                             accessTokenSessionRule,
 	"GET /api/points/types/:type_id/rules":                              accessTokenSessionRule,
 	"POST /api/points/types/:type_id/rules":                             accessTokenSessionRule,

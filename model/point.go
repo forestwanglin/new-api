@@ -146,7 +146,6 @@ func initializePointTypes(db *gorm.DB) error {
 		pattern   PointModelMatchValue
 	}{
 		{PointType{Code: PointTypeGeneral, Name: "通用积分", ConsumePriority: 100}, "*"},
-		{PointType{Code: PointTypeGPT, Name: "GPT 专用积分", ConsumePriority: 10}, "gpt-*"},
 	} {
 		err := db.Transaction(func(tx *gorm.DB) error {
 			var existing PointType

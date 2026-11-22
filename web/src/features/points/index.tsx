@@ -31,14 +31,18 @@ import { formatNumber } from '@/lib/format'
 import { getServerErrorMessage } from '@/lib/server-error-message'
 
 import { getPointTypes, pointsQueryKeys } from './api'
-import { PointRenameDialog } from './components/point-rename-dialog'
+import { PointDeleteDialog } from './components/point-delete-dialog'
 import { PointRulesDialog } from './components/point-rules-dialog'
+import { PointTypeDialog } from './components/point-type-dialog'
 import type { PointType } from './types'
 
 export function Points() {
   const { t, i18n } = useTranslation()
   const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
-  const [renameType, setRenameType] = useState<PointType | null>(null)
+  const [editType, setEditType] = useState<PointType | null | undefined>(
+    undefined
+  )
+  const [deleteType, setDeleteType] = useState<PointType | null>(null)
   const [selectedType, setSelectedType] = useState<PointType | null>(null)
   const query = useQuery({
     queryKey: pointsQueryKeys.types,
@@ -84,9 +88,9 @@ export function Points() {
                 <Button
                   variant='outline'
                   size='sm'
-                  onClick={() => setRenameType(type)}
+                  onClick={() => setEditType(type)}
                 >
-                  {t('Rename point type')}
+                  {t('Edit point type')}
                 </Button>
                 <Button
                   variant='outline'
@@ -95,6 +99,27 @@ export function Points() {
                 >
                   {t('Manage model rules')}
                 </Button>
+                <Button
+                  variant='outline'
+                  size='sm'
+                  disabled={type.code === 'GENERAL'}
+                  aria-describedby={
+                    type.code === 'GENERAL'
+                      ? `point-type-protected-${type.id}`
+                      : undefined
+                  }
+                  onClick={() => setDeleteType(type)}
+                >
+                  {t('Delete point type')}
+                </Button>
+                {type.code === 'GENERAL' && (
+                  <span
+                    id={`point-type-protected-${type.id}`}
+                    className='sr-only'
+                  >
+                    {t('GENERAL is a system point type and cannot be deleted')}
+                  </span>
+                )}
               </div>
             ),
           },
@@ -105,21 +130,34 @@ export function Points() {
 
   return (
     <SectionPageLayout fixedContent>
-      <SectionPageLayout.Title>
-        {t('Points management')}
-      </SectionPageLayout.Title>
+      <SectionPageLayout.Title>{t('Point types')}</SectionPageLayout.Title>
       <SectionPageLayout.Content>
         <p className='text-muted-foreground mb-4 text-sm'>
           {t(
-            'Rename point types and configure model and channel conditions with grouped OR/AND rules.'
+            'Create and edit point types, configure model and channel rules, and delete unused types.'
           )}
         </p>
+        <p className='text-muted-foreground mb-4 text-sm'>
+          {t('GENERAL is a system point type and cannot be deleted')}
+        </p>
+        <div className='mb-4 flex flex-wrap justify-end gap-2'>
+          <Button onClick={() => setEditType(null)}>
+            {t('Add point type')}
+          </Button>
+        </div>
         {content}
-        {renameType && (
-          <PointRenameDialog
-            key={renameType.id}
-            pointType={renameType}
-            onClose={() => setRenameType(null)}
+        {editType !== undefined && (
+          <PointTypeDialog
+            key={editType?.id ?? 'new'}
+            pointType={editType}
+            onClose={() => setEditType(undefined)}
+          />
+        )}
+        {deleteType && (
+          <PointDeleteDialog
+            key={deleteType.id}
+            pointType={deleteType}
+            onClose={() => setDeleteType(null)}
           />
         )}
         {selectedType && (
