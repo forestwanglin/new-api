@@ -1338,6 +1338,16 @@
 - 验证：Go 1.26.10 扩大积分/邀请/订阅回归四包、vet 与 build 通过；真实 SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 16.16 的 CRUD/初始化/代表性升级/财务/订阅/邀请/调账矩阵通过，另在 MySQL 5.7.44 验证旧 SHARE 语法与并发。并发测试覆盖引用提交/回滚对删除、删除对首次调账、不同用户同时持 SHARE 锁、同 ID 跨用户仅一成功且不覆盖；SQLite 单写者不执行多共享行锁重叠断言。前端扩大回归 42 文件/335 测试、最终定向 10 文件/72 测试、类型检查、scoped oxlint/格式检查与生产构建通过；Chrome 验证 CRUD、刷新、取消、GENERAL、零余额账户删除提示、390px 与规则入口。独立代码审查无阻断问题。
 - 风险与未覆盖：历史快照也会阻止删除；损坏快照或引用表查询失败均拒绝删除。旧二进制可能重新创建 GPT，回滚不做任何资产/历史数据清理。升级测试为代表性旧结构，并非线上完整备份。
 
+### Z094 邀请活动发布兼容积分分组规则
+
+- 需求与原因：新积分类型使用 canonical 模型/渠道分组规则，邀请发布仍统计旧 `PointModelRule`，误报“邀请奖励积分类型无效”；残留旧规则还会错误放行显式空或禁用的 canonical 配置。
+- 变更内容：发布校验复用 `ResolvePointEligibilityPolicy`，canonical 优先、空旧存储回退 legacy；有效策略中至少存在启用分组及启用条件才允许发布。损坏策略安全拒绝。保留类型共享锁、草稿仅校验类型存在、活动版本/区间校验；不改变消费匹配或财务逻辑。
+- 影响面：`model/invitation.go`、新增 `model/invitation_point_policy_test.go`；**上游自有文件**无（修改 fork 邀请领域文件）。
+- 与上游差异：修复 fork 邀请模块对 fork 分组积分策略的集成，沿用现有接口与错误码。
+- 开关与默认值：无新增配置、依赖、迁移或部署变更；未配置可消费规则的新类型仍不能发布活动，legacy 规则不受编辑器数量上限限制。
+- 验证：Go 1.26.10 定向 SQLite 回归先复现 8 项失败，修复后 `go test ./model -run '^TestInvitationCampaignPointPolicyDatabaseMatrix$/sqlite' -count=1` 全部通过；14 场景覆盖真实创建/编辑器写入、模型/渠道、AND/OR、空/禁用/损坏 canonical 对旧规则的优先级、缺失类型、legacy 回退及 513 条历史规则。真实 SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 16.16 的新增策略矩阵、邀请领域/时间/退款/列表、套餐支付、积分策略编辑/升级及类型 CRUD 共 9 个矩阵全部通过，无数据库跳过；`go test ./model ./controller ./service ./router -run 'Point|Points|Invitation|CustomSubscription' -count=1`、`go vet ./model ./controller`、`go build ./...` 通过。
+- 风险与未覆盖：发布只检查有效启用条件，不做策略可满足性分析，不承诺特定模型/渠道一定匹配；调用仍按实际模型/渠道策略校验。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 

@@ -258,13 +258,27 @@ func validateInvitationPointType(tx *gorm.DB, id int64, publish bool) error {
 		return err
 	}
 	if publish {
-		var count int64
-		if err := tx.Model(&PointModelRule{}).Where("point_type_id = ? AND enabled = ?", id, true).Count(&count).Error; err != nil {
-			return err
+		var rules []PointModelRule
+		if pt.EligibilityPolicy == nil || *pt.EligibilityPolicy == "" {
+			if err := tx.Where("point_type_id = ?", id).Find(&rules).Error; err != nil {
+				return err
+			}
 		}
-		if count == 0 {
+		policy, err := ResolvePointEligibilityPolicy(pt, rules)
+		if err != nil || ValidatePointEligibilitySnapshotPolicy(policy) != nil {
 			return ErrInvitationPointType
 		}
+		for _, group := range policy.Groups {
+			if !group.Enabled {
+				continue
+			}
+			for _, condition := range group.Conditions {
+				if condition.Enabled {
+					return nil
+				}
+			}
+		}
+		return ErrInvitationPointType
 	}
 	return nil
 }
