@@ -1,9 +1,11 @@
 package model
 
 import (
+	"errors"
 	"fmt"
 	"github.com/QuantumNous/new-api/common"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 	"math"
 	"testing"
 	"time"
@@ -123,6 +125,88 @@ func TestInvitationAdminListsDatabaseMatrix(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, second.Items, 1)
 			require.Equal(t, "1", second.Items[0].Id)
+		})
+	}
+}
+
+func TestInvitationRewardAdminIdentityDatabaseMatrix(t *testing.T) {
+	for _, dialect := range []string{"sqlite", "mysql", "postgres"} {
+		t.Run(dialect, func(t *testing.T) {
+			db := invitationDomainTestDB(t, dialect)
+			require.NoError(t, migrateInvitations(db))
+			users := []User{
+				{Id: 41, AffCode: "identity-41", Username: "payer-account", DisplayName: "支付昵称", Email: "payer-private@example.test", Password: "private-password"},
+				{Id: 42, AffCode: "identity-42", Username: "inviter-account"},
+				{Id: 43, AffCode: "identity-43", Username: "deleted-account", DisplayName: "Deleted name"},
+				{Id: 44, AffCode: "identity-44", Username: "unrelated-account", DisplayName: "Unrelated"},
+			}
+			require.NoError(t, db.Create(&users).Error)
+			require.NoError(t, db.Delete(&users[2]).Error)
+			for _, reward := range []InvitationReward{
+				{Id: 1, OrderId: 1, InviteeId: 41, InviterId: 42, CampaignId: 1, PaidAt: 1794000000001, ReleaseAt: 1794604800001, Status: InvitationRewardFrozen},
+				{Id: 2, OrderId: 2, InviteeId: 43, InviterId: 999, CampaignId: 1, PaidAt: 1794000000002, ReleaseAt: 1794604800002, Status: InvitationRewardCancelled},
+				{Id: 3, OrderId: 3, InviteeId: 44, InviterId: 42, CampaignId: 2, PaidAt: 1794000000003, ReleaseAt: 1794604800003, Status: InvitationRewardReleased},
+			} {
+				require.NoError(t, db.Create(&reward).Error)
+			}
+
+			first, err := ListInvitationRewards(1, true, 1, 1, 1)
+			require.NoError(t, err)
+			require.Equal(t, "2", first.Total)
+			require.Len(t, first.Items, 1)
+			require.Equal(t, "2", first.Items[0].Id)
+			payload, err := common.Marshal(first.Items[0])
+			require.NoError(t, err)
+			var row map[string]any
+			require.NoError(t, common.Unmarshal(payload, &row))
+			require.Equal(t, map[string]any{"id": "43", "name": ""}, row["payer"], "deleted payer retains only its stable ID")
+			require.Equal(t, map[string]any{"id": "999", "name": ""}, row["inviter"], "missing inviter does not remove historical reward")
+			require.Equal(t, "1794000000002", row["paid_at"])
+			require.Equal(t, "1794604800002", row["release_at"])
+
+			second, err := ListInvitationRewards(1, true, 2, 1, 1)
+			require.NoError(t, err)
+			require.Equal(t, "2", second.Total)
+			require.Len(t, second.Items, 1)
+			require.Equal(t, "1", second.Items[0].Id)
+			payload, err = common.Marshal(second.Items[0])
+			require.NoError(t, err)
+			require.NoError(t, common.Unmarshal(payload, &row))
+			require.Equal(t, map[string]any{"id": "41", "name": "支付昵称"}, row["payer"])
+			require.Equal(t, map[string]any{"id": "42", "name": "inviter-account"}, row["inviter"])
+			require.Equal(t, "1794000000001", row["paid_at"])
+			require.Equal(t, "1794604800001", row["release_at"])
+			require.NotContains(t, string(payload), "payer-private")
+			require.NotContains(t, string(payload), "private-password")
+			require.NotContains(t, string(payload), "payer-account", "display name takes precedence over username")
+
+			self, err := ListInvitationRewards(42, false, 1, 20)
+			require.NoError(t, err)
+			require.Equal(t, "2", self.Total)
+			require.Len(t, self.Items, 2)
+			require.Equal(t, "3", self.Items[0].Id)
+			require.Equal(t, "1", self.Items[1].Id)
+			payload, err = common.Marshal(self)
+			require.NoError(t, err)
+			require.NotContains(t, string(payload), "\"payer\"")
+			require.NotContains(t, string(payload), "\"inviter\"")
+			require.NotContains(t, string(payload), "支付昵称")
+			require.NotContains(t, string(payload), "inviter-account")
+			require.Equal(t, "Friend #41", self.Items[1].InviteeLabel)
+
+			lookupErr := errors.New("account lookup unavailable")
+			require.NoError(t, db.Callback().Query().Before("gorm:query").Register("test:invitation_identity_lookup_failure", func(tx *gorm.DB) {
+				if tx.Statement.Table == "users" {
+					_ = tx.AddError(lookupErr)
+				}
+			}))
+			t.Cleanup(func() { require.NoError(t, db.Callback().Query().Remove("test:invitation_identity_lookup_failure")) })
+			_, err = ListInvitationRewards(1, true, 1, 1, 1)
+			require.ErrorIs(t, err, lookupErr, "database errors cannot masquerade as deleted users")
+			self, err = ListInvitationRewards(42, false, 1, 20)
+			require.NoError(t, err, "self listing never looks up account identities")
+			require.Equal(t, "2", self.Total)
+
 		})
 	}
 }

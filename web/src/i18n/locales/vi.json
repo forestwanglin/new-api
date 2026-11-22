@@ -1,5 +1,9 @@
 {
   "translation": {
+    "Paying user": "Người thanh toán",
+    "Inviting user": "Người mời",
+    "Payment time": "Thời gian thanh toán",
+    "Unfreeze time": "Thời gian mở khóa",
     "modelPlaza.percentOff": "{{percent}}% OFF",
     "Connect leading AI models to the tools you already use. Subscribe to earn points, pay per call, and keep your points forever.": "Kết nối các mô hình AI hàng đầu với công cụ bạn đang sử dụng. Đăng ký để nhận điểm, trừ điểm theo lượt gọi và giữ điểm không thời hạn.",
     "Help": "Trợ giúp",

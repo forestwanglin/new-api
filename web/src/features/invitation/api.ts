@@ -70,6 +70,8 @@ export const rewardSchema = z.object({
   order_id: decimal,
   order_label: z.string(),
   invitee_label: z.string(),
+  payer: z.object({ id: decimal, name: z.string() }).optional(),
+  inviter: z.object({ id: decimal, name: z.string() }).optional(),
   campaign_id: decimal.optional(),
   campaign_name: z.string(),
   campaign_version: decimal,

@@ -42,6 +42,7 @@ import {
   formatMoneyMinor,
   type Reward,
 } from './api'
+import { invitationTime } from './display'
 import {
   InvitationOperationDialog,
   type InvitationOperation,
@@ -78,7 +79,32 @@ export function InvitationRewardAdmin(props: { active: boolean }) {
   }
   const columns: StaticDataTableColumn<Reward>[] = [
     { id: 'order', header: t('Order ID'), cell: (r) => r.order_label },
-    { id: 'invitee', header: t('User'), cell: (r) => r.invitee_label },
+    {
+      id: 'payer',
+      header: t('Paying user'),
+      cell: (r) =>
+        r.payer ? (
+          <div className='max-w-48 min-w-28 break-words whitespace-normal'>
+            {r.payer.name && <div>{r.payer.name}</div>}
+            <div className='text-muted-foreground'>#{r.payer.id}</div>
+          </div>
+        ) : (
+          r.invitee_label
+        ),
+    },
+    {
+      id: 'inviter',
+      header: t('Inviting user'),
+      cell: (r) =>
+        r.inviter ? (
+          <div className='max-w-48 min-w-28 break-words whitespace-normal'>
+            {r.inviter.name && <div>{r.inviter.name}</div>}
+            <div className='text-muted-foreground'>#{r.inviter.id}</div>
+          </div>
+        ) : (
+          '—'
+        ),
+    },
     {
       id: 'campaign',
       header: t('Campaign name'),
@@ -120,6 +146,22 @@ export function InvitationRewardAdmin(props: { active: boolean }) {
       id: 'status',
       header: t('Status'),
       cell: (r) => statuses[r.status] ?? r.status,
+    },
+    {
+      id: 'paid_at',
+      header: t('Payment time'),
+      cell: (r) => (
+        <span className='whitespace-nowrap'>{invitationTime(r.paid_at)}</span>
+      ),
+    },
+    {
+      id: 'release_at',
+      header: t('Unfreeze time'),
+      cell: (r) => (
+        <span className='whitespace-nowrap'>
+          {invitationTime(r.release_at)}
+        </span>
+      ),
     },
     {
       id: 'actions',

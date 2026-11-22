@@ -8,12 +8,15 @@ import {
   within,
 } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import i18next from 'i18next'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
+import zh from '@/i18n/locales/zh.json'
 import { api } from '@/lib/api'
 
 import { InvitationCampaignAdmin } from '../admin'
+import { invitationTime } from '../display'
 
 vi.mock('@/components/layout', () => ({
   SectionPageLayout: Object.assign(
@@ -89,9 +92,16 @@ let refunds: Array<
   }
 > = []
 let campaignPages = false
+let rewardItems: Array<
+  typeof reward & {
+    payer?: { id: string; name: string }
+    inviter?: { id: string; name: string }
+  }
+> = []
 beforeEach(() => {
   refunds = []
   campaignPages = false
+  rewardItems = [reward]
   vi.spyOn(api, 'get').mockImplementation(async (url, config) => {
     const params = config?.params as
       | { p?: number; page_size?: number }
@@ -108,7 +118,7 @@ beforeEach(() => {
       data = [{ id: 1, code: 'GENERAL', name: 'General' }]
     }
     if (url.endsWith('/rewards')) {
-      data = { page: p, page_size: size, total: '41', items: [reward] }
+      data = { page: p, page_size: size, total: '41', items: rewardItems }
     }
     if (url.endsWith('/refunds')) {
       data = {
@@ -340,4 +350,96 @@ it('copying preserves all campaign configuration and new creation resets the for
   expect(screen.getByLabelText('Campaign code')).toHaveValue('')
   expect(screen.getByRole('checkbox', { name: 'Visible' })).toBeChecked()
   fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' })
+})
+
+it('reward orders distinguish paying and inviting users and show payment and scheduled unfreeze times', async () => {
+  rewardItems = [
+    {
+      ...reward,
+      payer: { id: '9007199254740993', name: 'Payment customer' },
+      inviter: { id: '7', name: 'Reward inviter' },
+      paid_at: '1794000000000',
+      release_at: '1795000000000',
+    },
+  ]
+  mount()
+  await userEvent.click(
+    screen.getByRole('tab', { name: 'Invitation reward orders' })
+  )
+  const row = await screen.findByRole('row', { name: /Order Eleven/ })
+  const cells = within(row).getAllByRole('cell')
+  expect(
+    screen.getByRole('columnheader', { name: 'Paying user' })
+  ).toBeInTheDocument()
+  expect(
+    screen.getByRole('columnheader', { name: 'Inviting user' })
+  ).toBeInTheDocument()
+  expect(
+    screen.queryByRole('columnheader', { name: /^User$/ })
+  ).not.toBeInTheDocument()
+  expect(cells[1]).toHaveTextContent('Payment customer')
+  expect(cells[1]).toHaveTextContent('#9007199254740993')
+  expect(cells[2]).toHaveTextContent('Reward inviter')
+  expect(cells[2]).toHaveTextContent('#7')
+  expect(
+    screen.getByRole('columnheader', { name: 'Payment time' })
+  ).toBeInTheDocument()
+  expect(
+    screen.getByRole('columnheader', { name: 'Unfreeze time' })
+  ).toBeInTheDocument()
+  expect(
+    within(row).getByText(invitationTime('1794000000000'))
+  ).toBeInTheDocument()
+  expect(
+    within(row).getByText(invitationTime('1795000000000'))
+  ).toBeInTheDocument()
+  expect(within(row).getByText('Frozen')).toBeInTheDocument()
+})
+
+it('missing account names keep stable payer and inviter IDs without guessing identities', async () => {
+  rewardItems = [
+    { ...reward, payer: { id: '6', name: '' }, inviter: { id: '8', name: '' } },
+  ]
+  mount()
+  await userEvent.click(
+    screen.getByRole('tab', { name: 'Invitation reward orders' })
+  )
+  const row = await screen.findByRole('row', { name: /Order Eleven/ })
+  const cells = within(row).getAllByRole('cell')
+  expect(cells[1]).toHaveTextContent('#6')
+  expect(cells[2]).toHaveTextContent('#8')
+  expect(within(row).queryByText('Friend A')).not.toBeInTheDocument()
+})
+
+it('older reward responses retain the payer label and do not invent an inviting user', async () => {
+  mount()
+  await userEvent.click(
+    screen.getByRole('tab', { name: 'Invitation reward orders' })
+  )
+  const row = await screen.findByRole('row', { name: /Order Eleven/ })
+  const cells = within(row).getAllByRole('cell')
+  expect(cells[1]).toHaveTextContent('Friend A')
+  expect(cells[2]).toHaveTextContent('—')
+})
+
+it('Chinese reward columns use the approved payer and inviting-user labels', async () => {
+  i18next.addResourceBundle('zh', 'translation', zh.translation, true, true)
+  await i18next.changeLanguage('zh')
+  try {
+    mount()
+    await userEvent.click(
+      screen.getByRole('tab', {
+        name: zh.translation['Invitation reward orders'],
+      })
+    )
+    await screen.findByText('Order Eleven')
+    for (const name of ['支付用户', '邀请用户', '支付时间', '解冻时间']) {
+      expect(screen.getByRole('columnheader', { name })).toBeInTheDocument()
+    }
+    expect(
+      screen.queryByRole('columnheader', { name: '被奖励用户' })
+    ).not.toBeInTheDocument()
+  } finally {
+    await i18next.changeLanguage('en')
+  }
 })

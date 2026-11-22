@@ -1,5 +1,9 @@
 {
   "translation": {
+    "Paying user": "付款使用者",
+    "Inviting user": "邀請使用者",
+    "Payment time": "付款時間",
+    "Unfreeze time": "解凍時間",
     "modelPlaza.percentOff": "{{percent}}% OFF",
     "Connect leading AI models to the tools you already use. Subscribe to earn points, pay per call, and keep your points forever.": "將主流大型語言模型接入你正在使用的工具。訂閱獲得積分，按呼叫扣除積分，積分永久有效。",
     "Help": "幫助",

@@ -1356,6 +1356,16 @@
 - 与上游差异：定制合作入口的简体中文展示文案。
 - 验证：检查差异与目标翻译值；按用户要求不运行测试。
 
+### Z096 邀请奖励订单用户与时间信息
+
+- 需求与原因：管理员需要明确每笔奖励的支付用户、邀请用户、支付时间及解冻时间，替换含义不明确的“用户”列。
+- 变更内容：管理员奖励列表增加 `payer` / `inviter` 对象（字符串 ID 与名称），按当前页批量读取账户名称；显示名称优先昵称、其次用户名，缺失或删除账户保留 ID。前端显示两类用户及持久化支付时间、预计解冻时间，兼容旧接口；个人接口保持原有匿名展示。
+- 影响面：`model/invitation_finance_query.go`、后端回归、`web/src/features/invitation/` 管理员表格/API schema/回归、七语言翻译；**上游自有文件**：七语言翻译文件，其他为 fork 邀请模块文件。
+- 与上游差异：扩展 fork 邀请管理员订单可观测信息，保持分页、活动过滤、奖励、退款与实际解冻逻辑。
+- 开关与默认值：无新增配置、依赖或迁移；名称只在管理员列表返回，不增加个人接口身份信息。
+- 验证：后端先 RED 再 GREEN；Go 1.26.10 扩大 `go test ./model ./controller ./service ./router -run 'Invitation|CustomSubscription|Point' -count=1`、`go vet ./model ./controller`、`go build ./...` 通过。真实 SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 16.16 的身份投影、管理员列表、邀请领域/策略、退款及套餐支付 6 个矩阵全部通过，无数据库跳过。前端邀请模块 5 文件/40 测试、typecheck（1,756 文件/2 projects）、scoped oxlint/oxfmt 及 production build 通过；独立审查无阻断问题。
+- 风险与未覆盖：解冻时间使用既有 `release_at`，代表计划截止时间；实际到账以奖励状态为准。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 

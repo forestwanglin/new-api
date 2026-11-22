@@ -13,11 +13,17 @@ type InvitationRewardPointType struct {
 	Code string `json:"code"`
 	Name string `json:"name"`
 }
+type InvitationRewardUser struct {
+	Id   string `json:"id"`
+	Name string `json:"name"`
+}
 type InvitationRewardView struct {
 	Id                 string                    `json:"id"`
 	OrderId            string                    `json:"order_id"`
 	OrderLabel         string                    `json:"order_label"`
 	InviteeLabel       string                    `json:"invitee_label"`
+	Payer              *InvitationRewardUser     `json:"payer,omitempty"`
+	Inviter            *InvitationRewardUser     `json:"inviter,omitempty"`
 	CampaignId         string                    `json:"campaign_id"`
 	CampaignName       string                    `json:"campaign_name"`
 	CampaignVersion    string                    `json:"campaign_version"`
@@ -91,8 +97,37 @@ func ListInvitationRewards(userID int64, admin bool, page, pageSize int, campaig
 	if err := query.Order("id DESC").Limit(pageSize).Offset((page - 1) * pageSize).Find(&rows).Error; err != nil {
 		return nil, err
 	}
+	users := make(map[int64]InvitationRewardUser)
+	if admin && len(rows) > 0 {
+		ids := make(map[int64]bool)
+		for _, r := range rows {
+			ids[r.InviteeId] = true
+			ids[r.InviterId] = true
+		}
+		userIDs := make([]int64, 0, len(ids))
+		for id := range ids {
+			userIDs = append(userIDs, id)
+			users[id] = InvitationRewardUser{Id: strconv.FormatInt(id, 10)}
+		}
+		var accounts []User
+		if err := DB.Select("id", "username", "display_name").Where("id IN ?", userIDs).Find(&accounts).Error; err != nil {
+			return nil, err
+		}
+		for _, account := range accounts {
+			name := account.DisplayName
+			if name == "" {
+				name = account.Username
+			}
+			users[int64(account.Id)] = InvitationRewardUser{Id: strconv.Itoa(account.Id), Name: name}
+		}
+	}
 	for _, r := range rows {
-		result.Items = append(result.Items, invitationRewardView(r))
+		view := invitationRewardView(r)
+		if admin {
+			payer, inviter := users[r.InviteeId], users[r.InviterId]
+			view.Payer, view.Inviter = &payer, &inviter
+		}
+		result.Items = append(result.Items, view)
 	}
 	return &result, nil
 }
