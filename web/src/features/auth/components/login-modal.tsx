@@ -279,19 +279,20 @@ function LoginModalContent() {
                     }
                   }}
                 >
-                  {qr && enabled ? (
-                    <div className='auth-qr'>
+                  <div className='auth-qr'>
+                    {qr && enabled && (
                       <img src={qr} alt={t('WeChat login QR code')} />
-                    </div>
-                  ) : (
+                    )}
+                  </div>
+                  <p className='auth-qr-status'>
+                    {t('Scan with WeChat to authorize.')}
+                  </p>
+                  {!qr && (
                     <p className='auth-helper'>
-                      {qr
-                        ? t('Accept the terms before authorizing with WeChat.')
-                        : t('WeChat login QR code is not configured')}
+                      {t('WeChat login QR code is not configured')}
                     </p>
                   )}
-                  {consent}
-                  <p className='auth-qr-status'>
+                  <p className='auth-helper'>
                     <WeChatVerificationHint />
                   </p>
                   <Label htmlFor='modal-wechat-code'>
@@ -327,6 +328,7 @@ function LoginModalContent() {
                   >
                     {t('Confirm')}
                   </Button>
+                  {consent}
                 </form>
               </WeChatMethodChoice>
             )}

@@ -194,45 +194,42 @@ export function OfficialWeChatAuthorization(props: AuthorizationProps) {
   const preparing = props.enabled !== false && !qrReady && !terminal && !error
   return (
     <div className='space-y-3 py-3 text-center'>
+      <div className='mx-auto w-fit max-w-full rounded-2xl border border-black/10 bg-white p-2'>
+        {flow && qrReady ? (
+          <QRCodeSVG
+            value={flow.qr_url}
+            size={224}
+            marginSize={4}
+            bgColor='#ffffff'
+            fgColor='#000000'
+            className='h-auto max-w-full'
+            title={t('WeChat authorization QR code')}
+          />
+        ) : (
+          <div
+            aria-hidden='true'
+            className='flex aspect-square w-56 max-w-full items-center justify-center'
+          >
+            {preparing && (
+              <LoadingState inline size='lg' className='text-neutral-400' />
+            )}
+          </div>
+        )}
+      </div>
+      <p role='status'>{t('Scan with WeChat to authorize.')}</p>
       {props.enabled === false && (
         <p>{t('Accept the terms before authorizing with WeChat.')}</p>
       )}
-      {props.enabled === false && props.afterQr}
       {preparing && (
-        <div role='status' className='space-y-3'>
-          <div className='mx-auto w-fit max-w-full rounded-2xl border border-black/10 bg-white p-2'>
-            <div
-              aria-hidden='true'
-              className='flex aspect-square w-56 max-w-full items-center justify-center'
-            >
-              <LoadingState inline size='lg' className='text-neutral-400' />
-            </div>
-          </div>
-          <p className='text-muted-foreground'>
-            {t('Preparing WeChat authorization...')}
-          </p>
-        </div>
+        <p role='status' className='text-muted-foreground'>
+          {t('Preparing WeChat authorization...')}
+        </p>
       )}
-      {preparing && props.afterQr}
       {flow && qrReady && (
         <>
-          <div className='animate-in fade-in-0 mx-auto w-fit max-w-full rounded-2xl border border-black/10 bg-white p-2 duration-200'>
-            <QRCodeSVG
-              value={flow.qr_url}
-              size={224}
-              marginSize={4}
-              bgColor='#ffffff'
-              fgColor='#000000'
-              className='h-auto max-w-full'
-              title={t('WeChat authorization QR code')}
-            />
-          </div>
-          {props.afterQr}
-          <p role='status'>
-            {status === 'awaiting_consent'
-              ? t('Confirm authorization in WeChat.')
-              : t('Scan with WeChat to authorize.')}
-          </p>
+          {status === 'awaiting_consent' && (
+            <p role='status'>{t('Confirm authorization in WeChat.')}</p>
+          )}
           {sameDevice && (
             <Button
               type='button'
@@ -276,7 +273,6 @@ export function OfficialWeChatAuthorization(props: AuthorizationProps) {
           {error}
         </p>
       )}
-      {(terminal || error) && props.afterQr}
       {props.enabled !== false && (terminal || error) && (
         <Button
           type='button'
@@ -286,6 +282,7 @@ export function OfficialWeChatAuthorization(props: AuthorizationProps) {
           {t('Refresh QR code')}
         </Button>
       )}
+      {props.afterQr}
     </div>
   )
 }
