@@ -355,3 +355,25 @@
 .dark .login-modal .auth-submit:not(:disabled):hover {
   background: color-mix(in oklch, var(--blue) 85%, black);
 }
+
+/* Agreement controls share a compact line instead of inheriting form field sizing. */
+.login-modal .agreement-consent {
+  margin-top: 16px;
+}
+.login-modal .agreement-consent-label {
+  display: inline;
+  margin: 0;
+  font-size: 12px;
+  line-height: 20px;
+  font-weight: 400;
+}
+.login-modal .agreement-document-link {
+  display: inline;
+  padding: 0;
+  height: auto;
+  min-height: 0;
+  font-size: 12px;
+  line-height: 20px;
+  font-weight: 400;
+  white-space: normal;
+}

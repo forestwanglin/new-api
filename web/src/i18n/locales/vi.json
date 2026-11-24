@@ -1,5 +1,11 @@
 {
   "translation": {
+    "Personal Subscription Service Agreement": "Thỏa thuận dịch vụ đăng ký cá nhân",
+    "Enter the subscription agreement in Markdown": "Nhập thỏa thuận đăng ký bằng Markdown",
+    "Supports Markdown. Leave empty to disable the agreement requirement.": "Hỗ trợ Markdown. Để trống để không yêu cầu đồng ý.",
+    "The administrator has not configured this agreement yet.": "Quản trị viên chưa cấu hình thỏa thuận này.",
+    "Unable to load agreement settings. Please retry.": "Không thể tải cấu hình thỏa thuận. Vui lòng thử lại.",
+    "Loading agreement settings…": "Đang tải cấu hình thỏa thuận…",
     "Available general points": "Điểm chung khả dụng",
     "General points pending release": "Điểm chung chờ phát hành",
     "Other available points": "Điểm khác khả dụng",

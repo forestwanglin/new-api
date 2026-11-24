@@ -28,6 +28,7 @@ export function WeChatMethodChoice(props: {
   methods: ('code' | 'official')[]
   request: OfficialRequest
   enabled?: boolean
+  afterQr?: ReactNode
   onResult: (result: unknown, request: OfficialRequest) => void | Promise<void>
   onMethodChange?: (method: 'code' | 'official') => void
   children: ReactNode
@@ -68,6 +69,7 @@ export function WeChatMethodChoice(props: {
         <OfficialWeChatAuthorization
           request={props.request}
           enabled={props.enabled}
+          afterQr={props.afterQr}
           onResult={props.onResult}
         />
       )}

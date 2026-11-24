@@ -1,5 +1,11 @@
 {
   "translation": {
+    "Personal Subscription Service Agreement": "個人向けサブスクリプションサービス利用規約",
+    "Enter the subscription agreement in Markdown": "Markdown 形式でサブスクリプション利用規約を入力",
+    "Supports Markdown. Leave empty to disable the agreement requirement.": "Markdown に対応しています。空欄の場合、同意は不要です。",
+    "The administrator has not configured this agreement yet.": "管理者はこの規約をまだ設定していません。",
+    "Unable to load agreement settings. Please retry.": "規約の設定を読み込めませんでした。再試行してください。",
+    "Loading agreement settings…": "規約の設定を読み込み中…",
     "Available general points": "利用可能な共通ポイント",
     "General points pending release": "付与待ちの共通ポイント",
     "Other available points": "その他の利用可能ポイント",

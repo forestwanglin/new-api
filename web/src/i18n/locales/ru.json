@@ -1,5 +1,11 @@
 {
   "translation": {
+    "Personal Subscription Service Agreement": "Соглашение о персональной подписке",
+    "Enter the subscription agreement in Markdown": "Введите соглашение о подписке в формате Markdown",
+    "Supports Markdown. Leave empty to disable the agreement requirement.": "Поддерживает Markdown. Оставьте пустым, чтобы не требовать согласия.",
+    "The administrator has not configured this agreement yet.": "Администратор ещё не настроил это соглашение.",
+    "Unable to load agreement settings. Please retry.": "Не удалось загрузить настройки соглашений. Повторите попытку.",
+    "Loading agreement settings…": "Загрузка настроек соглашений…",
     "Available general points": "Доступные общие баллы",
     "General points pending release": "Общие баллы, ожидающие начисления",
     "Other available points": "Другие доступные баллы",

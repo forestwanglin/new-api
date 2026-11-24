@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { QRCodeSVG } from 'qrcode.react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { LoadingState } from '@/components/loading-state'
@@ -38,6 +38,7 @@ import { saveOfficialUIDraft } from './ui-draft'
 interface AuthorizationProps {
   request: OfficialRequest
   enabled?: boolean
+  afterQr?: ReactNode
   onResult: (result: unknown, request: OfficialRequest) => void | Promise<void>
 }
 export function OfficialWeChatAuthorization(props: AuthorizationProps) {
@@ -188,13 +189,15 @@ export function OfficialWeChatAuthorization(props: AuthorizationProps) {
     props.request.intent,
   ])
   const terminal = ['cancelled', 'denied', 'failed', 'expired'].includes(status)
-  const qrReady = Boolean(flow?.qr_url) && !terminal && !error
+  const qrReady =
+    props.enabled !== false && Boolean(flow?.qr_url) && !terminal && !error
   const preparing = props.enabled !== false && !qrReady && !terminal && !error
   return (
     <div className='space-y-3 py-3 text-center'>
       {props.enabled === false && (
         <p>{t('Accept the terms before authorizing with WeChat.')}</p>
       )}
+      {props.enabled === false && props.afterQr}
       {preparing && (
         <div role='status' className='space-y-3'>
           <div className='mx-auto w-fit max-w-full rounded-2xl border border-black/10 bg-white p-2'>
@@ -210,6 +213,7 @@ export function OfficialWeChatAuthorization(props: AuthorizationProps) {
           </p>
         </div>
       )}
+      {preparing && props.afterQr}
       {flow && qrReady && (
         <>
           <div className='animate-in fade-in-0 mx-auto w-fit max-w-full rounded-2xl border border-black/10 bg-white p-2 duration-200'>
@@ -223,6 +227,7 @@ export function OfficialWeChatAuthorization(props: AuthorizationProps) {
               title={t('WeChat authorization QR code')}
             />
           </div>
+          {props.afterQr}
           <p role='status'>
             {status === 'awaiting_consent'
               ? t('Confirm authorization in WeChat.')
@@ -271,7 +276,8 @@ export function OfficialWeChatAuthorization(props: AuthorizationProps) {
           {error}
         </p>
       )}
-      {(terminal || error) && (
+      {(terminal || error) && props.afterQr}
+      {props.enabled !== false && (terminal || error) && (
         <Button
           type='button'
           variant='outline'

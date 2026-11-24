@@ -50,6 +50,14 @@ beforeEach(() => {
   sessionStorage.clear()
   useLoginModalStore.getState().close()
   vi.spyOn(api, 'get').mockImplementation(async (url) => {
+    if (url === '/api/status') {
+      return {
+        data: {
+          success: true,
+          data: { subscription_agreement_enabled: false },
+        },
+      }
+    }
     const items: Record<string, unknown[]> = {
       '/api/custom_subscription/plans': [configuredPlan],
       '/api/custom_subscription/payment_methods': [
@@ -285,6 +293,14 @@ it('queries an already paid checkout replay without submitting a second payment 
         },
       }
     }
+    if (url === '/api/status') {
+      return {
+        data: {
+          success: true,
+          data: { subscription_agreement_enabled: false },
+        },
+      }
+    }
     const items: Record<string, unknown[]> = {
       '/api/custom_subscription/plans': [configuredPlan],
       '/api/custom_subscription/payment_methods': [
@@ -402,4 +418,32 @@ it('requires an explicit confirmation of a new plan version before allowing paym
     })
   )
   expect(within(dialog).getByRole('button', { name: /支付 ¥/ })).toBeEnabled()
+})
+
+it('requires configured subscription agreement before payment and resets consent on reopen', async () => {
+  signIn()
+  const user = userEvent.setup()
+  const get = vi.mocked(api.get)
+  const originalGet = get.getMockImplementation()
+  if (!originalGet) throw new Error('Expected checkout API fixture')
+  get.mockImplementation((url, ...args) => {
+    if (url === '/api/status') {
+      return Promise.resolve({
+        data: { success: true, data: { subscription_agreement_enabled: true } },
+      })
+    }
+    return originalGet(url, ...args)
+  })
+  const post = vi.spyOn(api, 'post')
+  renderPage()
+  await user.click(await screen.findByRole('button', { name: /单次购买/ }))
+  const pay = await screen.findByRole('button', { name: /支付 ¥/ })
+  expect(pay).toBeDisabled()
+  expect(post).not.toHaveBeenCalled()
+  await user.click(screen.getByRole('checkbox'))
+  expect(pay).toBeEnabled()
+  await user.click(screen.getByRole('button', { name: '取消' }))
+  await user.click(screen.getByRole('button', { name: /单次购买/ }))
+  expect(await screen.findByRole('button', { name: /支付 ¥/ })).toBeDisabled()
+  expect(screen.getByRole('checkbox')).not.toBeChecked()
 })

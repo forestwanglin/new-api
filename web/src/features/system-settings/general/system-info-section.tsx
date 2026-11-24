@@ -61,6 +61,7 @@ const _systemInfoSchema = z.object({
   }),
   legal: z.object({
     user_agreement: z.string().optional(),
+    subscription_agreement: z.string().optional(),
     privacy_policy: z.string().optional(),
   }),
 })
@@ -99,6 +100,9 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
     },
     legal: {
       user_agreement: normalizeValue(defaultValues.legal?.user_agreement),
+      subscription_agreement: normalizeValue(
+        defaultValues.legal?.subscription_agreement
+      ),
       privacy_policy: normalizeValue(defaultValues.legal?.privacy_policy),
     },
   }
@@ -129,6 +133,7 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
     }),
     legal: z.object({
       user_agreement: z.string().optional(),
+      subscription_agreement: z.string().optional(),
       privacy_policy: z.string().optional(),
     }),
   })
@@ -359,6 +364,33 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
                     <FormDescription>
                       {t(
                         'Leave empty to disable the agreement requirement. Supports Markdown, HTML, or a full URL to redirect users.'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='legal.subscription_agreement'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      {t('Personal Subscription Service Agreement')}
+                    </FormLabel>
+                    <FormControl>
+                      <Textarea
+                        rows={6}
+                        placeholder={t(
+                          'Enter the subscription agreement in Markdown'
+                        )}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'Supports Markdown. Leave empty to disable the agreement requirement.'
                       )}
                     </FormDescription>
                     <FormMessage />

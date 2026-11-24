@@ -337,3 +337,44 @@ it('shows a skeleton placeholder sized to the QR while the flow is pending and r
     screen.queryByText('Preparing WeChat authorization...')
   ).not.toBeInTheDocument()
 })
+
+it('removes the QR and cancels its owner flow when legal consent is withdrawn', async () => {
+  let finish!: (value: ReturnType<typeof response>) => void
+  const pending = new Promise<ReturnType<typeof response>>((resolve) => {
+    finish = resolve
+  })
+  const result = vi.fn()
+  const post = vi.spyOn(api, 'post').mockImplementation(async (url) => {
+    if (url.endsWith('/flows')) return response(flow)
+    if (url.endsWith('/status')) return pending
+    return response({})
+  })
+  const content = (enabled: boolean) => (
+    <OfficialWeChatAuthorization
+      request={{ intent: 'login' }}
+      enabled={enabled}
+      onResult={result}
+      afterQr={<span>Agreement control</span>}
+    />
+  )
+  const view = render(content(false))
+  expect(api.get).not.toHaveBeenCalled()
+  expect(screen.getByText('Agreement control')).toBeVisible()
+  view.rerender(content(true))
+  await screen.findByTitle('WeChat authorization QR code')
+  view.rerender(content(false))
+  expect(
+    screen.queryByTitle('WeChat authorization QR code')
+  ).not.toBeInTheDocument()
+  expect(screen.getByText('Agreement control')).toBeVisible()
+  finish(response({ status: 'authorized' }))
+  await waitFor(() =>
+    expect(post).toHaveBeenCalledWith(
+      expect.stringContaining('/cancel'),
+      { flow_token: flow.flow_token },
+      expect.any(Object)
+    )
+  )
+  expect(result).not.toHaveBeenCalled()
+  expect(post.mock.calls.some(([url]) => url.endsWith('/complete'))).toBe(false)
+})

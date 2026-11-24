@@ -28,6 +28,7 @@ import type { LegalDocumentResponse } from './types'
 export async function getUserAgreement(): Promise<LegalDocumentResponse> {
   const res = await api.get<LegalDocumentResponse>('/api/user-agreement', {
     headers: { 'Cache-Control': null },
+    skipAuthRefresh: true,
   })
   return res.data
 }
@@ -35,6 +36,18 @@ export async function getUserAgreement(): Promise<LegalDocumentResponse> {
 export async function getPrivacyPolicy(): Promise<LegalDocumentResponse> {
   const res = await api.get<LegalDocumentResponse>('/api/privacy-policy', {
     headers: { 'Cache-Control': null },
+    skipAuthRefresh: true,
   })
+  return res.data
+}
+
+export async function getSubscriptionAgreement(): Promise<LegalDocumentResponse> {
+  const res = await api.get<LegalDocumentResponse>(
+    '/api/subscription-agreement',
+    {
+      headers: { 'Cache-Control': null },
+      skipAuthRefresh: true,
+    }
+  )
   return res.data
 }

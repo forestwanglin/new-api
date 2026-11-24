@@ -16,12 +16,17 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+
 import { Dialog } from '@/components/dialog'
 import { ErrorState } from '@/components/error-state'
 import { Button } from '@/components/ui/button'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { formatPlanPrice } from '@/features/custom-subscriptions/lib/format'
+import { AgreementConsent } from '@/features/legal/agreement-consent'
 import { usePointName } from '@/features/points/lib/point-name-context'
+import { useStatus } from '@/hooks/use-status'
 import { formatNumber } from '@/lib/format'
 import { getServerErrorMessage } from '@/lib/server-error-message'
 import { generateRequestId } from '@/lib/utils'
@@ -35,6 +40,21 @@ import {
 } from './use-checkout'
 
 export function SubscriptionCheckout(props: SubscriptionCheckoutProps) {
+  const { t: translate } = useTranslation()
+  const {
+    status,
+    ready,
+    error: statusError,
+    refetch: refetchStatus,
+  } = useStatus()
+  const [agreed, setAgreed] = useState(false)
+  const requiresConsent = Boolean(status?.subscription_agreement_enabled)
+  const consentEnabled = ready && (!requiresConsent || agreed)
+  const isOpen = Boolean(props.selection)
+  useEffect(
+    () => setAgreed(false),
+    [props.selection?.plan.id, props.selection?.plan.version, isOpen]
+  )
   const pointName = usePointName()
   const selection = props.selection
   const onClose = props.onClose
@@ -107,6 +127,35 @@ export function SubscriptionCheckout(props: SubscriptionCheckoutProps) {
         showCloseButton={false}
         footer={
           <>
+            {requiresConsent && (
+              <AgreementConsent
+                className='basis-full'
+                documents={['subscription']}
+                checked={agreed}
+                onCheckedChange={setAgreed}
+              />
+            )}
+            {!ready && (
+              <div
+                className='basis-full text-sm'
+                role={statusError ? 'alert' : 'status'}
+              >
+                {statusError
+                  ? translate(
+                      'Unable to load agreement settings. Please retry.'
+                    )
+                  : translate('Loading agreement settings…')}
+                {statusError && (
+                  <Button
+                    type='button'
+                    variant='link'
+                    onClick={() => void refetchStatus()}
+                  >
+                    {translate('Retry')}
+                  </Button>
+                )}
+              </div>
+            )}
             <Button
               variant='outline'
               disabled={mutation.isPending}
@@ -116,10 +165,22 @@ export function SubscriptionCheckout(props: SubscriptionCheckoutProps) {
             </Button>
             <Button
               disabled={
-                !paymentType || !selection || mutation.isPending || !!changed
+                !consentEnabled ||
+                !paymentType ||
+                !selection ||
+                mutation.isPending ||
+                !!changed
               }
               onClick={() => {
-                if (!selection || !paymentType || mutation.isPending) return
+                if (
+                  !consentEnabled ||
+                  !selection ||
+                  !paymentType ||
+                  mutation.isPending ||
+                  changed
+                ) {
+                  return
+                }
                 mutation.mutate({
                   plan_id: selection.plan.id,
                   plan_version: selection.plan.version,

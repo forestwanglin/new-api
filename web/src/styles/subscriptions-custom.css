@@ -198,7 +198,8 @@
 .subscriptions-custom .sub-purchase-cta {
   font-weight: 700;
   letter-spacing: 0.2px;
-  box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--primary) 55%, transparent);
+  box-shadow: 0 6px 16px -6px
+    color-mix(in srgb, var(--primary) 55%, transparent);
 }
 .subscriptions-custom .sub-card {
   border: 1px solid var(--border);
@@ -400,7 +401,7 @@
   border: 0;
   background: transparent;
 }
-.sub-checkout .sub-checkout-footer button {
+.sub-checkout .sub-checkout-footer > button {
   min-height: 0;
   height: auto;
   padding: 10px 18px;
@@ -411,22 +412,22 @@
   gap: 8px;
   white-space: nowrap;
 }
-.sub-checkout .sub-checkout-footer button:first-child {
+.sub-checkout .sub-checkout-footer > button:first-of-type {
   color: inherit;
   background: transparent;
   border-color: var(--sub-checkout-button-line);
 }
-.sub-checkout .sub-checkout-footer button:first-child:hover:not(:disabled) {
+.sub-checkout .sub-checkout-footer > button:first-of-type:hover:not(:disabled) {
   background: #f5f7fa;
   border-color: #c3cbd8;
 }
-.sub-checkout .sub-checkout-footer button:last-child {
+.sub-checkout .sub-checkout-footer > button:last-child {
   background: #2563eb;
   border: 0;
   color: #fff;
   box-shadow: 0 2px 6px -2px #2563eb4d;
 }
-.sub-checkout .sub-checkout-footer button:last-child:hover:not(:disabled) {
+.sub-checkout .sub-checkout-footer > button:last-child:hover:not(:disabled) {
   background: #1d4ed8;
 }
 @media (max-width: 640px) {

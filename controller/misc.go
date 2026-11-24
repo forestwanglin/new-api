@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
@@ -113,25 +114,26 @@ func GetStatus(c *gin.Context) {
 		"HeaderNavModules":    common.OptionMap["HeaderNavModules"],
 		"SidebarModulesAdmin": common.OptionMap["SidebarModulesAdmin"],
 
-		"oidc_enabled":                system_setting.GetOIDCSettings().Enabled,
-		"oidc_client_id":              system_setting.GetOIDCSettings().ClientId,
-		"oidc_authorization_endpoint": system_setting.GetOIDCSettings().AuthorizationEndpoint,
-		"oidc_display_name":           system_setting.GetOIDCSettings().GetEffectiveDisplayName(),
-		"passkey_login":               passkeySetting.Enabled,
-		"passkey_display_name":        passkeySetting.RPDisplayName,
-		"passkey_rp_id":               passkeySetting.EffectiveRPID(),
-		"passkey_rp_ids":              passkeySetting.RelyingPartyIDs(),
-		"passkey_allow_insecure":      passkeySetting.AllowInsecureOrigin,
-		"passkey_user_verification":   passkeySetting.UserVerification,
-		"passkey_attachment":          passkeySetting.AttachmentPreference,
-		"setup":                       constant.Setup,
-		"user_agreement_enabled":      legalSetting.UserAgreement != "",
-		"privacy_policy_enabled":      legalSetting.PrivacyPolicy != "",
-		"checkin_enabled":             operation_setting.GetCheckinSetting().Enabled,
-		"log_export_enabled":          operation_setting.GetLogSetting().UserExportEnabled,
-		"log_max_range_days":          operation_setting.GetLogSetting().MaxRangeDays,
-		"quota_remind_enabled":        common.QuotaRemindEnabled,
-		"quota_remind_threshold":      common.QuotaRemindThreshold,
+		"oidc_enabled":                   system_setting.GetOIDCSettings().Enabled,
+		"oidc_client_id":                 system_setting.GetOIDCSettings().ClientId,
+		"oidc_authorization_endpoint":    system_setting.GetOIDCSettings().AuthorizationEndpoint,
+		"oidc_display_name":              system_setting.GetOIDCSettings().GetEffectiveDisplayName(),
+		"passkey_login":                  passkeySetting.Enabled,
+		"passkey_display_name":           passkeySetting.RPDisplayName,
+		"passkey_rp_id":                  passkeySetting.EffectiveRPID(),
+		"passkey_rp_ids":                 passkeySetting.RelyingPartyIDs(),
+		"passkey_allow_insecure":         passkeySetting.AllowInsecureOrigin,
+		"passkey_user_verification":      passkeySetting.UserVerification,
+		"passkey_attachment":             passkeySetting.AttachmentPreference,
+		"setup":                          constant.Setup,
+		"user_agreement_enabled":         strings.TrimSpace(legalSetting.UserAgreement) != "",
+		"subscription_agreement_enabled": strings.TrimSpace(legalSetting.SubscriptionAgreement) != "",
+		"privacy_policy_enabled":         legalSetting.PrivacyPolicy != "",
+		"checkin_enabled":                operation_setting.GetCheckinSetting().Enabled,
+		"log_export_enabled":             operation_setting.GetLogSetting().UserExportEnabled,
+		"log_max_range_days":             operation_setting.GetLogSetting().MaxRangeDays,
+		"quota_remind_enabled":           common.QuotaRemindEnabled,
+		"quota_remind_threshold":         common.QuotaRemindThreshold,
 	}
 
 	// 根据启用状态注入可选内容
@@ -197,6 +199,10 @@ func GetAbout(c *gin.Context) {
 
 func GetUserAgreement(c *gin.Context) {
 	serveRevalidatedJSON(c, system_setting.GetLegalSettings().UserAgreement)
+}
+
+func GetSubscriptionAgreement(c *gin.Context) {
+	serveRevalidatedJSON(c, system_setting.GetLegalSettings().SubscriptionAgreement)
 }
 
 func GetPrivacyPolicy(c *gin.Context) {

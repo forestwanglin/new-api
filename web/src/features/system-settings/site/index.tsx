@@ -37,6 +37,7 @@ const defaultSiteSettings: SiteSettings = {
   'general_setting.support_wecom': '',
   'general_setting.operations_email': '',
   'legal.user_agreement': '',
+  'legal.subscription_agreement': '',
   'legal.privacy_policy': '',
   HeaderNavModules: '',
   SidebarModulesAdmin: '',

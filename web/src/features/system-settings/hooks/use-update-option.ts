@@ -28,6 +28,9 @@ import type { UpdateOptionRequest, UpdatePasskeyDomainsRequest } from '../types'
 
 // Configuration keys that require status refresh
 const STATUS_RELATED_KEYS = new Set([
+  'legal.user_agreement',
+  'legal.privacy_policy',
+  'legal.subscription_agreement',
   'general_setting.support_wecom',
   'general_setting.operations_email',
   'HeaderNavModules',
@@ -81,6 +84,12 @@ export function useUpdateOption() {
           } catch {
             /* empty */
           }
+        }
+
+        if (variables.key.startsWith('legal.')) {
+          queryClient.invalidateQueries({ queryKey: ['legal-document'] })
+          queryClient.invalidateQueries({ queryKey: ['user-agreement'] })
+          queryClient.invalidateQueries({ queryKey: ['privacy-policy'] })
         }
 
         toast.success(i18next.t('Setting updated successfully'))

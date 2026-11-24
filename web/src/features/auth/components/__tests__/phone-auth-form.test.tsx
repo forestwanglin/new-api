@@ -389,3 +389,19 @@ it('retains a bounded retry permit after explicit rejection and sends only on an
   fireEvent.change(view.phone, { target: { value: '13900139000' } })
   expect(view.send).toBeDisabled()
 })
+
+it('does not submit a valid phone form while consent disables the login action', async () => {
+  const post = vi
+    .spyOn(api, 'post')
+    .mockResolvedValue({ data: { success: true, data: {} } })
+  const view = fixture()
+  view.setEnabled(false)
+  await fill(view)
+  await view.user.type(screen.getByLabelText('SMS verification code'), '123456')
+  const submit = screen.getByRole('button', { name: 'Register / Sign in' })
+  const form = submit.closest('form')
+  if (!form) throw new Error('Phone submit must belong to a form')
+  fireEvent.submit(form)
+  await waitFor(() => expect(submit).toBeDisabled())
+  expect(post).not.toHaveBeenCalled()
+})

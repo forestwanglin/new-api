@@ -1,5 +1,11 @@
 {
   "translation": {
+    "Personal Subscription Service Agreement": "個人版訂閱服務協議",
+    "Enter the subscription agreement in Markdown": "請輸入 Markdown 格式的訂閱服務協議",
+    "Supports Markdown. Leave empty to disable the agreement requirement.": "支援 Markdown，留空則不要求同意。",
+    "The administrator has not configured this agreement yet.": "管理員尚未設定此協議。",
+    "Unable to load agreement settings. Please retry.": "無法載入協議設定，請重試。",
+    "Loading agreement settings…": "正在載入協議設定…",
     "Available general points": "可用通用積分",
     "General points pending release": "待釋放通用積分",
     "Other available points": "其他可用積分",

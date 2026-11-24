@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
@@ -36,9 +36,13 @@ vi.mock('react-i18next', async (importOriginal) => ({
   ...(await importOriginal<typeof import('react-i18next')>()),
   useTranslation: () => ({ t: (s: string) => s }),
 }))
+const statusFixture = vi.hoisted(() => ({ required: false }))
+
 vi.mock('@/hooks/use-status', () => ({
   useStatus: () => ({
+    ready: true,
     status: {
+      user_agreement_enabled: statusFixture.required,
       wechat_login: true,
       phone_login: true,
       wechat_qrcode: 'https://example.test/qr.png',
@@ -46,6 +50,7 @@ vi.mock('@/hooks/use-status', () => ({
   }),
 }))
 beforeEach(() => {
+  statusFixture.required = false
   localStorage.clear()
   useAuthStore.getState().auth.reset()
   useLoginModalStore.getState().open()
@@ -332,4 +337,116 @@ it('retains the invitation during MFA and clears it after the final verification
   await userEvent.click(screen.getByRole('button', { name: 'Verify' }))
   await waitFor(() => expect(useAuthStore.getState().auth.user?.id).toBe(42))
   expect(localStorage.getItem('aff')).toBeNull()
+})
+
+it('hides the QR until the agreement is accepted and removes it when consent is withdrawn', async () => {
+  statusFixture.required = true
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <LoginModal />
+    </QueryClientProvider>
+  )
+  await screen.findByRole('dialog', { name: 'Register / Sign in' })
+  expect(
+    screen.queryByRole('img', { name: 'WeChat login QR code' })
+  ).not.toBeInTheDocument()
+  const checkbox = screen.getByRole('checkbox')
+  await userEvent.click(checkbox)
+  expect(
+    screen.getByRole('img', { name: 'WeChat login QR code' })
+  ).toBeVisible()
+  await userEvent.click(checkbox)
+  expect(
+    screen.queryByRole('img', { name: 'WeChat login QR code' })
+  ).not.toBeInTheDocument()
+})
+
+it('opens the agreement in a detail dialog without accepting it', async () => {
+  statusFixture.required = true
+  vi.mocked(api.get).mockResolvedValue({
+    data: { success: true, data: '# Agreement details' },
+  })
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <LoginModal />
+    </QueryClientProvider>
+  )
+  await userEvent.click(
+    await screen.findByRole('button', { name: 'User Agreement' })
+  )
+  expect(
+    await screen.findByRole('heading', { name: 'Agreement details' })
+  ).toBeVisible()
+  expect(screen.getByRole('dialog', { name: 'User Agreement' })).toBeVisible()
+})
+
+it('ignores a late WeChat login response after consent is withdrawn', async () => {
+  statusFixture.required = true
+  let resolve!: (value: unknown) => void
+  vi.spyOn(api, 'post').mockReturnValue(
+    new Promise((done) => {
+      resolve = done
+    })
+  )
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <LoginModal />
+    </QueryClientProvider>
+  )
+  await userEvent.click(await screen.findByRole('checkbox'))
+  await userEvent.type(
+    screen.getByLabelText('WeChat verification code'),
+    '123456'
+  )
+  await userEvent.click(screen.getByRole('button', { name: 'Confirm' }))
+  await waitFor(() => expect(api.post).toHaveBeenCalled())
+  await userEvent.click(screen.getByRole('checkbox'))
+  await act(async () => resolve({ data: { success: true, data: bundle } }))
+  expect(useAuthStore.getState().auth.user).toBeNull()
+  expect(useLoginModalStore.getState().isOpen).toBe(true)
+})
+
+it('keeps consent above phone submission and preserves it when changing tabs', async () => {
+  statusFixture.required = true
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <LoginModal />
+    </QueryClientProvider>
+  )
+  await userEvent.click(await screen.findByRole('checkbox'))
+  await userEvent.click(
+    screen.getByRole('tab', { name: 'Phone verification code' })
+  )
+  const checkbox = screen.getByRole('checkbox')
+  const submit = screen.getByRole('button', { name: 'Register / Sign in' })
+  expect(checkbox).toBeChecked()
+  expect(
+    screen.queryByText(
+      'Phone login is not configured. Please contact your administrator.'
+    )
+  ).not.toBeInTheDocument()
+  expect(
+    checkbox.compareDocumentPosition(submit) & Node.DOCUMENT_POSITION_FOLLOWING
+  ).toBeTruthy()
+  await userEvent.click(checkbox)
+  expect(submit).toBeDisabled()
+})
+
+it('resets login consent after closing and reopening the modal', async () => {
+  statusFixture.required = true
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <LoginModal />
+    </QueryClientProvider>
+  )
+  await userEvent.click(await screen.findByRole('checkbox'))
+  act(() => useLoginModalStore.getState().close())
+  await waitFor(() =>
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  )
+  act(() => useLoginModalStore.getState().open())
+  expect(await screen.findByRole('checkbox')).not.toBeChecked()
+  expect(
+    screen.queryByRole('img', { name: 'WeChat login QR code' })
+  ).not.toBeInTheDocument()
 })

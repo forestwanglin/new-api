@@ -50,6 +50,7 @@ const SITE_SECTIONS = [
           },
           legal: {
             user_agreement: settings['legal.user_agreement'],
+            subscription_agreement: settings['legal.subscription_agreement'],
             privacy_policy: settings['legal.privacy_policy'],
           },
         }}

@@ -1,5 +1,11 @@
 {
   "translation": {
+    "Personal Subscription Service Agreement": "Personal Subscription Service Agreement",
+    "Enter the subscription agreement in Markdown": "Enter the subscription agreement in Markdown",
+    "Supports Markdown. Leave empty to disable the agreement requirement.": "Supports Markdown. Leave empty to disable the agreement requirement.",
+    "The administrator has not configured this agreement yet.": "The administrator has not configured this agreement yet.",
+    "Unable to load agreement settings. Please retry.": "Unable to load agreement settings. Please retry.",
+    "Loading agreement settings…": "Loading agreement settings…",
     "Available general points": "Available general points",
     "General points pending release": "General points pending release",
     "Other available points": "Other available points",

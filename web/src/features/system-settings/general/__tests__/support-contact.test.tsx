@@ -131,3 +131,33 @@ it('allows clearing both support contacts', async () => {
     value: '',
   })
 })
+
+it.each(['# Subscription terms', '   '])(
+  'saves subscription agreement %j and invalidates status and document caches',
+  async (value) => {
+    const client = await mount()
+    client.setQueryData(['legal-document', 'subscription'], { data: 'old' })
+    localStorage.setItem(
+      'status',
+      JSON.stringify({ subscription_agreement_enabled: false })
+    )
+    fireEvent.change(
+      screen.getByRole('textbox', {
+        name: 'Personal Subscription Service Agreement',
+      }),
+      { target: { value } }
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Save Changes' }))
+    await waitFor(() =>
+      expect(api.put).toHaveBeenCalledWith('/api/option/', {
+        key: 'legal.subscription_agreement',
+        value,
+      })
+    )
+    expect(client.getQueryState(['status'])?.isInvalidated).toBe(true)
+    expect(
+      client.getQueryState(['legal-document', 'subscription'])?.isInvalidated
+    ).toBe(true)
+    expect(localStorage.getItem('status')).toBeNull()
+  }
+)

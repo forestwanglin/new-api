@@ -153,6 +153,7 @@ export type SiteSettings = {
   'general_setting.support_wecom': string
   'general_setting.operations_email': string
   'legal.user_agreement': string
+  'legal.subscription_agreement'?: string
   'legal.privacy_policy': string
   HeaderNavModules: string
   SidebarModulesAdmin: string

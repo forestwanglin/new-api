@@ -57,7 +57,12 @@ export function LoginModal() {
 
 function LoginModalContent() {
   const { t } = useTranslation()
-  const { status } = useStatus()
+  const {
+    status,
+    ready,
+    error: statusError,
+    refetch: refetchStatus,
+  } = useStatus()
   const navigate = useNavigate()
   const router = useRouter()
   const initialBindToken = useLoginModalStore((state) => state.bindToken)
@@ -85,7 +90,23 @@ function LoginModalContent() {
   const requiresConsent = Boolean(
     status?.user_agreement_enabled || status?.privacy_policy_enabled
   )
-  const enabled = !requiresConsent || agreed
+  const enabled = ready && (!requiresConsent || agreed)
+  const enabledRef = useRef(enabled)
+  enabledRef.current = enabled
+  const consent = requiresConsent ? (
+    <LegalConsent
+      status={status}
+      checked={agreed}
+      onCheckedChange={(checked) => {
+        enabledRef.current = checked
+        if (!checked) {
+          request.current?.abort()
+          cancel()
+        }
+        setAgreed(checked)
+      }}
+    />
+  ) : undefined
 
   useEffect(() => {
     if (initialBindToken) {
@@ -105,6 +126,7 @@ function LoginModalContent() {
   const onResult = async (result: unknown, affiliateCode = '') => {
     if (
       !active.current ||
+      !enabledRef.current ||
       useAuthStore.getState().auth.session?.sid !== initialSID
     ) {
       return
@@ -128,6 +150,7 @@ function LoginModalContent() {
     }
     if (
       !active.current ||
+      !enabledRef.current ||
       !bundle ||
       useAuthStore.getState().auth.session?.sid !== initialSID
     ) {
@@ -147,6 +170,7 @@ function LoginModalContent() {
 
   const wechat = useMutation({
     mutationFn: async () => {
+      if (!enabledRef.current) return
       setError('')
       request.current?.abort()
       const controller = new AbortController()
@@ -222,7 +246,9 @@ function LoginModalContent() {
               <PhoneAuthForm
                 affiliateCode={bindingAffiliateCode.current}
                 bindToken={bindToken}
+                available={phoneEnabled}
                 enabled={phoneEnabled && enabled}
+                beforeSubmit={consent}
                 onResult={onResult}
               />
             ) : (
@@ -236,6 +262,7 @@ function LoginModalContent() {
                   aff: getAffiliateCode() || undefined,
                 }}
                 enabled={enabled}
+                afterQr={consent}
                 onResult={(result, request) =>
                   onResult(
                     result,
@@ -252,15 +279,18 @@ function LoginModalContent() {
                     }
                   }}
                 >
-                  {qr ? (
+                  {qr && enabled ? (
                     <div className='auth-qr'>
                       <img src={qr} alt={t('WeChat login QR code')} />
                     </div>
                   ) : (
                     <p className='auth-helper'>
-                      {t('WeChat login QR code is not configured')}
+                      {qr
+                        ? t('Accept the terms before authorizing with WeChat.')
+                        : t('WeChat login QR code is not configured')}
                     </p>
                   )}
+                  {consent}
                   <p className='auth-qr-status'>
                     <WeChatVerificationHint />
                   </p>
@@ -303,18 +333,28 @@ function LoginModalContent() {
           </TabsContent>
           <TabsContent value='phone'>
             <PhoneAuthForm
+              available={phoneEnabled}
               enabled={phoneEnabled && enabled}
+              beforeSubmit={consent}
               onResult={onResult}
             />
           </TabsContent>
         </Tabs>
-        {requiresConsent && (
-          <LegalConsent
-            status={status}
-            checked={agreed}
-            onCheckedChange={setAgreed}
-            className='mt-4'
-          />
+        {!ready && (
+          <p role={statusError ? 'alert' : 'status'} className='auth-helper'>
+            {statusError
+              ? t('Unable to load agreement settings. Please retry.')
+              : t('Loading agreement settings…')}
+          </p>
+        )}
+        {statusError && (
+          <Button
+            type='button'
+            variant='outline'
+            onClick={() => void refetchStatus()}
+          >
+            {t('Retry')}
+          </Button>
         )}
       </Dialog>
       <SecureVerificationDialog {...verification.dialogProps} />

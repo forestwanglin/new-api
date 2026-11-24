@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
@@ -44,6 +44,8 @@ interface PhoneAuthFormProps {
   affiliateCode?: string
   bindToken?: string
   enabled: boolean
+  available?: boolean
+  beforeSubmit?: ReactNode
   onResult: (result: unknown, affiliateCode?: string) => Promise<void> | void
 }
 
@@ -176,7 +178,7 @@ export function PhoneAuthForm(props: PhoneAuthFormProps) {
 
   const action = useMutation({
     mutationFn: async (kind: 'send' | 'login') => {
-      if (!captcha.data) return
+      if (!props.enabled || !captcha.data) return
       operation.current?.abort()
       const controller = new AbortController()
       operation.current = controller
@@ -376,7 +378,7 @@ export function PhoneAuthForm(props: PhoneAuthFormProps) {
             ? t('Image verified')
             : t('Verify the image code before requesting an SMS code'))}
       </p>
-      {!props.enabled && (
+      {!(props.available ?? props.enabled) && (
         <p className='auth-helper'>
           {t(
             'Phone login is not configured. Please contact your administrator.'
@@ -388,6 +390,7 @@ export function PhoneAuthForm(props: PhoneAuthFormProps) {
           {error || getServerErrorMessage(captcha.error)}
         </div>
       )}
+      {props.beforeSubmit}
       <Button
         type='submit'
         className='auth-submit'

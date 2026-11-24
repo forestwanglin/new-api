@@ -33,15 +33,18 @@ function getInitialStatus(): SystemStatus | undefined {
  * components costs one request. See `statusQueryOptions` for cache lifetimes.
  */
 export function useStatus() {
-  const { data, isLoading, error } = useQuery({
-    ...statusQueryOptions,
-    // Use localStorage data as initial data
-    placeholderData: getInitialStatus(),
-  })
+  const { data, isLoading, error, isSuccess, isPlaceholderData, refetch } =
+    useQuery({
+      ...statusQueryOptions,
+      // Use localStorage data as initial data
+      placeholderData: getInitialStatus(),
+    })
 
   return {
     status: (data as SystemStatus | null) ?? null,
     loading: isLoading,
     error,
+    ready: isSuccess && !isPlaceholderData && data != null && !error,
+    refetch,
   }
 }
