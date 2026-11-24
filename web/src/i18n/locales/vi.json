@@ -8599,6 +8599,9 @@
     "Point type is used by subscription orders": "Loại điểm này đã được tham chiếu trong đơn hàng đăng ký",
     "Point type is used by invitation campaigns": "Loại điểm này đang được chiến dịch giới thiệu sử dụng",
     "Point type is used by invitation rewards": "Loại điểm này đã được tham chiếu trong phần thưởng giới thiệu",
-    "Point type is used by model billing history": "Loại điểm này đã được tham chiếu trong lịch sử tính phí mô hình"
+    "Point type is used by model billing history": "Loại điểm này đã được tham chiếu trong lịch sử tính phí mô hình",
+    "Other points": "Điểm khác",
+    "No other points accounts": "Chưa có tài khoản điểm khác",
+    "Buy points": "Mua điểm"
   }
 }

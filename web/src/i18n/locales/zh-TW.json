@@ -8599,6 +8599,9 @@
     "Point type is used by subscription orders": "此積分類型已被訂閱訂單引用，無法刪除",
     "Point type is used by invitation campaigns": "此積分類型已被邀請活動引用，無法刪除",
     "Point type is used by invitation rewards": "此積分類型已被邀請獎勵紀錄引用，無法刪除",
-    "Point type is used by model billing history": "此積分類型已被模型計費歷史快照引用，無法刪除"
+    "Point type is used by model billing history": "此積分類型已被模型計費歷史快照引用，無法刪除",
+    "Other points": "其他點數",
+    "No other points accounts": "暫無其他點數帳戶",
+    "Buy points": "購買點數"
   }
 }

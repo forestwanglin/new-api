@@ -8601,6 +8601,9 @@
     "Point type is used by subscription orders": "Этот тип баллов указан в заказах подписки",
     "Point type is used by invitation campaigns": "Этот тип баллов используется в реферальных кампаниях",
     "Point type is used by invitation rewards": "Этот тип баллов указан в реферальных наградах",
-    "Point type is used by model billing history": "Этот тип баллов указан в истории расчётов моделей"
+    "Point type is used by model billing history": "Этот тип баллов указан в истории расчётов моделей",
+    "Other points": "Другие баллы",
+    "No other points accounts": "Других счетов баллов нет",
+    "Buy points": "Купить баллы"
   }
 }

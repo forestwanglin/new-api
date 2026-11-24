@@ -141,20 +141,24 @@ type InvitationCampaignPage struct {
 	Items    []InvitationCampaignView `json:"items"`
 }
 type InvitationBindingView struct {
-	Bound        bool   `json:"bound"`
-	InviterCode  string `json:"inviter_code"`
-	InviterLabel string `json:"inviter_label"`
-	BoundAt      *int64 `json:"-"`
+	Bound            bool   `json:"bound"`
+	InviterCode      string `json:"inviter_code"`
+	InviterLabel     string `json:"inviter_label"`
+	InviterName      string `json:"inviter_name"`
+	InviterAvatarURL string `json:"inviter_avatar_url"`
+	BoundAt          *int64 `json:"-"`
 }
 
 func (v InvitationBindingView) MarshalJSON() ([]byte, error) {
 	type dto struct {
-		Bound        bool    `json:"bound"`
-		InviterCode  string  `json:"inviter_code"`
-		InviterLabel string  `json:"inviter_label"`
-		BoundAt      *string `json:"bound_at"`
+		Bound            bool    `json:"bound"`
+		InviterCode      string  `json:"inviter_code"`
+		InviterLabel     string  `json:"inviter_label"`
+		InviterName      string  `json:"inviter_name"`
+		InviterAvatarURL string  `json:"inviter_avatar_url"`
+		BoundAt          *string `json:"bound_at"`
 	}
-	return common.Marshal(dto{v.Bound, v.InviterCode, v.InviterLabel, invitationTime(v.BoundAt)})
+	return common.Marshal(dto{v.Bound, v.InviterCode, v.InviterLabel, v.InviterName, v.InviterAvatarURL, invitationTime(v.BoundAt)})
 }
 
 type InvitationFriend struct {
@@ -556,6 +560,16 @@ func GetInvitationBinding(uid int64) (*InvitationBindingView, error) {
 			return err
 		}
 		out = &InvitationBindingView{Bound: true, InviterCode: b.InviterCode, InviterLabel: invitationLabel(b.InviterId), BoundAt: b.BoundAt}
+		var inviter User
+		err = tx.Select("display_name", "username", "avatar_url").First(&inviter, b.InviterId).Error
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		out.InviterName = strings.TrimSpace(inviter.DisplayName)
+		if out.InviterName == "" {
+			out.InviterName = inviter.Username
+		}
+		out.InviterAvatarURL = inviter.AvatarURL
 		return nil
 	})
 	return out, err
@@ -628,6 +642,11 @@ func BindInvitation(uid int64, code, request string) (*InvitationBindingView, er
 			return err
 		}
 		out = &InvitationBindingView{Bound: true, InviterCode: inviter.AffCode, InviterLabel: invitationLabel(int64(inviter.Id)), BoundAt: &now}
+		out.InviterName = strings.TrimSpace(inviter.DisplayName)
+		if out.InviterName == "" {
+			out.InviterName = inviter.Username
+		}
+		out.InviterAvatarURL = inviter.AvatarURL
 		return nil
 	})
 	return out, err

@@ -8599,6 +8599,9 @@
     "Point type is used by subscription orders": "Ce type de points est référencé dans des commandes d’abonnement",
     "Point type is used by invitation campaigns": "Ce type de points est utilisé par des campagnes de parrainage",
     "Point type is used by invitation rewards": "Ce type de points est référencé dans des récompenses de parrainage",
-    "Point type is used by model billing history": "Ce type de points est référencé dans l’historique de facturation des modèles"
+    "Point type is used by model billing history": "Ce type de points est référencé dans l’historique de facturation des modèles",
+    "Other points": "Autres points",
+    "No other points accounts": "Aucun autre compte de points",
+    "Buy points": "Acheter des points"
   }
 }

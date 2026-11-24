@@ -1366,6 +1366,17 @@
 - 验证：后端先 RED 再 GREEN；Go 1.26.10 扩大 `go test ./model ./controller ./service ./router -run 'Invitation|CustomSubscription|Point' -count=1`、`go vet ./model ./controller`、`go build ./...` 通过。真实 SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 16.16 的身份投影、管理员列表、邀请领域/策略、退款及套餐支付 6 个矩阵全部通过，无数据库跳过。前端邀请模块 5 文件/40 测试、typecheck（1,756 文件/2 projects）、scoped oxlint/oxfmt 及 production build 通过；独立审查无阻断问题。
 - 风险与未覆盖：解冻时间使用既有 `release_at`，代表计划截止时间；实际到账以奖励状态为准。
 
+### Z097 邀请人资料、订阅支付状态与钱包购买入口
+
+- 需求与原因：用户需要识别已绑定邀请人、快速区分支付结果，并在钱包余额不足时进入订阅购买；钱包须展示所有自定义积分类型。
+- 变更内容：绑定查询与绑定结果增加当前邀请人的昵称和头像，保留原有匿名标签，昵称为空时使用用户名，账户删除时保留绑定与匿名标签；个人邀请页复用 Avatar。订单复用 StatusBadge，支付成功绿色，失败、取消、关闭及过期红色，待支付和未知状态保持中性。钱包增加 /subscription 购买入口，“其他积分”逐项展示所有非 GENERAL 类型的可用余额，总额使用 BigInt 汇总所有类型，不计冻结和邀请待发奖励；无其他账户时显示明确空状态。
+- 影响面：fork 文件 model/invitation.go、model/invitation_test.go、web/src/features/invitation/{api.ts,index.tsx}、web/src/features/points-wallet/index.tsx、web/src/features/subscriptions-custom/orders.tsx 及三个模块回归。**上游自有文件**：七语言 web/src/i18n/locales/{en,zh,zh-TW,fr,ru,ja,vi}.json。
+- 与上游差异：扩展 fork 邀请、订阅与钱包体验；不修改积分扣减、奖励计算、支付状态或绑定规则。
+- 开关与默认值：无新增配置、依赖或迁移；绑定接口字段为兼容性扩展，前端兼容旧接口缺失资料；非通用积分直接使用钱包账户数据。
+- 验证：相关模块 bun run test src/features/invitation src/features/points-wallet src/features/subscriptions-custom：14 文件、104 用例通过；bun run typecheck、涉及文件 oxlint/oxfmt、bun run build 与 go build ./... 通过。go test ./model -run '^TestInvitation(DomainDatabaseMatrix|BindingProfileFallback)$' -count=1 -v 使用隔离真实 SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 16.16 全通过，无数据库跳过；覆盖 fresh/legacy_upgrade、重复迁移、资料读写、昵称降级与邀请人删除。
+- 全量回归：bun run test 共 339 文件、3693 用例，3673 通过、20 失败。修改前 HEAD 的隔离副本复跑失败文件，复现 19 项既有失败：components/account-avatar（4）、hooks/sidebar-config（5）、config-tutorial/page（1）、model-plaza/navigation（2）、security/wechat-binding（6）、usage-logs/detail-preview（1，20 秒超时）；另 users/permissions 的 refreshes a changed point row 用例全量失败，但修改前及当前单独复跑均通过，当前该文件 8 项全通过。
+- 风险与未覆盖：未做浏览器实机核对；全量前端测试仍有上述既有失败及并发不稳定用例。头像加载失败由既有组件降级。邀请人昵称和头像仅通过当前用户自己的绑定接口返回，不扩展好友列表资料。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 

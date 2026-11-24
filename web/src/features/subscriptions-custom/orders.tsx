@@ -29,6 +29,7 @@ import {
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { LoadingState } from '@/components/loading-state'
+import { StatusBadge, type StatusVariant } from '@/components/status-badge'
 import { formatPlanPrice } from '@/features/custom-subscriptions/lib/format'
 import { toIntlLocale } from '@/i18n/languages'
 import { formatNumber } from '@/lib/format'
@@ -140,9 +141,22 @@ export function SubscriptionOrders() {
           cancelled: t('Cancelled'),
           closed: t('Closed'),
         }
+        const variants: Record<string, StatusVariant> = {
+          success: 'success',
+          paid: 'success',
+          failed: 'danger',
+          cancelled: 'danger',
+          expired: 'danger',
+          closed: 'danger',
+        }
         return (
           <>
-            {labels[row.status] ?? row.status}
+            <StatusBadge
+              type='text'
+              copyable={false}
+              variant={variants[row.status] ?? 'neutral'}
+              label={labels[row.status] ?? row.status}
+            />
             <div className='account-secondary'>
               {row.fulfillment_status === 'fulfilled'
                 ? t('Fulfilled')

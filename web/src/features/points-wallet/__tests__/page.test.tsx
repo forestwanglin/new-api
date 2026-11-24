@@ -291,7 +291,7 @@ it('removes the previous viewer balances while loading another viewer account', 
   expect(screen.queryByText('Private reward')).not.toBeInTheDocument()
 })
 
-it('marks missing point types and the combined total unavailable while preserving confirmed zero accounts', async () => {
+it('shows zero total and empty other balances with only a general account', async () => {
   vi.spyOn(api, 'get').mockImplementation(async (url) => ({
     data: {
       success: true,
@@ -321,14 +321,72 @@ it('marks missing point types and the combined total unavailable while preservin
     .closest('div')
   if (!general) throw new Error('General points card is missing')
   expect(within(general).getByText('0')).toBeVisible()
-  for (const title of ['Total credited points', 'GPT']) {
+  for (const title of ['Total credited points', 'Other points']) {
     const card = within(stats)
       .getByRole('heading', { name: title })
       .closest('div')
     if (!card) throw new Error(`${title} card is missing`)
-    expect(within(card).getByText('Not available yet')).toBeVisible()
-    expect(within(card).queryByText('0')).not.toBeInTheDocument()
+    if (title === 'Other points') {
+      expect(within(card).getByText('No other points accounts')).toBeVisible()
+    } else {
+      expect(within(card).getByText('0')).toBeVisible()
+    }
   }
+})
+
+it('lists every non-general balance and includes them in the exact total', async () => {
+  vi.spyOn(api, 'get').mockImplementation(async (url) => ({
+    data: {
+      success: true,
+      data:
+        url === '/api/points/wallet/self'
+          ? {
+              balances: [
+                {
+                  point_type_id: '1',
+                  code: 'GENERAL',
+                  name: 'General',
+                  available_points: '9007199254740993',
+                  frozen_points: '20',
+                },
+                {
+                  point_type_id: '2',
+                  code: 'GPT',
+                  name: 'GPT balance',
+                  available_points: '10',
+                  frozen_points: '7',
+                },
+                {
+                  point_type_id: '3',
+                  code: 'CUSTOM',
+                  name: 'Custom balance',
+                  available_points: '25',
+                  frozen_points: '9',
+                },
+              ],
+              pending_gpt_points: '0',
+              pending_invitation_rewards: [],
+              source_summaries: [],
+            }
+          : { items: [] },
+    },
+  }))
+  await renderWallet()
+  const stats = await screen.findByRole('region', { name: 'Wallet statistics' })
+  expect(within(stats).getByText('9,007,199,254,741,028')).toBeVisible()
+  const other = within(stats)
+    .getByRole('heading', { name: 'Other points' })
+    .closest('div')
+  if (!other) throw new Error('Other points card is missing')
+  expect(within(other).getByText('GPT balance')).toBeVisible()
+  expect(within(other).getByText('10')).toBeVisible()
+  expect(within(other).getByText('Custom balance')).toBeVisible()
+  expect(within(other).getByText('25')).toBeVisible()
+  expect(within(other).queryByText('General')).not.toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Buy points' })).toHaveAttribute(
+    'href',
+    '/subscription'
+  )
 })
 
 it('shows typed pending rewards without adding them to available totals and labels known sources', async () => {

@@ -8600,6 +8600,9 @@
     "Point type is used by subscription orders": "Point type is used by subscription orders",
     "Point type is used by invitation campaigns": "Point type is used by invitation campaigns",
     "Point type is used by invitation rewards": "Point type is used by invitation rewards",
-    "Point type is used by model billing history": "Point type is used by model billing history"
+    "Point type is used by model billing history": "Point type is used by model billing history",
+    "Other points": "Other points",
+    "No other points accounts": "No other points accounts",
+    "Buy points": "Buy points"
   }
 }

@@ -56,6 +56,35 @@ function renderOrders() {
     </QueryClientProvider>
   )
 }
+it.each([
+  ['success', 'Paid', 'text-success'],
+  ['paid', 'Paid', 'text-success'],
+  ['failed', 'Failed', 'text-destructive'],
+  ['cancelled', 'Cancelled', 'text-destructive'],
+  ['closed', 'Closed', 'text-destructive'],
+  ['expired', 'Expired', 'text-destructive'],
+  ['pending', 'Pending payment', 'text-muted-foreground'],
+])(
+  'renders %s payment status with its semantic color',
+  async (status, label, color) => {
+    vi.spyOn(api, 'get').mockResolvedValue({
+      data: {
+        success: true,
+        data: {
+          page: 1,
+          page_size: 20,
+          total: 1,
+          items: [{ ...order, status }],
+        },
+      },
+    })
+    renderOrders()
+    const labelElement = await screen.findByText(label)
+    expect(
+      labelElement.closest('[data-slot="status-badge"]') ?? labelElement
+    ).toHaveClass(color)
+  }
+)
 it('preserves server descending order, snapshot title, exact points and pending amount due', async () => {
   vi.spyOn(api, 'get').mockResolvedValue({
     data: {

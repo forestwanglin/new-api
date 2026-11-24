@@ -8599,6 +8599,9 @@
     "Point type is used by subscription orders": "このポイント種別はサブスクリプション注文から参照されています",
     "Point type is used by invitation campaigns": "このポイント種別は紹介キャンペーンで使用されています",
     "Point type is used by invitation rewards": "このポイント種別は紹介報酬の記録から参照されています",
-    "Point type is used by model billing history": "このポイント種別はモデル課金履歴から参照されています"
+    "Point type is used by model billing history": "このポイント種別はモデル課金履歴から参照されています",
+    "Other points": "その他のポイント",
+    "No other points accounts": "その他のポイント口座はありません",
+    "Buy points": "ポイントを購入"
   }
 }

@@ -8600,6 +8600,9 @@
     "Point type is used by subscription orders": "该积分类型已被订阅订单引用，无法删除",
     "Point type is used by invitation campaigns": "该积分类型已被邀请活动引用，无法删除",
     "Point type is used by invitation rewards": "该积分类型已被邀请奖励记录引用，无法删除",
-    "Point type is used by model billing history": "该积分类型已被模型计费历史快照引用，无法删除"
+    "Point type is used by model billing history": "该积分类型已被模型计费历史快照引用，无法删除",
+    "Other points": "其他积分",
+    "No other points accounts": "暂无其他积分账户",
+    "Buy points": "购买积分"
   }
 }

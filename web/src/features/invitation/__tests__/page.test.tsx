@@ -31,11 +31,13 @@ vi.mock('@/components/layout', () => ({
 }))
 const empty = { page: 1, page_size: 20, total: '0', items: [] }
 let bound = false
+let inviterAvatar = ''
 beforeEach(() => {
   sessionStorage.clear()
   useAuthStore.getState().auth.reset()
   useLoginModalStore.getState().close()
   bound = false
+  inviterAvatar = ''
   vi.spyOn(api, 'get').mockImplementation(async (url) => {
     let data: unknown = empty
     if (url.endsWith('/current')) data = null
@@ -56,6 +58,8 @@ beforeEach(() => {
       data = {
         bound,
         inviter_label: 'F***',
+        inviter_name: 'Forest昵称',
+        inviter_avatar_url: inviterAvatar,
         inviter_code: 'forest',
         bound_at: null,
       }
@@ -77,6 +81,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
 })
 function mount(page: ReactNode = <InvitationPage />) {
   const client = new QueryClient({
@@ -104,6 +109,39 @@ function login() {
     },
   })
 }
+it('shows the bound inviter nickname and avatar fallback', async () => {
+  bound = true
+  login()
+  mount()
+  expect(await screen.findByText('Forest昵称')).toBeVisible()
+  expect(
+    screen.getByText('F', { selector: '[data-slot="avatar-fallback"]' })
+  ).toBeVisible()
+})
+it('shows the bound inviter avatar after the image loads', async () => {
+  const images: HTMLImageElement[] = []
+  const OriginalImage = window.Image
+  vi.stubGlobal(
+    'Image',
+    class extends OriginalImage {
+      constructor() {
+        super()
+        images.push(this)
+      }
+    }
+  )
+  bound = true
+  inviterAvatar = 'https://example.com/inviter.png'
+  login()
+  mount()
+  await waitFor(() => expect(images.length).toBeGreaterThan(0))
+  await act(async () => {
+    for (const image of images) image.dispatchEvent(new Event('load'))
+  })
+  expect(
+    await screen.findByRole('img', { name: 'Forest昵称' })
+  ).toHaveAttribute('src', inviterAvatar)
+})
 it.each([
   { endsAt: '2', expired: true },
   { endsAt: '4102444800000', expired: false },

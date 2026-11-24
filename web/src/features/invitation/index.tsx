@@ -26,10 +26,12 @@ import '@/styles/invitation.css'
 import { Dialog } from '@/components/dialog'
 import { ErrorState } from '@/components/error-state'
 import { LoadingState } from '@/components/loading-state'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { usePointName } from '@/features/points/lib/point-name-context'
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
+import { getUserAvatarFallback, getUserAvatarStyle } from '@/lib/avatar'
 import {
   getServerErrorMessage,
   getServerErrorSources,
@@ -91,6 +93,8 @@ export function InvitationPage({
     queryFn: getBinding,
     enabled: fullAuth,
   })
+  const inviterName =
+    binding.data?.inviter_name || binding.data?.inviter_label || ''
   const summary = useQuery({
     queryKey: ['invitation', 'summary', user?.id],
     queryFn: getSummary,
@@ -322,9 +326,22 @@ export function InvitationPage({
               </p>
               {binding.data?.bound ? (
                 <div className='iv-ref-done'>
-                  <strong>
-                    {t('Bound inviter')}: {binding.data.inviter_label}
-                  </strong>
+                  <div className='flex min-w-0 items-center gap-3'>
+                    <Avatar>
+                      <AvatarImage
+                        src={binding.data.inviter_avatar_url}
+                        alt={inviterName}
+                        referrerPolicy='no-referrer'
+                      />
+                      <AvatarFallback style={getUserAvatarStyle(inviterName)}>
+                        {getUserAvatarFallback(inviterName)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <strong className='min-w-0 break-all'>
+                      <span>{t('Bound inviter')}: </span>
+                      <span>{inviterName}</span>
+                    </strong>
+                  </div>
                   <span className='iv-ref-code'>
                     {binding.data.inviter_code}
                   </span>

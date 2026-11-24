@@ -43,6 +43,8 @@ export const bindingSchema = z.object({
   bound: z.boolean(),
   inviter_code: z.string(),
   inviter_label: z.string(),
+  inviter_name: z.string().optional().default(''),
+  inviter_avatar_url: z.string().optional().default(''),
   bound_at: timestamp.nullable(),
 })
 export const summarySchema = z.object({

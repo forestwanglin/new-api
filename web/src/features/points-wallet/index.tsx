@@ -17,11 +17,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useQuery } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
 import { ErrorState } from '@/components/error-state'
 import { SectionPageLayout } from '@/components/layout'
 import { LoadingState } from '@/components/loading-state'
+import { buttonVariants } from '@/components/ui/button'
 import { InvitationPendingRewards } from '@/features/invitation/pending'
 import { usePointName } from '@/features/points/lib/point-name-context'
 import { toIntlLocale } from '@/i18n/languages'
@@ -40,16 +42,17 @@ function WalletStatistics(props: { wallet: PointWallet }) {
   const pointName = usePointName()
   const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
   const general = props.wallet.balances.find((item) => item.code === 'GENERAL')
-  const gpt = props.wallet.balances.find((item) => item.code === 'GPT')
-  const total =
-    general && gpt
-      ? BigInt(general.available_points) + BigInt(gpt.available_points)
-      : null
+  const otherBalances = props.wallet.balances.filter(
+    (item) => item.code !== 'GENERAL'
+  )
+  const total = props.wallet.balances.reduce(
+    (sum, item) => sum + BigInt(item.available_points),
+    0n
+  )
   const cards = [
     {
       title: t('Total credited points'),
-      value:
-        total === null ? t('Not available yet') : formatNumber(total, locale),
+      value: formatNumber(total, locale),
       description: t(
         'Available points, subject to configured model and channel rules'
       ),
@@ -68,15 +71,6 @@ function WalletStatistics(props: { wallet: PointWallet }) {
         : t('Not available yet'),
       description: t('Available for calls matching the configured rules'),
     },
-    {
-      title: gpt
-        ? pointName({ id: gpt.point_type_id, code: gpt.code, name: gpt.name })
-        : 'GPT',
-      value: gpt
-        ? formatNumber(BigInt(gpt.available_points), locale)
-        : t('Not available yet'),
-      description: t('Available for calls matching the configured rules'),
-    },
   ]
   return (
     <section className='wallet-stats' aria-label={t('Wallet statistics')}>
@@ -90,6 +84,25 @@ function WalletStatistics(props: { wallet: PointWallet }) {
           <p>{card.description}</p>
         </div>
       ))}
+      <div className='account-card wallet-stat'>
+        <h2>{t('Other points')}</h2>
+        {otherBalances.map((balance) => (
+          <div key={balance.point_type_id}>
+            <span className='text-muted-foreground block text-xs break-words'>
+              {pointName({
+                id: balance.point_type_id,
+                code: balance.code,
+                name: balance.name,
+              })}
+            </span>
+            <div className='wallet-stat-number'>
+              {formatNumber(BigInt(balance.available_points), locale)}
+            </div>
+          </div>
+        ))}
+        {otherBalances.length === 0 && <p>{t('No other points accounts')}</p>}
+        <p>{t('Available for calls matching the configured rules')}</p>
+      </div>
       <div className='account-card wallet-stat'>
         <h2>{t('Invitation rewards pending release')}</h2>
         {props.wallet.pending_invitation_rewards.map((reward) => (
@@ -134,6 +147,11 @@ export function PointsWallet() {
       </SectionPageLayout.Description>
       <SectionPageLayout.Content>
         <div className='points-account'>
+          <div className='flex justify-end'>
+            <Link to='/subscription' className={buttonVariants()}>
+              {t('Buy points')}
+            </Link>
+          </div>
           {query.isPending && <LoadingState />}
           {query.isError && (
             <ErrorState

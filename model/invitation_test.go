@@ -258,8 +258,13 @@ func invitationDomainBindingCases(t *testing.T, db *gorm.DB) {
 	}
 	_, err := BindInvitation(21, "AAAA", "self")
 	require.ErrorIs(t, err, ErrInvitationSelf)
-	_, err = BindInvitation(22, "AAAA", "bind")
+	require.NoError(t, db.Model(&User{}).Where("id = ?", 21).Updates(map[string]any{"display_name": "Inviter nickname", "avatar_url": "https://example.com/avatar.png"}).Error)
+	created, err := BindInvitation(22, "AAAA", "bind")
 	require.NoError(t, err)
+	createdJSON, err := common.Marshal(created)
+	require.NoError(t, err)
+	assert.Contains(t, string(createdJSON), "Inviter nickname")
+	assert.Contains(t, string(createdJSON), "https://example.com/avatar.png")
 	_, err = BindInvitation(22, "AAAA", "again")
 	require.ErrorIs(t, err, ErrInvitationAlreadyBound)
 	_, err = BindInvitation(23, "BBBB", "bind")
@@ -292,6 +297,8 @@ func invitationDomainBindingCases(t *testing.T, db *gorm.DB) {
 	require.NoError(t, err)
 	encoded, err := common.Marshal(binding)
 	require.NoError(t, err)
+	assert.Contains(t, string(encoded), "Inviter nickname")
+	assert.Contains(t, string(encoded), "https://example.com/avatar.png")
 	assert.Contains(t, string(encoded), `"bound_at":"`)
 	friends, err := ListInvitationFriends(21, 1, 20)
 	require.NoError(t, err)
@@ -380,4 +387,31 @@ func invitationDomainQualificationCases(t *testing.T, db *gorm.DB) {
 	assert.EqualValues(t, 202, switched.CandidateOrderId)
 	require.NotNil(t, switched.QualifiedAt)
 	assert.Equal(t, later+invitationQualificationPeriod, *switched.QualifiedAt)
+}
+
+func TestInvitationBindingProfileFallback(t *testing.T) {
+	for _, dialect := range []string{"sqlite", "mysql", "postgres"} {
+		t.Run(dialect, func(t *testing.T) {
+			db := invitationDomainTestDB(t, dialect)
+			require.NoError(t, migrateInvitations(db))
+			require.NoError(t, db.Create(&User{Id: 1, Username: "inviter", AffCode: "INVITER", Status: common.UserStatusEnabled}).Error)
+			require.NoError(t, db.Create(&User{Id: 2, Username: "invitee", Status: common.UserStatusEnabled}).Error)
+			bound, err := BindInvitation(2, "INVITER", "bind-profile")
+			require.NoError(t, err)
+			assert.Equal(t, "inviter", bound.InviterName)
+			assert.Empty(t, bound.InviterAvatarURL)
+			require.NoError(t, db.Model(&User{}).Where("id = ?", 1).Updates(map[string]any{"display_name": "Updated nickname", "avatar_url": "https://example.com/new.png"}).Error)
+			current, err := GetInvitationBinding(2)
+			require.NoError(t, err)
+			assert.Equal(t, "Updated nickname", current.InviterName)
+			assert.Equal(t, "https://example.com/new.png", current.InviterAvatarURL)
+			require.NoError(t, db.Delete(&User{}, 1).Error)
+			missing, err := GetInvitationBinding(2)
+			require.NoError(t, err)
+			assert.True(t, missing.Bound)
+			assert.Equal(t, "User #1", missing.InviterLabel)
+			assert.Empty(t, missing.InviterName)
+			assert.Empty(t, missing.InviterAvatarURL)
+		})
+	}
 }
