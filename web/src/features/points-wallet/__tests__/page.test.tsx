@@ -24,7 +24,6 @@ import {
   RouterProvider,
 } from '@tanstack/react-router'
 import { act, render, screen, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import i18next from 'i18next'
 import { afterEach, expect, it, vi } from 'vitest'
 
@@ -207,10 +206,9 @@ it('renders cumulative source movements above int64 without treating them as a r
   expect(screen.getByText('Cumulative movements by source')).toBeVisible()
   expect(screen.getByText('historical_source')).toBeVisible()
   expect(screen.getByText('No points accounts')).toBeVisible()
-  expect(screen.getByText('No points rules configured')).toBeVisible()
+  expect(screen.getByText('No subscription rules')).toBeVisible()
 })
-it('opens database configured rule content from its accessible disclosure', async () => {
-  const user = userEvent.setup()
+it('shows the same managed rules as the public subscription page without a disclosure', async () => {
   vi.spyOn(api, 'get').mockImplementation(async (url) => ({
     data: {
       success: true,
@@ -242,11 +240,11 @@ it('opens database configured rule content from its accessible disclosure', asyn
     },
   }))
   await renderWallet()
-  const disclosure = await screen.findByText('View full points rules (1)')
-  expect(disclosure.closest('details')).not.toHaveAttribute('open')
-  await user.click(disclosure)
-  expect(disclosure.closest('details')).toHaveAttribute('open')
+  expect(await screen.findByText('Configured title')).toBeVisible()
   expect(screen.getByText('Configured policy')).toBeVisible()
+  expect(screen.getByText('Configured policy').closest('details')).toBeNull()
+  expect(api.get).toHaveBeenCalledWith('/api/custom_subscription/rules')
+  expect(api.get).not.toHaveBeenCalledWith('/api/points/wallet/rules')
 })
 it('removes the previous viewer balances while loading another viewer account', async () => {
   vi.spyOn(api, 'get').mockImplementation(async (url) => ({
@@ -383,6 +381,9 @@ it('lists every non-general balance and includes them in the exact total', async
   expect(within(other).getByText('Custom balance')).toBeVisible()
   expect(within(other).getByText('25')).toBeVisible()
   expect(within(other).queryByText('General')).not.toBeInTheDocument()
+  expect(
+    screen.getByRole('link', { name: 'Buy points' }).parentElement
+  ).toHaveClass('mb-6')
   expect(screen.getByRole('link', { name: 'Buy points' })).toHaveAttribute(
     'href',
     '/subscription'

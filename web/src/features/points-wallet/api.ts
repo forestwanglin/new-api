@@ -18,7 +18,6 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { z } from 'zod'
 
-import type { PublicRule } from '@/features/custom-subscriptions/rules/types'
 import { api } from '@/lib/api'
 import { requireServerSuccess } from '@/lib/server-error-message'
 
@@ -62,12 +61,4 @@ export const pointsWalletKey = (userId: number | undefined) =>
 export async function getPointsWallet(): Promise<PointWallet> {
   const response = await api.get('/api/points/wallet/self')
   return walletSchema.parse(requireServerSuccess(response.data).data)
-}
-export async function getPointsWalletRules(): Promise<PublicRule[]> {
-  const response = await api.get<{
-    success: boolean
-    message?: string
-    data: { items: PublicRule[] }
-  }>('/api/points/wallet/rules')
-  return requireServerSuccess(response.data).data.items
 }

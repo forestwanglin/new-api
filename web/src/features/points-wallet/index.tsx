@@ -147,7 +147,7 @@ export function PointsWallet() {
       </SectionPageLayout.Description>
       <SectionPageLayout.Content>
         <div className='points-account'>
-          <div className='flex justify-end'>
+          <div className='mb-6 flex justify-end'>
             <Link to='/subscription' className={buttonVariants()}>
               {t('Buy points')}
             </Link>

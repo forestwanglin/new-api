@@ -92,22 +92,17 @@
 .points-account .wallet-details-title-row h2 {
   margin: 0;
 }
-.points-account .wallet-rule-list {
+.points-account .wallet-rules .sub-rules {
   padding-left: 24px;
   margin: 16px 0 0;
   list-style: decimal;
 }
-.points-account .wallet-rule-list li {
+.points-account .wallet-rules .sub-rules li {
   margin-top: 12px;
   padding-left: 4px;
 }
-.points-account .wallet-rule-list li strong {
+.points-account .wallet-rules .sub-rules li strong {
   color: var(--foreground);
-}
-.points-account .wallet-rules summary {
-  color: var(--primary);
-  cursor: pointer;
-  width: fit-content;
 }
 .points-account summary:focus-visible {
   outline: 2px solid var(--ring);
