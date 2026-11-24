@@ -1368,6 +1368,8 @@
 
 ### Z097 邀请人资料、订阅支付状态与钱包购买入口
 
+- 头像菜单积分列表补充（2026-11-24）：登录头像下拉菜单沿用原积分行格式，逐项展示所有积分类型名称与 available_points，GENERAL 稳定置顶，其余保持接口顺序；复用 usePointName 和 BigInt 格式化，不改变查询缓存内容。无数据或请求失败显示破折号，零余额正常展示；顶部胶囊原合计口径保持不变。影响 **上游自有文件** web/src/components/profile-dropdown.tsx 及 fork 回归 account-avatar.test.tsx；无新增依赖、配置或后端修改。新增 3 个定向用例通过，覆盖类型排序、精确可用金额、零值、缺通用类型和空钱包；typecheck、scoped oxlint/oxfmt、生产构建通过。完整文件 11/16 通过，头像加载、旧邮箱展示断言、超级管理员菜单、隐藏模块和购买跳转用例失败；隔离修改前 HEAD 两次复跑分别 3、4 失败，复现其中 4 项，隐藏模块定向复跑通过。扩大定向组合中的旧请求错误用例亦不稳定；本次新增三例始终通过。未做浏览器实机验证。
+
 - 钱包四卡分类补充（2026-11-24）：按用户要求改为“可用通用积分 / 待释放通用积分 / 其他可用积分 / 其他待释放积分”，移除跨类型合计卡。通用按 GENERAL 识别；其他可用逐类型展示余额，其他待释放按类型匹配 pending_invitation_rewards，无待释放时为 0，并保留只有待释放奖励的类型。待释放沿用后端 processing + frozen 奖励口径，不使用账户冻结额或旧 pending_gpt_points，不修改发放、扣费及数据库查询。影响 fork 自有钱包 index.tsx、page.test.tsx；**上游自有文件**：七语言 locale JSON。回归覆盖卡片顺序、分类隔离、大整数精度、零值、空态和仅有奖励的类型；钱包测试、typecheck、scoped oxlint/oxfmt 与生产构建通过。未做浏览器实机验证。
 
 - 钱包规则与间距补充（2026-11-24）：购买按钮下方增加 24px 间距；钱包底部复用公开订阅页 PublicSubscriptionRules，读取 /api/custom_subscription/rules 的管理员配置规则列表并直接展示，统一加载、空态、错误重试及富文本展示，替代原来仅显示 wallet- 前缀规则的折叠列表。删除前端闲置钱包规则请求函数及折叠专用样式，后端旧接口保持兼容。影响 fork 自有 points-wallet/{index.tsx,rules.tsx,api.ts,__tests__/page.test.tsx} 与 points-account.css，无上游自有文件新增变更，无新增依赖、配置或数据库行为变更。钱包与公开规则 2 文件、12 测试、typecheck、scoped oxlint/oxfmt 和生产构建通过；未做浏览器实机验证。

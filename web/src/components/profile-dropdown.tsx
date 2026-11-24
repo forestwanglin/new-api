@@ -34,6 +34,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { getPhoneChangeStatus } from '@/features/personal-profile/api'
 import { getPointsWallet, pointsWalletKey } from '@/features/points-wallet/api'
+import { usePointName } from '@/features/points/lib/point-name-context'
 import {
   customSubscriptionSelfKey,
   getCustomSubscriptionSelf,
@@ -53,6 +54,7 @@ const avatarFallbackClassName = 'font-semibold text-white'
 
 export function ProfileDropdown() {
   const { t, i18n } = useTranslation()
+  const pointName = usePointName()
   const [menuOpen, setMenuOpen] = useState(false)
   const navigate = useNavigate()
   const [open, setOpen] = useDialogState()
@@ -83,6 +85,11 @@ export function ProfileDropdown() {
   })
   const general = wallet.data?.balances.find((item) => item.code === 'GENERAL')
   const gpt = wallet.data?.balances.find((item) => item.code === 'GPT')
+  const balances = wallet.isError
+    ? []
+    : [...(wallet.data?.balances ?? [])].sort(
+        (a, b) => Number(b.code === 'GENERAL') - Number(a.code === 'GENERAL')
+      )
   const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
   const points =
     !wallet.isError && general && gpt
@@ -146,13 +153,34 @@ export function ProfileDropdown() {
           <div className='profile-account-head'>
             <div className='profile-account-title'>{displayName}</div>
             <div className='profile-account-secondary'>
-              {!phone.isError && phone.data?.bound ? phone.data.phone_masked : ''}
+              {!phone.isError && phone.data?.bound
+                ? phone.data.phone_masked
+                : ''}
             </div>
           </div>
-          <div className='profile-account-balance'>
-            <span>{t('Remaining points')}</span>
-            <strong>{points}</strong>
-          </div>
+          {balances.map((balance) => (
+            <div
+              className='profile-account-balance'
+              key={balance.point_type_id}
+            >
+              <span>
+                {pointName({
+                  id: balance.point_type_id,
+                  code: balance.code,
+                  name: balance.name,
+                })}
+              </span>
+              <strong>
+                {formatNumber(BigInt(balance.available_points), locale)}
+              </strong>
+            </div>
+          ))}
+          {balances.length === 0 && (
+            <div className='profile-account-balance'>
+              <span>{t('Remaining points')}</span>
+              <strong>—</strong>
+            </div>
+          )}
           {isSubscriptionVisible && (
             <div className='profile-account-subscription'>
               <div className='profile-account-subscription-info'>

@@ -64,8 +64,18 @@ async function showEntry(
   if (seedAccount) {
     client.setQueryData(pointsWalletKey(currentUser.id), {
       balances: [
-        { code: 'GENERAL', available_points: '9007199254740993' },
-        { code: 'GPT', available_points: '7' },
+        {
+          point_type_id: '1',
+          code: 'GENERAL',
+          name: 'General points',
+          available_points: '9007199254740993',
+        },
+        {
+          point_type_id: '2',
+          code: 'GPT',
+          name: 'GPT points',
+          available_points: '7',
+        },
       ],
     })
     client.setQueryData(customSubscriptionSelfKey(currentUser.id), {
@@ -179,7 +189,7 @@ test('desktop account shows real points without precision loss and current subsc
   await user.click(trigger)
   const menu = await screen.findByRole('menu')
   expect(within(menu).getByText('alice@example.com')).toBeVisible()
-  expect(within(menu).getByText('9,007,199,254,741,000')).toBeVisible()
+  expect(within(menu).getByText('9,007,199,254,740,993')).toBeVisible()
   expect(within(menu).getByText('Team plan')).toBeVisible()
   expect(within(menu).getByText('Yearly')).toBeVisible()
   expect(within(menu).getByRole('menuitem', { name: 'Renew' })).toBeVisible()
@@ -255,4 +265,87 @@ test('desktop account keeps menus usable without fabricating balances or subscri
     'true'
   )
   expect(within(menu).getByRole('menuitem', { name: 'Profile' })).toBeVisible()
+})
+
+test('desktop dropdown lists all available balances with general first and preserves exact amounts', async () => {
+  vi.spyOn(api, 'get').mockRejectedValue(new Error('Unavailable'))
+  const { client } = await showEntry(false, undefined, false)
+  const balances = [
+    {
+      point_type_id: '3',
+      code: 'CUSTOM',
+      name: 'Custom points',
+      available_points: '0',
+      frozen_points: '88',
+    },
+    {
+      point_type_id: '2',
+      code: 'GPT',
+      name: 'GPT points',
+      available_points: '7',
+      frozen_points: '10',
+    },
+    {
+      point_type_id: '1',
+      code: 'GENERAL',
+      name: 'General points',
+      available_points: '9007199254740993',
+      frozen_points: '20',
+    },
+  ]
+  act(() => client.setQueryData(pointsWalletKey(user.id), { balances }))
+  await userEvent.setup().click(screen.getByRole('button', { name: /Alice/ }))
+  const menu = await screen.findByRole('menu')
+  const labels = ['General points', 'Custom points', 'GPT points']
+  const rows = [...menu.querySelectorAll('.profile-account-balance')]
+  expect(rows).toHaveLength(3)
+  expect(rows.map((row) => row.querySelector('span')?.textContent)).toEqual(
+    labels
+  )
+  expect(rows.map((row) => row.querySelector('strong')?.textContent)).toEqual([
+    '9,007,199,254,740,993',
+    '0',
+    '7',
+  ])
+  expect(balances.map((balance) => balance.code)).toEqual([
+    'CUSTOM',
+    'GPT',
+    'GENERAL',
+  ])
+  expect(within(menu).queryByText('Remaining points')).not.toBeInTheDocument()
+})
+
+test('desktop dropdown shows a custom available balance when general points are absent', async () => {
+  vi.spyOn(api, 'get').mockRejectedValue(new Error('Unavailable'))
+  const { client } = await showEntry(false, undefined, false)
+  act(() =>
+    client.setQueryData(pointsWalletKey(user.id), {
+      balances: [
+        {
+          point_type_id: '3',
+          code: 'CUSTOM',
+          name: 'Custom points',
+          available_points: '123',
+          frozen_points: '99',
+        },
+      ],
+    })
+  )
+  await userEvent.setup().click(screen.getByRole('button', { name: /Alice/ }))
+  const menu = await screen.findByRole('menu')
+  expect(within(menu).getByText('Custom points')).toBeVisible()
+  expect(within(menu).getByText('123')).toBeVisible()
+  expect(within(menu).queryByText('99')).not.toBeInTheDocument()
+  expect(within(menu).queryByText('General points')).not.toBeInTheDocument()
+})
+
+test('desktop dropdown keeps an unavailable balance placeholder for an empty wallet', async () => {
+  vi.spyOn(api, 'get').mockRejectedValue(new Error('Unavailable'))
+  const { client } = await showEntry(false, undefined, false)
+  act(() => client.setQueryData(pointsWalletKey(user.id), { balances: [] }))
+  await userEvent.setup().click(screen.getByRole('button', { name: /Alice/ }))
+  const menu = await screen.findByRole('menu')
+  expect(within(menu).getByText('Remaining points')).toBeVisible()
+  expect(within(menu).getByText('—')).toBeVisible()
+  expect(within(menu).queryByText('0')).not.toBeInTheDocument()
 })
