@@ -57,8 +57,8 @@ function renderOrders() {
   )
 }
 it.each([
-  ['success', 'Paid', 'text-success'],
-  ['paid', 'Paid', 'text-success'],
+  ['success', 'Paid', 'text-emerald-500'],
+  ['paid', 'Paid', 'text-emerald-500'],
   ['failed', 'Failed', 'text-destructive'],
   ['cancelled', 'Cancelled', 'text-destructive'],
   ['closed', 'Closed', 'text-destructive'],

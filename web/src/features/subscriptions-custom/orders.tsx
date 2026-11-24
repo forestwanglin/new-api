@@ -141,9 +141,12 @@ export function SubscriptionOrders() {
           cancelled: t('Cancelled'),
           closed: t('Closed'),
         }
+        // Paid must always read as green: the `success` semantic color is
+        // remapped to each named theme preset's chart palette (often not
+        // green), so pin paid to the fixed `light-green` variant.
         const variants: Record<string, StatusVariant> = {
-          success: 'success',
-          paid: 'success',
+          success: 'light-green',
+          paid: 'light-green',
           failed: 'danger',
           cancelled: 'danger',
           expired: 'danger',
