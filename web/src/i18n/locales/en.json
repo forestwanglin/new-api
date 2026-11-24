@@ -1,5 +1,9 @@
 {
   "translation": {
+    "Available general points": "Available general points",
+    "General points pending release": "General points pending release",
+    "Other available points": "Other available points",
+    "Other points pending release": "Other points pending release",
     "Paying user": "Paying user",
     "Inviting user": "Inviting user",
     "Payment time": "Payment time",

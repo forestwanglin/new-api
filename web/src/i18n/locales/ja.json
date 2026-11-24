@@ -1,5 +1,9 @@
 {
   "translation": {
+    "Available general points": "利用可能な共通ポイント",
+    "General points pending release": "付与待ちの共通ポイント",
+    "Other available points": "その他の利用可能ポイント",
+    "Other points pending release": "その他の付与待ちポイント",
     "Paying user": "支払いユーザー",
     "Inviting user": "招待ユーザー",
     "Payment time": "支払日時",

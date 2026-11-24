@@ -51,6 +51,10 @@ it('resolves wallet translations through the real i18next resource namespace', a
     'Pending invitation rewards are excluded from available points until release.',
     'Processing and frozen invitation rewards become available only after release.',
     'Invitation rewards',
+    'Available general points',
+    'General points pending release',
+    'Other available points',
+    'Other points pending release',
   ] as const
   for (const [language, resource] of Object.entries(resources)) {
     const t = i18n.getFixedT(language)
@@ -95,7 +99,7 @@ async function renderWallet() {
     </QueryClientProvider>
   )
 }
-it('shows exact available totals, separates frozen points and shows actual zero pending rewards', async () => {
+it('shows exact general available points and excludes frozen and other balances', async () => {
   vi.spyOn(api, 'get').mockImplementation(async (url) => ({
     data: {
       success: true,
@@ -142,11 +146,11 @@ it('shows exact available totals, separates frozen points and shows actual zero 
     },
   }))
   await renderWallet()
-  expect(await screen.findByText('9,007,199,254,741,003')).toBeVisible()
+  await screen.findByRole('region', { name: 'Wallet statistics' })
   const stats = screen.getByRole('region', { name: 'Wallet statistics' })
   expect(within(stats).getByText('9,007,199,254,740,993')).toBeVisible()
   expect(within(stats).queryByText('Not available yet')).not.toBeInTheDocument()
-  expect(within(stats).getByText('0')).toBeVisible()
+  expect(within(stats).getAllByText('0')).toHaveLength(2)
   expect(
     screen.queryByRole('columnheader', { name: 'Remaining points by source' })
   ).not.toBeInTheDocument()
@@ -289,7 +293,7 @@ it('removes the previous viewer balances while loading another viewer account', 
   expect(screen.queryByText('Private reward')).not.toBeInTheDocument()
 })
 
-it('shows zero total and empty other balances with only a general account', async () => {
+it('shows zero general balances and empty other cards with only a general account', async () => {
   vi.spyOn(api, 'get').mockImplementation(async (url) => ({
     data: {
       success: true,
@@ -314,25 +318,21 @@ it('shows zero total and empty other balances with only a general account', asyn
   }))
   await renderWallet()
   const stats = await screen.findByRole('region', { name: 'Wallet statistics' })
-  const general = within(stats)
-    .getByRole('heading', { name: 'General' })
-    .closest('div')
-  if (!general) throw new Error('General points card is missing')
-  expect(within(general).getByText('0')).toBeVisible()
-  for (const title of ['Total credited points', 'Other points']) {
-    const card = within(stats)
-      .getByRole('heading', { name: title })
-      .closest('div')
-    if (!card) throw new Error(`${title} card is missing`)
-    if (title === 'Other points') {
-      expect(within(card).getByText('No other points accounts')).toBeVisible()
-    } else {
-      expect(within(card).getByText('0')).toBeVisible()
-    }
-  }
+  expect(
+    within(stats)
+      .getAllByRole('heading')
+      .map((heading) => heading.textContent)
+  ).toEqual([
+    'Available general points',
+    'General points pending release',
+    'Other available points',
+    'Other points pending release',
+  ])
+  expect(within(stats).getAllByText('0')).toHaveLength(2)
+  expect(within(stats).getAllByText('No other points accounts')).toHaveLength(2)
 })
 
-it('lists every non-general balance and includes them in the exact total', async () => {
+it('lists every non-general available balance separately from general points', async () => {
   vi.spyOn(api, 'get').mockImplementation(async (url) => ({
     data: {
       success: true,
@@ -371,9 +371,12 @@ it('lists every non-general balance and includes them in the exact total', async
   }))
   await renderWallet()
   const stats = await screen.findByRole('region', { name: 'Wallet statistics' })
-  expect(within(stats).getByText('9,007,199,254,741,028')).toBeVisible()
+  expect(within(stats).getByText('9,007,199,254,740,993')).toBeVisible()
+  expect(
+    within(stats).queryByText('9,007,199,254,741,028')
+  ).not.toBeInTheDocument()
   const other = within(stats)
-    .getByRole('heading', { name: 'Other points' })
+    .getByRole('heading', { name: 'Other available points' })
     .closest('div')
   if (!other) throw new Error('Other points card is missing')
   expect(within(other).getByText('GPT balance')).toBeVisible()
@@ -390,7 +393,7 @@ it('lists every non-general balance and includes them in the exact total', async
   )
 })
 
-it('shows typed pending rewards without adding them to available totals and labels known sources', async () => {
+it('separates general and other pending rewards using exact amounts and retains reward-only types', async () => {
   vi.spyOn(api, 'get').mockImplementation(async (url) => ({
     data: {
       success: true,
@@ -460,7 +463,24 @@ it('shows typed pending rewards without adding them to available totals and labe
   }))
   await renderWallet()
   const stats = await screen.findByRole('region', { name: 'Wallet statistics' })
-  expect(within(stats).getByText('60')).toBeVisible()
+  expect(within(stats).getByText('50')).toBeVisible()
+  expect(within(stats).queryByText('60')).not.toBeInTheDocument()
+  const generalPending = within(stats).getByRole('heading', {
+    name: 'General points pending release',
+  }).parentElement
+  if (!generalPending) throw new Error('General pending card is missing')
+  expect(
+    within(generalPending).getByText('9,007,199,254,740,995')
+  ).toBeVisible()
+  const otherPending = within(stats).getByRole('heading', {
+    name: 'Other points pending release',
+  }).parentElement
+  if (!otherPending) throw new Error('Other pending card is missing')
+  expect(within(otherPending).getByText('GPT')).toBeVisible()
+  expect(within(otherPending).getByText('7')).toBeVisible()
+  expect(within(otherPending).getByText('Custom reward')).toBeVisible()
+  expect(within(otherPending).getByText('8')).toBeVisible()
+  expect(within(otherPending).queryByText('General')).not.toBeInTheDocument()
   expect(within(stats).getByText('9,007,199,254,740,995')).toBeVisible()
   const rewards = screen.getByRole('region', {
     name: 'Invitation reward details',

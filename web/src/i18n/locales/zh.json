@@ -1,5 +1,9 @@
 {
   "translation": {
+    "Available general points": "可用通用积分",
+    "General points pending release": "待释放通用积分",
+    "Other available points": "其他可用积分",
+    "Other points pending release": "其他待释放积分",
     "Paying user": "支付用户",
     "Inviting user": "邀请用户",
     "Payment time": "支付时间",

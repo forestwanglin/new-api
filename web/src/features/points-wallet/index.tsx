@@ -45,38 +45,54 @@ function WalletStatistics(props: { wallet: PointWallet }) {
   const otherBalances = props.wallet.balances.filter(
     (item) => item.code !== 'GENERAL'
   )
-  const total = props.wallet.balances.reduce(
-    (sum, item) => sum + BigInt(item.available_points),
-    0n
+  const generalPending = props.wallet.pending_invitation_rewards.find(
+    (item) => item.code === 'GENERAL'
+  )
+  const pendingByType = new Map(
+    props.wallet.pending_invitation_rewards.map((reward) => [
+      reward.point_type_id,
+      reward,
+    ])
+  )
+  const otherPending = otherBalances.map((balance) => ({
+    point_type_id: balance.point_type_id,
+    code: balance.code,
+    name: balance.name,
+    pending_points:
+      pendingByType.get(balance.point_type_id)?.pending_points ?? '0',
+  }))
+  const otherTypeIds = new Set(
+    otherBalances.map((balance) => balance.point_type_id)
+  )
+  otherPending.push(
+    ...props.wallet.pending_invitation_rewards.filter(
+      (reward) =>
+        reward.code !== 'GENERAL' && !otherTypeIds.has(reward.point_type_id)
+    )
   )
   const cards = [
     {
-      title: t('Total credited points'),
-      value: formatNumber(total, locale),
-      description: t(
-        'Available points, subject to configured model and channel rules'
-      ),
-      total: true,
+      title: t('Available general points'),
+      value: formatNumber(BigInt(general?.available_points ?? '0'), locale),
+      description: t('Available for calls matching the configured rules'),
+      available: true,
     },
     {
-      title: general
-        ? pointName({
-            id: general.point_type_id,
-            code: general.code,
-            name: general.name,
-          })
-        : 'GENERAL',
-      value: general
-        ? formatNumber(BigInt(general.available_points), locale)
-        : t('Not available yet'),
-      description: t('Available for calls matching the configured rules'),
+      title: t('General points pending release'),
+      value: formatNumber(
+        BigInt(generalPending?.pending_points ?? '0'),
+        locale
+      ),
+      description: t(
+        'Pending invitation rewards are excluded from available points until release.'
+      ),
     },
   ]
   return (
     <section className='wallet-stats' aria-label={t('Wallet statistics')}>
       {cards.map((card) => (
         <div
-          className={`account-card wallet-stat${card.total ? ' wallet-points' : ''}`}
+          className={`account-card wallet-stat${card.available ? ' wallet-points' : ''}`}
           key={card.title}
         >
           <h2>{card.title}</h2>
@@ -85,7 +101,7 @@ function WalletStatistics(props: { wallet: PointWallet }) {
         </div>
       ))}
       <div className='account-card wallet-stat'>
-        <h2>{t('Other points')}</h2>
+        <h2>{t('Other available points')}</h2>
         {otherBalances.map((balance) => (
           <div key={balance.point_type_id}>
             <span className='text-muted-foreground block text-xs break-words'>
@@ -104,8 +120,8 @@ function WalletStatistics(props: { wallet: PointWallet }) {
         <p>{t('Available for calls matching the configured rules')}</p>
       </div>
       <div className='account-card wallet-stat'>
-        <h2>{t('Invitation rewards pending release')}</h2>
-        {props.wallet.pending_invitation_rewards.map((reward) => (
+        <h2>{t('Other points pending release')}</h2>
+        {otherPending.map((reward) => (
           <div key={reward.point_type_id}>
             <span className='text-muted-foreground block text-xs break-words'>
               {pointName({
@@ -119,9 +135,7 @@ function WalletStatistics(props: { wallet: PointWallet }) {
             </div>
           </div>
         ))}
-        {props.wallet.pending_invitation_rewards.length === 0 && (
-          <div className='wallet-stat-number'>0</div>
-        )}
+        {otherPending.length === 0 && <p>{t('No other points accounts')}</p>}
         <p>
           {t(
             'Pending invitation rewards are excluded from available points until release.'

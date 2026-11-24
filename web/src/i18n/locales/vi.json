@@ -1,5 +1,9 @@
 {
   "translation": {
+    "Available general points": "Điểm chung khả dụng",
+    "General points pending release": "Điểm chung chờ phát hành",
+    "Other available points": "Điểm khác khả dụng",
+    "Other points pending release": "Điểm khác chờ phát hành",
     "Paying user": "Người thanh toán",
     "Inviting user": "Người mời",
     "Payment time": "Thời gian thanh toán",

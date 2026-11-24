@@ -1,5 +1,9 @@
 {
   "translation": {
+    "Available general points": "Доступные общие баллы",
+    "General points pending release": "Общие баллы, ожидающие начисления",
+    "Other available points": "Другие доступные баллы",
+    "Other points pending release": "Другие баллы, ожидающие начисления",
     "Paying user": "Плательщик",
     "Inviting user": "Пригласивший пользователь",
     "Payment time": "Время оплаты",
