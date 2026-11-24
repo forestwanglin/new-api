@@ -421,6 +421,15 @@
   background: #f5f7fa;
   border-color: #c3cbd8;
 }
+/* Dark mode: the light hover surface above would put near-white text on a
+   near-white background; use the theme's muted surface instead. */
+.dark
+  .sub-checkout
+  .sub-checkout-footer
+  > button:first-of-type:hover:not(:disabled) {
+  background: var(--muted);
+  border-color: var(--border);
+}
 .sub-checkout .sub-checkout-footer > button:last-child {
   background: #2563eb;
   border: 0;

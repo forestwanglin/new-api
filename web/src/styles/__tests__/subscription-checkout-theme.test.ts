@@ -61,6 +61,29 @@ it('retains the cancel border color after adding the agreement row', () => {
   }
   expect(cancel.matches(rule.selectorText)).toBe(true)
 })
+it('keeps the cancel hover surface theme-aware in dark mode', () => {
+  const normalize = (selector: string) => selector.replaceAll(/\s+/g, ' ')
+  const rules = [...(stylesheet.sheet as CSSStyleSheet).cssRules].filter(
+    (entry): entry is CSSStyleRule => entry instanceof CSSStyleRule
+  )
+  const lightHover = rules.find(
+    (entry) =>
+      normalize(entry.selectorText) ===
+      '.sub-checkout .sub-checkout-footer > button:first-of-type:hover:not(:disabled)'
+  )
+  expect(lightHover?.style.getPropertyValue('background')).toBe(
+    'rgb(245, 247, 250)'
+  )
+  const darkHover = rules.find(
+    (entry) =>
+      normalize(entry.selectorText) ===
+      '.dark .sub-checkout .sub-checkout-footer > button:first-of-type:hover:not(:disabled)'
+  )
+  expect(darkHover?.style.getPropertyValue('background')).toBe('var(--muted)')
+  expect(darkHover?.style.getPropertyValue('border-color')).toBe(
+    'var(--border)'
+  )
+})
 it('keeps payment button sizing out of the nested agreement title', () => {
   const agreement = checkout.querySelector<HTMLButtonElement>(
     '.agreement-document-link'

@@ -868,6 +868,7 @@
 
 ### Z048 订阅确认弹窗精确还原与支付方式空状态修复
 
+- 深色模式取消按钮 hover 修复（2026-11-24）：确认弹窗取消按钮的 hover 背景硬编码浅色 `#f5f7fa`，深色模式下近白文字落在近白背景上不可读；新增 `.dark` 覆盖改用主题 `--muted` 表面与 `--border` 边框，浅色 hover 保持不变。影响 fork 自有 `web/src/styles/subscriptions-custom.css` 及主题回归测试，无上游自有文件变更。checkout 主题回归新增 1 用例（共 3 项）通过；`bun run typecheck`、scoped oxlint/oxfmt、`bun run build` 通过；Chrome 以生产构建 CSS 静态页实测深色 hover 背景为 `--muted`、文字为 `--foreground`，浅色 hover 仍为 `#f5f7fa`。
 - 需求与原因：继续按 `c-dev/ZYY-AI-demo.html` 的实际单次购买弹窗对齐；支付接口返回空列表时，原条件渲染会同时隐藏支付方式标签和选择器，造成入口丢失。
 - 变更内容：始终展示支付方式区域，复用 `NativeSelect` 恢复 demo 原生选择器外观；加载中、失败、空列表均禁用并展示相应提示，失败仍可重试，只有后端实际返回的渠道可选。移除确认弹窗的优先级排期说明，保留页面原有说明。精确采用系统字体、44%遮罩、阴影、正文/积分单位字号、按钮颜色/边框/内边距与 demo 的间距；支付金额去除币种空格及整数尾部 `.00`，仍复用 BigInt 格式化以保留分金额精度。
 - 影响面：`web/src/features/subscriptions-custom/checkout.tsx`、`copy.json`、`__tests__/{checkout,configured-plans}.test.tsx`、`web/src/styles/subscriptions-custom.css` 及本登记表。
