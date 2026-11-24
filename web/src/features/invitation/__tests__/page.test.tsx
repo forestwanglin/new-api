@@ -335,7 +335,7 @@ it('requires explicit confirmation after complete authentication', async () => {
     )
   )
 })
-it('does not use a partial MFA identity to bind and shows existing binding dialog', async () => {
+it('does not use a partial MFA identity to bind and shows the inviter after full login', async () => {
   act(() =>
     useAuthStore
       .getState()
@@ -351,12 +351,11 @@ it('does not use a partial MFA identity to bind and shows existing binding dialo
   expect(api.post).not.toHaveBeenCalled()
   bound = true
   act(() => login())
-  await userEvent.click(
-    await screen.findByRole('button', { name: 'View binding' })
-  )
-  expect(await screen.findByRole('dialog')).toHaveTextContent(
-    'You have already bound an inviter'
-  )
+  expect(await screen.findByText('Forest昵称')).toBeVisible()
+  expect(
+    screen.queryByRole('button', { name: 'View binding' })
+  ).not.toBeInTheDocument()
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   expect(api.post).not.toHaveBeenCalled()
 })
 it('clears binding input on account switch', async () => {
@@ -369,14 +368,17 @@ it('clears binding input on account switch', async () => {
   await waitFor(() => expect(screen.getByRole('textbox')).toHaveValue(''))
 })
 
-it('backend already-bound race opens the immutable binding dialog', async () => {
+it('backend already-bound race shows the error inline and refreshes inviter details', async () => {
   login()
-  vi.mocked(api.post).mockResolvedValue({
-    data: {
-      success: false,
-      code: 'ALREADY_BOUND',
-      message: 'An inviter has already been bound',
-    },
+  vi.mocked(api.post).mockImplementation(async () => {
+    bound = true
+    return {
+      data: {
+        success: false,
+        code: 'ALREADY_BOUND',
+        message: 'An inviter has already been bound',
+      },
+    }
   })
   mount()
   await userEvent.type(screen.getByRole('textbox'), 'forest')
@@ -389,24 +391,38 @@ it('backend already-bound race opens the immutable binding dialog', async () => 
   await userEvent.click(
     await screen.findByRole('button', { name: 'Bind permanently' })
   )
-  await waitFor(() =>
-    expect(screen.getByRole('dialog')).toHaveTextContent(
-      'You have already bound an inviter'
-    )
+  expect(await screen.findByRole('status')).toHaveTextContent(
+    'An inviter has already been bound'
   )
+  expect(await screen.findByText('Forest昵称')).toBeVisible()
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 })
 
-it('already-bound account without a URL code can open its binding dialog', async () => {
+it('shows only the bound label, avatar and nickname in that order', async () => {
   bound = true
   login()
   mount()
-  const view = await screen.findByRole('button', { name: 'View binding' })
+  const name = await screen.findByText('Forest昵称')
+  const label = screen.getByText('Bound inviter:')
+  const avatar = screen.getByText('F', {
+    selector: '[data-slot="avatar-fallback"]',
+  })
+  expect(
+    label.compareDocumentPosition(avatar) & Node.DOCUMENT_POSITION_FOLLOWING
+  ).toBeTruthy()
+  expect(
+    avatar.compareDocumentPosition(name) & Node.DOCUMENT_POSITION_FOLLOWING
+  ).toBeTruthy()
   expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
-  expect(screen.getAllByText('forest').length).toBeGreaterThan(0)
-  await userEvent.click(view)
-  expect(await screen.findByRole('dialog')).toHaveTextContent(
-    'You have already bound an inviter'
-  )
+  const inviterSection = screen
+    .getByRole('heading', { name: 'My inviter' })
+    .closest('section')
+  if (!inviterSection) throw new Error('Inviter section is missing')
+  expect(within(inviterSection).queryByText('forest')).not.toBeInTheDocument()
+  expect(
+    screen.queryByRole('button', { name: 'View binding' })
+  ).not.toBeInTheDocument()
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   expect(api.post).not.toHaveBeenCalled()
 })
 

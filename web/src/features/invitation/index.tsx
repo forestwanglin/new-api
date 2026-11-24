@@ -23,7 +23,6 @@ import { useTranslation } from 'react-i18next'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 
 import '@/styles/invitation.css'
-import { Dialog } from '@/components/dialog'
 import { ErrorState } from '@/components/error-state'
 import { LoadingState } from '@/components/loading-state'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -32,10 +31,7 @@ import { Input } from '@/components/ui/input'
 import { usePointName } from '@/features/points/lib/point-name-context'
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 import { getUserAvatarFallback, getUserAvatarStyle } from '@/lib/avatar'
-import {
-  getServerErrorMessage,
-  getServerErrorSources,
-} from '@/lib/server-error-message'
+import { getServerErrorMessage } from '@/lib/server-error-message'
 import { useAuthStore } from '@/stores/auth-store'
 import { useLoginModalStore } from '@/stores/login-modal-store'
 
@@ -76,7 +72,6 @@ export function InvitationPage({
   )
   const [rewardsPage, setRewardsPage] = useState(1)
   const [activitiesOpen, setActivitiesOpen] = useState(false)
-  const [boundDialog, setBoundDialog] = useState(false)
   const [confirmDialog, setConfirmDialog] = useState(false)
   const [message, setMessage] = useState('')
   const campaign = useQuery({
@@ -126,20 +121,12 @@ export function InvitationPage({
     onError: (error, variables) => {
       if (useAuthStore.getState().auth.user?.id !== variables.viewer) return
       setConfirmDialog(false)
-      if (
-        getServerErrorSources(error).some((s) => s.code === 'ALREADY_BOUND')
-      ) {
-        setBoundDialog(true)
-      }
       setMessage(getServerErrorMessage(error))
       void binding.refetch()
     },
   })
   const confirm = () => {
-    if (fullAuth && binding.data?.bound) {
-      setBoundDialog(true)
-      return
-    }
+    if (fullAuth && binding.data?.bound) return
     if (!input.trim()) return
     if (!fullAuth) {
       saveBindingIntent(input.trim())
@@ -147,10 +134,6 @@ export function InvitationPage({
       return
     }
     if (!binding.isSuccess) return
-    if (binding.data.bound) {
-      setBoundDialog(true)
-      return
-    }
     setConfirmDialog(true)
   }
   useEffect(() => {
@@ -158,7 +141,6 @@ export function InvitationPage({
       clearBindingIntent()
       setInput('')
       setMessage('')
-      setBoundDialog(false)
       setConfirmDialog(false)
       setRewardsPage(1)
     }
@@ -326,6 +308,7 @@ export function InvitationPage({
               </p>
               {binding.data?.bound ? (
                 <div className='iv-ref-done'>
+                  <strong>{t('Bound inviter')}: </strong>
                   <div className='flex min-w-0 items-center gap-3'>
                     <Avatar>
                       <AvatarImage
@@ -337,17 +320,8 @@ export function InvitationPage({
                         {getUserAvatarFallback(inviterName)}
                       </AvatarFallback>
                     </Avatar>
-                    <strong className='min-w-0 break-all'>
-                      <span>{t('Bound inviter')}: </span>
-                      <span>{inviterName}</span>
-                    </strong>
+                    <strong className='min-w-0 break-all'>{inviterName}</strong>
                   </div>
-                  <span className='iv-ref-code'>
-                    {binding.data.inviter_code}
-                  </span>
-                  <Button variant='outline' onClick={confirm}>
-                    {t('View binding')}
-                  </Button>
                 </div>
               ) : (
                 <div className='iv-ref-form'>
@@ -400,13 +374,6 @@ export function InvitationPage({
           }
         }}
       />
-      <Dialog
-        open={boundDialog}
-        onOpenChange={setBoundDialog}
-        title={t('Bound inviter')}
-      >
-        <p>{t('You have already bound an inviter')}</p>
-      </Dialog>
       <ActivityDialog open={activitiesOpen} onOpenChange={setActivitiesOpen} />
     </main>
   )

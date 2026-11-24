@@ -483,13 +483,6 @@
   border-radius: 10px;
   background: #f8fbff;
 }
-.invitation-page .iv-ref-code {
-  font-family: 'SF Mono', Menlo, monospace;
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--tx);
-  letter-spacing: 0.4px;
-}
 .invitation-page .iv-stages {
   padding: 26px 30px 28px;
   border-top: 1px solid #e5ebf4;

@@ -1368,6 +1368,7 @@
 
 ### Z097 邀请人资料、订阅支付状态与钱包购买入口
 
+- 展示精简（2026-11-24）：已绑定行按“已绑定邀请人：头像 昵称”顺序展示，移除邀请人的邀请码、查看绑定按钮和只读绑定弹窗，删除对应状态及无用 CSS；绑定冲突保留内联错误与资料刷新，首次绑定确认保持不变。影响 fork 自有邀请页面、回归与 invitation.css，无上游自有文件新增变更。邀请及主题 6 文件、46 测试、typecheck、scoped oxlint/oxfmt 与生产构建通过；未做浏览器实机核对。
 - 需求与原因：用户需要识别已绑定邀请人、快速区分支付结果，并在钱包余额不足时进入订阅购买；钱包须展示所有自定义积分类型。
 - 变更内容：绑定查询与绑定结果增加当前邀请人的昵称和头像，保留原有匿名标签，昵称为空时使用用户名，账户删除时保留绑定与匿名标签；个人邀请页复用 Avatar。订单复用 StatusBadge，支付成功绿色，失败、取消、关闭及过期红色，待支付和未知状态保持中性。钱包增加 /subscription 购买入口，“其他积分”逐项展示所有非 GENERAL 类型的可用余额，总额使用 BigInt 汇总所有类型，不计冻结和邀请待发奖励；无其他账户时显示明确空状态。
 - 影响面：fork 文件 model/invitation.go、model/invitation_test.go、web/src/features/invitation/{api.ts,index.tsx}、web/src/features/points-wallet/index.tsx、web/src/features/subscriptions-custom/orders.tsx 及三个模块回归。**上游自有文件**：七语言 web/src/i18n/locales/{en,zh,zh-TW,fr,ru,ja,vi}.json。
