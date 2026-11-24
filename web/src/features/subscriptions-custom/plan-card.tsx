@@ -19,9 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { Fragment } from 'react'
 
 import { Button } from '@/components/ui/button'
-import { Switch } from '@/components/ui/switch'
 import { formatPlanPrice } from '@/features/custom-subscriptions/lib/format'
-import { autoBonusPoints } from '@/features/custom-subscriptions/lib/schema'
 import { usePointName } from '@/features/points/lib/point-name-context'
 import { formatNumber } from '@/lib/format'
 
@@ -33,13 +31,9 @@ import {
   type PublicSubscriptionPlan,
 } from './plans'
 
-function PlanPoints(props: {
-  plan: PublicSubscriptionPlan
-  locale: string
-  renewal?: boolean
-}) {
+function PlanPoints(props: { plan: PublicSubscriptionPlan; locale: string }) {
   const pointName = usePointName()
-  return offerPointAmounts(props.plan, props.renewal, pointName).map(
+  return offerPointAmounts(props.plan, false, pointName).map(
     (entry, index) => (
       <Fragment key={entry.id}>
         {index > 0 && ' + '}
@@ -51,9 +45,7 @@ function PlanPoints(props: {
 
 type Props = {
   offer: Offer
-  enabled: boolean
   onSelect: (offer: Offer) => void
-  onCancel: () => void
 }
 export function PlanCard(props: Props) {
   const pointName = usePointName()
@@ -67,26 +59,10 @@ export function PlanCard(props: Props) {
     benefitCounts.set(text, occurrence)
     return { id: JSON.stringify([text, occurrence]), text }
   })
-  const extra = autoBonusPoints(
-    offer.plan.paid_points,
-    offer.plan.bonus_points,
-    offer.plan.auto_renew_bonus_bps
-  )
-  const reward = `${formatNumber(offer.plan.auto_renew_bonus_bps / 100, locale)}%`
-  let renewalInstruction = t(
-    'Confirm using the switch or button below. Cancel anytime. An existing purchase requires authorization only, with no immediate charge.'
-  )
-  if (!offer.plan.auto_renew_enabled) {
-    renewalInstruction = t('Auto renewal is unavailable for this plan.')
-  } else {
-    renewalInstruction = t(
-      'Automatic renewal is not available yet. One-time purchases do not authorize future charges.'
-    )
-  }
   const period = offer.yearly ? t('year') : t('month')
   return (
     <article
-      className={`sub-plan ${props.enabled ? 'is-auto-enabled' : ''}`}
+      className='sub-plan'
       aria-label={`${offer.plan.title} · ${period}`}
     >
       <header className='sub-plan-top'>
@@ -117,57 +93,6 @@ export function PlanCard(props: Props) {
           <li key={benefit.id}>{benefit.text}</li>
         ))}
       </ul>
-      <section className='sub-option-auto'>
-        <div className='sub-auto-control'>
-          <div>
-            <h4>
-              {t('Auto renewal')}{' '}
-              <span className='sub-recommend'>{t('Unavailable')}</span>
-            </h4>
-            <p>
-              {t('Future auto renewals add {{rate}} extra points', {
-                rate: reward,
-              })}
-            </p>
-          </div>
-          <Switch
-            checked={props.enabled}
-            disabled
-            aria-label={`${offer.plan.title} ${period} ${t('Auto renewal')}`}
-            onCheckedChange={() =>
-              props.enabled
-                ? props.onCancel()
-                : props.onSelect({ ...offer, auto: true })
-            }
-          />
-        </div>
-        <div className='sub-renew-benefit'>
-          <span>
-            {t('Points credited after each successful automatic payment')}
-          </span>
-          <strong>
-            <PlanPoints plan={offer.plan} locale={locale} renewal />
-          </strong>
-          <span>
-            {t('Includes {{points}} extra', {
-              points:
-                `${formatNumber(BigInt(extra), locale)} ${offer.plan.auto_bonus_point_type ? pointName(offer.plan.auto_bonus_point_type) : ''}`.trim(),
-            })}
-          </span>
-        </div>
-        <p>
-          {t(
-            'Bonus points start with the first successful automatic renewal payment; authorization alone does not charge or credit points.'
-          )}
-        </p>
-        <p>{renewalInstruction}</p>
-        <Button
-          disabled
-          onClick={() => props.onSelect({ ...offer, auto: true })}
-        >
-          {price} · {t('Subscribe and enable auto renewal')}
-        </Button>
-      </section>
       <section className='sub-option-once'>
         <div className='sub-once-heading'>
           <h4>
@@ -186,7 +111,8 @@ export function PlanCard(props: Props) {
           })}
         </p>
         <Button
-          variant='outline'
+          variant='default'
+          className='sub-purchase-cta'
           onClick={() => props.onSelect({ ...offer, auto: false })}
         >
           {price} · {t('One-time purchase')}

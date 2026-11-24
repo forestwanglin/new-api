@@ -187,7 +187,7 @@ it('submits configured wxpay with exact plan identity and navigates through the 
   )
   expect(screen.getByText(/支付确认中/)).toBeVisible()
 })
-it('shows unavailable payments without creating an order and disables automatic renewal', async () => {
+it('shows unavailable payments without creating an order', async () => {
   signIn()
   const user = userEvent.setup()
   vi.spyOn(api, 'get').mockImplementation(async (url) => ({
@@ -200,11 +200,7 @@ it('shows unavailable payments without creating an order and disables automatic 
   }))
   const post = vi.spyOn(api, 'post')
   renderPage()
-  expect(await screen.findByRole('switch')).toHaveAttribute(
-    'aria-disabled',
-    'true'
-  )
-  await user.click(screen.getByRole('button', { name: /单次购买/ }))
+  await user.click(await screen.findByRole('button', { name: /单次购买/ }))
   expect(
     await screen.findByText('暂无可用支付方式，请联系客服。')
   ).toBeVisible()

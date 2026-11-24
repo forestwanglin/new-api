@@ -94,30 +94,18 @@ it('groups backend records by month/year and renders exact configured prices, po
     within(cards[0]).getAllByText(/9,007,199,254,740,993 通用积分/).length
   ).toBeGreaterThan(0)
   expect(within(cards[0]).getAllByText(/7 GPT积分/).length).toBeGreaterThan(0)
-  expect(within(cards[0]).getByText(/12.5%/)).toBeVisible()
-  expect(
-    within(cards[0]).getByText('含额外赠送 1,125,899,906,842,625 GPT积分')
-  ).toBeVisible()
   expect(
     within(cards[1]).getAllByText(/90,071,992,547,409.93/).length
   ).toBeGreaterThan(0)
   expect(screen.queryByText(/较逐月购买省2个月/)).not.toBeInTheDocument()
 })
-it('disables unavailable renewal and uses the selected database record in the purchase confirmation', async () => {
+it('uses the selected database record in the purchase confirmation', async () => {
   const user = userEvent.setup()
   useAuthStore.getState().auth.setUser({ id: 1, username: 'buyer', role: 1 })
   mockPlans([yearlyPlan])
   const post = vi.spyOn(api, 'post')
   renderPage()
   const card = await screen.findByRole('article')
-  expect(within(card).getByText('此方案暂未开放自动续费。')).toBeVisible()
-  expect(within(card).getByRole('switch')).toHaveAttribute(
-    'aria-disabled',
-    'true'
-  )
-  expect(
-    within(card).getByRole('button', { name: /订阅并开启自动续费/ })
-  ).toBeDisabled()
   await user.click(within(card).getByRole('button', { name: /单次购买/ }))
   const dialog = screen.getByRole('dialog')
   expect(within(dialog).getByRole('heading', { level: 3 })).toHaveTextContent(
@@ -172,8 +160,9 @@ it('shows API failures and retries rather than converting failure into an empty 
     /后台月付计划/
   )
 })
-it('uses no bonus for zero reward and discards a stale selection when a plan is removed', async () => {
+it('discards a stale selection when a plan is removed', async () => {
   const user = userEvent.setup()
+  useAuthStore.getState().auth.setUser({ id: 1, username: 'buyer', role: 1 })
   mockPlans([
     {
       ...configuredPlan,
@@ -185,8 +174,8 @@ it('uses no bonus for zero reward and discards a stale selection when a plan is 
   ])
   const client = renderPage()
   const card = await screen.findByRole('article')
-  expect(within(card).queryByText(/10%|12.5%/)).not.toBeInTheDocument()
-  await user.click(within(card).getByRole('switch'))
+  await user.click(within(card).getByRole('button', { name: /单次购买/ }))
+  expect(screen.getByRole('dialog')).toBeInTheDocument()
   await act(async () => {
     client.setQueryData(['subscription-plans', 'public'], [])
   })

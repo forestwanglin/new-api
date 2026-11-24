@@ -214,18 +214,12 @@ it('shows configured offers, exact annual points and all rules', async () => {
   expect(screen.getAllByText(/2,388,000 通用积分/).length).toBeGreaterThan(0)
   expect(screen.getByRole('heading', { name: '订阅规则' })).toBeVisible()
 })
-it('keeps automatic renewal disabled without creating a simulated authorization', async () => {
-  const user = userEvent.setup()
+it('hides the auto-renewal section regardless of the backend setting', async () => {
   await renderDemo()
-  for (const toggle of screen.getAllByRole('switch')) {
-    expect(toggle).toHaveAttribute('aria-disabled', 'true')
-  }
-  await user.click(screen.getAllByRole('switch')[0])
-  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-  expect(screen.getAllByRole('switch')[0]).toHaveAttribute(
-    'aria-checked',
-    'false'
-  )
+  expect(screen.queryByRole('switch')).not.toBeInTheDocument()
+  expect(
+    screen.queryByRole('button', { name: /订阅并开启自动续费/ })
+  ).not.toBeInTheDocument()
 })
 it('hides account-only tabs and sections for signed-out visitors', async () => {
   await renderDemo()

@@ -177,9 +177,7 @@ export function SubscriptionsCustom(
                             <PlanCard
                               key={plan.id}
                               offer={offer}
-                              enabled={false}
                               onSelect={select}
-                              onCancel={() => {}}
                             />
                           )
                         })}
