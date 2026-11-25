@@ -58,7 +58,41 @@ it('does not start a flow before legal consent', async () => {
   expect(
     screen.getByText('Accept the terms before authorizing with WeChat.')
   ).toBeInTheDocument()
+  expect(
+    screen.queryByText('Scan with WeChat to authorize.')
+  ).not.toBeInTheDocument()
   expect(api.get).not.toHaveBeenCalled()
+})
+it('replaces the consent prompt with the scan hint in the same slot once consent is given', async () => {
+  vi.spyOn(api, 'post').mockImplementation(async (url) => {
+    if (url.endsWith('/flows')) return response(flow)
+    if (url.endsWith('/status')) return response({ status: 'pending' })
+    return response({})
+  })
+  const view = render(
+    <OfficialWeChatAuthorization
+      request={{ intent: 'login' }}
+      enabled={false}
+      onResult={vi.fn()}
+    />
+  )
+  expect(
+    screen.getByText('Accept the terms before authorizing with WeChat.')
+  ).toBeInTheDocument()
+
+  view.rerender(
+    <OfficialWeChatAuthorization
+      request={{ intent: 'login' }}
+      enabled
+      onResult={vi.fn()}
+    />
+  )
+  expect(
+    await screen.findByText('Scan with WeChat to authorize.')
+  ).toBeInTheDocument()
+  expect(
+    screen.queryByText('Accept the terms before authorizing with WeChat.')
+  ).not.toBeInTheDocument()
 })
 it('consumes authorized login once and keeps owner capability outside QR and browser storage', async () => {
   const result = vi.fn()
@@ -317,17 +351,11 @@ it('shows a skeleton placeholder sized to the QR while the flow is pending and r
   const placeholder = await screen.findByText(
     'Preparing WeChat authorization...'
   )
-  const placeholderCard = placeholder.closest('[role="status"]')
+  const placeholderCard = placeholder.parentElement?.firstElementChild
   expect(placeholderCard).toBeInTheDocument()
   // The placeholder keeps the QR footprint so the card does not shift.
-  expect(placeholderCard?.firstElementChild).toHaveClass(
-    'rounded-2xl',
-    'bg-white',
-    'p-2'
-  )
-  expect(placeholderCard?.firstElementChild?.firstElementChild).toHaveClass(
-    'w-56'
-  )
+  expect(placeholderCard).toHaveClass('rounded-2xl', 'bg-white', 'p-2')
+  expect(placeholderCard?.firstElementChild).toHaveClass('w-56')
   expect(
     screen.queryByTitle('WeChat authorization QR code')
   ).not.toBeInTheDocument()
