@@ -51,9 +51,17 @@ func AttachUserPointBalances(users []*User) ([]UserWithPointBalances, error) {
 	}
 
 	// Sort in Go so ordering does not depend on the database collation.
-	priority := map[string]int{PointTypeGeneral: -2, PointTypeGPT: -1}
+	// GENERAL comes first; every other type is ordered by code.
 	slices.SortFunc(rows, func(a, b pointBalanceRow) int {
-		if order := cmp.Compare(priority[a.Code], priority[b.Code]); order != 0 {
+		aGeneral := 1
+		if a.Code == PointTypeGeneral {
+			aGeneral = 0
+		}
+		bGeneral := 1
+		if b.Code == PointTypeGeneral {
+			bGeneral = 0
+		}
+		if order := cmp.Compare(aGeneral, bGeneral); order != 0 {
 			return order
 		}
 		return cmp.Compare(a.Code, b.Code)

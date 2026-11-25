@@ -90,8 +90,8 @@ it('sorts general points first and keeps frozen-only holdings visible', () => {
   ])
   const rows = screen.getAllByText(/：/)
   expect(rows[0]).toHaveTextContent('通用积分：12,000/2,000')
-  expect(rows[1]).toHaveTextContent('GPT 专用积分：0/15')
-  expect(rows[2]).toHaveTextContent('Future point type：7/0')
+  expect(rows[1]).toHaveTextContent('Future point type：7/0')
+  expect(rows[2]).toHaveTextContent('GPT 专用积分：0/15')
 })
 
 it('hides holdings where both available and frozen are zero', () => {

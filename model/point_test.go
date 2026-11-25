@@ -421,8 +421,8 @@ func TestUserPointBalancesDatabaseMatrix(t *testing.T) {
 			assert.Equal(t, []UserPointBalance{{Code: "GPT", Name: "GPT", AvailablePoints: "0", FrozenPoints: "500"}}, items[0].PointBalances)
 			assert.Equal(t, []UserPointBalance{
 				{Code: "GENERAL", Name: "General", AvailablePoints: "9007199254740993", FrozenPoints: "2000"},
-				{Code: "GPT", Name: "GPT", AvailablePoints: "9223372036854775807", FrozenPoints: "0"},
 				{Code: "DS", Name: "Future first", AvailablePoints: "0", FrozenPoints: "300"},
+				{Code: "GPT", Name: "GPT", AvailablePoints: "9223372036854775807", FrozenPoints: "0"},
 				{Code: "ZZ", Name: "Future last", AvailablePoints: "-1", FrozenPoints: "0"},
 			}, items[1].PointBalances)
 			assert.Equal(t, []UserPointBalance{}, items[2].PointBalances)

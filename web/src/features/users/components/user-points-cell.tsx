@@ -38,10 +38,9 @@ export function UserPointsCell(props: UserPointsCellProps) {
         balance.available_points !== '0' || balance.frozen_points !== '0'
     )
     .sort((a, b) => {
-      const priority = (code: string) =>
-        code === 'GENERAL' ? -2 : code === 'GPT' ? -1 : 0
-      const order = priority(a.code) - priority(b.code)
-      if (order !== 0) return order
+      const aGeneral = a.code === 'GENERAL' ? 0 : 1
+      const bGeneral = b.code === 'GENERAL' ? 0 : 1
+      if (aGeneral !== bGeneral) return aGeneral - bGeneral
       return a.code.localeCompare(b.code)
     })
   if (balances.length === 0) return <span>—</span>
