@@ -63,11 +63,14 @@ it('does not start a flow before legal consent', async () => {
   ).not.toBeInTheDocument()
   expect(api.get).not.toHaveBeenCalled()
 })
-it('replaces the consent prompt with the scan hint in the same slot once consent is given', async () => {
+it('shows the scan hint only after the QR replaces the preparing state', async () => {
+  let finishFlow!: (value: ReturnType<typeof response>) => void
+  const pendingFlow = new Promise<ReturnType<typeof response>>((resolve) => {
+    finishFlow = resolve
+  })
   vi.spyOn(api, 'post').mockImplementation(async (url) => {
-    if (url.endsWith('/flows')) return response(flow)
-    if (url.endsWith('/status')) return response({ status: 'pending' })
-    return response({})
+    if (url.endsWith('/flows')) return pendingFlow
+    return response({ status: 'pending' })
   })
   const view = render(
     <OfficialWeChatAuthorization
@@ -79,6 +82,9 @@ it('replaces the consent prompt with the scan hint in the same slot once consent
   expect(
     screen.getByText('Accept the terms before authorizing with WeChat.')
   ).toBeInTheDocument()
+  expect(
+    screen.queryByText('Preparing WeChat authorization...')
+  ).not.toBeInTheDocument()
 
   view.rerender(
     <OfficialWeChatAuthorization
@@ -88,11 +94,23 @@ it('replaces the consent prompt with the scan hint in the same slot once consent
     />
   )
   expect(
-    await screen.findByText('Scan with WeChat to authorize.')
+    await screen.findByText('Preparing WeChat authorization...')
   ).toBeInTheDocument()
+  expect(
+    screen.queryByText('Scan with WeChat to authorize.')
+  ).not.toBeInTheDocument()
   expect(
     screen.queryByText('Accept the terms before authorizing with WeChat.')
   ).not.toBeInTheDocument()
+
+  finishFlow(response(flow))
+  expect(
+    await screen.findByTitle('WeChat authorization QR code')
+  ).toBeInTheDocument()
+  expect(
+    screen.queryByText('Preparing WeChat authorization...')
+  ).not.toBeInTheDocument()
+  expect(screen.getByText('Scan with WeChat to authorize.')).toBeInTheDocument()
 })
 it('consumes authorized login once and keeps owner capability outside QR and browser storage', async () => {
   const result = vi.fn()

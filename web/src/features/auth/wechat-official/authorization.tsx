@@ -216,11 +216,12 @@ export function OfficialWeChatAuthorization(props: AuthorizationProps) {
           </div>
         )}
       </div>
-      <p role='status'>
-        {props.enabled === false
-          ? t('Accept the terms before authorizing with WeChat.')
-          : t('Scan with WeChat to authorize.')}
-      </p>
+      {props.enabled === false && (
+        <p role='status'>
+          {t('Accept the terms before authorizing with WeChat.')}
+        </p>
+      )}
+      {qrReady && <p role='status'>{t('Scan with WeChat to authorize.')}</p>}
       {preparing && (
         <p role='status' className='text-muted-foreground'>
           {t('Preparing WeChat authorization...')}
