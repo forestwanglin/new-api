@@ -15,6 +15,9 @@ export function tierLabel(
   t: TFunction
 ) {
   if (!next) {
+    if (tier.min_effective_friends === 0) {
+      return t('Any number of friends')
+    }
     return t('{{count}}+ friends', { count: tier.min_effective_friends })
   }
   return t('{{start}}—{{end}} friends', {

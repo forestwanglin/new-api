@@ -1013,6 +1013,7 @@
 - 开关与默认值：无新增运行时开关；`freeze_days` 默认 7，允许 1–365；阶梯 `rate_bps` 为 0–10000，活动时间为 `[starts_at, ends_at)`，积分类型必须来自现有 point_types。活动草稿不生效，绑定不可覆盖。
 - 验证：邀请边界、控制器/路由、model/service 定向测试通过；SQLite 3.50.4、MySQL 8.4.13、PostgreSQL 16.16 fresh/legacy 双次迁移和支付/退款/冻结/释放矩阵通过，并覆盖冻结奖励退款舍入到零后再次退款、零奖励事件确认前后退款；前端邀请测试、typecheck、范围 lint/format、生产构建通过；隔离 Chrome 验证匿名登录弹窗取消、邀请页及 390×844 移动布局。全量后端仍复现既有 OpenAI 采样兼容与 PAT 路由目录失败；前端全量 281 文件 / 3028 用例通过，仅既有 detail-preview 本地化价格用例超时；新增导航顺序回归已同步。详见 [验证记录](invitation-campaign-verification.md)。
 - 风险与未覆盖：未部署生产，未执行真实支付渠道退款或真实短信/微信认证；全量基线失败未由本功能扩大处理范围。阶梯请求在 HTTP 边界严格拒绝 `null`、缺失和未知字段，避免配置被静默归一化。
+- 2026-11-25 单档邀请活动文案：后端要求首个阶梯阈值为 0，活动只配一档时末档标签渲染为「0人及以上」，容易被理解为人数门槛而非「没有人数要求」。前端 `tierLabel` 在末档阈值为 0 时改用「不限人数」（`Any number of friends`）；多档的区间标签与 `N人及以上` 保持不变。影响面：fork 自有文件 `web/src/features/invitation/display.ts` 与对应 `__tests__/display.test.ts`，**上游自有文件**七种 locale（新增 1 个键）。验证：邀请 display/demo 回归 17 用例、`bun check -b`、涉及文件 oxlint/oxfmt 通过。
 - 2026-11-16 日期与控件调整：允许过去的开始时间；创建、编辑、发布均要求结束时间严格晚于当前时间，并保留结束晚于开始的约束。过期返回 `CAMPAIGN_END_PASSED` 及明确提示，管理列表仅提示结束过期的草稿。实际生效从 `max(starts_at, 发布时间)` 开始，按实际有效区间检查重叠，避免追溯影响历史订单。“可见”使用既有 `Checkbox`，默认值保持 true，支持标签点击和空格切换。影响 `model/controller` 邀请模块及对应测试、前端邀请表单、错误码映射与中英文文案；涉及既有上游文件 `web/src/lib/server-error-message.ts` 与 locale 文件，升级时复核。扩展 Z062 的活动发布行为，无新增配置、依赖或部署脚本变更。验证：邀请 Go 定向测试（SQLite）与前端邀请模块/错误映射、typecheck 通过；MySQL/PostgreSQL 因未配置隔离 DSN 未验证，未执行真实支付。
 
 ### Z063 已登录账号绑定微信的短信二次验证

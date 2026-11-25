@@ -42,3 +42,17 @@ it.each([
     ).toBe('5人及以上')
   }
 )
+
+it.each([
+  ['zhCN', zh, '不限人数'],
+  ['zhTW', zhTW, '不限人數'],
+] as const)(
+  'labels a single tier without a friend minimum as unlimited for %s',
+  async (language, resource, expected) => {
+    const i18n = createInstance()
+    await i18n.init({ lng: language, resources: { [language]: resource } })
+    expect(
+      tierLabel({ min_effective_friends: 0, rate_bps: 500 }, undefined, i18n.t)
+    ).toBe(expected)
+  }
+)
