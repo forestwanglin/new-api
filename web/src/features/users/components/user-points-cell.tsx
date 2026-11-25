@@ -54,8 +54,14 @@ export function UserPointsCell(props: UserPointsCellProps) {
           key={balance.code}
           className='min-w-0 break-words whitespace-normal'
         >
-          {pointName(balance)}：{format(balance.available_points)}/
-          {format(balance.frozen_points)}
+          {pointName(balance)}：
+          <span className='text-green-600 dark:text-green-400'>
+            {format(balance.available_points)}
+          </span>{' '}
+          /{' '}
+          <span className='text-orange-600 dark:text-orange-400'>
+            {format(balance.frozen_points)}
+          </span>
         </div>
       ))}
     </div>

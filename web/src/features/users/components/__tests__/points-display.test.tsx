@@ -75,11 +75,20 @@ it.each([
   expect(screen.queryByRole('button')).not.toBeInTheDocument()
 })
 
-it('lists every held point type on its own row as name: available/pending-release', () => {
+it('lists every held point type on its own row as name: available / pending-release', () => {
   view([general, { ...gpt, available_points: '0', frozen_points: '15' }])
-  expect(screen.getByText('通用积分：12,000/2,000')).toBeVisible()
-  expect(screen.getByText('GPT 专用积分：0/15')).toBeVisible()
+  const rows = screen.getAllByText(/：/)
+  expect(rows[0]).toHaveTextContent('通用积分：12,000 / 2,000')
+  expect(rows[1]).toHaveTextContent('GPT 专用积分：0 / 15')
   expect(screen.queryByText('12,015')).not.toBeInTheDocument()
+})
+
+it('colors available points green and pending-release points orange', () => {
+  view([general])
+  const available = screen.getByText('12,000')
+  const frozen = screen.getByText('2,000')
+  expect(available).toHaveClass('text-green-600')
+  expect(frozen).toHaveClass('text-orange-600')
 })
 
 it('sorts general points first and keeps frozen-only holdings visible', () => {
@@ -89,9 +98,9 @@ it('sorts general points first and keeps frozen-only holdings visible', () => {
     general,
   ])
   const rows = screen.getAllByText(/：/)
-  expect(rows[0]).toHaveTextContent('通用积分：12,000/2,000')
-  expect(rows[1]).toHaveTextContent('Future point type：7/0')
-  expect(rows[2]).toHaveTextContent('GPT 专用积分：0/15')
+  expect(rows[0]).toHaveTextContent('通用积分：12,000 / 2,000')
+  expect(rows[1]).toHaveTextContent('Future point type：7 / 0')
+  expect(rows[2]).toHaveTextContent('GPT 专用积分：0 / 15')
 })
 
 it('hides holdings where both available and frozen are zero', () => {
@@ -99,7 +108,7 @@ it('hides holdings where both available and frozen are zero', () => {
     general,
     { code: 'GPT', name: 'GPT 专用积分', available_points: '0', frozen_points: '0' },
   ])
-  expect(screen.getByText('通用积分：12,000/2,000')).toBeVisible()
+  expect(screen.getByText(/通用积分：/)).toBeVisible()
   expect(screen.queryByText(/GPT 专用积分/)).not.toBeInTheDocument()
 })
 
@@ -118,21 +127,23 @@ it.each(['en', 'fr', 'ru', 'ja', 'vi', 'zhCN', 'zhTW'])(
     const available = new Intl.NumberFormat(locale).format(9223372036854775807n)
     const frozen = new Intl.NumberFormat(locale).format(-9223372036854775808n)
     expect(
-      screen.getByText(`通用积分：${available}/${frozen}`, {
-        normalizer: (text) => text,
-      })
+      screen.getByText(available, { normalizer: (text) => text })
+    ).toBeVisible()
+    expect(
+      screen.getByText(frozen, { normalizer: (text) => text })
     ).toBeVisible()
   }
 )
 
 it('preserves configured type names while translating number grouping', async () => {
   view([general])
-  expect(screen.getByText('通用积分：12,000/2,000')).toBeVisible()
+  expect(screen.getByText('12,000')).toBeVisible()
   await act(() => i18n.changeLanguage('fr'))
   expect(
-    screen.getByText(/通用积分：12\u202f000\/2\u202f000/, {
-      normalizer: (text) => text,
-    })
+    screen.getByText('12\u202f000', { normalizer: (text) => text })
+  ).toBeVisible()
+  expect(
+    screen.getByText('2\u202f000', { normalizer: (text) => text })
   ).toBeVisible()
 })
 
