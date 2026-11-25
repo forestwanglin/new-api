@@ -8042,7 +8042,6 @@
     "Available after each order’s release is confirmed": "每筆訂單獎勵確認入帳後即可使用",
     "Available for eligible GPT model calls": "已到帳可用，可用於符合條件的GPT模型呼叫",
     "Available points": "可用積分",
-    "Available points are shown; frozen points are listed separately.": "顯示可用積分，凍結積分單獨列出。",
     "Bind a phone number to finish WeChat sign in": "请绑定手机号后完成微信登录。",
     "Bind inviter": "綁定邀請人",
     "Bind permanently": "永久綁定",
@@ -8613,6 +8612,7 @@
     "Point type is used by model billing history": "此積分類型已被模型計費歷史快照引用，無法刪除",
     "Other points": "其他點數",
     "No other points accounts": "暫無其他點數帳戶",
-    "Buy points": "購買點數"
+    "Buy points": "購買點數",
+    "Each point type shows available/pending-release points.": "每種積分顯示可用/待釋放積分。"
   }
 }

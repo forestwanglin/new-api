@@ -18,7 +18,6 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useTranslation } from 'react-i18next'
 
-import { QuotaDetailsPopover } from '@/components/quota-details-popover'
 import { usePointName } from '@/features/points/lib/point-name-context'
 import { toIntlLocale } from '@/i18n/languages'
 import { formatNumber } from '@/lib/format'
@@ -30,67 +29,36 @@ type UserPointsCellProps = {
 }
 
 export function UserPointsCell(props: UserPointsCellProps) {
-  const { t, i18n } = useTranslation()
+  const { i18n } = useTranslation()
   const pointName = usePointName()
   const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
-  const balances = (props.balances ?? []).filter(
-    (balance) =>
-      balance.available_points !== '0' || balance.frozen_points !== '0'
-  )
+  const balances = (props.balances ?? [])
+    .filter(
+      (balance) =>
+        balance.available_points !== '0' || balance.frozen_points !== '0'
+    )
+    .sort((a, b) => {
+      const priority = (code: string) =>
+        code === 'GENERAL' ? -2 : code === 'GPT' ? -1 : 0
+      const order = priority(a.code) - priority(b.code)
+      if (order !== 0) return order
+      return a.code.localeCompare(b.code)
+    })
   if (balances.length === 0) return <span>—</span>
 
   const format = (value: string) => formatNumber(BigInt(value), locale)
-  const name = pointName
-  const details = (balance: UserPointBalance) => [
-    {
-      label: `${pointName(balance)} (${balance.code}) · ${t('Available points')}`,
-      value: format(balance.available_points),
-    },
-    {
-      label: `${pointName(balance)} (${balance.code}) · ${t('Frozen points')}`,
-      value: format(balance.frozen_points),
-    },
-  ]
 
   return (
     <div className='grid min-w-0 gap-1 text-sm tabular-nums'>
-      {balances.slice(0, 2).map((balance) => (
-        <QuotaDetailsPopover
+      {balances.map((balance) => (
+        <div
           key={balance.code}
-          title={t('Points details')}
-          triggerLabel={`${pointName(balance)} (${balance.code}) · ${t('Available points')} ${format(balance.available_points)}; ${t('Frozen points')} ${format(balance.frozen_points)}`}
-          details={details(balance)}
+          className='min-w-0 break-words whitespace-normal'
         >
-          <span className='grid w-full min-w-0 gap-0.5'>
-            <span className='flex min-w-0 items-baseline gap-2'>
-              <span className='text-muted-foreground max-w-24 shrink-0 truncate text-xs'>
-                {name(balance)}
-              </span>
-              <span className='min-w-0 break-all whitespace-normal'>
-                {format(balance.available_points)}
-              </span>
-            </span>
-            {balance.frozen_points !== '0' && (
-              <span
-                data-table-text='secondary'
-                className='text-muted-foreground text-xs break-words whitespace-normal'
-              >
-                {t('Frozen points')} {format(balance.frozen_points)}
-              </span>
-            )}
-          </span>
-        </QuotaDetailsPopover>
+          {pointName(balance)}：{format(balance.available_points)}/
+          {format(balance.frozen_points)}
+        </div>
       ))}
-      {balances.length > 2 && (
-        <QuotaDetailsPopover
-          title={t('Points details')}
-          triggerLabel={t('More point types', { count: balances.length - 2 })}
-          details={balances.flatMap(details)}
-          triggerClassName='text-muted-foreground text-xs'
-        >
-          {t('More point types', { count: balances.length - 2 })}
-        </QuotaDetailsPopover>
-      )}
     </div>
   )
 }

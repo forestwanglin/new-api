@@ -8042,7 +8042,6 @@
     "Available after each order’s release is confirmed": "Available after each order’s release is confirmed",
     "Available for eligible GPT model calls": "Available for eligible GPT model calls",
     "Available points": "Available points",
-    "Available points are shown; frozen points are listed separately.": "Available points are shown; frozen points are listed separately.",
     "Bind a phone number to finish WeChat sign in": "Bind a phone number to finish WeChat sign in",
     "Bind inviter": "Bind inviter",
     "Bind permanently": "Bind permanently",
@@ -8614,6 +8613,7 @@
     "Point type is used by model billing history": "Point type is used by model billing history",
     "Other points": "Other points",
     "No other points accounts": "No other points accounts",
-    "Buy points": "Buy points"
+    "Buy points": "Buy points",
+    "Each point type shows available/pending-release points.": "Each point type shows available/pending-release points."
   }
 }

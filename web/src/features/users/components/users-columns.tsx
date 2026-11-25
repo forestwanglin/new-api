@@ -224,7 +224,7 @@ export function useUsersColumns(): ColumnDef<User>[] {
             </TooltipTrigger>
             <TooltipContent>
               {t(
-                'Available points are shown; frozen points are listed separately.'
+                'Each point type shows available/pending-release points.'
               )}
             </TooltipContent>
           </Tooltip>

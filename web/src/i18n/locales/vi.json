@@ -8042,7 +8042,6 @@
     "Available after each order’s release is confirmed": "Có thể dùng sau khi xác nhận trả thưởng cho từng đơn",
     "Available for eligible GPT model calls": "Khả dụng cho các lượt gọi mô hình GPT phù hợp",
     "Available points": "Điểm khả dụng",
-    "Available points are shown; frozen points are listed separately.": "Hiển thị điểm khả dụng; điểm bị đóng băng được liệt kê riêng.",
     "Bind a phone number to finish WeChat sign in": "Bind a phone number to finish WeChat sign in",
     "Bind inviter": "Liên kết người giới thiệu",
     "Bind permanently": "Liên kết vĩnh viễn",
@@ -8613,6 +8612,7 @@
     "Point type is used by model billing history": "Loại điểm này đã được tham chiếu trong lịch sử tính phí mô hình",
     "Other points": "Điểm khác",
     "No other points accounts": "Chưa có tài khoản điểm khác",
-    "Buy points": "Mua điểm"
+    "Buy points": "Mua điểm",
+    "Each point type shows available/pending-release points.": "Mỗi loại điểm hiển thị điểm khả dụng/chờ giải phóng."
   }
 }

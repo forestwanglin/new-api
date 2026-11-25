@@ -8042,7 +8042,6 @@
     "Available after each order’s release is confirmed": "Доступны после подтверждения начисления по каждому заказу",
     "Available for eligible GPT model calls": "Доступны для подходящих моделей GPT",
     "Available points": "Доступные баллы",
-    "Available points are shown; frozen points are listed separately.": "Показаны доступные баллы; замороженные баллы указаны отдельно.",
     "Bind a phone number to finish WeChat sign in": "Bind a phone number to finish WeChat sign in",
     "Bind inviter": "Привязать пригласившего",
     "Bind permanently": "Привязать навсегда",
@@ -8615,6 +8614,7 @@
     "Point type is used by model billing history": "Этот тип баллов указан в истории расчётов моделей",
     "Other points": "Другие баллы",
     "No other points accounts": "Других счетов баллов нет",
-    "Buy points": "Купить баллы"
+    "Buy points": "Купить баллы",
+    "Each point type shows available/pending-release points.": "Каждый тип баллов показывает доступные/ожидающие выпуска баллы."
   }
 }

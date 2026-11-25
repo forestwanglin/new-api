@@ -8042,7 +8042,6 @@
     "Available after each order’s release is confirmed": "各注文の報酬付与が確認された後に利用できます",
     "Available for eligible GPT model calls": "対象GPTモデルの呼び出しに利用可能",
     "Available points": "利用可能ポイント",
-    "Available points are shown; frozen points are listed separately.": "利用可能ポイントを表示し、凍結ポイントは別途表示します。",
     "Bind a phone number to finish WeChat sign in": "Bind a phone number to finish WeChat sign in",
     "Bind inviter": "招待者を紐付け",
     "Bind permanently": "永久に紐付け",
@@ -8613,6 +8612,7 @@
     "Point type is used by model billing history": "このポイント種別はモデル課金履歴から参照されています",
     "Other points": "その他のポイント",
     "No other points accounts": "その他のポイント口座はありません",
-    "Buy points": "ポイントを購入"
+    "Buy points": "ポイントを購入",
+    "Each point type shows available/pending-release points.": "各ポイントタイプは利用可能/解放待ちポイントを表示します。"
   }
 }
