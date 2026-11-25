@@ -121,6 +121,27 @@ it('shows an explicit empty document state after a successful blank response', a
     )
   ).toBeVisible()
 })
+it('stacks the document dialog above the login modal and enlarges the reading area', async () => {
+  const user = userEvent.setup()
+  vi.spyOn(api, 'get').mockResolvedValue({
+    data: { success: true, data: '# Terms' },
+  })
+  mount('user')
+  await user.click(screen.getByRole('button', { name: 'User Agreement' }))
+  const dialog = await screen.findByRole('dialog', {
+    name: 'User Agreement',
+  })
+  // The login modal pins its overlay/content to z-index 800/801 in
+  // styles/login-modal.css; the document dialog must stack above it.
+  expect(dialog.className).toContain('z-[802]')
+  expect(
+    document.querySelector('[data-slot="dialog-overlay"]')?.className
+  ).toContain('z-[802]')
+  expect(dialog.style.getPropertyValue('--dialog-content-height')).toBe(
+    'min(75vh, 40rem)'
+  )
+  expect(dialog.className).toContain('sm:max-w-3xl')
+})
 it('preserves external URL user agreements without navigating away from the login form', async () => {
   vi.spyOn(api, 'get').mockResolvedValue({
     data: { success: true, data: 'https://example.test/terms' },

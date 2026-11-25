@@ -1386,6 +1386,15 @@
 - 全量回归：bun run test 共 339 文件、3693 用例，3673 通过、20 失败。修改前 HEAD 的隔离副本复跑失败文件，复现 19 项既有失败：components/account-avatar（4）、hooks/sidebar-config（5）、config-tutorial/page（1）、model-plaza/navigation（2）、security/wechat-binding（6）、usage-logs/detail-preview（1，20 秒超时）；另 users/permissions 的 refreshes a changed point row 用例全量失败，但修改前及当前单独复跑均通过，当前该文件 8 项全通过。
 - 风险与未覆盖：未做浏览器实机核对；全量前端测试仍有上述既有失败及并发不稳定用例。头像加载失败由既有组件降级。邀请人昵称和头像仅通过当前用户自己的绑定接口返回，不扩展好友列表资料。
 
+### Z098 协议文档弹窗层级修复与展示区域放大
+
+- 需求与原因：登录/注册弹窗中点击“用户协议”或“隐私政策”时，二次协议文档弹窗被登录弹窗挡住不可见；支付与登录场景的协议文档弹窗展示区域偏小，长文档阅读不便。
+- 变更内容：协议文档弹窗（AgreementDetail）内容与遮罩的 z-index 从共享弹窗层 z-50 提升到 z-[802]，高于登录弹窗（styles/login-modal.css 固定 800/801）；文档正文高度从 min(60vh, 32rem) 增大到 min(75vh, 40rem)，桌面最大宽度从 672px（sm:max-w-2xl）增大到 768px（sm:max-w-3xl）。登录弹窗与订阅支付弹窗本身不变，toast（sonner z-index 999999999）仍居最顶层。
+- 影响面：fork 自有 web/src/features/legal/agreement-consent.tsx 及其回归测试；无上游自有文件变更，无新增依赖或配置。
+- 与上游差异：共享 Dialog 组件与登录弹窗 z-index 均不修改，仅在 fork 协议组件上叠加层级与尺寸类。
+- 验证：新增 1 个定向用例（文件共 5 项）通过，断言弹窗/遮罩类含 z-[802]、正文高度 min(75vh, 40rem) 与 sm:max-w-3xl；typecheck、scoped oxlint/oxfmt、bun run build 通过。Chrome 以生产构建 CSS 静态页实测：协议弹窗（z-802）渲染于登录弹窗（z-801）之上，桌面宽 768px，移动端宽受视口约束。
+- 风险与未覆盖：z-[802] 与登录弹窗 800/801 联动，若未来登录弹窗 z-index 上调需同步（代码已留注释）；未做真实登录/支付流程的浏览器验证。
+
 ## 5. 上游自有文件改动清单（升级冲突重点关注）
 
 

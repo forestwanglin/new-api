@@ -130,6 +130,10 @@ function AgreementDetail(props: {
   })
   const content = query.data?.data?.trim() ?? ''
   const legacy = props.kind !== 'subscription'
+  // z-[802] keeps this document dialog above the login modal, whose fork CSS
+  // pins overlay/content to z-index 800/801 (see styles/login-modal.css);
+  // the shared dialog layer is z-50, so without the bump the document dialog
+  // opened from the login modal would render behind it.
   return (
     <Dialog
       open
@@ -137,7 +141,9 @@ function AgreementDetail(props: {
         if (!open) props.onClose()
       }}
       title={props.title}
-      contentHeight='min(60vh, 32rem)'
+      contentHeight='min(75vh, 40rem)'
+      contentClassName='agreement-detail-dialog z-[802] sm:max-w-3xl'
+      overlayClassName='agreement-detail-overlay z-[802]'
       footer={
         <Button type='button' onClick={props.onClose}>
           {t('Close')}
