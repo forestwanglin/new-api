@@ -23,9 +23,10 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router'
-import { act, render, screen, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 
+import { PageFooterProvider } from '@/components/layout/components/page-footer'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -33,7 +34,9 @@ import { MySubscription } from '..'
 
 vi.mock('@/components/layout', () => ({
   SectionPageLayout: Object.assign(
-    ({ children }: { children: React.ReactNode }) => <main>{children}</main>,
+    ({ children }: { children: React.ReactNode }) => (
+      <main>{children}</main>
+    ),
     {
       Title: ({ children }: { children: React.ReactNode }) => (
         <h1>{children}</h1>
@@ -82,7 +85,7 @@ const self = {
   ],
 }
 afterEach(() => useAuthStore.getState().auth.reset())
-async function renderPage() {
+async function renderPage(footer?: HTMLDivElement) {
   useAuthStore.getState().auth.setUser({ id: 1, username: 'buyer', role: 1 })
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -92,10 +95,17 @@ async function renderPage() {
     history: createMemoryHistory({ initialEntries: ['/my-subscription'] }),
   })
   await router.load()
-  render(
+  const tree = (
     <QueryClientProvider client={client}>
       <RouterProvider router={router} />
     </QueryClientProvider>
+  )
+  render(
+    footer ? (
+      <PageFooterProvider container={footer}>{tree}</PageFooterProvider>
+    ) : (
+      tree
+    )
   )
 }
 it('shows purchased snapshot identity and exact backend expiry, preserving the personal entitlement schedule', async () => {
@@ -177,4 +187,46 @@ it('shows no active subscription and no epoch date for an empty account', async 
     )
   ).toBeVisible()
   expect(document.querySelector('time')).toBeNull()
+})
+it('renders the schedule pagination in the page footer like point ledger and usage logs', async () => {
+  const manyItems = Array.from({ length: 25 }, (_, index) => ({
+    id: String(index + 1),
+    plan_id: '42',
+    plan_title: `Plan ${index + 1}`,
+    status: 'active' as const,
+    priority: index + 1,
+    billing_cycle: 'month',
+    remaining_duration_ms: '2592000000',
+    purchased_at: '1794614400000',
+    first_activated_at: '1794614400000',
+    active_since_at: '1794614400000',
+    active_until_at: '1796246400000',
+    ended_at: null,
+  }))
+  vi.spyOn(api, 'get').mockResolvedValue({
+    data: { success: true, data: { ...self, items: manyItems } },
+  })
+  const footer = document.createElement('div')
+  document.body.append(footer)
+  try {
+    await renderPage(footer)
+    // The pagination must be portaled into the page footer, not inline in the card.
+    await waitFor(
+      () => {
+        expect(
+          within(footer).getByRole('button', { name: 'Go to next page' })
+        ).toBeVisible()
+      },
+      { timeout: 5000 }
+    )
+    const card = document.querySelector('.sub-card')
+    expect(card).not.toBeNull()
+    expect(
+      within(card as HTMLElement).queryByRole('button', {
+        name: 'Go to next page',
+      })
+    ).not.toBeInTheDocument()
+  } finally {
+    footer.remove()
+  }
 })
