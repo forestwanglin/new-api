@@ -251,6 +251,9 @@
 .subscriptions-custom .sub-card [data-slot='table'] {
   min-width: 760px;
 }
+.subscriptions-custom .sub-card .sub-schedule-pagination {
+  margin-top: 16px;
+}
 .subscriptions-custom .sub-management {
   display: flex;
   gap: 24px;

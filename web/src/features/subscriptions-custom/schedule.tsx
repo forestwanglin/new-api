@@ -29,7 +29,6 @@ import {
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { LoadingState } from '@/components/loading-state'
-import { PageFooterPortal } from '@/components/layout/components/page-footer'
 import { toIntlLocale } from '@/i18n/languages'
 import { formatNumber } from '@/lib/format'
 import { getServerErrorMessage } from '@/lib/server-error-message'
@@ -157,9 +156,9 @@ export function SubscriptionSchedule(props: {
             getRowKey={(row) => row.id}
             tableClassName='min-w-[760px]'
           />
-          <PageFooterPortal>
+          <div className='sub-schedule-pagination'>
             <DataTablePagination table={table} />
-          </PageFooterPortal>
+          </div>
         </>
       )}
     </section>

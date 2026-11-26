@@ -26,7 +26,6 @@ import {
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 
-import { PageFooterProvider } from '@/components/layout/components/page-footer'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -85,7 +84,7 @@ const self = {
   ],
 }
 afterEach(() => useAuthStore.getState().auth.reset())
-async function renderPage(footer?: HTMLDivElement) {
+async function renderPage() {
   useAuthStore.getState().auth.setUser({ id: 1, username: 'buyer', role: 1 })
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -95,17 +94,10 @@ async function renderPage(footer?: HTMLDivElement) {
     history: createMemoryHistory({ initialEntries: ['/my-subscription'] }),
   })
   await router.load()
-  const tree = (
+  render(
     <QueryClientProvider client={client}>
       <RouterProvider router={router} />
     </QueryClientProvider>
-  )
-  render(
-    footer ? (
-      <PageFooterProvider container={footer}>{tree}</PageFooterProvider>
-    ) : (
-      tree
-    )
   )
 }
 it('shows purchased snapshot identity and exact backend expiry, preserving the personal entitlement schedule', async () => {
@@ -188,7 +180,7 @@ it('shows no active subscription and no epoch date for an empty account', async 
   ).toBeVisible()
   expect(document.querySelector('time')).toBeNull()
 })
-it('renders the schedule pagination in the page footer like point ledger and usage logs', async () => {
+it('renders the schedule pagination below the schedule card', async () => {
   const manyItems = Array.from({ length: 25 }, (_, index) => ({
     id: String(index + 1),
     plan_id: '42',
@@ -206,27 +198,26 @@ it('renders the schedule pagination in the page footer like point ledger and usa
   vi.spyOn(api, 'get').mockResolvedValue({
     data: { success: true, data: { ...self, items: manyItems } },
   })
-  const footer = document.createElement('div')
-  document.body.append(footer)
-  try {
-    await renderPage(footer)
-    // The pagination must be portaled into the page footer, not inline in the card.
-    await waitFor(
-      () => {
-        expect(
-          within(footer).getByRole('button', { name: 'Go to next page' })
-        ).toBeVisible()
-      },
-      { timeout: 5000 }
-    )
-    const card = document.querySelector('.sub-card')
-    expect(card).not.toBeNull()
-    expect(
-      within(card as HTMLElement).queryByRole('button', {
-        name: 'Go to next page',
+  await renderPage()
+  // The pagination must sit inside the schedule card, below the table.
+  await waitFor(
+    () => {
+      const heading = screen.getByRole('heading', {
+        name: 'My subscription and entitlement schedule',
       })
-    ).not.toBeInTheDocument()
-  } finally {
-    footer.remove()
-  }
+      const card = heading.closest('.sub-card')
+      expect(card).not.toBeNull()
+      expect(
+        within(card as HTMLElement).getByRole('button', {
+          name: 'Go to next page',
+        })
+      ).toBeVisible()
+    },
+    { timeout: 5000 }
+  )
+  const pagination = document.querySelector('.sub-schedule-pagination')
+  expect(pagination).not.toBeNull()
+  expect(
+    pagination?.querySelector("[data-slot='table-container']")
+  ).toBeNull()
 })
