@@ -211,7 +211,6 @@
 .general-console-page .point-ledger-table {
   height: 100%;
   min-height: 0;
-  border-radius: 4px;
   display: flex;
   flex-direction: column;
 }
