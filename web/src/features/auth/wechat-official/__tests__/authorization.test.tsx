@@ -112,6 +112,33 @@ it('shows the scan hint only after the QR replaces the preparing state', async (
   ).not.toBeInTheDocument()
   expect(screen.getByText('Scan with WeChat to authorize.')).toBeInTheDocument()
 })
+it('hides the scan hint once WeChat asks the user to confirm authorization', async () => {
+  let status = 'pending'
+  vi.spyOn(api, 'post').mockImplementation(async (url) => {
+    if (url.endsWith('/flows')) return response(flow)
+    if (url.endsWith('/status')) return response({ status })
+    return response({})
+  })
+  render(
+    <OfficialWeChatAuthorization
+      request={{ intent: 'login' }}
+      onResult={vi.fn()}
+    />
+  )
+  await screen.findByTitle('WeChat authorization QR code')
+  expect(screen.getByText('Scan with WeChat to authorize.')).toBeInTheDocument()
+  expect(
+    screen.queryByText('Confirm authorization in WeChat.')
+  ).not.toBeInTheDocument()
+  status = 'awaiting_consent'
+  // The next poll lands 2s after the first one, so allow it to elapse.
+  await screen.findByText('Confirm authorization in WeChat.', undefined, {
+    timeout: 5000,
+  })
+  expect(
+    screen.queryByText('Scan with WeChat to authorize.')
+  ).not.toBeInTheDocument()
+})
 it('consumes authorized login once and keeps owner capability outside QR and browser storage', async () => {
   const result = vi.fn()
   vi.spyOn(api, 'post').mockImplementation(async (url) => {

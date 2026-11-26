@@ -221,7 +221,9 @@ export function OfficialWeChatAuthorization(props: AuthorizationProps) {
           {t('Accept the terms before authorizing with WeChat.')}
         </p>
       )}
-      {qrReady && <p role='status'>{t('Scan with WeChat to authorize.')}</p>}
+      {qrReady && status !== 'awaiting_consent' && (
+        <p role='status'>{t('Scan with WeChat to authorize.')}</p>
+      )}
       {preparing && (
         <p role='status' className='text-muted-foreground'>
           {t('Preparing WeChat authorization...')}
