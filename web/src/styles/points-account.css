@@ -7,7 +7,7 @@
 .points-account .account-card,
 .account-current {
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--card);
   padding: 22px;
   margin-bottom: 18px;
@@ -70,7 +70,7 @@
   padding: 14px 18px;
   margin-bottom: 18px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--muted);
 }
 .points-account .wallet-usage-guide p {
@@ -107,7 +107,7 @@
 .points-account summary:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 4px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
 }
 .points-account.account-subscriptions {
   max-width: none;
