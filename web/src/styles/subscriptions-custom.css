@@ -157,6 +157,37 @@
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
+.subscriptions-custom .sub-points-breakdown {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+.subscriptions-custom .sub-points-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.subscriptions-custom .sub-points-row > span {
+  color: var(--muted-foreground);
+  font-size: 14px;
+}
+.subscriptions-custom .sub-points-row > strong {
+  color: var(--sub-color-4);
+  font-size: 28px;
+  line-height: 1.25;
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.subscriptions-custom .sub-points-row > strong small {
+  font-size: 14px;
+  white-space: nowrap;
+}
+.subscriptions-custom .sub-points-bonus > strong {
+  color: var(--sub-color-4);
+  font-size: 28px;
+}
 .subscriptions-custom .sub-plan-benefits {
   list-style: disc;
   padding: 0 18px 15px 32px;

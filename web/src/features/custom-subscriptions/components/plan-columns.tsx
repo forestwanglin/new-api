@@ -139,7 +139,7 @@ export function usePlanColumns(props: {
       header: t('Status'),
       size: 100,
       cell: ({ row }) => (
-        <Badge variant={row.original.enabled ? 'default' : 'secondary'}>
+        <Badge variant={row.original.enabled ? 'default' : 'destructive'}>
           {t(row.original.enabled ? 'Enabled' : 'Disabled')}
         </Badge>
       ),

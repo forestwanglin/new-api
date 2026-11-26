@@ -16,8 +16,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Fragment } from 'react'
-
 import { Button } from '@/components/ui/button'
 import { formatPlanPrice } from '@/features/custom-subscriptions/lib/format'
 import { usePointName } from '@/features/points/lib/point-name-context'
@@ -26,20 +24,41 @@ import { formatNumber } from '@/lib/format'
 import { subscriptionCopy as t } from './copy'
 import {
   formatOfferPoints,
-  offerPointAmounts,
   type Offer,
   type PublicSubscriptionPlan,
 } from './plans'
 
 function PlanPoints(props: { plan: PublicSubscriptionPlan; locale: string }) {
   const pointName = usePointName()
-  return offerPointAmounts(props.plan, false, pointName).map(
-    (entry, index) => (
-      <Fragment key={entry.id}>
-        {index > 0 && ' + '}
-        {formatNumber(entry.amount, props.locale)} <small>{entry.name}</small>
-      </Fragment>
-    )
+  const paidPointName = pointName
+    ? pointName(props.plan.paid_point_type)
+    : props.plan.paid_point_type.name
+  let bonusPointName: string | null = null
+  if (props.plan.bonus_point_type) {
+    bonusPointName = pointName
+      ? pointName(props.plan.bonus_point_type)
+      : props.plan.bonus_point_type.name
+  }
+
+  return (
+    <div className='sub-points-breakdown'>
+      <div className='sub-points-row'>
+        <span>{t('Included points')}</span>
+        <strong>
+          {formatNumber(BigInt(props.plan.paid_points), props.locale)}{' '}
+          <small>{paidPointName}</small>
+        </strong>
+      </div>
+      {props.plan.bonus_points !== '0' && bonusPointName && (
+        <div className='sub-points-row sub-points-bonus'>
+          <span>{t('Extra bonus')}</span>
+          <strong>
+            + {formatNumber(BigInt(props.plan.bonus_points), props.locale)}{' '}
+            <small>{bonusPointName}</small>
+          </strong>
+        </div>
+      )}
+    </div>
   )
 }
 

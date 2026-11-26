@@ -78,6 +78,12 @@ beforeEach(() => {
       billing_cycle: 'month',
       duration_months: 1,
       paid_points: '89000',
+      bonus_points: '4450',
+      bonus_point_type: {
+        id: '2',
+        code: 'DEEPSEEK',
+        name: 'DeepSeek分组专用积分',
+      },
     },
     {
       id: '3',
@@ -212,6 +218,9 @@ it('shows configured offers, exact annual points and all rules', async () => {
   expect(screen.getByRole('contentinfo')).toBeVisible()
   expect(screen.getAllByRole('article')).toHaveLength(6)
   expect(screen.getAllByText(/2,388,000 通用积分/).length).toBeGreaterThan(0)
+  expect(screen.getAllByText('基础积分').length).toBeGreaterThan(0)
+  expect(screen.getByText('额外赠送')).toBeVisible()
+  expect(screen.getAllByText(/4,450/).length).toBeGreaterThan(0)
   expect(screen.getByRole('heading', { name: '订阅规则' })).toBeVisible()
 })
 it('hides the auto-renewal section regardless of the backend setting', async () => {

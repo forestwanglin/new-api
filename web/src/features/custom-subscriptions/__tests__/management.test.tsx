@@ -130,6 +130,29 @@ describe('custom subscription management', () => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     )
   })
+
+  it('shows disabled plans with a destructive status badge', async () => {
+    vi.mocked(api.get).mockImplementation(async () => ({
+      data: {
+        success: true,
+        data: {
+          page: 1,
+          page_size: 20,
+          total: 1,
+          items: [{ ...plan, enabled: false }],
+          point_types: [plan.paid_point_type],
+        },
+      },
+    }))
+    renderPage()
+    const disabledLabels = await screen.findAllByText('Disabled')
+    expect(
+      disabledLabels.find((label) =>
+        label.classList.contains('bg-destructive/10')
+      )
+    ).toBeTruthy()
+  })
+
   it('keeps entered values on server failure and refreshes after a successful edit', async () => {
     const user = userEvent.setup()
     const put = vi
