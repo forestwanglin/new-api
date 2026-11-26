@@ -165,13 +165,14 @@ export function PointLedger(props: { scope: PointLedgerScope }) {
   } else {
     content = (
       <>
-        <div className='general-table-surface min-h-0 flex-1 overflow-auto'>
+        <div className='general-table-surface point-ledger-table min-h-0 flex-1 overflow-auto'>
           <StaticDataTable
             tableClassName='min-w-[1100px]'
             data={rows}
             getRowKey={(row) => row.id}
             columns={columns}
             emptyContent={<EmptyState title={t('No point ledger entries')} />}
+            emptyClassName='h-full'
           />
         </div>
         <PageFooterPortal>

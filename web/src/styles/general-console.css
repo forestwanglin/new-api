@@ -208,6 +208,19 @@
   box-shadow: var(--general-shadow);
 }
 
+.general-console-page .point-ledger-table {
+  border-radius: 4px;
+}
+
+.general-console-page .point-ledger-table [data-slot='table-container'],
+.general-console-page .point-ledger-table [data-slot='table'] {
+  height: 100%;
+}
+
+.general-console-page .point-ledger-table [data-slot='table-body'] {
+  height: 100%;
+}
+
 /* Dense tables step one shade below the card surface: the header band is
  * always filled and rows deepen on hover. `--table-header-bg` keeps sticky
  * headers and pinned header cells opaque. */
