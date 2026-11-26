@@ -131,7 +131,12 @@ export function PointsWalletDetails(props: { wallet: PointWallet }) {
         columns={sourceColumns}
         getRowKey={(row) => `${row.point_type_id}:${row.biz_type}`}
         tableClassName='min-w-[680px]'
-        emptyContent={<EmptyState title={t('No point ledger entries')} />}
+        emptyContent={
+          <EmptyState
+            className='min-h-0'
+            title={t('No point ledger entries')}
+          />
+        }
       />
     </section>
   )
