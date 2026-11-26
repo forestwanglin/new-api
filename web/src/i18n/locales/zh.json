@@ -8381,6 +8381,8 @@
     "Released {{type}} can be used for eligible model calls according to its configured scope. Pending rewards are shown separately from available wallet points. Cumulative released rewards include previously spent points. Refunds adjust unreleased rewards; orders with released rewards require manual review. Rewards cannot be withdrawn as cash. Self-invitations and abnormal transactions are excluded.": "{{type}}到账后即可按其配置的适用范围用于模型调用。钱包单独展示待释放奖励，到账后计入可用余额；邀请页累计已到账含历史已使用部分。退款会按有效实付调整对应未释放奖励，已有奖励到账的订单由客服协助核实。奖励为模型调用积分，不支持提现；活动适用于真实的直接好友订阅订单，本人订阅、自邀及异常交易不参与。",
     "Remaining points": "剩余积分",
     "Remaining points by source": "来源剩余积分",
+    "Activation / expiry": "生效 / 到期",
+    "Remaining service": "剩余服务时长",
     "Remaining service: {{seconds}} seconds": "剩余服务时长 {{seconds}} 秒",
     "Remove fragment": "删除片段",
     "Remove paragraph": "删除段落",

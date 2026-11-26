@@ -8381,6 +8381,8 @@
     "Released {{type}} can be used for eligible model calls according to its configured scope. Pending rewards are shown separately from available wallet points. Cumulative released rewards include previously spent points. Refunds adjust unreleased rewards; orders with released rewards require manual review. Rewards cannot be withdrawn as cash. Self-invitations and abnormal transactions are excluded.": "Released {{type}} can be used for eligible model calls according to its configured scope. Pending rewards are shown separately from available wallet points. Cumulative released rewards include previously spent points. Refunds adjust unreleased rewards; orders with released rewards require manual review. Rewards cannot be withdrawn as cash. Self-invitations and abnormal transactions are excluded.",
     "Remaining points": "Remaining points",
     "Remaining points by source": "Remaining points by source",
+    "Activation / expiry": "Activation / expiry",
+    "Remaining service": "Remaining service",
     "Remaining service: {{seconds}} seconds": "Remaining service: {{seconds}} seconds",
     "Remove fragment": "Remove fragment",
     "Remove paragraph": "Remove paragraph",

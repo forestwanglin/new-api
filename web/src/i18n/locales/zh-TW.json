@@ -8380,6 +8380,8 @@
     "Released {{type}} can be used for eligible model calls according to its configured scope. Pending rewards are shown separately from available wallet points. Cumulative released rewards include previously spent points. Refunds adjust unreleased rewards; orders with released rewards require manual review. Rewards cannot be withdrawn as cash. Self-invitations and abnormal transactions are excluded.": "{{type}}入帳後可依設定的適用範圍用於模型呼叫。待發放獎勵與錢包可用積分分開展示。累計已入帳獎勵包含已使用部分。退款會調整未發放獎勵；已有獎勵入帳的訂單須人工覆核。獎勵不可提領現金，自我邀請及異常交易不參與。",
     "Remaining points": "剩餘積分",
     "Remaining points by source": "來源剩餘積分",
+    "Activation / expiry": "生效 / 到期",
+    "Remaining service": "剩餘服務時長",
     "Remaining service: {{seconds}} seconds": "剩餘服務時長 {{seconds}} 秒",
     "Remove fragment": "刪除片段",
     "Remove paragraph": "刪除段落",

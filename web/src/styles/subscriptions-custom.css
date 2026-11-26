@@ -245,6 +245,12 @@
 .subscriptions-custom .account-orders > :last-child {
   margin-top: 16px;
 }
+.subscriptions-custom .sub-card [data-slot='table-container'] {
+  margin-top: 16px;
+}
+.subscriptions-custom .sub-card [data-slot='table'] {
+  min-width: 760px;
+}
 .subscriptions-custom .sub-management {
   display: flex;
   gap: 24px;

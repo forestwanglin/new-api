@@ -17,8 +17,15 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import {
+  DataTablePagination,
+  StaticDataTable,
+  useDataTable,
+  type StaticDataTableColumn,
+} from '@/components/data-table'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { LoadingState } from '@/components/loading-state'
@@ -27,9 +34,31 @@ import { formatNumber } from '@/lib/format'
 import { getServerErrorMessage } from '@/lib/server-error-message'
 import { useAuthStore } from '@/stores/auth-store'
 
-import { customSubscriptionSelfKey, getCustomSubscriptionSelf } from './api'
+import {
+  customSubscriptionSelfKey,
+  getCustomSubscriptionSelf,
+  type CustomSubscription,
+} from './api'
 import { SubscriptionTime } from './current-subscription'
 import type { PublicSubscriptionPlan } from './plans'
+
+function formatRemainingDuration(
+  durationMs: string,
+  locale: Parameters<typeof formatNumber>[1],
+  t: (key: string) => string
+) {
+  const totalMinutes = BigInt(durationMs) / 60000n
+  const days = totalMinutes / 1440n
+  const hours = (totalMinutes % 1440n) / 60n
+  const minutes = totalMinutes % 60n
+  const parts = [
+    days > 0n && `${formatNumber(days, locale)} ${t('days')}`,
+    hours > 0n && `${formatNumber(hours, locale)} ${t('hours')}`,
+    minutes > 0n && `${formatNumber(minutes, locale)} ${t('minutes')}`,
+  ].filter(Boolean)
+
+  return parts.length > 0 ? parts.join(' ') : `0 ${t('minutes')}`
+}
 
 export function SubscriptionSchedule(props: {
   plans: PublicSubscriptionPlan[]
@@ -43,12 +72,62 @@ export function SubscriptionSchedule(props: {
     cancelled: t('Cancelled'),
   }
   const userId = useAuthStore((state) => state.auth.user?.id)
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 20 })
   const query = useQuery({
     queryKey: customSubscriptionSelfKey(userId),
     queryFn: getCustomSubscriptionSelf,
     enabled: !!userId,
     refetchInterval: 10000,
   })
+  const rows = query.data?.items ?? []
+  const { table } = useDataTable<CustomSubscription>({
+    data: rows,
+    columns: [],
+    pagination,
+    onPaginationChange: setPagination,
+  })
+  const paginatedRows = table.getRowModel().rows.map((row) => row.original)
+  const columns: StaticDataTableColumn<CustomSubscription>[] = [
+    {
+      id: 'plan',
+      header: t('Subscription plan'),
+      cell: (subscription) =>
+        subscription.plan_title ||
+        props.plans.find((plan) => plan.id === subscription.plan_id)?.title ||
+        t('Plan {{id}}', { id: subscription.plan_id }),
+    },
+    {
+      id: 'status',
+      header: t('Status'),
+      cell: (subscription) => statusLabels[subscription.status],
+    },
+    {
+      id: 'active',
+      header: t('Activation / expiry'),
+      cell: (subscription) => (
+        <>
+          <SubscriptionTime value={subscription.active_since_at} /> /{' '}
+          <SubscriptionTime value={subscription.active_until_at} />
+        </>
+      ),
+    },
+    {
+      id: 'priority',
+      header: t('Priority'),
+      cell: (subscription) => subscription.priority,
+    },
+    {
+      id: 'remaining',
+      header: t('Remaining service'),
+      cell: (subscription) =>
+        formatRemainingDuration(
+          subscription.remaining_duration_ms,
+          locale,
+          (key) => t(key)
+        ),
+    },
+  ]
+
   return (
     <section className='sub-card'>
       <h2>{t('My subscription and entitlement schedule')}</h2>
@@ -69,32 +148,17 @@ export function SubscriptionSchedule(props: {
       {query.isSuccess && !query.data.items.length && (
         <EmptyState title={t('No purchased subscriptions yet')} />
       )}
-      {query.data?.items.map((subscription) => (
-        <div key={subscription.id} className='sub-management'>
-          <strong>
-            {subscription.plan_title ||
-              props.plans.find((plan) => plan.id === subscription.plan_id)
-                ?.title ||
-              t('Plan {{id}}', { id: subscription.plan_id })}
-          </strong>
-          <span>{statusLabels[subscription.status]}</span>
-          <span>
-            <SubscriptionTime value={subscription.active_since_at} /> /{' '}
-            <SubscriptionTime value={subscription.active_until_at} />
-          </span>
-          <span>
-            {t('Priority {{priority}}', { priority: subscription.priority })}
-          </span>
-          <span>
-            {t('Remaining service: {{seconds}} seconds', {
-              seconds: formatNumber(
-                BigInt(subscription.remaining_duration_ms) / 1000n,
-                locale
-              ),
-            })}
-          </span>
-        </div>
-      ))}
+      {query.isSuccess && rows.length > 0 && (
+        <>
+          <StaticDataTable
+            data={paginatedRows}
+            columns={columns}
+            getRowKey={(row) => row.id}
+            tableClassName='min-w-[760px]'
+          />
+          <DataTablePagination table={table} />
+        </>
+      )}
     </section>
   )
 }
