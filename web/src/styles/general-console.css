@@ -209,15 +209,33 @@
 }
 
 .general-console-page .point-ledger-table {
+  height: 100%;
+  min-height: 0;
   border-radius: 4px;
+  display: flex;
+  flex-direction: column;
 }
 
-.general-console-page .point-ledger-table [data-slot='table-container'],
+.general-console-page .point-ledger-table [data-slot='table-container'] {
+  min-height: 0;
+  flex: 1;
+}
+
 .general-console-page .point-ledger-table [data-slot='table'] {
   height: 100%;
 }
 
 .general-console-page .point-ledger-table [data-slot='table-body'] {
+  height: 100%;
+}
+
+.general-console-page .point-ledger-table [data-slot='table-body'] > tr,
+.general-console-page .point-ledger-table [data-slot='table-body'] > tr > td {
+  height: 100%;
+}
+
+.general-console-page .point-ledger-table [data-slot='empty'] {
+  min-height: 0;
   height: 100%;
 }
 

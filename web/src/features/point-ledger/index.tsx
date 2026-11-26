@@ -165,8 +165,9 @@ export function PointLedger(props: { scope: PointLedgerScope }) {
   } else {
     content = (
       <>
-        <div className='general-table-surface point-ledger-table min-h-0 flex-1 overflow-auto'>
+        <div className='min-h-0 flex-1 overflow-auto'>
           <StaticDataTable
+            className='general-table-surface point-ledger-table'
             tableClassName='min-w-[1100px]'
             data={rows}
             getRowKey={(row) => row.id}
