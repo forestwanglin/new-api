@@ -234,7 +234,7 @@
 }
 .subscriptions-custom .sub-card {
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--card);
   padding: 24px;
   margin: 22px 0;

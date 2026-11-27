@@ -30,7 +30,7 @@
 .security-access-page .sa-card {
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   padding: 24px;
   box-shadow:
     0 2px 8px -5px #20365b1c,
@@ -59,7 +59,7 @@
   height: auto;
   padding: 10px 13px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   font-size: 14.5px;
   font-weight: 400;
   color: var(--muted-foreground);
@@ -125,7 +125,7 @@
   max-width: 240px;
   height: auto;
   border: 1px solid var(--input);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 9px 12px;
   font-size: 14.5px;
   line-height: 1.62;
@@ -138,7 +138,7 @@
   height: auto;
   padding: 7px 13px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--card);
   font-size: 14px;
   font-weight: 600;
@@ -164,7 +164,7 @@
 .security-access-page .sa-danger {
   border: 1px solid #f4cccc;
   background: color-mix(in oklch, var(--destructive) 4%, var(--card));
-  border-radius: 11px;
+  border-radius: var(--radius-md);
   padding: 16px 18px;
 }
 .security-access-page .sa-danger h2 {
@@ -219,7 +219,7 @@
 .security-access-page .sa-device > div:first-child {
   width: 32px;
   height: 32px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--muted);
   color: var(--muted-foreground);
 }
@@ -273,7 +273,7 @@
     width: auto;
     flex-shrink: 0;
     border: 1px solid var(--input);
-    border-radius: 20px;
+    border-radius: var(--radius-xl);
     font-size: 14px;
     padding: 8px 13px;
   }
