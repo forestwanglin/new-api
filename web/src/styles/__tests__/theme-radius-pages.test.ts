@@ -7,6 +7,7 @@ const stylesheets = [
   'security-access',
   'subscriptions-custom',
   'general-console',
+  'model-plaza',
 ].map((name) => {
   const style = document.createElement('style')
   style.textContent = readFileSync(
@@ -183,3 +184,19 @@ it.each([
     expect(radiiFor(file, fixture, target)).toEqual(expected)
   }
 )
+
+it('keeps the model-plaza use-model button paired with the discount badge radius', () => {
+  const fixture =
+    '<main class="model-plaza"><table class="mp-table"><tbody><tr>' +
+    '<td><div class="mp-name">demo-model</div><button data-slot="button"></button></td>' +
+    '<td><span class="mp-discount"></span></td>' +
+    '</tr></tbody></table></main>'
+  // The button must stay on the fixed chip radius shared with the badge
+  // instead of following the theme radius scale.
+  expect(radiiFor('model-plaza', fixture, '[data-slot="button"]')).toEqual([
+    'var(--mp-chip-radius)',
+  ])
+  expect(radiiFor('model-plaza', fixture, '.mp-discount')).toEqual([
+    'var(--mp-chip-radius)',
+  ])
+})

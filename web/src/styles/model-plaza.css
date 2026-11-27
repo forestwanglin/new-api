@@ -10,6 +10,7 @@
   --mp-deal-line: #fecaca;
   --mp-discount-surface: #fff1f2;
   --mp-discount-line: #fecdd3;
+  --mp-chip-radius: 6px;
 }
 .dark .model-plaza {
   --mp-brand: #8ab4ff;
@@ -234,6 +235,11 @@
   font-weight: 600;
   overflow-wrap: anywhere;
 }
+/* The use-model button pairs with the discount badge: both keep the fixed
+ * chip radius instead of following the theme radius scale. */
+.model-plaza .mp-name + [data-slot='button'] {
+  border-radius: var(--mp-chip-radius);
+}
 .model-plaza .mp-table .mp-use {
   font-size: 14px;
   color: var(--muted-foreground);
@@ -246,7 +252,7 @@
   display: inline-block;
   padding: 4px 9px;
   border: 1px solid var(--mp-discount-line);
-  border-radius: 6px;
+  border-radius: var(--mp-chip-radius);
   background: var(--mp-discount-surface);
   color: var(--mp-red);
   font-size: 18px;
