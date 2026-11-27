@@ -178,6 +178,24 @@ For commercial licensing, please contact support@quantumnous.com
   );
 }
 
+/* Derived radius tokens for hand-written CSS (e.g. points-account.css).
+ *
+ * The `@theme inline` block above emits these on `:root`, where `var(--radius)`
+ * substitutes against the 1rem default and the computed values are inherited
+ * frozen. Theme presets and the user's radius choice (theme-presets.css)
+ * override `--radius` on <body>, so the tokens are re-declared here to compute
+ * against body's effective `--radius`. Keep the factors in sync with the
+ * `@theme inline` block above. */
+body {
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
 .dark {
   /* Native controls follow the theme; Dark Reader also reads this to detect
      the built-in dark theme. */

@@ -21,6 +21,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useState,
 } from 'react'
@@ -140,7 +141,11 @@ export function ThemeCustomizationProvider(props: {
     applyAttribute('data-theme-font', resolveThemeFont(font, preset))
   }, [font, preset])
 
-  useEffect(() => {
+  // useLayoutEffect (not useEffect): JS consumers (useThemeRadiusPx) read the
+  // radius in passive effects, which run before this provider's passive
+  // effects would; applying the attribute before paint also avoids a frame of
+  // the stale radius.
+  useLayoutEffect(() => {
     applyAttribute(
       'data-theme-radius',
       radius === DEFAULT_THEME_CUSTOMIZATION.radius ? null : radius

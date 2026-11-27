@@ -22,6 +22,8 @@ export function resolveThemeRadiusPx(
   cssVariable = '--radius-md'
 ): number | undefined {
   if (typeof document === 'undefined') return undefined
+  const host = document.body
+  if (!host) return undefined
 
   const probe = document.createElement('div')
   probe.style.borderRadius = `var(${cssVariable})`
@@ -29,7 +31,11 @@ export function resolveThemeRadiusPx(
   probe.style.position = 'absolute'
   probe.style.visibility = 'hidden'
 
-  document.documentElement.appendChild(probe)
+  // Attach to <body>, not <html>: theme presets and the user's radius choice
+  // override --radius on <body> (theme-presets.css), and the derived radius
+  // tokens are re-declared there (theme.css). A probe on <html> would inherit
+  // the tokens computed against the 1rem :root default and stay frozen.
+  host.appendChild(probe)
   const resolvedRadius = getComputedStyle(probe).borderTopLeftRadius
   probe.remove()
 
