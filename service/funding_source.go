@@ -95,6 +95,24 @@ type SubscriptionFunding struct {
 func (s *SubscriptionFunding) Source() string { return BillingSourceSubscription }
 
 func (s *SubscriptionFunding) PreConsume(_ int) error {
+	if s.amount <= 0 {
+		subs, err := model.GetAllActiveUserSubscriptions(s.userId)
+		if err != nil {
+			return err
+		}
+		if len(subs) == 0 || subs[0].Subscription == nil {
+			return errors.New("no active subscription")
+		}
+		sub := subs[0].Subscription
+		s.subscriptionId = sub.Id
+		s.AmountTotal = sub.AmountTotal
+		s.AmountUsedAfter = sub.AmountUsed
+		if planInfo, err := model.GetSubscriptionPlanInfoByUserSubscriptionId(sub.Id); err == nil && planInfo != nil {
+			s.PlanId = planInfo.PlanId
+			s.PlanTitle = planInfo.PlanTitle
+		}
+		return nil
+	}
 	// amount 参数被忽略，使用内部 s.amount（已在构造时根据 preConsumedQuota 计算）
 	res, err := model.PreConsumeUserSubscription(s.requestId, s.userId, s.modelName, 0, s.amount)
 	if err != nil {
