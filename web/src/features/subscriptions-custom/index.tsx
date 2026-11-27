@@ -78,7 +78,7 @@ export function SubscriptionsCustom(
             <h1>{t('Subscription plans')}</h1>
             <p>
               {t(
-                'Compare monthly and yearly plans · One-time purchase / Auto renewal · Points never expire'
+                'Monthly plans · One-time purchase / Auto renewal · Points never expire'
               )}
             </p>
           </header>
@@ -121,7 +121,7 @@ export function SubscriptionsCustom(
                 <p>
                   <strong>{t('Subscription service:')}</strong>
                   {t(
-                    'Monthly service lasts 30 days; yearly service lasts 365 days. Higher priority is active first; equal priorities follow payment time.'
+                    'Monthly service lasts 30 days. Higher priority is active first; equal priorities follow payment time.'
                   )}
                 </p>
               </section>
