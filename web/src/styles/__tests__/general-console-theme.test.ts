@@ -95,7 +95,7 @@ it('applies the demo card treatment only to an explicitly opted-in page', () => 
   expect(
     getComputedStyle(page.querySelector('.general-card') as HTMLElement)
       .borderRadius
-  ).toBe('14px')
+  ).toBe('var(--radius-lg)')
   expect(
     getComputedStyle(outside.querySelector('.general-card') as HTMLElement)
       .borderRadius
@@ -192,7 +192,7 @@ it('keeps dashboard cards and key tables contained while preserving table scroll
   ) as HTMLElement
   expect(getComputedStyle(card).minWidth).toBe('0px')
   expect(getComputedStyle(card).overflow).toBe('hidden')
-  expect(getComputedStyle(table).borderRadius).toBe('12px')
+  expect(getComputedStyle(table).borderRadius).toBe('var(--radius-md)')
   expect(getComputedStyle(table).overflow).toBe('auto')
   expect(
     getComputedStyle(page.querySelector('th') as HTMLElement).paddingBlock

@@ -1,7 +1,9 @@
 /* Effective console rules from c-dev/ZYY-AI-demo.html, including its final
  * C-end refinement cascade. Opt-in classes keep shared components unchanged.
  * Chart series, row status colors, fixed headers and scrollports remain owned
- * by their existing components. Portal surfaces keep their shared theme. */
+ * by their existing components. Portal surfaces keep their shared theme.
+ * Border radii use the theme radius scale instead of the demo's fixed pixels
+ * so the selected theme radius reaches these pages. */
 .general-console-page {
   --general-page-bg: #f8fafd;
   --general-surface: var(--card);
@@ -59,7 +61,7 @@
 .general-console-page :is(.general-card, [data-slot='card']) {
   min-width: 0;
   border: 1px solid var(--general-line);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   background: var(--general-surface);
   box-shadow: var(--general-shadow);
 }
@@ -105,12 +107,12 @@
   flex-shrink: 0;
   padding: 15px 18px;
   border: 1px solid var(--general-line);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background: var(--general-surface);
 }
 
 .general-console-page [data-slot='button'] {
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   font-size: 14px;
   line-height: 1.5;
   transition:
@@ -142,7 +144,7 @@
   ) {
   min-width: 0;
   border-color: var(--general-control-line);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--general-surface);
   font-size: 14px;
   line-height: 1.5;
@@ -165,7 +167,7 @@
 .general-console-page [data-slot='tabs-list'] {
   max-width: 100%;
   border: 1px solid var(--general-line);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--general-inset);
 }
 
@@ -203,7 +205,7 @@
 
 .general-console-page .general-table-surface {
   border-color: var(--general-line);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background: var(--general-surface);
   box-shadow: var(--general-shadow);
 }

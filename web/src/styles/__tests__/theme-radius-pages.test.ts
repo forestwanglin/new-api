@@ -6,6 +6,7 @@ const stylesheets = [
   'personal-profile',
   'security-access',
   'subscriptions-custom',
+  'general-console',
 ].map((name) => {
   const style = document.createElement('style')
   style.textContent = readFileSync(
@@ -127,6 +128,54 @@ it.each([
     '<main class="subscriptions-custom"><section class="sub-card"></section></main>',
     '.sub-card',
     ['var(--radius-lg)'],
+  ],
+  [
+    'general-console',
+    '<main class="general-console-page"><section class="general-card"></section></main>',
+    '.general-card',
+    ['var(--radius-lg)'],
+  ],
+  [
+    'general-console',
+    '<main class="general-console-page"><div data-slot="card"></div></main>',
+    '[data-slot="card"]',
+    ['var(--radius-lg)'],
+  ],
+  [
+    'general-console',
+    '<main class="general-console-page"><div class="general-filter-card"></div></main>',
+    '.general-filter-card',
+    ['var(--radius-md)'],
+  ],
+  [
+    'general-console',
+    '<main class="general-console-page"><button data-slot="button"></button></main>',
+    '[data-slot="button"]',
+    ['var(--radius-md)'],
+  ],
+  [
+    'general-console',
+    '<main class="general-console-page"><input data-slot="input"></main>',
+    '[data-slot="input"]',
+    ['var(--radius-md)'],
+  ],
+  [
+    'general-console',
+    '<main class="general-console-page"><button data-slot="select-trigger"></button></main>',
+    '[data-slot="select-trigger"]',
+    ['var(--radius-md)'],
+  ],
+  [
+    'general-console',
+    '<main class="general-console-page"><div data-slot="tabs-list"></div></main>',
+    '[data-slot="tabs-list"]',
+    ['var(--radius-md)'],
+  ],
+  [
+    'general-console',
+    '<main class="general-console-page"><div class="general-table-surface"></div></main>',
+    '.general-table-surface',
+    ['var(--radius-md)'],
   ],
 ])(
   'keeps %s surfaces on the theme radius scale',
