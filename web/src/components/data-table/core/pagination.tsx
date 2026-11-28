@@ -117,7 +117,7 @@ export function DataTablePagination<TData>({
         </div>
 
         <div className='flex shrink-0 items-center gap-1.5 @lg/pagination:gap-2'>
-          <p className='text-muted-foreground/80 hidden text-sm font-medium whitespace-nowrap @2xl/pagination:block'>
+          <p className='text-muted-foreground/80 m-0 hidden text-sm leading-none font-medium whitespace-nowrap @2xl/pagination:block'>
             {t('Rows per page')}
           </p>
           <Select
