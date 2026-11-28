@@ -33,6 +33,7 @@ import { PageFooterPortal } from '@/components/layout/components/page-footer'
 import { LoadingState } from '@/components/loading-state'
 import { Button } from '@/components/ui/button'
 import { usePointName } from '@/features/points/lib/point-name-context'
+import { getDefaultTimeRange } from '@/features/usage-logs/lib/utils'
 import { toIntlLocale } from '@/i18n/languages'
 import { formatNumber, formatTimestampToDate } from '@/lib/format'
 import { ROLE } from '@/lib/roles'
@@ -54,7 +55,14 @@ export function PointLedger(props: { scope: PointLedgerScope }) {
   const pointName = usePointName()
   const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
   const userId = useAuthStore((state) => state.auth.user?.id)
-  const [filters, setFilters] = useState<PointLedgerFilters>({})
+  // Same default time range as the usage logs page: today 00:00:00 ~ now + 1h.
+  const [filters, setFilters] = useState<PointLedgerFilters>(() => {
+    const { start, end } = getDefaultTimeRange()
+    return {
+      start_timestamp: start.getTime(),
+      end_timestamp: end.getTime(),
+    }
+  })
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 20 })
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const params = {

@@ -28,7 +28,7 @@ import {
 import userEvent from '@testing-library/user-event'
 import { createInstance } from 'i18next'
 import { I18nextProvider } from 'react-i18next'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { SectionPageLayout } from '@/components/layout'
 import { PageFooterProvider } from '@/components/layout/components/page-footer'
@@ -83,6 +83,20 @@ const page: PointLedgerPage = {
 function response(data: PointLedgerPage) {
   return { data: { success: true, data } }
 }
+
+// The ledger shares the usage-logs default time range (today 00:00:00 ~
+// now + 1h), so pin the clock to make the default range deterministic.
+const fakeNow = new Date(2026, 8, 8, 12)
+const defaultRange = {
+  start_timestamp: new Date(2026, 8, 8, 0).getTime(),
+  end_timestamp: new Date(2026, 8, 8, 13).getTime(),
+}
+const defaultTriggerName = '2026-09-08 00:00:00 ~ 2026-09-08 13:00:00'
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(fakeNow)
+})
 function setup(scope: PointLedgerScope = 'self') {
   useAuthStore.getState().auth.setUser({ id: 1, username: 'first', role: 10 })
   const client = new QueryClient({
@@ -99,7 +113,10 @@ function setup(scope: PointLedgerScope = 'self') {
   )
   return client
 }
-afterEach(() => useAuthStore.getState().auth.reset())
+afterEach(() => {
+  vi.useRealTimers()
+  useAuthStore.getState().auth.reset()
+})
 
 describe('point ledger queries', () => {
   it('preserves int64 snapshots, raw unknown actions and non-link business references in details', async () => {
@@ -125,7 +142,7 @@ describe('point ledger queries', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Go to next page' }))
     await waitFor(() =>
       expect(get).toHaveBeenLastCalledWith('/api/points/ledger', {
-        params: { p: 2, page_size: 20 },
+        params: { p: 2, page_size: 20, ...defaultRange },
       })
     )
     await screen.findByRole('button', { name: 'Search' })
@@ -135,7 +152,12 @@ describe('point ledger queries', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Search' }))
     await waitFor(() =>
       expect(get).toHaveBeenLastCalledWith('/api/points/ledger', {
-        params: { p: 1, page_size: 20, user_id: '9007199254740993' },
+        params: {
+          p: 1,
+          page_size: 20,
+          user_id: '9007199254740993',
+          ...defaultRange,
+        },
       })
     )
     const count = get.mock.calls.length
@@ -184,7 +206,7 @@ describe('point ledger queries', () => {
     await user.click(screen.getByRole('button', { name: 'Go to last page' }))
     await waitFor(() =>
       expect(get).toHaveBeenLastCalledWith('/api/points/ledger/self', {
-        params: { p: 6, page_size: 20 },
+        params: { p: 6, page_size: 20, ...defaultRange },
       })
     )
     await screen.findByText('FUTURE_ACTION')
@@ -192,14 +214,14 @@ describe('point ledger queries', () => {
     await user.click(await screen.findByRole('option', { name: '50' }))
     await waitFor(() =>
       expect(get).toHaveBeenLastCalledWith('/api/points/ledger/self', {
-        params: { p: 1, page_size: 50 },
+        params: { p: 1, page_size: 50, ...defaultRange },
       })
     )
     await screen.findByText('FUTURE_ACTION')
     await user.click(screen.getByRole('button', { name: 'Go to next page' }))
     await waitFor(() =>
       expect(get).toHaveBeenLastCalledWith('/api/points/ledger/self', {
-        params: { p: 2, page_size: 50 },
+        params: { p: 2, page_size: 50, ...defaultRange },
       })
     )
   })
@@ -221,13 +243,19 @@ describe('point ledger queries', () => {
     await user.click(screen.getByRole('button', { name: 'Search' }))
     await waitFor(() =>
       expect(get).toHaveBeenLastCalledWith('/api/points/ledger', {
-        params: { p: 1, page_size: 20, point_type_id: '1', action: 'FREEZE' },
+        params: {
+          p: 1,
+          page_size: 20,
+          point_type_id: '1',
+          action: 'FREEZE',
+          ...defaultRange,
+        },
       })
     )
     await user.click(screen.getByRole('button', { name: 'Reset' }))
     await waitFor(() =>
       expect(get).toHaveBeenLastCalledWith('/api/points/ledger', {
-        params: { p: 1, page_size: 20 },
+        params: { p: 1, page_size: 20, ...defaultRange },
       })
     )
     expect(screen.getByRole('button', { name: 'Point type' })).toBeVisible()
@@ -247,16 +275,18 @@ describe('point ledger queries', () => {
   })
   it('submits the selected local time range as millisecond boundaries', async () => {
     const get = vi.spyOn(api, 'get').mockResolvedValue(response(page))
+    const user = userEvent.setup()
     setup()
     await screen.findByText('FUTURE_ACTION')
-    await userEvent.click(screen.getByRole('button', { name: 'Time range' }))
-    fireEvent.change(screen.getByLabelText('Start time'), {
-      target: { value: '2026-11-12T08:00' },
+    await user.click(screen.getByRole('button', { name: defaultTriggerName }))
+    fireEvent.change(screen.getByLabelText('Start Time'), {
+      target: { value: '2026-11-12T08:00:00' },
     })
-    fireEvent.change(screen.getByLabelText('End time (exclusive)'), {
-      target: { value: '2026-11-12T09:00' },
+    fireEvent.change(screen.getByLabelText('End Time'), {
+      target: { value: '2026-11-12T09:00:00' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Search' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm' }))
+    await user.click(screen.getByRole('button', { name: 'Search' }))
     await waitFor(() =>
       expect(get).toHaveBeenLastCalledWith('/api/points/ledger/self', {
         params: {
@@ -270,17 +300,19 @@ describe('point ledger queries', () => {
   })
   it('rejects a reversed time range before requesting another page', async () => {
     const get = vi.spyOn(api, 'get').mockResolvedValue(response(page))
+    const user = userEvent.setup()
     setup()
     await screen.findByText('FUTURE_ACTION')
     const requestCount = get.mock.calls.length
-    await userEvent.click(screen.getByRole('button', { name: 'Time range' }))
-    fireEvent.change(screen.getByLabelText('Start time'), {
-      target: { value: '2026-11-12T09:00' },
+    await user.click(screen.getByRole('button', { name: defaultTriggerName }))
+    fireEvent.change(screen.getByLabelText('Start Time'), {
+      target: { value: '2026-11-12T09:00:00' },
     })
-    fireEvent.change(screen.getByLabelText('End time (exclusive)'), {
-      target: { value: '2026-11-12T08:00' },
+    fireEvent.change(screen.getByLabelText('End Time'), {
+      target: { value: '2026-11-12T08:00:00' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Search' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm' }))
+    await user.click(screen.getByRole('button', { name: 'Search' }))
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Invalid point ledger filters'
     )
@@ -369,7 +401,7 @@ it('reacts to language changes without losing exact integer precision', async ()
     )
   ).toBeVisible()
   await userEvent.click(
-    screen.getByRole('button', { name: fr.translation['Time range'] })
+    screen.getByRole('button', { name: defaultTriggerName })
   )
   expect(screen.getByLabelText('Heure de début')).toBeVisible()
 })
@@ -421,12 +453,12 @@ describe('general point ledger role scope', () => {
     setupPage(100)
     expect(await screen.findByText('other-user (2)')).toBeVisible()
     expect(get).toHaveBeenLastCalledWith('/api/points/ledger', {
-      params: { p: 1, page_size: 20 },
+      params: { p: 1, page_size: 20, ...defaultRange },
     })
     fireEvent.click(screen.getByRole('button', { name: 'Go to next page' }))
     await waitFor(() =>
       expect(get).toHaveBeenLastCalledWith('/api/points/ledger', {
-        params: { p: 2, page_size: 20 },
+        params: { p: 2, page_size: 20, ...defaultRange },
       })
     )
     fireEvent.change(screen.getByLabelText('User ID'), {
@@ -435,13 +467,13 @@ describe('general point ledger role scope', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Search' }))
     await waitFor(() =>
       expect(get).toHaveBeenLastCalledWith('/api/points/ledger', {
-        params: { p: 1, page_size: 20, user_id: '2' },
+        params: { p: 1, page_size: 20, user_id: '2', ...defaultRange },
       })
     )
     fireEvent.click(screen.getByRole('button', { name: 'Reset' }))
     await waitFor(() =>
       expect(get).toHaveBeenLastCalledWith('/api/points/ledger', {
-        params: { p: 1, page_size: 20 },
+        params: { p: 1, page_size: 20, ...defaultRange },
       })
     )
     expect(screen.getByLabelText('User ID')).toHaveValue('')
@@ -454,7 +486,7 @@ describe('general point ledger role scope', () => {
       setupPage(role)
       await screen.findByText('FUTURE_ACTION')
       expect(get).toHaveBeenLastCalledWith('/api/points/ledger/self', {
-        params: { p: 1, page_size: 20 },
+        params: { p: 1, page_size: 20, ...defaultRange },
       })
       expect(screen.queryByLabelText('User ID')).not.toBeInTheDocument()
     }
@@ -470,14 +502,14 @@ describe('general point ledger role scope', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Search' }))
     await waitFor(() =>
       expect(get).toHaveBeenLastCalledWith('/api/points/ledger', {
-        params: { p: 1, page_size: 20, user_id: '2' },
+        params: { p: 1, page_size: 20, user_id: '2', ...defaultRange },
       })
     )
     await screen.findByText('FUTURE_ACTION')
     fireEvent.click(screen.getByRole('button', { name: 'Go to next page' }))
     await waitFor(() =>
       expect(get).toHaveBeenLastCalledWith('/api/points/ledger', {
-        params: { p: 2, page_size: 20, user_id: '2' },
+        params: { p: 2, page_size: 20, user_id: '2', ...defaultRange },
       })
     )
     act(() =>
@@ -488,7 +520,7 @@ describe('general point ledger role scope', () => {
     expect(screen.getByLabelText('User ID')).toHaveValue('')
     await waitFor(() =>
       expect(get).toHaveBeenLastCalledWith('/api/points/ledger', {
-        params: { p: 1, page_size: 20 },
+        params: { p: 1, page_size: 20, ...defaultRange },
       })
     )
   })
@@ -511,7 +543,7 @@ describe('general point ledger role scope', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Search' }))
     await waitFor(() =>
       expect(get).toHaveBeenLastCalledWith('/api/points/ledger', {
-        params: { p: 1, page_size: 20, user_id: '2' },
+        params: { p: 1, page_size: 20, user_id: '2', ...defaultRange },
       })
     )
     act(() =>
@@ -523,7 +555,7 @@ describe('general point ledger role scope', () => {
     expect(screen.queryByLabelText('User ID')).not.toBeInTheDocument()
     await waitFor(() =>
       expect(get).toHaveBeenLastCalledWith('/api/points/ledger/self', {
-        params: { p: 1, page_size: 20 },
+        params: { p: 1, page_size: 20, ...defaultRange },
       })
     )
     await act(async () =>

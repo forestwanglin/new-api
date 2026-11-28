@@ -17,22 +17,17 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
-import { PlusCircle } from 'lucide-react'
+import { useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
 
 import { DataTableFacetedFilter } from '@/components/data-table'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover'
 import { usePointName } from '@/features/points/lib/point-name-context'
+import { CompactDateTimeRangePicker } from '@/features/usage-logs/components/compact-date-time-range-picker'
+import { getDefaultTimeRange } from '@/features/usage-logs/lib/utils'
 
 import { POINT_LEDGER_ACTIONS } from '../lib/actions'
 import type { PointLedgerFilters, PointLedgerType } from '../types'
@@ -48,25 +43,30 @@ const schema = z
       ),
     point_type_id: z.string(),
     action: z.string(),
-    start: z.string(),
-    end: z.string(),
+    start: z.date().optional(),
+    end: z.date().optional(),
   })
   .refine((values) => {
-    const start = values.start ? new Date(values.start).getTime() : undefined
-    const end = values.end ? new Date(values.end).getTime() : undefined
+    const start = values.start?.getTime()
+    const end = values.end?.getTime()
     return (
-      (start === undefined || (Number.isSafeInteger(start) && start >= 0)) &&
-      (end === undefined || (Number.isSafeInteger(end) && end >= 0)) &&
+      (start === undefined || (Number.isFinite(start) && start >= 0)) &&
+      (end === undefined || (Number.isFinite(end) && end >= 0)) &&
       (start === undefined || end === undefined || start < end)
     )
   })
 type FilterValues = z.infer<typeof schema>
-const defaults: FilterValues = {
-  user_id: '',
-  point_type_id: 'all',
-  action: 'all',
-  start: '',
-  end: '',
+
+/**
+ * Same default time range as the usage logs page: today 00:00:00 ~ now + 1h.
+ */
+function defaultFilters(): FilterValues {
+  return {
+    user_id: '',
+    point_type_id: 'all',
+    action: 'all',
+    ...getDefaultTimeRange(),
+  }
 }
 
 export function LedgerFilters(props: {
@@ -76,9 +76,10 @@ export function LedgerFilters(props: {
 }) {
   const { t } = useTranslation()
   const pointName = usePointName()
+  const [baseline, setBaseline] = useState(defaultFilters)
   const form = useForm<FilterValues>({
     resolver: zodResolver(schema),
-    defaultValues: defaults,
+    defaultValues: baseline,
   })
   const apply = (values: FilterValues) => {
     const filters: PointLedgerFilters = {}
@@ -87,8 +88,8 @@ export function LedgerFilters(props: {
       filters.point_type_id = values.point_type_id
     }
     if (values.action !== 'all') filters.action = values.action
-    if (values.start) filters.start_timestamp = new Date(values.start).getTime()
-    if (values.end) filters.end_timestamp = new Date(values.end).getTime()
+    if (values.start) filters.start_timestamp = values.start.getTime()
+    if (values.end) filters.end_timestamp = values.end.getTime()
     props.onApply(filters)
   }
   const typeItems = props.types.map((type) => ({
@@ -100,11 +101,12 @@ export function LedgerFilters(props: {
     label: t(action.labelKey),
   }))
   const values = form.watch()
-  const hasFilters = Object.keys(defaults).some(
-    (key) =>
-      values[key as keyof FilterValues] !== defaults[key as keyof FilterValues]
-  )
-  const timeFilterCount = Number(!!values.start) + Number(!!values.end)
+  const hasFilters =
+    values.user_id !== '' ||
+    values.point_type_id !== 'all' ||
+    values.action !== 'all' ||
+    values.start?.getTime() !== baseline.start?.getTime() ||
+    values.end?.getTime() !== baseline.end?.getTime()
   return (
     <form
       onSubmit={form.handleSubmit(apply)}
@@ -147,55 +149,24 @@ export function LedgerFilters(props: {
           />
         )}
       />
-      <Popover>
-        <PopoverTrigger
-          render={
-            <Button
-              type='button'
-              variant='outline'
-              size='sm'
-              className='h-8 border-dashed'
-            />
-          }
-        >
-          <PlusCircle className='size-4' />
-          {t('Time range')}
-          {timeFilterCount > 0 && (
-            <Badge variant='secondary'>{timeFilterCount}</Badge>
-          )}
-        </PopoverTrigger>
-        <PopoverContent
-          align='start'
-          className='grid w-80 max-w-[calc(100vw-2rem)] gap-3'
-        >
-          <div className='grid min-w-0 gap-1.5'>
-            <Label htmlFor='ledger-start'>{t('Start time')}</Label>
-            <Input
-              id='ledger-start'
-              type='datetime-local'
-              className='min-w-0'
-              {...form.register('start')}
-            />
-          </div>
-          <div className='grid min-w-0 gap-1.5'>
-            <Label htmlFor='ledger-end'>{t('End time (exclusive)')}</Label>
-            <Input
-              id='ledger-end'
-              type='datetime-local'
-              className='min-w-0'
-              {...form.register('end')}
-            />
-          </div>
-        </PopoverContent>
-      </Popover>
+      <CompactDateTimeRangePicker
+        start={values.start}
+        end={values.end}
+        onChange={({ start, end }) => {
+          form.setValue('start', start, { shouldValidate: true })
+          form.setValue('end', end, { shouldValidate: true })
+        }}
+      />
       <Button type='submit'>{t('Search')}</Button>
       <Button
         type='button'
         variant='ghost'
         disabled={!hasFilters}
         onClick={() => {
-          form.reset(defaults)
-          props.onApply({})
+          const next = defaultFilters()
+          setBaseline(next)
+          form.reset(next)
+          apply(next)
         }}
       >
         {t('Reset')}
