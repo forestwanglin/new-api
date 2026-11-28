@@ -284,7 +284,7 @@ it('removes the previous viewer balances while loading another viewer account', 
   }))
   await renderWallet()
   expect((await screen.findAllByText('12,345')).length).toBeGreaterThan(0)
-  expect(screen.getAllByText('Private reward')).toHaveLength(2)
+  expect(screen.getAllByText('Private reward')).toHaveLength(3)
   vi.mocked(api.get).mockImplementation(() => new Promise(() => {}))
   await act(async () =>
     useAuthStore.getState().auth.setUser({ id: 2, username: 'other', role: 1 })
@@ -328,7 +328,7 @@ it('shows zero general balances and empty other cards with only a general accoun
     'Other available points',
     'Other points pending release',
   ])
-  expect(within(stats).getAllByText('0')).toHaveLength(2)
+  expect(within(stats).getAllByText('0')).toHaveLength(4)
   expect(within(stats).getAllByText('No other points accounts')).toHaveLength(2)
 })
 

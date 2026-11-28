@@ -25,7 +25,6 @@ import { SectionPageLayout } from '@/components/layout'
 import { LoadingState } from '@/components/loading-state'
 import { buttonVariants } from '@/components/ui/button'
 import { InvitationPendingRewards } from '@/features/invitation/pending'
-import { usePointName } from '@/features/points/lib/point-name-context'
 import { toIntlLocale } from '@/i18n/languages'
 import { formatNumber } from '@/lib/format'
 import { getServerErrorMessage } from '@/lib/server-error-message'
@@ -33,43 +32,55 @@ import { useAuthStore } from '@/stores/auth-store'
 
 import { getPointsWallet, pointsWalletKey, type PointWallet } from './api'
 import { PointsWalletDetails } from './details'
+import {
+  OtherPointsCard,
+  OtherPointsTable,
+  type OtherTypeRow,
+} from './other-points'
 import { PointsWalletRules } from './rules'
 
 import '@/styles/points-account.css'
 
-function WalletStatistics(props: { wallet: PointWallet }) {
-  const { t, i18n } = useTranslation()
-  const pointName = usePointName()
-  const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
-  const general = props.wallet.balances.find((item) => item.code === 'GENERAL')
-  const otherBalances = props.wallet.balances.filter(
-    (item) => item.code !== 'GENERAL'
-  )
-  const generalPending = props.wallet.pending_invitation_rewards.find(
-    (item) => item.code === 'GENERAL'
-  )
+function buildOtherRows(wallet: PointWallet): OtherTypeRow[] {
   const pendingByType = new Map(
-    props.wallet.pending_invitation_rewards.map((reward) => [
+    wallet.pending_invitation_rewards.map((reward) => [
       reward.point_type_id,
       reward,
     ])
   )
-  const otherPending = otherBalances.map((balance) => ({
-    point_type_id: balance.point_type_id,
-    code: balance.code,
-    name: balance.name,
-    pending_points:
-      pendingByType.get(balance.point_type_id)?.pending_points ?? '0',
-  }))
-  const otherTypeIds = new Set(
-    otherBalances.map((balance) => balance.point_type_id)
+  const rows: OtherTypeRow[] = wallet.balances
+    .filter((balance) => balance.code !== 'GENERAL')
+    .map((balance) => ({
+      point_type_id: balance.point_type_id,
+      code: balance.code,
+      name: balance.name,
+      available_points: BigInt(balance.available_points),
+      pending_points: BigInt(
+        pendingByType.get(balance.point_type_id)?.pending_points ?? '0'
+      ),
+    }))
+  const seen = new Set(rows.map((row) => row.point_type_id))
+  for (const reward of wallet.pending_invitation_rewards) {
+    if (reward.code === 'GENERAL' || seen.has(reward.point_type_id)) continue
+    rows.push({
+      point_type_id: reward.point_type_id,
+      code: reward.code,
+      name: reward.name,
+      available_points: 0n,
+      pending_points: BigInt(reward.pending_points),
+    })
+  }
+  return rows
+}
+
+function WalletStatistics(props: { wallet: PointWallet }) {
+  const { t, i18n } = useTranslation()
+  const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
+  const general = props.wallet.balances.find((item) => item.code === 'GENERAL')
+  const generalPending = props.wallet.pending_invitation_rewards.find(
+    (item) => item.code === 'GENERAL'
   )
-  otherPending.push(
-    ...props.wallet.pending_invitation_rewards.filter(
-      (reward) =>
-        reward.code !== 'GENERAL' && !otherTypeIds.has(reward.point_type_id)
-    )
-  )
+  const otherRows = buildOtherRows(props.wallet)
   const cards = [
     {
       title: t('Available general points'),
@@ -89,60 +100,35 @@ function WalletStatistics(props: { wallet: PointWallet }) {
     },
   ]
   return (
-    <section className='wallet-stats' aria-label={t('Wallet statistics')}>
-      {cards.map((card) => (
-        <div
-          className={`account-card wallet-stat${card.available ? ' wallet-points' : ''}`}
-          key={card.title}
-        >
-          <h2>{card.title}</h2>
-          <div className='wallet-stat-number'>{card.value}</div>
-          <p>{card.description}</p>
-        </div>
-      ))}
-      <div className='account-card wallet-stat'>
-        <h2>{t('Other available points')}</h2>
-        {otherBalances.map((balance) => (
-          <div key={balance.point_type_id}>
-            <span className='text-muted-foreground block text-xs break-words'>
-              {pointName({
-                id: balance.point_type_id,
-                code: balance.code,
-                name: balance.name,
-              })}
-            </span>
-            <div className='wallet-stat-number'>
-              {formatNumber(BigInt(balance.available_points), locale)}
-            </div>
+    <>
+      <section className='wallet-stats' aria-label={t('Wallet statistics')}>
+        {cards.map((card) => (
+          <div
+            className={`account-card wallet-stat${card.available ? ' wallet-points' : ''}`}
+            key={card.title}
+          >
+            <h2>{card.title}</h2>
+            <div className='wallet-stat-number'>{card.value}</div>
+            <p>{card.description}</p>
           </div>
         ))}
-        {otherBalances.length === 0 && <p>{t('No other points accounts')}</p>}
-        <p>{t('Available for calls matching the configured rules')}</p>
-      </div>
-      <div className='account-card wallet-stat'>
-        <h2>{t('Other points pending release')}</h2>
-        {otherPending.map((reward) => (
-          <div key={reward.point_type_id}>
-            <span className='text-muted-foreground block text-xs break-words'>
-              {pointName({
-                id: reward.point_type_id,
-                code: reward.code,
-                name: reward.name,
-              })}
-            </span>
-            <div className='wallet-stat-number'>
-              {formatNumber(BigInt(reward.pending_points), locale)}
-            </div>
-          </div>
-        ))}
-        {otherPending.length === 0 && <p>{t('No other points accounts')}</p>}
-        <p>
-          {t(
+        <OtherPointsCard
+          title={t('Other available points')}
+          rows={otherRows}
+          value={(row) => row.available_points}
+          description={t('Available for calls matching the configured rules')}
+        />
+        <OtherPointsCard
+          title={t('Other points pending release')}
+          rows={otherRows}
+          value={(row) => row.pending_points}
+          description={t(
             'Pending invitation rewards are excluded from available points until release.'
           )}
-        </p>
-      </div>
-    </section>
+        />
+      </section>
+      <OtherPointsTable rows={otherRows} />
+    </>
   )
 }
 export function PointsWallet() {
