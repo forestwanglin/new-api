@@ -18,16 +18,6 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useTranslation } from 'react-i18next'
 
-import { EmptyState } from '@/components/empty-state'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableFooter,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { usePointName } from '@/features/points/lib/point-name-context'
 import { toIntlLocale } from '@/i18n/languages'
 import { formatNumber } from '@/lib/format'
@@ -119,79 +109,5 @@ export function OtherPointsCard(props: {
       )}
       <p>{props.description}</p>
     </div>
-  )
-}
-
-export function OtherPointsTable(props: { rows: OtherTypeRow[] }) {
-  const { t, i18n } = useTranslation()
-  const pointName = usePointName()
-  const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
-  const totalAvailable = props.rows.reduce(
-    (sum, row) => sum + row.available_points,
-    0n
-  )
-  const totalPending = props.rows.reduce(
-    (sum, row) => sum + row.pending_points,
-    0n
-  )
-  return (
-    <section className='account-card wallet-other-table'>
-      <h2>{t('Other point type details')}</h2>
-      {props.rows.length === 0 ? (
-        <EmptyState title={t('No other points accounts')} />
-      ) : (
-        <div className='wallet-other-table-wrap'>
-          <Table className='min-w-[600px]'>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t('Point type')}</TableHead>
-                <TableHead className='text-right'>
-                  {t('Available points')}
-                </TableHead>
-                <TableHead className='text-right'>
-                  {t('Pending release')}
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {props.rows.map((row, index) => (
-                <TableRow key={row.point_type_id}>
-                  <TableCell>
-                    <span className='wallet-other-table-type'>
-                      <span
-                        className='wallet-other-legend-dot'
-                        style={{ background: colorFor(index) }}
-                      />
-                      {pointName({
-                        id: row.point_type_id,
-                        code: row.code,
-                        name: row.name,
-                      })}
-                    </span>
-                  </TableCell>
-                  <TableCell className='text-right tabular-nums'>
-                    {formatNumber(row.available_points, locale)}
-                  </TableCell>
-                  <TableCell className='text-right tabular-nums'>
-                    {formatNumber(row.pending_points, locale)}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-            <TableFooter>
-              <TableRow>
-                <TableCell>{t('Total')}</TableCell>
-                <TableCell className='text-right tabular-nums'>
-                  {formatNumber(totalAvailable, locale)}
-                </TableCell>
-                <TableCell className='text-right tabular-nums'>
-                  {formatNumber(totalPending, locale)}
-                </TableCell>
-              </TableRow>
-            </TableFooter>
-          </Table>
-        </div>
-      )}
-    </section>
   )
 }

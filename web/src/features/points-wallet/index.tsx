@@ -32,11 +32,7 @@ import { useAuthStore } from '@/stores/auth-store'
 
 import { getPointsWallet, pointsWalletKey, type PointWallet } from './api'
 import { PointsWalletDetails } from './details'
-import {
-  OtherPointsCard,
-  OtherPointsTable,
-  type OtherTypeRow,
-} from './other-points'
+import { OtherPointsCard, type OtherTypeRow } from './other-points'
 import { PointsWalletRules } from './rules'
 
 import '@/styles/points-account.css'
@@ -100,35 +96,32 @@ function WalletStatistics(props: { wallet: PointWallet }) {
     },
   ]
   return (
-    <>
-      <section className='wallet-stats' aria-label={t('Wallet statistics')}>
-        {cards.map((card) => (
-          <div
-            className={`account-card wallet-stat${card.available ? ' wallet-points' : ''}`}
-            key={card.title}
-          >
-            <h2>{card.title}</h2>
-            <div className='wallet-stat-number'>{card.value}</div>
-            <p>{card.description}</p>
-          </div>
-        ))}
-        <OtherPointsCard
-          title={t('Other available points')}
-          rows={otherRows}
-          value={(row) => row.available_points}
-          description={t('Available for calls matching the configured rules')}
-        />
-        <OtherPointsCard
-          title={t('Other points pending release')}
-          rows={otherRows}
-          value={(row) => row.pending_points}
-          description={t(
-            'Pending invitation rewards are excluded from available points until release.'
-          )}
-        />
-      </section>
-      <OtherPointsTable rows={otherRows} />
-    </>
+    <section className='wallet-stats' aria-label={t('Wallet statistics')}>
+      {cards.map((card) => (
+        <div
+          className={`account-card wallet-stat${card.available ? ' wallet-points' : ''}`}
+          key={card.title}
+        >
+          <h2>{card.title}</h2>
+          <div className='wallet-stat-number'>{card.value}</div>
+          <p>{card.description}</p>
+        </div>
+      ))}
+      <OtherPointsCard
+        title={t('Other available points')}
+        rows={otherRows}
+        value={(row) => row.available_points}
+        description={t('Available for calls matching the configured rules')}
+      />
+      <OtherPointsCard
+        title={t('Other points pending release')}
+        rows={otherRows}
+        value={(row) => row.pending_points}
+        description={t(
+          'Pending invitation rewards are excluded from available points until release.'
+        )}
+      />
+    </section>
   )
 }
 export function PointsWallet() {

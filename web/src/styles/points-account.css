@@ -241,23 +241,3 @@
   font-variant-numeric: tabular-nums;
   color: var(--foreground);
 }
-.points-account .wallet-other-table {
-  margin-top: 0;
-}
-.points-account .wallet-other-table h2 {
-  margin-bottom: 12px;
-}
-.points-account .wallet-other-table-wrap {
-  overflow-x: auto;
-}
-.points-account .wallet-other-table-type {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-.points-account .wallet-other-table table {
-  width: 100%;
-}
-.points-account .wallet-other-table tfoot td {
-  font-weight: 600;
-}

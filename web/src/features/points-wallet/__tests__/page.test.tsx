@@ -284,7 +284,7 @@ it('removes the previous viewer balances while loading another viewer account', 
   }))
   await renderWallet()
   expect((await screen.findAllByText('12,345')).length).toBeGreaterThan(0)
-  expect(screen.getAllByText('Private reward')).toHaveLength(3)
+  expect(screen.getAllByText('Private reward')).toHaveLength(2)
   vi.mocked(api.get).mockImplementation(() => new Promise(() => {}))
   await act(async () =>
     useAuthStore.getState().auth.setUser({ id: 2, username: 'other', role: 1 })
