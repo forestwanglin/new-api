@@ -18,7 +18,33 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { describe, expect, test } from 'vitest'
 
-import { convertDetectedLanguage } from './languages'
+import { resources } from './config'
+import {
+  INTERFACE_LANGUAGE_OPTIONS,
+  convertDetectedLanguage,
+  normalizeInterfaceLanguage,
+} from './languages'
+
+describe('INTERFACE_LANGUAGE_OPTIONS', () => {
+  test('offers only Simplified Chinese, English, Traditional Chinese, and Japanese', () => {
+    expect(INTERFACE_LANGUAGE_OPTIONS.map((language) => language.code)).toEqual([
+      'zhCN',
+      'en',
+      'zhTW',
+      'ja',
+    ])
+  })
+
+  test('falls back removed interface languages to English', () => {
+    expect(normalizeInterfaceLanguage('fr')).toBe('en')
+    expect(normalizeInterfaceLanguage('ru')).toBe('en')
+    expect(normalizeInterfaceLanguage('vi')).toBe('en')
+  })
+
+  test('bundles only the supported interface language resources', () => {
+    expect(Object.keys(resources).sort()).toEqual(['en', 'ja', 'zhCN', 'zhTW'])
+  })
+})
 
 describe('convertDetectedLanguage', () => {
   test('maps browser BCP-47 Chinese tags onto interface codes', () => {

@@ -57,7 +57,7 @@ it('preserves the nickname draft through language saves and syncs later updates 
     savedProfile = {
       ...savedProfile,
       display_name: values.display_name ?? savedProfile.display_name,
-      setting: JSON.stringify({ language: values.language ?? 'fr' }),
+      setting: JSON.stringify({ language: values.language ?? 'ja' }),
     }
     return { data: { success: true } }
   })
@@ -67,9 +67,9 @@ it('preserves the nickname draft through language saves and syncs later updates 
   await user.clear(nickname)
   await user.type(nickname, 'Draft nickname')
   await user.click(screen.getByLabelText('Preferred language'))
-  await user.click(await screen.findByRole('option', { name: 'Français' }))
+  await user.click(await screen.findByRole('option', { name: '日本語' }))
   await waitFor(() =>
-    expect(put).toHaveBeenCalledWith('/api/user/self', { language: 'fr' })
+    expect(put).toHaveBeenCalledWith('/api/user/self', { language: 'ja' })
   )
   await waitFor(() =>
     expect(
