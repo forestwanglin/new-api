@@ -80,7 +80,7 @@ afterEach(() => {
   useAuthStore.getState().auth.reset()
 })
 
-function setup() {
+function setup(scope: 'self' | 'admin' = 'self') {
   const get = vi.spyOn(api, 'get').mockResolvedValue(response(page))
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -89,7 +89,7 @@ function setup() {
     <QueryClientProvider client={client}>
       <SectionPageLayout fixedContent>
         <SectionPageLayout.Content>
-          <PointLedger scope='self' />
+          <PointLedger scope={scope} />
         </SectionPageLayout.Content>
       </SectionPageLayout>
     </QueryClientProvider>
@@ -98,6 +98,17 @@ function setup() {
 }
 
 describe('point ledger time range', () => {
+  it('places the time range control before the user ID input on one row', async () => {
+    setup('admin')
+    await screen.findByText('FUTURE_ACTION')
+    const trigger = screen.getByRole('button', { name: defaultTriggerName })
+    const input = screen.getByLabelText('User ID')
+    expect(
+      trigger.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+    expect(input).not.toHaveClass('w-full')
+  })
+
   it('requests the usage-logs default range on load', async () => {
     const get = setup()
     await screen.findByText('FUTURE_ACTION')

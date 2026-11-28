@@ -112,6 +112,15 @@ export function LedgerFilters(props: {
       onSubmit={form.handleSubmit(apply)}
       className='general-filter-card mb-4 flex min-w-0 flex-wrap items-center gap-2 sm:gap-3'
     >
+      <CompactDateTimeRangePicker
+        className='w-auto'
+        start={values.start}
+        end={values.end}
+        onChange={({ start, end }) => {
+          form.setValue('start', start, { shouldValidate: true })
+          form.setValue('end', end, { shouldValidate: true })
+        }}
+      />
       {props.admin && (
         <Input
           id='ledger-user'
@@ -120,7 +129,7 @@ export function LedgerFilters(props: {
           placeholder={t('User ID')}
           {...form.register('user_id')}
           aria-invalid={!!form.formState.errors.user_id}
-          className='w-full sm:w-[200px] lg:w-[240px]'
+          className='w-[200px] lg:w-[240px]'
         />
       )}
       <Controller
@@ -148,14 +157,6 @@ export function LedgerFilters(props: {
             onValueChange={(value) => field.onChange(value[0] ?? 'all')}
           />
         )}
-      />
-      <CompactDateTimeRangePicker
-        start={values.start}
-        end={values.end}
-        onChange={({ start, end }) => {
-          form.setValue('start', start, { shouldValidate: true })
-          form.setValue('end', end, { shouldValidate: true })
-        }}
       />
       <Button type='submit'>{t('Search')}</Button>
       <Button
